@@ -7,6 +7,9 @@
       {%- if page_title == blank -%}{{ shop.name }}{%- else -%}{{ page_title }} &ndash; {{ shop.name }}{%- endif -%}
     </title>
     <meta name="description" content="{{ page_description | escape }}">
+    {%- if settings.favicon != blank -%}
+      <link rel="icon" type="image/png" href="{{ settings.favicon | image_url: width: 32 }}">
+    {%- endif -%}
 
     {{ content_for_header }}
 

@@ -4,8 +4,19 @@
     "theme_name": "Shader Store",
     "theme_version": "1.0.0",
     "theme_author": "Custom",
-    "theme_documentation_url": "",
-    "theme_support_url": ""
+    "theme_documentation_url": "https://brightfield-2.myshopify.com",
+    "theme_support_url": "https://brightfield-2.myshopify.com"
+  },
+  {
+    "name": "Favicon",
+    "settings": [
+      {
+        "type": "image_picker",
+        "id": "favicon",
+        "label": "Favicon image",
+        "info": "Recommended: 32×32 px PNG or ICO"
+      }
+    ]
   },
   {
     "name": "Colors",
