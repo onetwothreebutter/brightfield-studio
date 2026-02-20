@@ -1,0 +1,119 @@
+<div class="product-page section-padding">
+  <div class="container">
+    <div class="product-layout">
+
+      <!-- Media -->
+      <div class="product-media">
+        <div class="product-media__main">
+          {%- if product.featured_image -%}
+            <img
+              src="{{ product.featured_image | image_url: width: 900 }}"
+              alt="{{ product.featured_image.alt | escape }}"
+              class="product-media__image"
+              width="900"
+              height="900"
+            >
+          {%- endif -%}
+        </div>
+        {%- if product.images.size > 1 -%}
+          <div class="product-media__thumbs">
+            {%- for image in product.images -%}
+              <img
+                src="{{ image | image_url: width: 150 }}"
+                alt="{{ image.alt | escape }}"
+                class="product-thumb"
+                loading="lazy"
+                width="150"
+                height="150"
+              >
+            {%- endfor -%}
+          </div>
+        {%- endif -%}
+      </div>
+
+      <!-- Info -->
+      <div class="product-info">
+        {%- if product.vendor != blank -%}
+          <p class="product-vendor">{{ product.vendor }}</p>
+        {%- endif -%}
+
+        <h1
+          class="product-title glitch"
+          data-text="{{ product.title | escape }}"
+        >
+          {{ product.title | escape }}
+        </h1>
+
+        <p class="product-price">
+          {%- if product.compare_at_price > product.price -%}
+            <s class="product-price__compare">{{ product.compare_at_price | money }}</s>
+          {%- endif -%}
+          {{ product.price | money }}
+        </p>
+
+        {%- form 'product', product -%}
+
+          {%- if product.variants.size > 1 -%}
+            {%- for option in product.options_with_values -%}
+              <fieldset class="variant-fieldset">
+                <legend class="variant-label">{{ option.name }}</legend>
+                <div class="variant-options">
+                  {%- for value in option.values -%}
+                    <label class="variant-option">
+                      <input
+                        type="radio"
+                        name="options[{{ option.name | escape }}]"
+                        value="{{ value | escape }}"
+                        {% if option.selected_value == value %}checked{% endif %}
+                      >
+                      <span>{{ value | escape }}</span>
+                    </label>
+                  {%- endfor -%}
+                </div>
+              </fieldset>
+            {%- endfor -%}
+
+            <select name="id" class="variant-select visually-hidden">
+              {%- for variant in product.variants -%}
+                <option
+                  value="{{ variant.id }}"
+                  {% unless variant.available %}disabled{% endunless %}
+                >
+                  {{ variant.title }}
+                </option>
+              {%- endfor -%}
+            </select>
+
+          {%- else -%}
+            <input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">
+          {%- endif -%}
+
+          <div class="product-actions">
+            <button
+              type="submit"
+              class="btn btn--primary btn--lg btn--full"
+              {% unless product.available %}disabled{% endunless %}
+            >
+              {%- if product.available -%}Add to Cart{%- else -%}Sold Out{%- endif -%}
+            </button>
+          </div>
+
+        {%- endform -%}
+
+        {%- if product.description != blank -%}
+          <div class="product-description rte">
+            {{ product.description }}
+          </div>
+        {%- endif -%}
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Product",
+  "settings": []
+}
+{% endschema %}

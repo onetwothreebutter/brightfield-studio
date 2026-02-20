@@ -1,0 +1,87 @@
+{%- assign featured = collections[section.settings.collection] -%}
+
+<section class="featured-collection section-padding">
+  <div class="container">
+
+    <div class="section-header">
+      <h2
+        class="section-title glitch"
+        data-text="{{ section.settings.heading | default: 'Latest Drops' | escape }}"
+      >
+        {{ section.settings.heading | default: 'Latest Drops' }}
+      </h2>
+      {%- if section.settings.description != blank -%}
+        <p class="section-description">{{ section.settings.description }}</p>
+      {%- endif -%}
+    </div>
+
+    <div class="product-grid">
+      {%- if featured != blank -%}
+        {%- for product in featured.products limit: section.settings.products_to_show -%}
+          {% render 'product-card', product: product %}
+        {%- endfor -%}
+      {%- else -%}
+        {%- for i in (1..section.settings.products_to_show) -%}
+          <div class="product-card product-card--placeholder">
+            <div class="product-card__media">
+              <div class="product-card__image product-card__image--placeholder"></div>
+            </div>
+            <div class="product-card__info">
+              <div class="placeholder-line placeholder-line--title"></div>
+              <div class="placeholder-line placeholder-line--price"></div>
+            </div>
+          </div>
+        {%- endfor -%}
+      {%- endif -%}
+    </div>
+
+    {%- if section.settings.show_view_all and featured != blank -%}
+      <div class="section-footer">
+        <a href="{{ featured.url }}" class="btn btn--outline">View All</a>
+      </div>
+    {%- endif -%}
+
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Featured Collection",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Latest Drops"
+    },
+    {
+      "type": "textarea",
+      "id": "description",
+      "label": "Description"
+    },
+    {
+      "type": "collection",
+      "id": "collection",
+      "label": "Collection"
+    },
+    {
+      "type": "range",
+      "id": "products_to_show",
+      "label": "Products to show",
+      "min": 2,
+      "max": 12,
+      "step": 2,
+      "default": 4
+    },
+    {
+      "type": "checkbox",
+      "id": "show_view_all",
+      "label": "Show 'View All' button",
+      "default": true
+    }
+  ],
+  "presets": [
+    { "name": "Featured Collection" }
+  ]
+}
+{% endschema %}

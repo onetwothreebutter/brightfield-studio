@@ -1,0 +1,87 @@
+[
+  {
+    "name": "theme_info",
+    "theme_name": "Shader Store",
+    "theme_version": "1.0.0",
+    "theme_author": "Custom",
+    "theme_documentation_url": "",
+    "theme_support_url": ""
+  },
+  {
+    "name": "Colors",
+    "settings": [
+      {
+        "type": "color",
+        "id": "color_bg",
+        "label": "Background",
+        "default": "#080808"
+      },
+      {
+        "type": "color",
+        "id": "color_surface",
+        "label": "Surface (cards, header)",
+        "default": "#111111"
+      },
+      {
+        "type": "color",
+        "id": "color_text",
+        "label": "Body text",
+        "default": "#e0e0e0"
+      },
+      {
+        "type": "color",
+        "id": "color_primary",
+        "label": "Primary accent",
+        "default": "#00ffff"
+      },
+      {
+        "type": "color",
+        "id": "color_secondary",
+        "label": "Secondary accent",
+        "default": "#ff00ff"
+      }
+    ]
+  },
+  {
+    "name": "Typography",
+    "settings": [
+      {
+        "type": "font_picker",
+        "id": "heading_font",
+        "label": "Heading font",
+        "default": "space_grotesk_n7"
+      },
+      {
+        "type": "font_picker",
+        "id": "body_font",
+        "label": "Body font",
+        "default": "ibm_plex_mono_n4"
+      }
+    ]
+  },
+  {
+    "name": "Shader",
+    "settings": [
+      {
+        "type": "range",
+        "id": "shader_opacity",
+        "label": "Hero shader opacity",
+        "min": 10,
+        "max": 100,
+        "step": 5,
+        "unit": "%",
+        "default": 55
+      },
+      {
+        "type": "range",
+        "id": "shader_speed",
+        "label": "Animation speed",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+        "default": 5,
+        "info": "1 = slowest, 10 = fastest"
+      }
+    ]
+  }
+]

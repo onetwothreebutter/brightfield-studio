@@ -1,0 +1,70 @@
+<section class="hero">
+  <canvas id="shader-canvas" class="hero__canvas" aria-hidden="true"></canvas>
+
+  <div class="hero__content container">
+    {%- if section.settings.eyebrow != blank -%}
+      <p class="hero__eyebrow">{{ section.settings.eyebrow }}</p>
+    {%- endif -%}
+
+    <h1
+      class="hero__title glitch"
+      data-text="{{ section.settings.heading | default: shop.name | escape }}"
+    >
+      {{ section.settings.heading | default: shop.name | escape }}
+    </h1>
+
+    {%- if section.settings.subheading != blank -%}
+      <p class="hero__subtitle">{{ section.settings.subheading }}</p>
+    {%- endif -%}
+
+    {%- if section.settings.cta_url != blank -%}
+      <a href="{{ section.settings.cta_url }}" class="btn btn--primary btn--lg">
+        {{ section.settings.cta_label | default: 'Shop the Collection' }}
+      </a>
+    {%- endif -%}
+  </div>
+
+  <div class="hero__scroll-hint" aria-hidden="true">
+    <span class="hero__scroll-line"></span>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Hero",
+  "settings": [
+    {
+      "type": "text",
+      "id": "eyebrow",
+      "label": "Eyebrow text",
+      "default": "Wearable Shader Art"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "info": "Leave blank to use store name"
+    },
+    {
+      "type": "textarea",
+      "id": "subheading",
+      "label": "Subheading",
+      "default": "T-shirts generated from GLSL fragment shaders. Every design is a living program."
+    },
+    {
+      "type": "url",
+      "id": "cta_url",
+      "label": "Button link"
+    },
+    {
+      "type": "text",
+      "id": "cta_label",
+      "label": "Button label",
+      "default": "Shop the Collection"
+    }
+  ],
+  "presets": [
+    { "name": "Hero" }
+  ]
+}
+{% endschema %}

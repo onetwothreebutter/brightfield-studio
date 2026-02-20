@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="{{ request.locale.iso_code }}">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+      {%- if page_title == blank -%}{{ shop.name }}{%- else -%}{{ page_title }} &ndash; {{ shop.name }}{%- endif -%}
+    </title>
+    <meta name="description" content="{{ page_description | escape }}">
+
+    {{ content_for_header }}
+
+    {{ 'theme.css' | asset_url | stylesheet_tag }}
+  </head>
+  <body class="template-{{ template.name | handle }}">
+
+    {% section 'header' %}
+
+    <main id="main-content" role="main" tabindex="-1">
+      {{ content_for_layout }}
+    </main>
+
+    {% section 'footer' %}
+
+    <script src="{{ 'shader.js' | asset_url }}" defer></script>
+  </body>
+</html>

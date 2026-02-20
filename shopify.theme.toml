@@ -1,0 +1,3 @@
+[environments.production]
+store = "brightfield-2.myshopify.com"
+theme_id = "143500345459"

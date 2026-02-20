@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+
+# Node
+node_modules/
+
+# Shopify CLI
+.shopify/
+
+# Keep settings_schema but ignore live store data
+config/settings_data.json
