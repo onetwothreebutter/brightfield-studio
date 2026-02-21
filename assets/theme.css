@@ -697,6 +697,151 @@ h1, h2, h3, h4, h5, h6 {
   color:     var(--color-text-muted);
 }
 
+/* ─── Cart Page ──────────────────────────────────────────── */
+.cart-page__title {
+  font-size:     clamp(2rem, 5vw, 3.5rem);
+  margin-bottom: 3rem;
+}
+
+.cart-empty {
+  display:         flex;
+  flex-direction:  column;
+  align-items:     center;
+  gap:             2rem;
+  padding:         4rem 0;
+  text-align:      center;
+}
+
+.cart-empty__message {
+  font-size:  1.125rem;
+  color:      var(--color-text-muted);
+}
+
+.cart-items {
+  display:        flex;
+  flex-direction: column;
+  gap:            1.5rem;
+  margin-bottom:  3rem;
+}
+
+.cart-item {
+  display:       grid;
+  grid-template-columns: 160px 1fr;
+  gap:           1.5rem;
+  padding:       1.5rem;
+  background:    var(--color-surface);
+  border:        1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.cart-item__image-link { display: block; }
+
+.cart-item__image {
+  width:         100%;
+  height:        160px;
+  object-fit:    cover;
+  border-radius: calc(var(--radius) - 2px);
+}
+
+.cart-item__details {
+  display:        flex;
+  flex-direction: column;
+  gap:            0.5rem;
+}
+
+.cart-item__title {
+  font-size:   1.0625rem;
+  font-weight: 600;
+  color:       var(--color-text);
+}
+.cart-item__title:hover { color: var(--color-primary); }
+
+.cart-item__variant {
+  font-size: 0.8125rem;
+  color:     var(--color-text-muted);
+}
+
+.cart-item__price {
+  font-size:   1.0625rem;
+  font-weight: 700;
+  color:       var(--color-primary);
+}
+
+.cart-item__qty {
+  display:     flex;
+  align-items: center;
+  gap:         1rem;
+  margin-top:  auto;
+}
+
+.cart-item__qty-input {
+  width:         4rem;
+  padding:       0.375rem 0.5rem;
+  background:    transparent;
+  border:        1px solid var(--color-border);
+  border-radius: var(--radius);
+  color:         var(--color-text);
+  font-size:     0.875rem;
+  text-align:    center;
+}
+.cart-item__qty-input:focus {
+  outline:      none;
+  border-color: var(--color-primary);
+}
+
+.cart-item__remove {
+  font-size:  0.775rem;
+  color:      var(--color-text-muted);
+  transition: color var(--transition-fast);
+}
+.cart-item__remove:hover { color: #ff4d4d; }
+
+.cart-footer {
+  border-top:  1px solid var(--color-border);
+  padding-top: 2rem;
+  max-width:   480px;
+  margin-left: auto;
+}
+
+.cart-subtotal {
+  display:         flex;
+  justify-content: space-between;
+  align-items:     baseline;
+  margin-bottom:   0.5rem;
+}
+
+.cart-subtotal__label {
+  font-size:      0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color:          var(--color-text-muted);
+}
+
+.cart-subtotal__price {
+  font-size:   1.5rem;
+  font-weight: 700;
+  color:       var(--color-primary);
+}
+
+.cart-subtotal__note {
+  font-size:     0.8125rem;
+  color:         var(--color-text-muted);
+  margin-bottom: 1.5rem;
+}
+
+.cart-actions {
+  display: flex;
+  gap:     1rem;
+}
+
+@media (max-width: 600px) {
+  .cart-item {
+    grid-template-columns: 100px 1fr;
+  }
+  .cart-item__image { height: 100px; }
+  .cart-actions { flex-direction: column; }
+}
+
 .footer-social {
   display: flex;
   gap:     1.5rem;
@@ -737,3 +882,156 @@ h1, h2, h3, h4, h5, h6 {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* ─── Media Tabs ─────────────────────────────────────────── */
+.media-tabs {
+  display:       flex;
+  gap:           0.375rem;
+  margin-bottom: 0.75rem;
+}
+
+.media-tab {
+  padding:        0.35rem 0.9rem;
+  font-family:    var(--font-body);
+  font-size:      0.7rem;
+  font-weight:    600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background:     transparent;
+  color:          var(--color-text-muted);
+  border:         1px solid var(--color-border);
+  border-radius:  var(--radius);
+  cursor:         pointer;
+  transition:     all var(--transition-fast);
+}
+
+.media-tab:hover {
+  border-color: var(--color-primary);
+  color:        var(--color-text);
+}
+
+.media-tab.is-active {
+  border-color: var(--color-primary);
+  color:        var(--color-primary);
+  background:   var(--color-primary-dim);
+}
+
+/* ─── Media Panels ───────────────────────────────────────── */
+.media-panel { display: none; }
+.media-panel.is-active { display: block; }
+
+/* ─── Product Shader Canvas ──────────────────────────────── */
+.product-shader__canvas {
+  width:         100%;
+  aspect-ratio:  1 / 1;
+  display:       block;
+  border-radius: var(--radius-lg);
+  border:        1px solid var(--color-border);
+}
+
+/* ─── Shader GUI ─────────────────────────────────────────── */
+.shader-gui {
+  margin-top:    0.75rem;
+  background:    var(--color-surface);
+  border:        1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow:      hidden;
+}
+
+.shader-gui__header {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  padding:         0.45rem 0.75rem;
+  background:      var(--color-surface-2);
+  border-bottom:   1px solid var(--color-border);
+}
+
+.shader-gui__title {
+  font-size:      0.65rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color:          var(--color-text-muted);
+}
+
+.shader-gui__toggle {
+  font-family:    var(--font-body);
+  font-size:      0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background:     transparent;
+  border:         none;
+  color:          var(--color-primary);
+  cursor:         pointer;
+  padding:        0;
+}
+.shader-gui__toggle:hover { opacity: 0.7; }
+
+.shader-gui__body { padding: 0.25rem 0; }
+.shader-gui__body.is-hidden { display: none; }
+
+.shader-control {
+  display:     grid;
+  grid-template-columns: 5.5rem 1fr;
+  align-items: center;
+  gap:         0.75rem;
+  padding:     0.3rem 0.75rem;
+}
+
+.shader-control__label {
+  font-size:      0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color:          var(--color-text-muted);
+  white-space:    nowrap;
+}
+
+.shader-control__range-wrap {
+  display:     flex;
+  align-items: center;
+  gap:         0.5rem;
+}
+
+.shader-control__range {
+  flex:         1;
+  accent-color: var(--color-primary);
+  cursor:       pointer;
+}
+
+.shader-control__value {
+  font-size:            0.7rem;
+  color:                var(--color-primary);
+  min-width:            2.75rem;
+  text-align:           right;
+  font-variant-numeric: tabular-nums;
+}
+
+.shader-control__toggle {
+  font-family:    var(--font-body);
+  font-size:      0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding:        0.25rem 0.65rem;
+  background:     transparent;
+  border:         1px solid var(--color-border);
+  border-radius:  var(--radius);
+  color:          var(--color-text-muted);
+  cursor:         pointer;
+  transition:     all var(--transition-fast);
+}
+.shader-control__toggle.is-on {
+  border-color: var(--color-primary);
+  color:        var(--color-primary);
+  background:   var(--color-primary-dim);
+}
+
+.shader-control__color {
+  width:         2.25rem;
+  height:        1.6rem;
+  padding:       0.1rem;
+  background:    transparent;
+  border:        1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor:        pointer;
+}
+.shader-control__color:hover { border-color: var(--color-primary); }

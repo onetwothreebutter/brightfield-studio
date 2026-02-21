@@ -1,5 +1,5 @@
 <section class="hero">
-  <canvas id="shader-canvas" class="hero__canvas" aria-hidden="true"></canvas>
+  <canvas id="hero-shader-canvas" class="hero__canvas" aria-hidden="true"></canvas>
 
   <div class="hero__content container">
     {%- if section.settings.eyebrow != blank -%}
@@ -28,6 +28,8 @@
     <span class="hero__scroll-line"></span>
   </div>
 </section>
+
+<script src="{{ 'hero-shader.js' | asset_url }}" defer></script>
 
 {% schema %}
 {

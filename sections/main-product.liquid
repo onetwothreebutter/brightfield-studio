@@ -4,31 +4,53 @@
 
       <!-- Media -->
       <div class="product-media">
-        <div class="product-media__main">
-          {%- if product.featured_image -%}
-            <img
-              src="{{ product.featured_image | image_url: width: 900 }}"
-              alt="{{ product.featured_image.alt | escape }}"
-              class="product-media__image"
-              width="900"
-              height="900"
-            >
+
+        <div class="media-tabs">
+          <button class="media-tab is-active" data-tab="photo">Photo</button>
+          <button class="media-tab" data-tab="shader">Shader</button>
+        </div>
+
+        <!-- Photo panel -->
+        <div class="media-panel is-active" data-panel="photo">
+          <div class="product-media__main">
+            {%- if product.featured_image -%}
+              <img
+                src="{{ product.featured_image | image_url: width: 900 }}"
+                alt="{{ product.featured_image.alt | escape }}"
+                class="product-media__image"
+                width="900"
+                height="900"
+              >
+            {%- endif -%}
+          </div>
+          {%- if product.images.size > 1 -%}
+            <div class="product-media__thumbs">
+              {%- for image in product.images -%}
+                <img
+                  src="{{ image | image_url: width: 150 }}"
+                  alt="{{ image.alt | escape }}"
+                  class="product-thumb"
+                  loading="lazy"
+                  width="150"
+                  height="150"
+                >
+              {%- endfor -%}
+            </div>
           {%- endif -%}
         </div>
-        {%- if product.images.size > 1 -%}
-          <div class="product-media__thumbs">
-            {%- for image in product.images -%}
-              <img
-                src="{{ image | image_url: width: 150 }}"
-                alt="{{ image.alt | escape }}"
-                class="product-thumb"
-                loading="lazy"
-                width="150"
-                height="150"
-              >
-            {%- endfor -%}
+
+        <!-- Shader panel -->
+        <div class="media-panel" data-panel="shader">
+          <canvas id="shader-canvas" class="product-shader__canvas"></canvas>
+          <div class="shader-gui">
+            <div class="shader-gui__header">
+              <span class="shader-gui__title">Customize</span>
+              <button class="shader-gui__toggle" id="shader-gui-toggle">Hide</button>
+            </div>
+            <div class="shader-gui__body" id="shader-gui-body"></div>
           </div>
-        {%- endif -%}
+        </div>
+
       </div>
 
       <!-- Info -->
@@ -77,6 +99,7 @@
               {%- for variant in product.variants -%}
                 <option
                   value="{{ variant.id }}"
+                  {% if variant == product.selected_or_first_available_variant %}selected{% endif %}
                   {% unless variant.available %}disabled{% endunless %}
                 >
                   {{ variant.title }}
@@ -87,6 +110,8 @@
           {%- else -%}
             <input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">
           {%- endif -%}
+
+          <input type="hidden" name="quantity" value="1">
 
           <div class="product-actions">
             <button
@@ -110,6 +135,140 @@
     </div>
   </div>
 </div>
+
+<script>
+// ── Tab switcher ─────────────────────────────────────────────────────────────
+(function () {
+  var tabs   = document.querySelectorAll('.media-tab');
+  var panels = document.querySelectorAll('.media-panel');
+  if (!tabs.length) return;
+
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      var target = this.dataset.tab;
+
+      tabs.forEach(function (t) { t.classList.remove('is-active'); });
+      panels.forEach(function (p) { p.classList.remove('is-active'); });
+
+      this.classList.add('is-active');
+      document.querySelector('[data-panel="' + target + '"]').classList.add('is-active');
+
+      // Let shader.js resize now that the canvas is visible
+      if (target === 'shader') {
+        window.dispatchEvent(new Event('resize'));
+      }
+    });
+  });
+}());
+
+// ── Shader GUI ────────────────────────────────────────────────────────────────
+(function () {
+  var body = document.getElementById('shader-gui-body');
+  if (!body) return;
+
+  // Param definitions — shader.js reads window._shaderState.values each frame
+  var controls = [
+    { key: 'u_rows',       label: 'Rows',       type: 'range',  min: 10,  max: 100, step: 1,    value: 48   },
+    { key: 'u_cols',       label: 'Cols',       type: 'range',  min: 5,   max: 60,  step: 1,    value: 37   },
+    { key: 'u_min_radius', label: 'Min Radius', type: 'range',  min: 0,   max: 0.5, step: 0.01, value: 0.04 },
+    { key: 'u_max_radius', label: 'Max Radius', type: 'range',  min: 0.1, max: 1.5, step: 0.01, value: 0.48 },
+    { key: 'u_invert',     label: 'Invert',     type: 'toggle',                                 value: 0    },
+    { key: 'u_dot_color',  label: 'Color',      type: 'color',                                  value: '#00ffff' }
+  ];
+
+  // Initialise shared state that shader.js (deferred) will read
+  var values = {};
+  controls.forEach(function (c) {
+    values[c.key] = c.type === 'color' ? hexToRgb(c.value) : c.value;
+  });
+  window._shaderState = { values: values };
+
+  // Build controls
+  controls.forEach(function (ctrl) {
+    var row = document.createElement('div');
+    row.className = 'shader-control';
+
+    var label = document.createElement('label');
+    label.className = 'shader-control__label';
+    label.textContent = ctrl.label;
+    row.appendChild(label);
+
+    if (ctrl.type === 'range') {
+      var wrap = document.createElement('div');
+      wrap.className = 'shader-control__range-wrap';
+
+      var input = document.createElement('input');
+      input.type      = 'range';
+      input.className = 'shader-control__range';
+      input.min   = ctrl.min;
+      input.max   = ctrl.max;
+      input.step  = ctrl.step;
+      input.value = ctrl.value;
+
+      var display = document.createElement('span');
+      display.className   = 'shader-control__value';
+      display.textContent = ctrl.value;
+
+      input.addEventListener('input', function () {
+        var v = parseFloat(this.value);
+        display.textContent = v;
+        window._shaderState.values[ctrl.key] = v;
+      });
+
+      wrap.appendChild(input);
+      wrap.appendChild(display);
+      row.appendChild(wrap);
+
+    } else if (ctrl.type === 'toggle') {
+      var btn = document.createElement('button');
+      btn.className    = 'shader-control__toggle';
+      btn.textContent  = 'Off';
+      btn.dataset.on   = '0';
+
+      btn.addEventListener('click', function () {
+        var isOn = this.dataset.on === '1';
+        this.dataset.on  = isOn ? '0' : '1';
+        this.textContent = isOn ? 'Off' : 'On';
+        this.classList.toggle('is-on', !isOn);
+        window._shaderState.values[ctrl.key] = isOn ? 0 : 1;
+      });
+
+      row.appendChild(btn);
+
+    } else if (ctrl.type === 'color') {
+      var picker = document.createElement('input');
+      picker.type      = 'color';
+      picker.className = 'shader-control__color';
+      picker.value     = ctrl.value;
+
+      picker.addEventListener('input', function () {
+        window._shaderState.values[ctrl.key] = hexToRgb(this.value);
+      });
+
+      row.appendChild(picker);
+    }
+
+    body.appendChild(row);
+  });
+
+  // Toggle panel visibility
+  var toggle  = document.getElementById('shader-gui-toggle');
+  toggle.addEventListener('click', function () {
+    var hidden = body.classList.toggle('is-hidden');
+    this.textContent = hidden ? 'Show' : 'Hide';
+  });
+
+  function hexToRgb(hex) {
+    return [
+      parseInt(hex.slice(1, 3), 16) / 255,
+      parseInt(hex.slice(3, 5), 16) / 255,
+      parseInt(hex.slice(5, 7), 16) / 255
+    ];
+  }
+}());
+</script>
+
+<script src="{{ 'shader.js' | asset_url }}" defer></script>
 
 {% schema %}
 {

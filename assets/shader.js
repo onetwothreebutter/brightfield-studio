@@ -17,43 +17,47 @@
     '}'
   ].join('\n');
 
-  // Neon plasma fragment shader — cyan (#00ffff) + magenta (#ff00ff) on dark
+  // Default: dot halftone driven by uniforms so the GUI can control it
   var fragSrc = [
     'precision mediump float;',
     'uniform float u_time;',
     'uniform vec2  u_resolution;',
+    'uniform float u_rows;',
+    'uniform float u_cols;',
+    'uniform float u_min_radius;',
+    'uniform float u_max_radius;',
+    'uniform float u_invert;',
+    'uniform vec3  u_dot_color;',
     '',
     'void main() {',
     '  vec2 uv = gl_FragCoord.xy / u_resolution;',
-    '  vec2 p  = uv * 2.0 - 1.0;',
-    '  p.x *= u_resolution.x / u_resolution.y;',
     '',
-    '  float t = u_time * 0.22;',
+    '  // Cell aspect ratio — keeps dots circular',
+    '  float ratio = (u_resolution.x / u_cols) / (u_resolution.y / u_rows);',
     '',
-    '  // Four overlapping sine fields',
-    '  float v = 0.0;',
-    '  v += sin(p.x * 3.8 + t * 1.1);',
-    '  v += sin(p.y * 3.4 + t * 0.85);',
-    '  v += sin((p.x + p.y) * 2.6 + t * 0.65);',
-    '  v += sin(sqrt(p.x * p.x + p.y * p.y + 0.4) * 6.5 - t * 1.4);',
+    '  vec2 gridUv   = uv * vec2(u_cols, u_rows);',
+    '  vec2 localUv  = fract(gridUv) - 0.5;',
+    '  vec2 corrected = vec2(localUv.x * ratio, localUv.y);',
+    '  float dist = length(corrected);',
     '',
-    '  // Map to cyan / magenta palette over dark background',
-    '  float c         = sin(v * 0.5) * 0.5 + 0.5;',
-    '  float intensity = pow(abs(sin(v * 0.75)), 2.8) * 0.7;',
+    '  float mixFactor  = mix(uv.y, 1.0 - uv.y, u_invert);',
+    '  float effectiveMax = u_max_radius * ratio;',
+    '  float radius = mix(effectiveMax, u_min_radius, mixFactor);',
     '',
-    '  float r = mix(0.031, mix(0.0,   1.0, c),   intensity);',
-    '  float g = mix(0.031, 0.0,               intensity * 0.9);',
-    '  float b = mix(0.031, 1.0,               intensity);',
+    '  float eps    = 0.008;',
+    '  float circle = 1.0 - smoothstep(radius - eps, radius + eps, dist);',
     '',
-    '  // Subtle horizontal scanlines for glitch texture',
-    '  float scan = sin(gl_FragCoord.y * 1.8) * 0.012;',
-    '  r += scan; g += scan; b += scan;',
-    '',
-    '  // Vignette',
-    '  float vign = 1.0 - smoothstep(0.5, 1.4, length(p * 0.6));',
-    '  gl_FragColor = vec4(r * vign, g * vign, b * vign, 1.0);',
+    '  vec3 bg    = vec3(0.031);',
+    '  vec3 color = mix(bg, u_dot_color, circle);',
+    '  gl_FragColor = vec4(color, 1.0);',
     '}'
   ].join('\n');
+
+  // Per-product shader override via metafield
+  var fragSrcEl = document.getElementById('shader-frag-src');
+  if (fragSrcEl) {
+    try { fragSrc = JSON.parse(fragSrcEl.textContent) || fragSrc; } catch (e) {}
+  }
 
   function compileShader(gl, src, type) {
     var s = gl.createShader(type);
@@ -96,13 +100,23 @@
   gl.enableVertexAttribArray(posLoc);
   gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-  var timeLoc = gl.getUniformLocation(program, 'u_time');
-  var resLoc  = gl.getUniformLocation(program, 'u_resolution');
+  // Uniform locations
+  var uTime      = gl.getUniformLocation(program, 'u_time');
+  var uRes       = gl.getUniformLocation(program, 'u_resolution');
+  var uRows      = gl.getUniformLocation(program, 'u_rows');
+  var uCols      = gl.getUniformLocation(program, 'u_cols');
+  var uMinRadius = gl.getUniformLocation(program, 'u_min_radius');
+  var uMaxRadius = gl.getUniformLocation(program, 'u_max_radius');
+  var uInvert    = gl.getUniformLocation(program, 'u_invert');
+  var uDotColor  = gl.getUniformLocation(program, 'u_dot_color');
 
   function resize() {
-    canvas.width  = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-    gl.viewport(0, 0, canvas.width, canvas.height);
+    var w = canvas.offsetWidth;
+    var h = canvas.offsetHeight;
+    if (!w || !h) return; // hidden tab — skip until visible
+    canvas.width  = w;
+    canvas.height = h;
+    gl.viewport(0, 0, w, h);
   }
   window.addEventListener('resize', resize);
   resize();
@@ -111,8 +125,17 @@
 
   function render() {
     var t = (performance.now() - start) / 1000.0;
-    gl.uniform1f(timeLoc, t);
-    gl.uniform2f(resLoc, canvas.width, canvas.height);
+    var v = (window._shaderState && window._shaderState.values) || {};
+
+    gl.uniform1f(uTime, t);
+    gl.uniform2f(uRes,  canvas.width, canvas.height);
+    gl.uniform1f(uRows,      v.u_rows       != null ? v.u_rows       : 48);
+    gl.uniform1f(uCols,      v.u_cols       != null ? v.u_cols       : 37);
+    gl.uniform1f(uMinRadius, v.u_min_radius != null ? v.u_min_radius : 0.04);
+    gl.uniform1f(uMaxRadius, v.u_max_radius != null ? v.u_max_radius : 0.48);
+    gl.uniform1f(uInvert,    v.u_invert     != null ? v.u_invert     : 0);
+    gl.uniform3fv(uDotColor, v.u_dot_color  || [0.0, 1.0, 1.0]);
+
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     requestAnimationFrame(render);
   }
