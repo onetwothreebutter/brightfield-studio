@@ -5,10 +5,7 @@
   if (!canvas) return;
 
   var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-  if (!gl) {
-    canvas.style.display = 'none';
-    return;
-  }
+  if (!gl) { canvas.style.display = 'none'; return; }
 
   var vertSrc = [
     'attribute vec2 a_position;',
@@ -17,7 +14,7 @@
     '}'
   ].join('\n');
 
-  // Default: dot halftone driven by uniforms so the GUI can control it
+  // RiseShirt dot-halftone port — faithful to the Three.js TSL original
   var fragSrc = [
     'precision mediump float;',
     'uniform float u_time;',
@@ -28,28 +25,56 @@
     'uniform float u_max_radius;',
     'uniform float u_invert;',
     'uniform vec3  u_dot_color;',
+    'uniform vec3  u_bg_color;',
+    'uniform float u_top_margin;',
+    'uniform float u_ratio;',
+    'uniform sampler2D u_text_texture;',
+    'uniform float u_text_grid_cols;',
+    'uniform float u_text_grid_rows;',
+    'uniform float u_text_blend;',
+    'uniform float u_text_radius;',
+    'uniform float u_text_ratio;',
+    'uniform vec3  u_text_color;',
+    'uniform vec3  u_text_bg_color;',
     '',
     'void main() {',
     '  vec2 uv = gl_FragCoord.xy / u_resolution;',
     '',
-    '  // Cell aspect ratio — keeps dots circular',
-    '  float ratio = (u_resolution.x / u_cols) / (u_resolution.y / u_rows);',
+    '  // Top margin — area above marginThreshold is collar / text zone',
+    '  float marginThreshold = 1.0 - u_top_margin;',
+    '  float inMargin        = step(marginThreshold, uv.y);',
     '',
-    '  vec2 gridUv   = uv * vec2(u_cols, u_rows);',
-    '  vec2 localUv  = fract(gridUv) - 0.5;',
-    '  vec2 corrected = vec2(localUv.x * ratio, localUv.y);',
-    '  float dist = length(corrected);',
+    '  // Remap Y so the full gradient spans only the design area',
+    '  float remappedY = clamp(uv.y / max(marginThreshold, 0.001), 0.0, 1.0);',
     '',
-    '  float mixFactor  = mix(uv.y, 1.0 - uv.y, u_invert);',
-    '  float effectiveMax = u_max_radius * ratio;',
-    '  float radius = mix(effectiveMax, u_min_radius, mixFactor);',
+    '  // ── Main dot grid ─────────────────────────────────────────────────',
+    '  vec2  gridUv    = vec2(uv.x, remappedY) * vec2(u_cols, u_rows);',
+    '  vec2  localUv   = fract(gridUv) - 0.5;',
+    '  vec2  corrected = vec2(localUv.x * u_ratio, localUv.y);',
+    '  float dist      = length(corrected);',
     '',
-    '  float eps    = 0.008;',
-    '  float circle = 1.0 - smoothstep(radius - eps, radius + eps, dist);',
+    '  float effectiveMax = u_max_radius * u_ratio;',
+    '  float mixFactor    = mix(remappedY, 1.0 - remappedY, u_invert);',
+    '  float radius       = mix(effectiveMax, u_min_radius, mixFactor);',
     '',
-    '  vec3 bg    = vec3(0.031);',
-    '  vec3 color = mix(bg, u_dot_color, circle);',
-    '  gl_FragColor = vec4(color, 1.0);',
+    '  float eps      = 0.005;',
+    '  float mainMask = 1.0 - smoothstep(radius - eps, radius + eps, dist);',
+    '  vec3  mainColor = mix(u_bg_color, u_dot_color, mainMask);',
+    '',
+    '  // ── Text dot grid (margin area) ───────────────────────────────────',
+    '  vec2  tGridUv    = uv * vec2(u_text_grid_cols, u_text_grid_rows);',
+    '  vec2  tLocalUv   = fract(tGridUv) - 0.5;',
+    '  vec2  tCorrected = vec2(tLocalUv.x * u_text_ratio, tLocalUv.y);',
+    '  float tDist      = length(tCorrected);',
+    '  vec2  tCellIdx   = floor(tGridUv);',
+    '  vec2  tCenterUv  = (tCellIdx + 0.5) / vec2(u_text_grid_cols, u_text_grid_rows);',
+    '  float tSample    = texture2D(u_text_texture, tCenterUv).r;',
+    '',
+    '  float circleMask  = 1.0 - smoothstep(u_text_radius - eps, u_text_radius + eps, tDist);',
+    '  float textMask    = circleMask * tSample * u_text_blend;',
+    '  vec3  marginColor = mix(u_text_bg_color, u_text_color, textMask);',
+    '',
+    '  gl_FragColor = vec4(mix(mainColor, marginColor, inMargin), 1.0);',
     '}'
   ].join('\n');
 
@@ -86,41 +111,85 @@
   gl.attachShader(program, vert);
   gl.attachShader(program, frag);
   gl.linkProgram(program);
-
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     console.error('Program link error:', gl.getProgramInfoLog(program));
     return;
   }
-
   gl.useProgram(program);
 
   // Full-screen quad
   var buf = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(
-    gl.ARRAY_BUFFER,
-    new Float32Array([-1, -1,  1, -1,  -1,  1,  1,  1]),
-    gl.STATIC_DRAW
-  );
-
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
   var posLoc = gl.getAttribLocation(program, 'a_position');
   gl.enableVertexAttribArray(posLoc);
   gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
   // Uniform locations
-  var uTime      = gl.getUniformLocation(program, 'u_time');
-  var uRes       = gl.getUniformLocation(program, 'u_resolution');
-  var uRows      = gl.getUniformLocation(program, 'u_rows');
-  var uCols      = gl.getUniformLocation(program, 'u_cols');
-  var uMinRadius = gl.getUniformLocation(program, 'u_min_radius');
-  var uMaxRadius = gl.getUniformLocation(program, 'u_max_radius');
-  var uInvert    = gl.getUniformLocation(program, 'u_invert');
-  var uDotColor  = gl.getUniformLocation(program, 'u_dot_color');
+  var uTime         = gl.getUniformLocation(program, 'u_time');
+  var uRes          = gl.getUniformLocation(program, 'u_resolution');
+  var uRows         = gl.getUniformLocation(program, 'u_rows');
+  var uCols         = gl.getUniformLocation(program, 'u_cols');
+  var uMinRadius    = gl.getUniformLocation(program, 'u_min_radius');
+  var uMaxRadius    = gl.getUniformLocation(program, 'u_max_radius');
+  var uInvert       = gl.getUniformLocation(program, 'u_invert');
+  var uDotColor     = gl.getUniformLocation(program, 'u_dot_color');
+  var uBgColor      = gl.getUniformLocation(program, 'u_bg_color');
+  var uTopMargin    = gl.getUniformLocation(program, 'u_top_margin');
+  var uRatio        = gl.getUniformLocation(program, 'u_ratio');
+  var uTextTex      = gl.getUniformLocation(program, 'u_text_texture');
+  var uTextGridCols = gl.getUniformLocation(program, 'u_text_grid_cols');
+  var uTextGridRows = gl.getUniformLocation(program, 'u_text_grid_rows');
+  var uTextBlend    = gl.getUniformLocation(program, 'u_text_blend');
+  var uTextRadius   = gl.getUniformLocation(program, 'u_text_radius');
+  var uTextRatio    = gl.getUniformLocation(program, 'u_text_ratio');
+  var uTextColor    = gl.getUniformLocation(program, 'u_text_color');
+  var uTextBgColor  = gl.getUniformLocation(program, 'u_text_bg_color');
+
+  // ── Text texture ──────────────────────────────────────────────────────────
+  var textCanvas    = document.createElement('canvas');
+  textCanvas.width  = 1024;
+  textCanvas.height = 1024;
+  var textCtx    = textCanvas.getContext('2d');
+  var textTex    = gl.createTexture();
+  var lastTextKey = null;
+  var lastTexW    = 0;
+  var lastTexH    = 0;
+
+  function drawAndUploadText(v, w, h) {
+    var size   = 1024;
+    var aspect = (w > 0 && h > 0) ? w / h : 1;
+
+    textCtx.fillStyle = '#000000';
+    textCtx.fillRect(0, 0, size, size);
+
+    var txt = v.text || '';
+    if (txt) {
+      textCtx.save();
+      textCtx.scale(1 / aspect, 1);
+      textCtx.fillStyle    = '#ffffff';
+      textCtx.font         = (v.textFontSize || 460) + 'px "IBM Plex Mono", monospace';
+      textCtx.textAlign    = 'center';
+      textCtx.textBaseline = 'middle';
+      var tx = v.textX != null ? v.textX : 0.5;
+      var ty = v.textY != null ? v.textY : 0.79;
+      textCtx.fillText(txt, size * tx * aspect, size * (1 - ty));
+      textCtx.restore();
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, textTex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCanvas);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  }
 
   function resize() {
     var w = canvas.offsetWidth;
     var h = canvas.offsetHeight;
-    if (!w || !h) return; // hidden tab — skip until visible
+    if (!w || !h) return;
     canvas.width  = w;
     canvas.height = h;
     gl.viewport(0, 0, w, h);
@@ -133,17 +202,60 @@
   function render() {
     var t = (performance.now() - start) / 1000.0;
     var v = (window._shaderState && window._shaderState.values) || {};
+    var w = canvas.width;
+    var h = canvas.height;
 
-    gl.uniform1f(uTime, t);
-    gl.uniform2f(uRes,  canvas.width, canvas.height);
-    gl.uniform1f(uRows,      v.u_rows       != null ? v.u_rows       : 48);
-    gl.uniform1f(uCols,      v.u_cols       != null ? v.u_cols       : 37);
-    gl.uniform1f(uMinRadius, v.u_min_radius != null ? v.u_min_radius : 0.04);
-    gl.uniform1f(uMaxRadius, v.u_max_radius != null ? v.u_max_radius : 0.48);
-    gl.uniform1f(uInvert,    v.u_invert     != null ? v.u_invert     : 0);
-    gl.uniform3fv(uDotColor, v.u_dot_color  || [0.0, 1.0, 1.0]);
+    if (w && h) {
+      // Regenerate text texture when content or canvas size changes
+      var textKey = JSON.stringify([v.text, v.textX, v.textY, v.textFontSize]);
+      var dirty   = window._shaderState && window._shaderState.textDirty;
+      if (dirty || textKey !== lastTextKey || w !== lastTexW || h !== lastTexH) {
+        drawAndUploadText(v, w, h);
+        lastTextKey = textKey;
+        lastTexW    = w;
+        lastTexH    = h;
+        if (window._shaderState) window._shaderState.textDirty = false;
+      }
 
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      var rows   = v.u_rows       != null ? v.u_rows       : 48;
+      var cols   = v.u_cols       != null ? v.u_cols       : 37;
+      var margin = v.u_top_margin != null ? v.u_top_margin : 0.0;
+
+      // Ratio = cell pixel width / cell pixel height (keeps dots circular)
+      var cellW = w / cols;
+      var cellH = (h * (1 - margin)) / rows;
+      var ratio = cellH > 0 ? cellW / cellH : 1.0;
+
+      var tGridCols = v.u_text_grid_cols != null ? v.u_text_grid_cols : 47;
+      var tGridRows = v.u_text_grid_rows != null ? v.u_text_grid_rows : 31;
+      var tRatio    = (w / tGridCols) / (h / tGridRows);
+
+      gl.uniform1f(uTime,         t);
+      gl.uniform2f(uRes,          w, h);
+      gl.uniform1f(uRows,         rows);
+      gl.uniform1f(uCols,         cols);
+      gl.uniform1f(uMinRadius,    v.u_min_radius   != null ? v.u_min_radius   : 0.02);
+      gl.uniform1f(uMaxRadius,    v.u_max_radius   != null ? v.u_max_radius   : 0.55);
+      gl.uniform1f(uInvert,       v.u_invert       != null ? v.u_invert       : 1);
+      gl.uniform3fv(uDotColor,    v.u_dot_color    || [1.0, 1.0, 1.0]);
+      gl.uniform3fv(uBgColor,     v.u_bg_color     || [0.0, 0.0, 0.0]);
+      gl.uniform1f(uTopMargin,    margin);
+      gl.uniform1f(uRatio,        ratio);
+      gl.uniform1f(uTextGridCols, tGridCols);
+      gl.uniform1f(uTextGridRows, tGridRows);
+      gl.uniform1f(uTextBlend,    v.u_text_blend   != null ? v.u_text_blend   : 1.0);
+      gl.uniform1f(uTextRadius,   v.u_text_radius  != null ? v.u_text_radius  : 0.16);
+      gl.uniform1f(uTextRatio,    tRatio);
+      gl.uniform3fv(uTextColor,   v.u_text_color   || [1.0, 1.0, 1.0]);
+      gl.uniform3fv(uTextBgColor, v.u_text_bg_color || [0.0, 0.0, 0.0]);
+
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, textTex);
+      gl.uniform1i(uTextTex, 0);
+
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+
     requestAnimationFrame(render);
   }
 
