@@ -3,12 +3,15 @@
     <div class="product-layout">
 
       <!-- Media -->
+      {%- assign shader_src = product.metafields.shader.fragment_glsl -%}
       <div class="product-media">
 
-        <div class="media-tabs">
-          <button class="media-tab is-active" data-tab="photo">Photo</button>
-          <button class="media-tab" data-tab="shader">Shader</button>
-        </div>
+        {%- if shader_src != blank -%}
+          <div class="media-tabs">
+            <button class="media-tab is-active" data-tab="photo">Photo</button>
+            <button class="media-tab" data-tab="shader">Shader</button>
+          </div>
+        {%- endif -%}
 
         <!-- Photo panel -->
         <div class="media-panel is-active" data-panel="photo">
@@ -40,16 +43,19 @@
         </div>
 
         <!-- Shader panel -->
-        <div class="media-panel" data-panel="shader">
-          <canvas id="shader-canvas" class="product-shader__canvas"></canvas>
-          <div class="shader-gui">
-            <div class="shader-gui__header">
-              <span class="shader-gui__title">Customize</span>
-              <button class="shader-gui__toggle" id="shader-gui-toggle">Hide</button>
+        {%- if shader_src != blank -%}
+          <div class="media-panel" data-panel="shader">
+            <canvas id="shader-canvas" class="product-shader__canvas"></canvas>
+            <script id="shader-frag-src" type="application/json">{{ shader_src | json }}</script>
+            <div class="shader-gui">
+              <div class="shader-gui__header">
+                <span class="shader-gui__title">Customize</span>
+                <button class="shader-gui__toggle" id="shader-gui-toggle">Hide</button>
+              </div>
+              <div class="shader-gui__body" id="shader-gui-body"></div>
             </div>
-            <div class="shader-gui__body" id="shader-gui-body"></div>
           </div>
-        </div>
+        {%- endif -%}
 
       </div>
 
