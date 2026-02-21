@@ -1,0 +1,12 @@
+{
+  "sections": {
+    "main": {
+      "type": "main-contact",
+      "settings": {
+        "heading": "Contact Us",
+        "subheading": "Questions about an order, custom work, or just want to say hi?"
+      }
+    }
+  },
+  "order": ["main"]
+}

@@ -883,6 +883,99 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* ─── Contact Page ───────────────────────────────────────── */
+.contact-page {
+  padding-top: calc(var(--header-height) + 3rem);
+}
+
+.contact-layout {
+  max-width: 560px;
+  margin:    0 auto;
+}
+
+.contact-header {
+  margin-bottom: 3rem;
+}
+
+.contact-eyebrow {
+  font-size:      0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color:          var(--color-secondary);
+  margin-bottom:  0.75rem;
+}
+
+.contact-title {
+  font-size:     clamp(2rem, 5vw, 3rem);
+  margin-bottom: 0.75rem;
+}
+
+.contact-subheading {
+  color:     var(--color-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.75;
+}
+
+.contact-success {
+  padding:       1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  border:        1px solid var(--color-primary);
+  border-radius: var(--radius);
+  color:         var(--color-primary);
+  font-size:     0.9rem;
+}
+
+.contact-error {
+  padding:       1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  border:        1px solid #ff4d4d;
+  border-radius: var(--radius);
+  color:         #ff4d4d;
+  font-size:     0.9rem;
+}
+
+.contact-form {
+  display:        flex;
+  flex-direction: column;
+  gap:            1.5rem;
+}
+
+.contact-field {
+  display:        flex;
+  flex-direction: column;
+  gap:            0.5rem;
+}
+
+.contact-label {
+  font-size:      0.7rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color:          var(--color-text-muted);
+}
+
+.contact-input {
+  width:         100%;
+  padding:       0.75rem 1rem;
+  background:    var(--color-surface);
+  border:        1px solid var(--color-border);
+  border-radius: var(--radius);
+  color:         var(--color-text);
+  font-family:   var(--font-body);
+  font-size:     0.9375rem;
+  transition:    border-color var(--transition-fast);
+}
+
+.contact-input:focus {
+  outline:      none;
+  border-color: var(--color-primary);
+  box-shadow:   0 0 0 1px var(--color-primary);
+}
+
+.contact-input--textarea {
+  resize:     vertical;
+  min-height: 140px;
+}
+
 /* ─── Media Tabs ─────────────────────────────────────────── */
 .media-tabs {
   display:       flex;
