@@ -3,7 +3,7 @@
     <div class="product-layout">
 
       <!-- Media -->
-      {%- assign shader_src = product.metafields.shader.fragment_glsl -%}
+      {%- assign shader_src = product.metafields.shader.fragment_glsl.value -%}
       <div class="product-media">
 
         {%- if shader_src != blank -%}
@@ -32,7 +32,8 @@
                 <img
                   src="{{ image | image_url: width: 150 }}"
                   alt="{{ image.alt | escape }}"
-                  class="product-thumb"
+                  class="product-thumb{% if forloop.first %} is-active{% endif %}"
+                  data-full="{{ image | image_url: width: 900 }}"
                   loading="lazy"
                   width="150"
                   height="150"
@@ -163,6 +164,22 @@
       if (target === 'shader') {
         window.dispatchEvent(new Event('resize'));
       }
+    });
+  });
+}());
+
+// ── Thumbnail switcher ────────────────────────────────────────────────────────
+(function () {
+  var mainImg = document.querySelector('.product-media__image');
+  var thumbs  = document.querySelectorAll('.product-thumb');
+  if (!mainImg || !thumbs.length) return;
+
+  thumbs.forEach(function (thumb) {
+    thumb.addEventListener('click', function () {
+      mainImg.src = this.dataset.full;
+      mainImg.alt = this.alt;
+      thumbs.forEach(function (t) { t.classList.remove('is-active'); });
+      this.classList.add('is-active');
     });
   });
 }());
