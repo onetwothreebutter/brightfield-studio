@@ -15,6 +15,7 @@
       "settings": {
         "heading": "Latest Drops",
         "description": "",
+        "collection": "frontpage",
         "products_to_show": 4,
         "show_view_all": true
       }
