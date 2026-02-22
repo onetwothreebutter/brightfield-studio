@@ -1047,6 +1047,26 @@ h1, h2, h3, h4, h5, h6 {
   color:          var(--color-text-muted);
 }
 
+.shader-gui__header-actions {
+  display:     flex;
+  align-items: center;
+  gap:         0.75rem;
+}
+
+.shader-gui--floating {
+  position:   fixed;
+  z-index:    9999;
+  margin-top: 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  overflow:   hidden;
+}
+.shader-gui--floating .shader-gui__header { cursor: grab; }
+.shader-gui--floating .shader-gui__header:active { cursor: grabbing; }
+.shader-gui--floating .shader-gui__body {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
 .shader-gui__toggle {
   font-family:    var(--font-body);
   font-size:      0.65rem;
