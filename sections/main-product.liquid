@@ -50,7 +50,10 @@
           <div class="shader-gui">
             <div class="shader-gui__header">
               <span class="shader-gui__title">Customize</span>
-              <button class="shader-gui__toggle" id="shader-gui-toggle">Hide</button>
+              <div class="shader-gui__header-actions">
+                <button class="shader-gui__toggle" id="shader-gui-popout">Popout</button>
+                <button class="shader-gui__toggle" id="shader-gui-toggle">Hide</button>
+              </div>
             </div>
             <div class="shader-gui__body" id="shader-gui-body"></div>
           </div>
@@ -158,7 +161,7 @@
       this.classList.add('is-active');
       document.querySelector('[data-panel="' + target + '"]').classList.add('is-active');
 
-      // Let shader.js resize now that the canvas is visible
+      // Let rise-shirt.js resize now that the canvas is visible
       if (target === 'shader') {
         window.dispatchEvent(new Event('resize'));
       }
@@ -209,7 +212,14 @@
     { key: 'u_text_radius',    label: 'Text Dot Size', type: 'range',  min: 0.01, max: 1.5,  step: 0.01, value: 0.16 },
     { key: 'u_text_blend',     label: 'Text Blend',    type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 1.0  },
     { key: 'u_text_color',     label: 'Text Color',    type: 'color',                                    value: '#ffffff' },
-    { key: 'u_text_bg_color',  label: 'Text BG',       type: 'color',                                    value: '#000000' }
+    { key: 'u_text_bg_color',  label: 'Text BG',       type: 'color',                                    value: '#000000' },
+    // ── Palette ───────────────────────────────────────────────────────────
+    { type: 'header', label: 'Palette' },
+    { key: 'u_color_mode',  label: 'Use Palette',   type: 'toggle',                                   value: 1        },
+    { key: 'u_palette_a',   label: 'Palette A',     type: 'color',                                    value: '#808080' },
+    { key: 'u_palette_b',   label: 'Palette B',     type: 'color',                                    value: '#808080' },
+    { key: 'u_palette_c',   label: 'Palette C',     type: 'color',                                    value: '#ffffff' },
+    { key: 'u_palette_d',   label: 'Palette D',     type: 'color',                                    value: '#436a8e' }
   ];
 
   // Initialise shared state — shader.js reads this each frame
@@ -320,6 +330,46 @@
     this.textContent = hidden ? 'Show' : 'Hide';
   });
 
+  // Popout / dock + drag
+  var gui       = document.querySelector('.shader-gui');
+  var guiHeader = document.querySelector('.shader-gui__header');
+  var popoutBtn = document.getElementById('shader-gui-popout');
+  var dragging  = false;
+  var dragOX    = 0;
+  var dragOY    = 0;
+
+  popoutBtn.addEventListener('click', function () {
+    if (gui.classList.contains('shader-gui--floating')) {
+      gui.classList.remove('shader-gui--floating');
+      gui.style.cssText = '';
+      this.textContent  = 'Popout';
+    } else {
+      var rect        = gui.getBoundingClientRect();
+      gui.style.left  = (rect.left + 16) + 'px';
+      gui.style.top   = (rect.top  - 16) + 'px';
+      gui.style.width = rect.width + 'px';
+      gui.classList.add('shader-gui--floating');
+      this.textContent = 'Dock';
+    }
+  });
+
+  guiHeader.addEventListener('mousedown', function (e) {
+    if (!gui.classList.contains('shader-gui--floating')) return;
+    if (e.target.tagName === 'BUTTON') return;
+    dragging = true;
+    dragOX   = e.clientX - parseFloat(gui.style.left);
+    dragOY   = e.clientY - parseFloat(gui.style.top);
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', function (e) {
+    if (!dragging) return;
+    gui.style.left = (e.clientX - dragOX) + 'px';
+    gui.style.top  = (e.clientY - dragOY) + 'px';
+  });
+
+  document.addEventListener('mouseup', function () { dragging = false; });
+
   function hexToRgb(hex) {
     return [
       parseInt(hex.slice(1, 3), 16) / 255,
@@ -330,7 +380,7 @@
 }());
 </script>
 
-<script src="{{ 'shader.js' | asset_url }}" defer></script>
+<script src="{{ 'rise-shirt.js' | asset_url }}" defer></script>
 
 {% schema %}
 {

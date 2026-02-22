@@ -36,6 +36,15 @@
     'uniform float u_text_ratio;',
     'uniform vec3  u_text_color;',
     'uniform vec3  u_text_bg_color;',
+    'uniform vec3  u_palette_a;',
+    'uniform vec3  u_palette_b;',
+    'uniform vec3  u_palette_c;',
+    'uniform vec3  u_palette_d;',
+    'uniform float u_color_mode;',
+    '',
+    'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
+    '  return a + b * cos(6.28318 * (c * t + d));',
+    '}',
     '',
     'void main() {',
     '  vec2 uv = gl_FragCoord.xy / u_resolution;',
@@ -59,7 +68,10 @@
     '',
     '  float eps      = 0.005;',
     '  float mainMask = 1.0 - smoothstep(radius - eps, radius + eps, dist);',
-    '  vec3  mainColor = mix(u_bg_color, u_dot_color, mainMask);',
+    '',
+    '  vec3 paletteColor = cosinePalette(mixFactor, u_palette_a, u_palette_b, u_palette_c, u_palette_d);',
+    '  vec3 dotColor     = mix(u_dot_color, paletteColor, step(0.5, u_color_mode));',
+    '  vec3 mainColor    = mix(u_bg_color, dotColor, mainMask);',
     '',
     '  // ── Text dot grid (margin area) ───────────────────────────────────',
     '  vec2  tGridUv    = uv * vec2(u_text_grid_cols, u_text_grid_rows);',
@@ -70,9 +82,12 @@
     '  vec2  tCenterUv  = (tCellIdx + 0.5) / vec2(u_text_grid_cols, u_text_grid_rows);',
     '  float tSample    = texture2D(u_text_texture, tCenterUv).r;',
     '',
-    '  float circleMask  = 1.0 - smoothstep(u_text_radius - eps, u_text_radius + eps, tDist);',
-    '  float textMask    = circleMask * tSample * u_text_blend;',
-    '  vec3  marginColor = mix(u_text_bg_color, u_text_color, textMask);',
+    '  float circleMask      = 1.0 - smoothstep(u_text_radius - eps, u_text_radius + eps, tDist);',
+    '  float textMask        = circleMask * tSample * u_text_blend;',
+    '  float textMixFactor   = mix(tCenterUv.y, 1.0 - tCenterUv.y, u_invert);',
+    '  vec3  textPalette     = cosinePalette(textMixFactor, u_palette_a, u_palette_b, u_palette_c, u_palette_d);',
+    '  vec3  textDotColor    = mix(u_text_color, textPalette, step(0.5, u_color_mode));',
+    '  vec3  marginColor     = mix(u_text_bg_color, textDotColor, textMask);',
     '',
     '  gl_FragColor = vec4(mix(mainColor, marginColor, inMargin), 1.0);',
     '}'
@@ -145,6 +160,11 @@
   var uTextRatio    = gl.getUniformLocation(program, 'u_text_ratio');
   var uTextColor    = gl.getUniformLocation(program, 'u_text_color');
   var uTextBgColor  = gl.getUniformLocation(program, 'u_text_bg_color');
+  var uPaletteA     = gl.getUniformLocation(program, 'u_palette_a');
+  var uPaletteB     = gl.getUniformLocation(program, 'u_palette_b');
+  var uPaletteC     = gl.getUniformLocation(program, 'u_palette_c');
+  var uPaletteD     = gl.getUniformLocation(program, 'u_palette_d');
+  var uColorMode    = gl.getUniformLocation(program, 'u_color_mode');
 
   // ── Text texture ──────────────────────────────────────────────────────────
   var textCanvas    = document.createElement('canvas');
@@ -248,6 +268,11 @@
       gl.uniform1f(uTextRatio,    tRatio);
       gl.uniform3fv(uTextColor,   v.u_text_color   || [1.0, 1.0, 1.0]);
       gl.uniform3fv(uTextBgColor, v.u_text_bg_color || [0.0, 0.0, 0.0]);
+      gl.uniform3fv(uPaletteA,    v.u_palette_a    || [0.5, 0.5, 0.5]);
+      gl.uniform3fv(uPaletteB,    v.u_palette_b    || [0.5, 0.5, 0.5]);
+      gl.uniform3fv(uPaletteC,    v.u_palette_c    || [1.0, 1.0, 1.0]);
+      gl.uniform3fv(uPaletteD,    v.u_palette_d    || [0.263, 0.416, 0.557]);
+      gl.uniform1f(uColorMode,    v.u_color_mode   != null ? v.u_color_mode   : 0.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);
