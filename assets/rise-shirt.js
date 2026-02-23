@@ -4,7 +4,8 @@
   var canvas = document.getElementById('shader-canvas');
   if (!canvas) return;
 
-  var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  var glOpts = { preserveDrawingBuffer: true };
+  var gl = canvas.getContext('webgl', glOpts) || canvas.getContext('experimental-webgl', glOpts);
   if (!gl) { canvas.style.display = 'none'; return; }
 
   var vertSrc = [
@@ -285,4 +286,28 @@
   }
 
   render();
+
+  // Export the shader at print resolution and return base64 PNG via callback
+  window._shaderExport = function (targetW, targetH, callback) {
+    var prevW = canvas.width;
+    var prevH = canvas.height;
+
+    canvas.width  = targetW;
+    canvas.height = targetH;
+    gl.viewport(0, 0, targetW, targetH);
+
+    // render() reads canvas.width/height and recalculates all uniforms (uRes, uRatio,
+    // uTextRatio, etc.) for the new size, then draws one frame.
+    render();
+
+    var dataUrl = canvas.toDataURL('image/png');
+
+    // Restore
+    canvas.width  = prevW;
+    canvas.height = prevH;
+    gl.viewport(0, 0, prevW, prevH);
+    if (window._shaderState) window._shaderState.textDirty = true;
+
+    callback(dataUrl.split(',')[1]); // base64 only
+  };
 }());

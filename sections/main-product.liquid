@@ -55,7 +55,25 @@
                 <button class="shader-gui__toggle" id="shader-gui-toggle">Hide</button>
               </div>
             </div>
+            <div class="shader-gui__preview">
+              <button
+                id="shader-preview-btn"
+                class="shader-gui__toggle"
+                data-variant-id="4012"
+                data-worker-url="https://brightfield-mockup-worker.eric-d-johnson.workers.dev"
+              >Preview on Shirt</button>
+            </div>
             <div class="shader-gui__body" id="shader-gui-body"></div>
+          </div>
+
+          <!-- Mockup modal -->
+          <div id="mockup-modal" class="mockup-modal mockup-modal--hidden">
+            <div class="mockup-modal__backdrop"></div>
+            <div class="mockup-modal__box">
+              <button class="mockup-modal__close" id="mockup-modal-close">&times;</button>
+              <img id="mockup-modal-img" class="mockup-modal__img" src="" alt="Shirt mockup">
+              <a id="mockup-modal-download" class="btn btn--secondary" download="mockup.jpg">Download</a>
+            </div>
           </div>
         </div>
 
@@ -377,6 +395,65 @@
       parseInt(hex.slice(5, 7), 16) / 255
     ];
   }
+}());
+
+// ── Preview on Shirt ──────────────────────────────────────────────────────────
+(function () {
+  var btn       = document.getElementById('shader-preview-btn');
+  var modal     = document.getElementById('mockup-modal');
+  var modalImg  = document.getElementById('mockup-modal-img');
+  var modalDl   = document.getElementById('mockup-modal-download');
+  var closeBtn  = document.getElementById('mockup-modal-close');
+  var backdrop  = modal.querySelector('.mockup-modal__backdrop');
+
+  if (!btn) return;
+
+  btn.addEventListener('click', function () {
+    if (!window._shaderExport) {
+      alert('Switch to the Shader tab first.');
+      return;
+    }
+
+    var variantId = btn.dataset.variantId;
+    var workerUrl = btn.dataset.workerUrl;
+
+    btn.disabled    = true;
+    btn.textContent = 'Generating…';
+
+    window._shaderExport(1800, 2400, function (base64png) {
+      fetch(workerUrl + '/generate-mockup', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ image: base64png, variant_id: variantId })
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.mockup_url) throw new Error(data.error || 'No mockup URL returned');
+        modalImg.src        = data.mockup_url;
+        modalDl.href        = data.mockup_url;
+        modal.classList.remove('mockup-modal--hidden');
+        document.body.style.overflow = 'hidden';
+      })
+      .catch(function (err) {
+        alert('Mockup failed: ' + err.message);
+      })
+      .finally(function () {
+        btn.disabled    = false;
+        btn.textContent = 'Preview on Shirt';
+      });
+    });
+  });
+
+  function closeModal() {
+    modal.classList.add('mockup-modal--hidden');
+    document.body.style.overflow = '';
+  }
+
+  closeBtn.addEventListener('click', closeModal);
+  backdrop.addEventListener('click', closeModal);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeModal();
+  });
 }());
 </script>
 

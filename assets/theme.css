@@ -1016,7 +1016,7 @@ h1, h2, h3, h4, h5, h6 {
 /* ─── Product Shader Canvas ──────────────────────────────── */
 .product-shader__canvas {
   width:         100%;
-  aspect-ratio:  1 / 1;
+  aspect-ratio:  3 / 4;
   display:       block;
   border-radius: var(--radius-lg);
   border:        1px solid var(--color-border);
@@ -1080,7 +1080,55 @@ h1, h2, h3, h4, h5, h6 {
 }
 .shader-gui__toggle:hover { opacity: 0.7; }
 
+.shader-gui__preview {
+  padding: 0.4rem 0.75rem 0;
+}
 .shader-gui__body { padding: 0.25rem 0; }
+
+
+/* ── Mockup modal ─────────────────────────────────────────────────────────── */
+.mockup-modal {
+  position: fixed;
+  inset:    0;
+  z-index:  10000;
+  display:  flex;
+  align-items: center;
+  justify-content: center;
+}
+.mockup-modal--hidden {
+  display: none;
+}
+.mockup-modal__backdrop {
+  position:   absolute;
+  inset:      0;
+  background: rgba(0, 0, 0, 0.85);
+}
+.mockup-modal__box {
+  position:       relative;
+  display:        flex;
+  flex-direction: column;
+  align-items:    center;
+  gap:            1rem;
+  max-width:      90vw;
+  max-height:     90vh;
+}
+.mockup-modal__close {
+  position:    absolute;
+  top:         -2rem;
+  right:       0;
+  background:  none;
+  border:      none;
+  color:       #fff;
+  font-size:   1.5rem;
+  cursor:      pointer;
+  line-height: 1;
+}
+.mockup-modal__img {
+  max-width:  100%;
+  max-height: 80vh;
+  display:    block;
+  object-fit: contain;
+}
 .shader-gui__body.is-hidden { display: none; }
 
 .shader-control {
