@@ -195,6 +195,14 @@
   });
 }());
 
+// ── Auto-open Shader tab from URL hash ────────────────────────────────────────
+if (window.location.hash === '#shader') {
+  document.addEventListener('DOMContentLoaded', function () {
+    var shaderTab = document.querySelector('.media-tab[data-tab="shader"]');
+    if (shaderTab) shaderTab.click();
+  });
+}
+
 // ── Thumbnail switcher ────────────────────────────────────────────────────────
 (function () {
   var mainImg = document.querySelector('.product-media__image');

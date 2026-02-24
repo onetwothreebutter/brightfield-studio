@@ -4,7 +4,7 @@
   var canvas = document.getElementById('shader-canvas');
   if (!canvas) return;
 
-  var glOpts = { preserveDrawingBuffer: true, alpha: true };
+  var glOpts = { preserveDrawingBuffer: true, alpha: true, antialias: true };
   var gl = canvas.getContext('webgl', glOpts) || canvas.getContext('experimental-webgl', glOpts);
   if (!gl) { canvas.style.display = 'none'; return; }
 
@@ -213,12 +213,15 @@
   }
 
   function resize() {
+    var dpr = window.devicePixelRatio || 1;
     var w = canvas.offsetWidth;
     var h = canvas.offsetHeight;
     if (!w || !h) return;
-    canvas.width  = w;
-    canvas.height = h;
-    gl.viewport(0, 0, w, h);
+    canvas.style.width  = w + 'px';
+    canvas.style.height = h + 'px';
+    canvas.width  = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    gl.viewport(0, 0, canvas.width, canvas.height);
   }
   window.addEventListener('resize', resize);
   resize();

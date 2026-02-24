@@ -42,5 +42,10 @@
     {%- else -%}
       <a href="{{ product.url }}" class="btn btn--primary btn--sm">Select Options</a>
     {%- endif -%}
+    {%- if product.tags contains 'custom-design' -%}
+      <a href="{{ product.url }}#shader" class="btn btn--outline btn--sm product-card__customize-btn">
+        Customize Design
+      </a>
+    {%- endif -%}
   </div>
 </article>
