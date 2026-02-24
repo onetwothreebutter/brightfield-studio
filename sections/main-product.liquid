@@ -79,6 +79,7 @@
               </div>
               <div class="mockup-modal__footer">
                 <a id="mockup-modal-download" class="btn btn--outline btn--sm" download="mockup.jpg">Download</a>
+                <button id="mockup-modal-order" class="btn btn--primary btn--sm">Order This Design</button>
               </div>
             </div>
           </div>
@@ -439,14 +440,17 @@
 
 // ── Preview on Shirt ──────────────────────────────────────────────────────────
 (function () {
-  var btn       = document.getElementById('shader-preview-btn');
-  var modal     = document.getElementById('mockup-modal');
-  var modalImg  = document.getElementById('mockup-modal-img');
-  var modalDl   = document.getElementById('mockup-modal-download');
-  var closeBtn  = document.getElementById('mockup-modal-close');
-  var backdrop  = modal.querySelector('.mockup-modal__backdrop');
+  var btn        = document.getElementById('shader-preview-btn');
+  var modal      = document.getElementById('mockup-modal');
+  var modalImg   = document.getElementById('mockup-modal-img');
+  var modalDl    = document.getElementById('mockup-modal-download');
+  var modalOrder = document.getElementById('mockup-modal-order');
+  var closeBtn   = document.getElementById('mockup-modal-close');
+  var backdrop   = modal.querySelector('.mockup-modal__backdrop');
 
   if (!btn) return;
+
+  var currentDesignUrl = null;
 
   btn.addEventListener('click', function () {
     if (!window._shaderExport) {
@@ -469,6 +473,7 @@
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (!data.mockup_url) throw new Error(data.error || 'No mockup URL returned');
+        currentDesignUrl    = data.design_url || null;
         modalImg.src        = data.mockup_url;
         modalDl.href        = data.mockup_url;
         modal.classList.remove('mockup-modal--hidden');
@@ -481,6 +486,42 @@
         btn.disabled    = false;
         btn.textContent = 'Preview on Shirt';
       });
+    });
+  });
+
+  modalOrder.addEventListener('click', function () {
+    if (!currentDesignUrl) {
+      alert('Design URL not available. Try generating a new preview.');
+      return;
+    }
+
+    // Read the currently selected Shopify variant ID from the product form
+    var shopifyVariantId = (document.querySelector('input[name="id"]') || {}).value;
+    if (!shopifyVariantId) {
+      alert('Could not determine variant. Please select a size and try again.');
+      return;
+    }
+
+    modalOrder.disabled    = true;
+    modalOrder.textContent = 'Adding…';
+
+    fetch('/cart/add.js', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id:       Number(shopifyVariantId),
+        quantity: 1,
+        properties: { '_design_url': currentDesignUrl }
+      })
+    })
+    .then(function (r) {
+      if (!r.ok) return r.json().then(function (d) { throw new Error(d.description || 'Cart error'); });
+      window.location.href = '/cart';
+    })
+    .catch(function (err) {
+      alert('Could not add to cart: ' + err.message);
+      modalOrder.disabled    = false;
+      modalOrder.textContent = 'Order This Design';
     });
   });
 

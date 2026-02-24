@@ -118,13 +118,13 @@ async function handleGenerateMockup(request, env, origin) {
       throw new Error('Mockup generation timed out');
     }
 
-    return new Response(JSON.stringify({ mockup_url: mockupUrl }), { status: 200, headers });
+    // 4. Keep the design file in R2 — merchant needs the URL to submit to Printful when fulfilling
+    return new Response(JSON.stringify({ mockup_url: mockupUrl, design_url: imageUrl }), { status: 200, headers });
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message, imageUrl }), { status: 500, headers });
-  } finally {
-    // 4. Clean up R2 — fire and forget
+    // Clean up orphaned R2 file on failure only
     env.MOCKUP_STAGING.delete(imageKey).catch(() => {});
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
   }
 }
 
