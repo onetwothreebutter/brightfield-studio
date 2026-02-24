@@ -70,9 +70,16 @@
           <div id="mockup-modal" class="mockup-modal mockup-modal--hidden">
             <div class="mockup-modal__backdrop"></div>
             <div class="mockup-modal__box">
-              <button class="mockup-modal__close" id="mockup-modal-close">&times;</button>
-              <img id="mockup-modal-img" class="mockup-modal__img" src="" alt="Shirt mockup">
-              <a id="mockup-modal-download" class="btn btn--secondary" download="mockup.jpg">Download</a>
+              <div class="mockup-modal__header">
+                <span class="mockup-modal__title">Shirt Preview</span>
+                <button class="mockup-modal__close" id="mockup-modal-close" aria-label="Close">&times;</button>
+              </div>
+              <div class="mockup-modal__body">
+                <img id="mockup-modal-img" class="mockup-modal__img" src="" alt="Shirt mockup">
+              </div>
+              <div class="mockup-modal__footer">
+                <a id="mockup-modal-download" class="btn btn--outline btn--sm" download="mockup.jpg">Download</a>
+              </div>
             </div>
           </div>
         </div>
