@@ -517,7 +517,14 @@
       })
     })
     .then(function (r) {
-      if (!r.ok) return r.json().then(function (d) { throw new Error(d.description || 'Cart error'); });
+      if (!r.ok) {
+        return r.text().then(function (text) {
+          console.error('Cart add failed', r.status, text);
+          var msg = 'Cart error (' + r.status + ')';
+          try { msg = JSON.parse(text).description || msg; } catch (e) {}
+          throw new Error(msg);
+        });
+      }
       window.location.href = '/cart';
     })
     .catch(function (err) {
