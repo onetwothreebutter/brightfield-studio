@@ -1,5 +1,9 @@
-const ALLOWED_ORIGIN = 'https://brightfield-2.myshopify.com';
-const PRINTFUL_API   = 'https://api.printful.com';
+const ALLOWED_ORIGINS = new Set([
+  'https://brightfield.studio',
+  'https://brightfield-2.myshopify.com',
+  'http://127.0.0.1:9292',
+]);
+const PRINTFUL_API = 'https://api.printful.com';
 
 // Bella + Canvas 3001 — product ID 71, front print area
 const PRODUCT_ID   = 71;
@@ -7,9 +11,9 @@ const PRINT_WIDTH  = 1800;
 const PRINT_HEIGHT = 2400;
 
 function corsHeaders(origin) {
-  const allowed = origin === ALLOWED_ORIGIN || origin === 'http://127.0.0.1:9292';
+  const allowed = ALLOWED_ORIGINS.has(origin);
   return {
-    'Access-Control-Allow-Origin':  allowed ? origin : ALLOWED_ORIGIN,
+    'Access-Control-Allow-Origin':  allowed ? origin : 'https://brightfield.studio',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
