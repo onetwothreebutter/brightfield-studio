@@ -3,7 +3,7 @@
    Palette: #080808 bg | #00ffff cyan | #ff00ff magenta
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Space+Grotesk:wght@500;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Space+Grotesk:wght@500;700;800&family=Anton&family=Bebas+Neue&family=Playfair+Display:wght@900&display=swap');
 
 /* ─── Custom Properties ──────────────────────────────────── */
 :root {
@@ -1221,3 +1221,17 @@ h1, h2, h3, h4, h5, h6 {
   transition:       border-color var(--transition-fast);
 }
 .shader-control__text-input:focus { border-color: var(--color-primary); }
+
+.shader-control__select {
+  font-family:  var(--font-body);
+  font-size:    0.7rem;
+  background:   var(--color-surface-2);
+  color:        var(--color-text);
+  border:       1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding:      0.2rem 0.35rem;
+  width:        100%;
+  outline:      none;
+  cursor:       pointer;
+}
+.shader-control__select:focus { border-color: var(--color-primary); }

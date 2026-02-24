@@ -4,7 +4,7 @@
   var canvas = document.getElementById('shader-canvas');
   if (!canvas) return;
 
-  var glOpts = { preserveDrawingBuffer: true };
+  var glOpts = { preserveDrawingBuffer: true, alpha: true };
   var gl = canvas.getContext('webgl', glOpts) || canvas.getContext('experimental-webgl', glOpts);
   if (!gl) { canvas.style.display = 'none'; return; }
 
@@ -42,6 +42,7 @@
     'uniform vec3  u_palette_c;',
     'uniform vec3  u_palette_d;',
     'uniform float u_color_mode;',
+    'uniform float u_transparent_bg;',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
     '  return a + b * cos(6.28318 * (c * t + d));',
@@ -90,7 +91,9 @@
     '  vec3  textDotColor    = mix(u_text_color, textPalette, step(0.5, u_color_mode));',
     '  vec3  marginColor     = mix(u_text_bg_color, textDotColor, textMask);',
     '',
-    '  gl_FragColor = vec4(mix(mainColor, marginColor, inMargin), 1.0);',
+    '  float dotAlpha = mix(mainMask, textMask, inMargin);',
+    '  float alpha    = mix(1.0, dotAlpha, u_transparent_bg);',
+    '  gl_FragColor   = vec4(mix(mainColor, marginColor, inMargin), alpha);',
     '}'
   ].join('\n');
 
@@ -165,7 +168,8 @@
   var uPaletteB     = gl.getUniformLocation(program, 'u_palette_b');
   var uPaletteC     = gl.getUniformLocation(program, 'u_palette_c');
   var uPaletteD     = gl.getUniformLocation(program, 'u_palette_d');
-  var uColorMode    = gl.getUniformLocation(program, 'u_color_mode');
+  var uColorMode      = gl.getUniformLocation(program, 'u_color_mode');
+  var uTransparentBg  = gl.getUniformLocation(program, 'u_transparent_bg');
 
   // ── Text texture ──────────────────────────────────────────────────────────
   var textCanvas    = document.createElement('canvas');
@@ -189,7 +193,8 @@
       textCtx.save();
       textCtx.scale(1 / aspect, 1);
       textCtx.fillStyle    = '#ffffff';
-      textCtx.font         = (v.textFontSize || 460) + 'px "IBM Plex Mono", monospace';
+      var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"IBM Plex Mono"';
+      textCtx.font         = (v.textFontSize || 460) + 'px ' + fontFamily + ', monospace';
       textCtx.textAlign    = 'center';
       textCtx.textBaseline = 'middle';
       var tx = v.textX != null ? v.textX : 0.5;
@@ -228,7 +233,7 @@
 
     if (w && h) {
       // Regenerate text texture when content or canvas size changes
-      var textKey = JSON.stringify([v.text, v.textX, v.textY, v.textFontSize]);
+      var textKey = JSON.stringify([v.text, v.textX, v.textY, v.textFontSize, v.textFont]);
       var dirty   = window._shaderState && window._shaderState.textDirty;
       if (dirty || textKey !== lastTextKey || w !== lastTexW || h !== lastTexH) {
         drawAndUploadText(v, w, h);
@@ -273,7 +278,8 @@
       gl.uniform3fv(uPaletteB,    v.u_palette_b    || [0.5, 0.5, 0.5]);
       gl.uniform3fv(uPaletteC,    v.u_palette_c    || [1.0, 1.0, 1.0]);
       gl.uniform3fv(uPaletteD,    v.u_palette_d    || [0.263, 0.416, 0.557]);
-      gl.uniform1f(uColorMode,    v.u_color_mode   != null ? v.u_color_mode   : 0.0);
+      gl.uniform1f(uColorMode,      v.u_color_mode      != null ? v.u_color_mode      : 0.0);
+      gl.uniform1f(uTransparentBg,  v.u_transparent_bg  != null ? v.u_transparent_bg  : 0.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);
@@ -296,6 +302,10 @@
     canvas.height = targetH;
     gl.viewport(0, 0, targetW, targetH);
 
+    // Enable transparent background for export so dots render on transparent,
+    // not black — Printful composites the design onto the shirt color.
+    if (window._shaderState) window._shaderState.values.u_transparent_bg = 1.0;
+
     // render() reads canvas.width/height and recalculates all uniforms (uRes, uRatio,
     // uTextRatio, etc.) for the new size, then draws one frame.
     render();
@@ -306,7 +316,10 @@
     canvas.width  = prevW;
     canvas.height = prevH;
     gl.viewport(0, 0, prevW, prevH);
-    if (window._shaderState) window._shaderState.textDirty = true;
+    if (window._shaderState) {
+      window._shaderState.values.u_transparent_bg = 0.0;
+      window._shaderState.textDirty = true;
+    }
 
     callback(dataUrl.split(',')[1]); // base64 only
   };
