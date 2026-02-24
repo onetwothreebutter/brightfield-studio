@@ -1,0 +1,104 @@
+<div class="cart-page section-padding">
+  <div class="container">
+
+    <h1 class="cart-page__title glitch" data-text="Your Cart">Your Cart</h1>
+
+    {%- if cart.item_count == 0 -%}
+
+      <div class="cart-empty">
+        <p class="cart-empty__message">Your cart is empty.</p>
+        <a href="/collections/all" class="btn btn--primary btn--lg">Shop the Collection</a>
+      </div>
+
+    {%- else -%}
+
+      <form action="/cart" method="post" class="cart-form">
+
+        <div class="cart-items">
+          {%- for item in cart.items -%}
+            <div class="cart-item">
+
+              {%- assign mockup_url = item.properties['_mockup_url'] -%}
+              {%- assign is_custom = item.properties['_design_url'] != blank -%}
+
+              <a href="{{ item.url }}" class="cart-item__image-link">
+                {%- if mockup_url != blank -%}
+                  <img
+                    src="{{ mockup_url }}"
+                    alt="Custom design preview"
+                    class="cart-item__image cart-item__image--mockup"
+                    width="160"
+                    height="160"
+                    loading="lazy"
+                  >
+                {%- elsif item.image -%}
+                  <img
+                    src="{{ item.image | image_url: width: 160 }}"
+                    alt="{{ item.image.alt | escape }}"
+                    class="cart-item__image"
+                    width="160"
+                    height="160"
+                    loading="lazy"
+                  >
+                {%- endif -%}
+              </a>
+
+              <div class="cart-item__details">
+                <a href="{{ item.url }}" class="cart-item__title">
+                  {{ item.product.title }}
+                  {%- if is_custom -%}
+                    <span class="cart-item__custom-badge">Custom Design</span>
+                  {%- endif -%}
+                </a>
+                {%- unless item.variant.title == 'Default Title' -%}
+                  <p class="cart-item__variant">{{ item.variant.title }}</p>
+                {%- endunless -%}
+                <p class="cart-item__price">{{ item.final_line_price | money }}</p>
+
+                <div class="cart-item__qty">
+                  <label for="qty-{{ item.index }}" class="visually-hidden">Quantity</label>
+                  <input
+                    id="qty-{{ item.index }}"
+                    type="number"
+                    name="updates[]"
+                    value="{{ item.quantity }}"
+                    min="0"
+                    class="cart-item__qty-input"
+                  >
+                  <a
+                    href="{{ item.url_to_remove }}"
+                    class="cart-item__remove"
+                    aria-label="Remove {{ item.product.title | escape }}"
+                  >Remove</a>
+                </div>
+              </div>
+
+            </div>
+          {%- endfor -%}
+        </div>
+
+        <div class="cart-footer">
+          <div class="cart-subtotal">
+            <span class="cart-subtotal__label">Subtotal</span>
+            <span class="cart-subtotal__price">{{ cart.total_price | money }}</span>
+          </div>
+          <p class="cart-subtotal__note">Shipping and taxes calculated at checkout.</p>
+          <div class="cart-actions">
+            <button type="submit" name="update" class="btn btn--outline">Update Cart</button>
+            <button type="submit" name="checkout" class="btn btn--primary btn--lg">Checkout</button>
+          </div>
+        </div>
+
+      </form>
+
+    {%- endif -%}
+
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Cart",
+  "settings": []
+}
+{% endschema %}

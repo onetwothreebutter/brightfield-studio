@@ -742,6 +742,25 @@ h1, h2, h3, h4, h5, h6 {
   object-fit:    cover;
   border-radius: calc(var(--radius) - 2px);
 }
+.cart-item__image--mockup {
+  object-fit:      contain;
+  background:      var(--color-surface-2);
+}
+
+.cart-item__custom-badge {
+  display:          inline-block;
+  margin-left:      0.5rem;
+  padding:          0.15em 0.5em;
+  font-family:      var(--font-body);
+  font-size:        0.65rem;
+  font-weight:      600;
+  letter-spacing:   0.08em;
+  text-transform:   uppercase;
+  color:            var(--color-bg);
+  background:       var(--color-primary);
+  border-radius:    var(--radius);
+  vertical-align:   middle;
+}
 
 .cart-item__details {
   display:        flex;

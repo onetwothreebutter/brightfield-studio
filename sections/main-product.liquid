@@ -513,7 +513,11 @@
       body: JSON.stringify({
         id:       Number(shopifyVariantId),
         quantity: 1,
-        properties: { '_design_url': currentDesignUrl }
+        properties: {
+          '_design_url':  currentDesignUrl,
+          '_mockup_url':  modalImg.src,
+          'Customization': 'Custom Shader Design'
+        }
       })
     })
     .then(function (r) {
