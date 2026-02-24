@@ -7,7 +7,7 @@
 import zlib from 'node:zlib';
 
 const WORKER_URL = 'https://brightfield-mockup-worker.eric-d-johnson.workers.dev';
-const VARIANT_ID = 4012; // Bella + Canvas 3001, White / M
+const VARIANT_ID = 4017; // Bella + Canvas 3001, Black / M
 
 // Generate a solid magenta 1800×2400 PNG in pure Node.js
 function makeSolidPng(width, height, r, g, b) {
