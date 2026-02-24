@@ -495,8 +495,10 @@
       return;
     }
 
-    // Read the currently selected Shopify variant ID from the product form
-    var shopifyVariantId = (document.querySelector('input[name="id"]') || {}).value;
+    // Read the currently selected Shopify variant ID from the product form.
+    // Multi-variant products render a <select name="id">; single-variant renders <input name="id">.
+    var variantEl = document.querySelector('select[name="id"]') || document.querySelector('input[name="id"]');
+    var shopifyVariantId = variantEl ? variantEl.value : null;
     if (!shopifyVariantId) {
       alert('Could not determine variant. Please select a size and try again.');
       return;
