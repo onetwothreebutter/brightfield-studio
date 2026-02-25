@@ -7,8 +7,8 @@
       <div class="product-media">
 
         <div class="media-tabs">
-          <button class="media-tab is-active" data-tab="photo">Photo</button>
-          <button class="media-tab" data-tab="shader">Shader</button>
+          <button class="media-tab is-active" data-tab="photo">Original Design</button>
+          <button class="media-tab" data-tab="shader">Customize</button>
         </div>
 
         <!-- Photo panel -->
@@ -47,24 +47,6 @@
           {%- if shader_src != blank -%}
             <script id="shader-frag-src" type="application/json">{{ shader_src | json }}</script>
           {%- endif -%}
-          <div class="shader-gui">
-            <div class="shader-gui__header">
-              <span class="shader-gui__title">Customize</span>
-              <div class="shader-gui__header-actions">
-                <button class="shader-gui__toggle" id="shader-gui-popout">Popout</button>
-                <button class="shader-gui__toggle" id="shader-gui-toggle">Hide</button>
-              </div>
-            </div>
-            <div class="shader-gui__preview">
-              <button
-                id="shader-preview-btn"
-                class="shader-gui__toggle"
-                data-variant-id="4017"
-                data-worker-url="https://brightfield-mockup-worker.eric-d-johnson.workers.dev"
-              >Preview on Shirt</button>
-            </div>
-            <div class="shader-gui__body" id="shader-gui-body"></div>
-          </div>
 
           <!-- Mockup modal -->
           <div id="mockup-modal" class="mockup-modal mockup-modal--hidden">
@@ -107,57 +89,72 @@
           {{ product.price | money }}
         </p>
 
-        {%- form 'product', product -%}
+        <div id="product-order-form">
+          {%- form 'product', product -%}
 
-          {%- if product.variants.size > 1 -%}
-            {%- for option in product.options_with_values -%}
-              <fieldset class="variant-fieldset">
-                <legend class="variant-label">{{ option.name }}</legend>
-                <div class="variant-options">
-                  {%- for value in option.values -%}
-                    <label class="variant-option">
-                      <input
-                        type="radio"
-                        name="options[{{ option.name | escape }}]"
-                        value="{{ value | escape }}"
-                        {% if option.selected_value == value %}checked{% endif %}
-                      >
-                      <span>{{ value | escape }}</span>
-                    </label>
-                  {%- endfor -%}
-                </div>
-              </fieldset>
-            {%- endfor -%}
-
-            <select name="id" class="variant-select visually-hidden">
-              {%- for variant in product.variants -%}
-                <option
-                  value="{{ variant.id }}"
-                  {% if variant == product.selected_or_first_available_variant %}selected{% endif %}
-                  {% unless variant.available %}disabled{% endunless %}
-                >
-                  {{ variant.title }}
-                </option>
+            {%- if product.variants.size > 1 -%}
+              {%- for option in product.options_with_values -%}
+                <fieldset class="variant-fieldset">
+                  <legend class="variant-label">{{ option.name }}</legend>
+                  <div class="variant-options">
+                    {%- for value in option.values -%}
+                      <label class="variant-option">
+                        <input
+                          type="radio"
+                          name="options[{{ option.name | escape }}]"
+                          value="{{ value | escape }}"
+                          {% if option.selected_value == value %}checked{% endif %}
+                        >
+                        <span>{{ value | escape }}</span>
+                      </label>
+                    {%- endfor -%}
+                  </div>
+                </fieldset>
               {%- endfor -%}
-            </select>
 
-          {%- else -%}
-            <input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">
-          {%- endif -%}
+              <select name="id" class="variant-select visually-hidden">
+                {%- for variant in product.variants -%}
+                  <option
+                    value="{{ variant.id }}"
+                    {% if variant == product.selected_or_first_available_variant %}selected{% endif %}
+                    {% unless variant.available %}disabled{% endunless %}
+                  >
+                    {{ variant.title }}
+                  </option>
+                {%- endfor -%}
+              </select>
 
-          <input type="hidden" name="quantity" value="1">
+            {%- else -%}
+              <input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">
+            {%- endif -%}
 
-          <div class="product-actions">
+            <input type="hidden" name="quantity" value="1">
+
+            <div class="product-actions">
+              <button
+                type="submit"
+                class="btn btn--primary btn--lg btn--full"
+                {% unless product.available %}disabled{% endunless %}
+              >
+                {%- if product.available -%}Add to Cart{%- else -%}Sold Out{%- endif -%}
+              </button>
+            </div>
+
+          {%- endform -%}
+        </div>
+
+        <div class="shader-gui" id="shader-gui">
+          <div class="shader-gui__preview">
             <button
-              type="submit"
+              id="shader-preview-btn"
               class="btn btn--primary btn--lg btn--full"
-              {% unless product.available %}disabled{% endunless %}
-            >
-              {%- if product.available -%}Add to Cart{%- else -%}Sold Out{%- endif -%}
-            </button>
+              data-variant-id="4017"
+              data-worker-url="https://brightfield-mockup-worker.eric-d-johnson.workers.dev"
+            >Preview on Shirt</button>
+            <p class="product-customize-actions__note">You'll select your size when you order.</p>
           </div>
-
-        {%- endform -%}
+          <div class="shader-gui__body" id="shader-gui-body"></div>
+        </div>
 
         {%- if product.description != blank -%}
           <div class="product-description rte">
@@ -173,8 +170,12 @@
 <script>
 // ── Tab switcher ─────────────────────────────────────────────────────────────
 (function () {
-  var tabs   = document.querySelectorAll('.media-tab');
-  var panels = document.querySelectorAll('.media-panel');
+  var tabs        = document.querySelectorAll('.media-tab');
+  var panels      = document.querySelectorAll('.media-panel');
+  var price       = document.querySelector('.product-price');
+  var orderForm   = document.getElementById('product-order-form');
+  var shaderGui   = document.getElementById('shader-gui');
+  var defaultDesc = document.querySelector('.product-description');
   if (!tabs.length) return;
 
   tabs.forEach(function (tab) {
@@ -187,10 +188,13 @@
       this.classList.add('is-active');
       document.querySelector('[data-panel="' + target + '"]').classList.add('is-active');
 
-      // Let rise-shirt.js resize now that the canvas is visible
-      if (target === 'shader') {
-        window.dispatchEvent(new Event('resize'));
-      }
+      var isCustomize = target === 'shader';
+      if (price)       price.style.display       = isCustomize ? 'none'  : '';
+      if (orderForm)   orderForm.style.display   = isCustomize ? 'none'  : '';
+      if (shaderGui)   shaderGui.style.display   = isCustomize ? 'block' : 'none';
+      if (defaultDesc) defaultDesc.style.display = isCustomize ? 'none'  : '';
+
+      if (isCustomize) window.dispatchEvent(new Event('resize'));
     });
   });
 }());
@@ -389,53 +393,6 @@ if (window.location.hash === '#shader') {
 
     body.appendChild(row);
   });
-
-  // Toggle panel visibility
-  var toggle = document.getElementById('shader-gui-toggle');
-  toggle.addEventListener('click', function () {
-    var hidden = body.classList.toggle('is-hidden');
-    this.textContent = hidden ? 'Show' : 'Hide';
-  });
-
-  // Popout / dock + drag
-  var gui       = document.querySelector('.shader-gui');
-  var guiHeader = document.querySelector('.shader-gui__header');
-  var popoutBtn = document.getElementById('shader-gui-popout');
-  var dragging  = false;
-  var dragOX    = 0;
-  var dragOY    = 0;
-
-  popoutBtn.addEventListener('click', function () {
-    if (gui.classList.contains('shader-gui--floating')) {
-      gui.classList.remove('shader-gui--floating');
-      gui.style.cssText = '';
-      this.textContent  = 'Popout';
-    } else {
-      var rect        = gui.getBoundingClientRect();
-      gui.style.left  = (rect.left + 16) + 'px';
-      gui.style.top   = (rect.top  - 16) + 'px';
-      gui.style.width = rect.width + 'px';
-      gui.classList.add('shader-gui--floating');
-      this.textContent = 'Dock';
-    }
-  });
-
-  guiHeader.addEventListener('mousedown', function (e) {
-    if (!gui.classList.contains('shader-gui--floating')) return;
-    if (e.target.tagName === 'BUTTON') return;
-    dragging = true;
-    dragOX   = e.clientX - parseFloat(gui.style.left);
-    dragOY   = e.clientY - parseFloat(gui.style.top);
-    e.preventDefault();
-  });
-
-  document.addEventListener('mousemove', function (e) {
-    if (!dragging) return;
-    gui.style.left = (e.clientX - dragOX) + 'px';
-    gui.style.top  = (e.clientY - dragOY) + 'px';
-  });
-
-  document.addEventListener('mouseup', function () { dragging = false; });
 
   function hexToRgb(hex) {
     return [

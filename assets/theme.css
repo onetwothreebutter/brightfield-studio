@@ -576,6 +576,31 @@ h1, h2, h3, h4, h5, h6 {
   font-size:   0.9375rem;
 }
 
+.product-customize-desc {
+  display:     none;
+  border-top:  1px solid var(--color-border);
+  padding-top: 2rem;
+  color:       var(--color-text-muted);
+  font-size:   0.9375rem;
+}
+
+.product-customize-desc__steps {
+  margin-top:   1rem;
+  padding-left: 1.25rem;
+  line-height:  1.8;
+}
+
+.product-customize-actions {
+  display: none;
+}
+
+.product-customize-actions__note {
+  margin-top: 0.75rem;
+  color:      var(--color-text-muted);
+  font-size:  0.875rem;
+  text-align: center;
+}
+
 /* ─── Collection Page ────────────────────────────────────── */
 .collection-page {
   padding-top: calc(var(--header-height) + 3rem);
@@ -1045,11 +1070,9 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ─── Shader GUI ─────────────────────────────────────────── */
 .shader-gui {
-  margin-top:    0.75rem;
-  background:    var(--color-surface);
-  border:        1px solid var(--color-border);
-  border-radius: var(--radius);
-  overflow:      hidden;
+  display:    none;
+  overflow-y: auto;
+  max-height: 70vh;
 }
 
 .shader-gui__header {
@@ -1102,7 +1125,7 @@ h1, h2, h3, h4, h5, h6 {
 .shader-gui__toggle:hover { opacity: 0.7; }
 
 .shader-gui__preview {
-  padding: 0.4rem 0.75rem 0;
+  margin-bottom: 1rem;
 }
 .shader-gui__body { padding: 0.25rem 0; }
 
