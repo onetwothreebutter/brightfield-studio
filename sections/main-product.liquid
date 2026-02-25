@@ -60,8 +60,22 @@
                 <img id="mockup-modal-img" class="mockup-modal__img" src="" alt="Shirt mockup">
               </div>
               <div class="mockup-modal__footer">
-                <a id="mockup-modal-download" class="btn btn--outline btn--sm" download="mockup.jpg">Download</a>
-                <button id="mockup-modal-order" class="btn btn--primary btn--sm">Order This Design</button>
+                {%- if product.variants.size > 1 -%}
+                  <div class="mockup-modal__size">
+                    <label class="mockup-modal__size-label" for="mockup-size-select">Size</label>
+                    <select id="mockup-size-select" class="mockup-modal__size-select">
+                      {%- for variant in product.variants -%}
+                        <option value="{{ variant.id }}" {% unless variant.available %}disabled{% endunless %}>
+                          {{ variant.title }}
+                        </option>
+                      {%- endfor -%}
+                    </select>
+                  </div>
+                {%- endif -%}
+                <div class="mockup-modal__footer-actions">
+                  <a id="mockup-modal-download" class="btn btn--outline btn--sm" download="mockup.jpg">Download</a>
+                  <button id="mockup-modal-order" class="btn btn--primary btn--sm">Order This Design</button>
+                </div>
               </div>
             </div>
           </div>
@@ -460,10 +474,10 @@ if (window.location.hash === '#shader') {
       return;
     }
 
-    // Read the currently selected Shopify variant ID from the product form.
-    // Multi-variant products render a <select name="id">; single-variant renders <input name="id">.
-    var variantEl = document.querySelector('select[name="id"]') || document.querySelector('input[name="id"]');
-    var shopifyVariantId = variantEl ? variantEl.value : null;
+    // Read size from modal picker (multi-variant) or hidden form input (single-variant).
+    var sizeSelect = document.getElementById('mockup-size-select');
+    var variantEl  = document.querySelector('select[name="id"]') || document.querySelector('input[name="id"]');
+    var shopifyVariantId = sizeSelect ? sizeSelect.value : (variantEl ? variantEl.value : null);
     if (!shopifyVariantId) {
       alert('Could not determine variant. Please select a size and try again.');
       return;

@@ -1209,12 +1209,43 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--radius);
 }
 .mockup-modal__footer {
+  display:        flex;
+  flex-direction: column;
+  gap:            0.625rem;
+  padding:        0.75rem 1.25rem;
+  border-top:     1px solid var(--color-border);
+  flex-shrink:    0;
+}
+
+.mockup-modal__size {
+  display:     flex;
+  align-items: center;
+  gap:         0.625rem;
+}
+
+.mockup-modal__size-label {
+  font-size:      0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color:          var(--color-text-muted);
+  white-space:    nowrap;
+}
+
+.mockup-modal__size-select {
+  flex:         1;
+  background:   var(--color-surface-2);
+  border:       1px solid var(--color-border);
+  border-radius: var(--radius);
+  color:        var(--color-text);
+  font-family:  var(--font-body);
+  font-size:    0.875rem;
+  padding:      0.35rem 0.6rem;
+}
+
+.mockup-modal__footer-actions {
   display:         flex;
   justify-content: flex-end;
   gap:             0.5rem;
-  padding:         0.75rem 1.25rem;
-  border-top:      1px solid var(--color-border);
-  flex-shrink:     0;
 }
 .shader-gui__body.is-hidden { display: none; }
 
