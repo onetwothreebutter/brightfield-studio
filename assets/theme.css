@@ -1097,18 +1097,33 @@ h1, h2, h3, h4, h5, h6 {
   gap:         0.75rem;
 }
 
-.shader-gui--floating {
-  position:   fixed;
-  z-index:    9999;
-  margin-top: 0;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-  overflow:   hidden;
+.shader-gui__mobile-bar {
+  display: none;
 }
-.shader-gui--floating .shader-gui__header { cursor: grab; }
-.shader-gui--floating .shader-gui__header:active { cursor: grabbing; }
-.shader-gui--floating .shader-gui__body {
-  max-height: 80vh;
-  overflow-y: auto;
+
+.shader-gui--floating {
+  position:      fixed;
+  z-index:       9999;
+  width:         min(85vw, 320px);
+  max-height:    70vh;
+  overflow-y:    auto;
+  background:    var(--color-surface);
+  border:        1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow:    0 8px 32px rgba(0, 0, 0, 0.7);
+}
+
+@media (max-width: 900px) {
+  .shader-gui__mobile-bar {
+    display:         flex;
+    justify-content: flex-end;
+    padding:         0.5rem 0.75rem;
+    border-bottom:   1px solid var(--color-border);
+    background:      var(--color-surface-2);
+    position:        sticky;
+    top:             0;
+    z-index:         1;
+  }
 }
 
 .shader-gui__toggle {

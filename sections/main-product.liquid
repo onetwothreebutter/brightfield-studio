@@ -158,6 +158,9 @@
         </div>
 
         <div class="shader-gui" id="shader-gui">
+          <div class="shader-gui__mobile-bar">
+            <button class="shader-gui__toggle" id="shader-gui-popout">Popout</button>
+          </div>
           <div class="shader-gui__preview">
             <button
               id="shader-preview-btn"
@@ -208,7 +211,17 @@
       if (shaderGui)   shaderGui.style.display   = isCustomize ? 'block' : 'none';
       if (defaultDesc) defaultDesc.style.display = isCustomize ? 'none'  : '';
 
-      if (isCustomize) window.dispatchEvent(new Event('resize'));
+      if (isCustomize) {
+        window.dispatchEvent(new Event('resize'));
+      } else {
+        // Dock the controls if they were floating when leaving Customize tab
+        var gui = document.getElementById('shader-gui');
+        var pb  = document.getElementById('shader-gui-popout');
+        if (gui && gui.classList.contains('shader-gui--floating')) {
+          gui.classList.remove('shader-gui--floating');
+          if (pb) pb.textContent = 'Popout';
+        }
+      }
     });
   });
 }());
@@ -407,6 +420,53 @@ if (window.location.hash === '#shader') {
 
     body.appendChild(row);
   });
+
+  // Mobile popout — draggable floating panel
+  var popoutBtn   = document.getElementById('shader-gui-popout');
+  var shaderGuiEl = document.getElementById('shader-gui');
+  var mobileBar   = document.querySelector('.shader-gui__mobile-bar');
+  var dragging = false, dragOX = 0, dragOY = 0;
+
+  if (popoutBtn) {
+    popoutBtn.addEventListener('click', function () {
+      var isFloating = shaderGuiEl.classList.toggle('shader-gui--floating');
+      this.textContent = isFloating ? 'Dock' : 'Popout';
+      if (isFloating) {
+        // Start in top-right corner, offset from edge
+        shaderGuiEl.style.top    = '70px';
+        shaderGuiEl.style.right  = '8px';
+        shaderGuiEl.style.left   = 'auto';
+        shaderGuiEl.style.bottom = 'auto';
+      } else {
+        shaderGuiEl.style.cssText = '';
+      }
+    });
+  }
+
+  if (mobileBar) {
+    // Touch drag
+    mobileBar.addEventListener('touchstart', function (e) {
+      if (!shaderGuiEl.classList.contains('shader-gui--floating')) return;
+      var touch = e.touches[0];
+      var rect  = shaderGuiEl.getBoundingClientRect();
+      dragging = true;
+      dragOX   = touch.clientX - rect.left;
+      dragOY   = touch.clientY - rect.top;
+      e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('touchmove', function (e) {
+      if (!dragging) return;
+      var touch = e.touches[0];
+      shaderGuiEl.style.left   = (touch.clientX - dragOX) + 'px';
+      shaderGuiEl.style.top    = (touch.clientY - dragOY) + 'px';
+      shaderGuiEl.style.right  = 'auto';
+      shaderGuiEl.style.bottom = 'auto';
+      e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('touchend', function () { dragging = false; });
+  }
 
   function hexToRgb(hex) {
     return [
