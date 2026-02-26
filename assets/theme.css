@@ -3,7 +3,7 @@
    Palette: #080808 bg | #00ffff cyan | #ff00ff magenta
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Space+Grotesk:wght@500;700;800&family=Anton&family=Bebas+Neue&family=Playfair+Display:wght@900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Space+Grotesk:wght@500;700;800&family=Anton&family=Bebas+Neue&family=Playfair+Display:wght@900&family=Oswald:wght@700&family=Orbitron:wght@900&family=Teko:wght@700&family=Righteous&family=Russo+One&display=swap');
 
 /* ─── Custom Properties ──────────────────────────────────── */
 :root {
