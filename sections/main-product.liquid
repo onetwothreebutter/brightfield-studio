@@ -256,12 +256,22 @@ if (window.location.hash === '#shader') {
   if (!body) return;
 
   var controls = [
+    // ── Palette ───────────────────────────────────────────────────────────
+    { type: 'header', label: 'Color Palette' },
+    { key: 'u_color_mode',  label: 'Use Palette',   type: 'toggle',                                   value: 1        },
+    { key: 'u_text_color',  label: 'Text Color',    type: 'color',  paletteDependent: true,           value: '#ffffff' },
+    { key: 'u_dot_color',   label: 'Dot Color',     type: 'color',  paletteDependent: true,           value: '#ffffff' },
+    { key: 'u_palette_a',   label: 'Palette A',     type: 'color',  value: '#808080',
+      tip: 'Offset — base brightness per channel. Sets the center point colors oscillate around.' },
+    { key: 'u_palette_b',   label: 'Palette B',     type: 'color',  value: '#808080',
+      tip: 'Amplitude — color swing range per channel. Higher = more vivid, saturated output.' },
+    { key: 'u_palette_c',   label: 'Palette C',     type: 'color',  value: '#ffffff',
+      tip: 'Frequency — how many times the palette cycles across the gradient per channel.' },
+    { key: 'u_palette_d',   label: 'Palette D',     type: 'color',  value: '#436a8e',
+      tip: 'Phase — shifts the starting hue of the color cycle. Rotates the overall color mood.' },
     // ── Text overlay ──────────────────────────────────────────────────────
     { type: 'header', label: 'Text Overlay' },
     { key: 'text',             label: 'Text',          type: 'text',                                     value: 'GLOW', textDirty: true },
-    { key: 'textX',            label: 'Text X',        type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 0.5,  textDirty: true },
-    { key: 'textY',            label: 'Text Y',        type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 0.79, textDirty: true },
-    { key: 'textFontSize',     label: 'Font Size',     type: 'range',  min: 50,   max: 800,  step: 10,   value: 320,  textDirty: true },
     { key: 'textFont',         label: 'Font',          type: 'select', textDirty: true, value: 'IBM Plex Mono',
       options: [
         { label: 'IBM Plex Mono',    value: 'IBM Plex Mono' },
@@ -276,12 +286,13 @@ if (window.location.hash === '#shader') {
         { label: 'Russo One',        value: 'Russo One' },
       ]
     },
+    { key: 'textFontSize',     label: 'Font Size',     type: 'range',  min: 50,   max: 800,  step: 10,   value: 320,  textDirty: true },
     { key: 'u_text_grid_cols', label: 'Text Cols',     type: 'range',  min: 1,    max: 50,   step: 1,    value: 28   },
     { key: 'u_text_grid_rows', label: 'Text Rows',     type: 'range',  min: 1,    max: 100,  step: 1,    value: 39   },
+    { key: 'textX',            label: 'Text X',        type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 0.5,  textDirty: true },
+    { key: 'textY',            label: 'Text Y',        type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 0.79, textDirty: true },
     { key: 'u_text_radius',    label: 'Text Dot Size', type: 'range',  min: 0.01, max: 1.5,  step: 0.01, value: 0.33 },
     { key: 'u_text_blend',     label: 'Text Blend',    type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 1.0  },
-    { key: 'u_text_color',     label: 'Text Color',    type: 'color',                                    value: '#ffffff' },
-    { key: 'u_text_bg_color',  label: 'Text BG',       type: 'color',                                    value: '#000000' },
     // ── Dots ──────────────────────────────────────────────────────────────
     { type: 'header', label: 'Dots' },
     { key: 'u_rows',           label: 'Rows',          type: 'range',  min: 10,   max: 200,  step: 1,    value: 23   },
@@ -289,16 +300,7 @@ if (window.location.hash === '#shader') {
     { key: 'u_min_radius',     label: 'Min Radius',    type: 'range',  min: 0,    max: 0.5,  step: 0.01, value: 0.02 },
     { key: 'u_max_radius',     label: 'Max Radius',    type: 'range',  min: 0.1,  max: 1.5,  step: 0.01, value: 0.55 },
     { key: 'u_invert',         label: 'Invert',        type: 'toggle',                                   value: 1    },
-    { key: 'u_dot_color',      label: 'Dot Color',     type: 'color',                                    value: '#ffffff' },
-    { key: 'u_bg_color',       label: 'BG Color',      type: 'color',                                    value: '#000000' },
     { key: 'u_top_margin',     label: 'Top Margin',    type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 0.31 },
-    // ── Palette ───────────────────────────────────────────────────────────
-    { type: 'header', label: 'Color Palette' },
-    { key: 'u_color_mode',  label: 'Use Palette',   type: 'toggle',                                   value: 1        },
-    { key: 'u_palette_a',   label: 'Palette A',     type: 'color',                                    value: '#808080' },
-    { key: 'u_palette_b',   label: 'Palette B',     type: 'color',                                    value: '#808080' },
-    { key: 'u_palette_c',   label: 'Palette C',     type: 'color',                                    value: '#ffffff' },
-    { key: 'u_palette_d',   label: 'Palette D',     type: 'color',                                    value: '#436a8e' }
   ];
 
   // Preload all shader fonts so canvas 2D context can use them immediately
@@ -314,7 +316,35 @@ if (window.location.hash === '#shader') {
   });
   window._shaderState = { values: values, textDirty: true };
 
+  // Shared tooltip for control tips
+  var tipEl = document.createElement('div');
+  tipEl.className    = 'shader-tip__popup';
+  tipEl.style.display = 'none';
+  document.body.appendChild(tipEl);
+  var activeTipBtn = null;
+
+  function showTip(btn, text) {
+    var rect = btn.getBoundingClientRect();
+    tipEl.textContent  = text;
+    tipEl.style.display = 'block';
+    tipEl.style.top    = (rect.bottom + 6) + 'px';
+    tipEl.style.left   = rect.left + 'px';
+    if (activeTipBtn) activeTipBtn.classList.remove('is-open');
+    activeTipBtn = btn;
+    btn.classList.add('is-open');
+  }
+  function hideTip() {
+    tipEl.style.display = 'none';
+    if (activeTipBtn) { activeTipBtn.classList.remove('is-open'); activeTipBtn = null; }
+  }
+  document.addEventListener('click', function (e) {
+    if (activeTipBtn && !activeTipBtn.contains(e.target)) hideTip();
+  });
+
   // Build controls
+  var paletteDependentRows = [];
+  var colorModeBtn = null;
+
   controls.forEach(function (ctrl) {
     if (ctrl.type === 'header') {
       var h = document.createElement('div');
@@ -330,6 +360,17 @@ if (window.location.hash === '#shader') {
     var label = document.createElement('label');
     label.className   = 'shader-control__label';
     label.textContent = ctrl.label;
+    if (ctrl.tip) {
+      var tipBtn       = document.createElement('button');
+      tipBtn.type      = 'button';
+      tipBtn.className = 'shader-tip-btn';
+      tipBtn.textContent = '?';
+      tipBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        activeTipBtn === this ? hideTip() : showTip(this, ctrl.tip);
+      });
+      label.appendChild(tipBtn);
+    }
     row.appendChild(label);
 
     if (ctrl.type === 'range') {
@@ -374,15 +415,19 @@ if (window.location.hash === '#shader') {
         window._shaderState.values[ctrl.key] = wasOn ? 0 : 1;
       });
 
+      if (ctrl.key === 'u_color_mode') colorModeBtn = btn;
+
       row.appendChild(btn);
 
     } else if (ctrl.type === 'color') {
       var picker = document.createElement('input');
-      picker.type      = 'color';
-      picker.className = 'shader-control__color';
-      picker.value     = ctrl.value;
+      picker.type            = 'text';
+      picker.className       = 'shader-control__color';
+      picker.value           = ctrl.value;
+      picker.dataset.coloris = '';
 
       picker.addEventListener('input', function () {
+        if (this.value.length < 7) return;
         window._shaderState.values[ctrl.key] = hexToRgb(this.value);
         if (ctrl.textDirty) window._shaderState.textDirty = true;
       });
@@ -423,8 +468,20 @@ if (window.location.hash === '#shader') {
       row.appendChild(sel);
     }
 
+    if (ctrl.paletteDependent) paletteDependentRows.push(row);
+
     body.appendChild(row);
   });
+
+  // Show/hide palette-dependent rows based on Use Palette toggle
+  function applyPaletteVisibility() {
+    var paletteOn = colorModeBtn && colorModeBtn.dataset.on === '1';
+    paletteDependentRows.forEach(function (r) {
+      r.style.display = paletteOn ? 'none' : '';
+    });
+  }
+  if (colorModeBtn) colorModeBtn.addEventListener('click', applyPaletteVisibility);
+  applyPaletteVisibility(); // apply on load (palette starts On)
 
   // Mobile popout — draggable floating panel
   var popoutBtn   = document.getElementById('shader-gui-popout');
@@ -480,6 +537,26 @@ if (window.location.hash === '#shader') {
       parseInt(hex.slice(5, 7), 16) / 255
     ];
   }
+
+  // Load Coloris — replaces native <input type="color"> picker (too large on iOS)
+  var clrLink  = document.createElement('link');
+  clrLink.rel  = 'stylesheet';
+  clrLink.href = 'https://cdn.jsdelivr.net/npm/@melloware/coloris@latest/dist/coloris.min.css';
+  document.head.appendChild(clrLink);
+
+  var clrScript    = document.createElement('script');
+  clrScript.src    = 'https://cdn.jsdelivr.net/npm/@melloware/coloris@latest/dist/coloris.min.js';
+  clrScript.onload = function () {
+    Coloris({
+      el:               '[data-coloris]',
+      theme:            'default',
+      themeMode:        'dark',
+      format:           'hex',
+      closeButton:      true,
+      closeButtonLabel: 'Done'
+    });
+  };
+  document.head.appendChild(clrScript);
 }());
 
 // ── Preview on Shirt ──────────────────────────────────────────────────────────

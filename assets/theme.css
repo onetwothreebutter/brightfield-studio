@@ -1320,16 +1320,67 @@ h1, h2, h3, h4, h5, h6 {
   background:   var(--color-primary-dim);
 }
 
-.shader-control__color {
-  width:         2.25rem;
-  height:        1.6rem;
-  padding:       0.1rem;
-  background:    transparent;
+/* ── Control tips ───────────────────────────────────────────── */
+.shader-tip-btn {
+  display:        inline-flex;
+  align-items:    center;
+  justify-content: center;
+  width:          1rem;
+  height:         1rem;
+  margin-left:    0.3rem;
+  font-size:      0.55rem;
+  font-family:    var(--font-body);
+  font-weight:    700;
+  color:          var(--color-text-muted);
+  background:     transparent;
+  border:         1px solid var(--color-border);
+  border-radius:  50%;
+  cursor:         pointer;
+  vertical-align: middle;
+  transition:     color var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink:    0;
+}
+.shader-tip-btn:hover,
+.shader-tip-btn.is-open {
+  color:         var(--color-primary);
+  border-color:  var(--color-primary);
+}
+
+.shader-tip__popup {
+  position:      fixed;
+  z-index:       10000;
+  max-width:     220px;
+  padding:       0.5rem 0.65rem;
+  background:    var(--color-surface-2);
   border:        1px solid var(--color-border);
   border-radius: var(--radius);
-  cursor:        pointer;
+  font-size:     0.65rem;
+  line-height:   1.5;
+  color:         var(--color-text);
+  box-shadow:    0 4px 16px rgba(0,0,0,0.5);
+  pointer-events: none;
 }
-.shader-control__color:hover { border-color: var(--color-primary); }
+
+/* Coloris wraps the input in .clr-field — fill the grid column */
+.shader-control .clr-field {
+  width: 100%;
+}
+
+.shader-control__color {
+  font-family:   monospace;
+  font-size:     0.65rem;
+  background:    var(--color-surface-2);
+  color:         var(--color-text);
+  border:        1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding:       0.25rem 0.4rem;
+  width:         100%;
+  outline:       none;
+  cursor:        pointer;
+  transition:    border-color var(--transition-fast);
+}
+.shader-control__color:hover,
+.shader-control__color:focus { border-color: var(--color-primary); }
 
 .shader-control__section-header {
   font-size:      0.6rem;
