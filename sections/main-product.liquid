@@ -213,13 +213,36 @@
 
       if (isCustomize) {
         window.dispatchEvent(new Event('resize'));
+        // On mobile, auto-popout the controls so the user sees canvas + controls at once
+        if (window.innerWidth <= 900 && !shaderGui.classList.contains('shader-gui--floating')) {
+          var pb     = document.getElementById('shader-gui-popout');
+          var panelW = Math.min(window.innerWidth * 0.85, 320);
+          shaderGui.classList.add('shader-gui--floating');
+          shaderGui.style.left      = Math.round((window.innerWidth - panelW) / 2) + 'px';
+          shaderGui.style.top       = Math.round(window.innerHeight * 0.72) + 'px';
+          shaderGui.style.right     = 'auto';
+          shaderGui.style.bottom    = 'auto';
+          shaderGui.style.maxHeight = Math.round(window.innerHeight * 0.26) + 'px';
+          if (pb) pb.textContent = 'Dock';
+          // Move preview button below the canvas (out of the floating panel)
+          var previewWrap = shaderGui.querySelector('.shader-gui__preview');
+          var shaderPanel = document.querySelector('[data-panel="shader"]');
+          if (previewWrap && shaderPanel) shaderPanel.appendChild(previewWrap);
+        }
       } else {
         // Dock the controls if they were floating when leaving Customize tab
         var gui = document.getElementById('shader-gui');
         var pb  = document.getElementById('shader-gui-popout');
         if (gui && gui.classList.contains('shader-gui--floating')) {
           gui.classList.remove('shader-gui--floating');
+          gui.style.cssText = '';
           if (pb) pb.textContent = 'Popout';
+          // Move preview button back into the GUI panel
+          var previewWrap = document.querySelector('.shader-gui__preview');
+          var guiBody     = document.getElementById('shader-gui-body');
+          if (previewWrap && guiBody && !gui.contains(previewWrap)) {
+            gui.insertBefore(previewWrap, guiBody);
+          }
         }
       }
     });
@@ -501,6 +524,12 @@ if (window.location.hash === '#shader') {
         shaderGuiEl.style.bottom = 'auto';
       } else {
         shaderGuiEl.style.cssText = '';
+        // Move preview button back into the GUI panel
+        var previewWrap = document.querySelector('.shader-gui__preview');
+        var guiBody     = document.getElementById('shader-gui-body');
+        if (previewWrap && guiBody && !shaderGuiEl.contains(previewWrap)) {
+          shaderGuiEl.insertBefore(previewWrap, guiBody);
+        }
       }
     });
   }
