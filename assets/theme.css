@@ -1116,13 +1116,27 @@ h1, h2, h3, h4, h5, h6 {
 @media (max-width: 900px) {
   .shader-gui__mobile-bar {
     display:         flex;
-    justify-content: flex-end;
+    justify-content: center;
+    align-items:     center;
     padding:         0.5rem 0.75rem;
     border-bottom:   1px solid var(--color-border);
     background:      var(--color-surface-2);
     position:        sticky;
     top:             0;
     z-index:         1;
+    cursor:          grab;
+  }
+  .shader-gui__mobile-bar::before {
+    content:       '';
+    display:       block;
+    width:         2.25rem;
+    height:        0.25rem;
+    background:    var(--color-text-muted);
+    border-radius: 9999px;
+    opacity:       0.5;
+  }
+  .shader-gui__toggle {
+    display: none;
   }
 }
 
@@ -1142,6 +1156,11 @@ h1, h2, h3, h4, h5, h6 {
 .shader-gui__preview {
   padding:       0 1rem;
   margin-bottom: 1rem;
+}
+/* When portalled below the canvas on mobile */
+.media-panel .shader-gui__preview {
+  padding:    0.75rem;
+  margin:     0;
 }
 .shader-gui__body { padding: 0.25rem 0; }
 
