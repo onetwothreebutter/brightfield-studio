@@ -33,7 +33,6 @@ Key files:
 
 ## Shader System
 
-- Per-product GLSL is stored in a metafield: `product.metafields.shader.fragment_glsl`
 - Products opt into the shader UI via a tag: `shader-[filename]` (e.g. `shader-rise-shirt`)
 - Each product page loads its own shader script — shaders are **not** loaded globally
 - GUI params are shared via `window._shaderState.values`: written by the inline GUI script, read by the deferred shader script

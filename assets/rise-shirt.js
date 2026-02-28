@@ -97,19 +97,6 @@
     '}'
   ].join('\n');
 
-  // Per-product shader override via metafield
-  var fragSrcEl = document.getElementById('shader-frag-src');
-  if (fragSrcEl) {
-    try {
-      var parsed = JSON.parse(fragSrcEl.textContent);
-      if (typeof parsed === 'string' && parsed.length > 0) {
-        fragSrc = parsed;
-      } else if (Array.isArray(parsed) && parsed.length > 0) {
-        fragSrc = parsed.join('\n');
-      }
-    } catch (e) {}
-  }
-
   function compileShader(gl, src, type) {
     var s = gl.createShader(type);
     gl.shaderSource(s, src);
