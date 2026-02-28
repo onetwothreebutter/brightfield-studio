@@ -4,11 +4,19 @@
 
       <!-- Media -->
       {%- assign shader_src = product.metafields.shader.fragment_glsl.value -%}
+      {%- assign shader_file = nil -%}
+      {%- for tag in product.tags -%}
+        {%- assign tag_prefix = tag | slice: 0, 7 -%}
+        {%- if tag_prefix == 'shader-' -%}
+          {%- assign shader_file = tag | remove_first: 'shader-' -%}
+          {%- break -%}
+        {%- endif -%}
+      {%- endfor -%}
       <div class="product-media">
 
         <div class="media-tabs">
           <button class="media-tab is-active" data-tab="photo">Original Design</button>
-          <button class="media-tab" data-tab="shader">Customize</button>
+          {%- if shader_file -%}<button class="media-tab" data-tab="shader">Customize</button>{%- endif -%}
         </div>
 
         <!-- Photo panel -->
@@ -41,7 +49,8 @@
           {%- endif -%}
         </div>
 
-        <!-- Shader panel — always shown; metafield overrides default GLSL if present -->
+        <!-- Shader panel — only shown when product has a shader-[file] tag -->
+        {%- if shader_file -%}
         <div class="media-panel" data-panel="shader">
           <canvas id="shader-canvas" class="product-shader__canvas"></canvas>
           {%- if shader_src != blank -%}
@@ -80,6 +89,7 @@
             </div>
           </div>
         </div>
+        {%- endif -%}
 
       </div>
 
@@ -157,6 +167,7 @@
           {%- endform -%}
         </div>
 
+        {%- if shader_file -%}
         <div class="shader-gui" id="shader-gui">
           <div class="shader-gui__mobile-bar">
             <button class="shader-gui__toggle" id="shader-gui-popout">Popout</button>
@@ -170,8 +181,16 @@
             >Preview on Shirt</button>
             <p class="product-customize-actions__note">You'll select your size when you order.</p>
           </div>
+          <p class="shader-gui__intro">
+            Tweak the controls below to make the design your own.
+            <strong>Color Palette</strong> changes the shader's color scheme.
+            <strong>Text Overlay</strong> lets you set custom text, font, size, and position.
+            <strong>Dots</strong> adjusts the halftone grid density and dot size.
+            Hit <strong>Preview on Shirt</strong> when you're ready to see it on the tee.
+          </p>
           <div class="shader-gui__body" id="shader-gui-body"></div>
         </div>
+        {%- endif -%}
 
         {%- if product.description != blank -%}
           <div class="product-description rte">
@@ -701,7 +720,9 @@ if (window.location.hash === '#shader') {
 }());
 </script>
 
-<script src="{{ 'rise-shirt.js' | asset_url }}" defer></script>
+{%- if shader_file -%}
+<script src="{{ shader_file | append: '.js' | asset_url }}" defer></script>
+{%- endif -%}
 
 {% schema %}
 {
