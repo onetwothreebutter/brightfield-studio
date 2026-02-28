@@ -3,7 +3,6 @@
     <div class="product-layout">
 
       <!-- Media -->
-      {%- assign shader_src = product.metafields.shader.fragment_glsl.value -%}
       {%- assign shader_file = nil -%}
       {%- for tag in product.tags -%}
         {%- assign tag_prefix = tag | slice: 0, 7 -%}
@@ -53,10 +52,6 @@
         {%- if shader_file -%}
         <div class="media-panel" data-panel="shader">
           <canvas id="shader-canvas" class="product-shader__canvas"></canvas>
-          {%- if shader_src != blank -%}
-            <script id="shader-frag-src" type="application/json">{{ shader_src | json }}</script>
-          {%- endif -%}
-
           <!-- Mockup modal -->
           <div id="mockup-modal" class="mockup-modal mockup-modal--hidden">
             <div class="mockup-modal__backdrop"></div>
