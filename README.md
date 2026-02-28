@@ -37,6 +37,13 @@ Key files:
 - Each product page loads its own shader script — shaders are **not** loaded globally
 - GUI params are shared via `window._shaderState.values`: written by the inline GUI script, read by the deferred shader script
 
+## How to Create a New Shirt
+
+1. Create a product in the Printful app within the Shopify Admin. Upload a PNG export from your shader to create the initial product.
+2. After creating the product in Printful, the product should sync to Shopify
+3. Edit the product in Shopify and add the tag `shader-[shader-file-name]` so it will load your shader defined in `assets/[shader-file-name].js`
+4. Deploy your latest shader by deploying this theme using the below deployment command
+
 ## Getting Started
 
 ```bash
