@@ -12,3 +12,6 @@ node_modules/
 
 # Keep settings_schema but ignore live store data
 config/settings_data.json
+
+# Local shader previews
+preview/
