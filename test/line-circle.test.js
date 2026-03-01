@@ -57,6 +57,15 @@ describe('line-circle.js', () => {
     expect(frag).not.toContain('aaCenter    = 0.002');
   });
 
+  it('fragSrc uses the mix(visibilityMask, 1.0, textAlpha) alpha formula from source', () => {
+    const frag = Array.isArray(opts.fragSrc) ? opts.fragSrc.join('\n') : opts.fragSrc;
+    expect(frag).toContain('visibilityMask');
+    expect(frag).toContain('textAlpha');
+    expect(frag).toContain('mix(visibilityMask, 1.0, textAlpha)');
+    // Old max()-based formula must be gone
+    expect(frag).not.toContain('contentAlpha');
+  });
+
   it('fragSrc declares all expected uniforms', () => {
     const frag = Array.isArray(opts.fragSrc) ? opts.fragSrc.join('\n') : opts.fragSrc;
     [
@@ -119,6 +128,30 @@ describe('line-circle.js', () => {
     );
     expect(aspectCall).toBeDefined();
     expect(aspectCall[1]).toBeCloseTo(1.5);
+  });
+
+  it('render() defaults match the TSL source (textX=0.3, textY=0.85, triWidth=45°, centerCircle on at 0.04)', () => {
+    const gl = { getUniformLocation: vi.fn((_p, name) => ({ _loc: name })) };
+    const uniforms = opts.setup(gl, {});
+    const renderGl = makeRenderGl();
+    // Pass empty values so all defaults fire
+    opts.render(renderGl, uniforms, {}, 500, 500, 0, {});
+
+    function findUniform1f(loc) {
+      const call = renderGl.uniform1f.mock.calls.find(([l]) => l === loc);
+      return call ? call[1] : undefined;
+    }
+    function findUniform3fv(loc) {
+      const call = renderGl.uniform3fv.mock.calls.find(([l]) => l === loc);
+      return call ? call[1] : undefined;
+    }
+
+    expect(findUniform1f(uniforms.textX)).toBeCloseTo(0.3);
+    expect(findUniform1f(uniforms.textY)).toBeCloseTo(0.85);
+    expect(findUniform1f(uniforms.triWidth)).toBeCloseTo((45 * Math.PI) / 180);
+    expect(findUniform1f(uniforms.centerCircleEnabled)).toBe(1.0);
+    expect(findUniform1f(uniforms.centerCircleRadius)).toBeCloseTo(0.04);
+    expect(findUniform3fv(uniforms.paletteD)).toEqual([0.0, 0.33, 0.67]);
   });
 
   // ── textKey() ─────────────────────────────────────────────────────────────────
