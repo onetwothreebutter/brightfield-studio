@@ -716,6 +716,7 @@ if (window.location.hash === '#shader') {
 </script>
 
 {%- if shader_file -%}
+<script src="{{ 'shader-base.js' | asset_url }}" defer></script>
 <script src="{{ shader_file | append: '.js' | asset_url }}" defer></script>
 {%- endif -%}
 

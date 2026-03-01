@@ -1,20 +1,6 @@
 (function () {
   'use strict';
 
-  var canvas = document.getElementById('shader-canvas');
-  if (!canvas) return;
-
-  var glOpts = { preserveDrawingBuffer: true, alpha: true, antialias: true };
-  var gl = canvas.getContext('webgl', glOpts) || canvas.getContext('experimental-webgl', glOpts);
-  if (!gl) { canvas.style.display = 'none'; return; }
-
-  var vertSrc = [
-    'attribute vec2 a_position;',
-    'void main() {',
-    '  gl_Position = vec4(a_position, 0.0, 1.0);',
-    '}'
-  ].join('\n');
-
   // RiseShirt dot-halftone port — faithful to the Three.js TSL original
   var fragSrc = [
     'precision mediump float;',
@@ -97,142 +83,40 @@
     '}'
   ].join('\n');
 
-  function compileShader(gl, src, type) {
-    var s = gl.createShader(type);
-    gl.shaderSource(s, src);
-    gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-      console.error('Shader error:', gl.getShaderInfoLog(s));
-      gl.deleteShader(s);
-      return null;
-    }
-    return s;
-  }
+  window.ShaderBase.create({
+    fragSrc: fragSrc,
 
-  var vert = compileShader(gl, vertSrc, gl.VERTEX_SHADER);
-  var frag = compileShader(gl, fragSrc, gl.FRAGMENT_SHADER);
-  if (!vert || !frag) return;
+    setup: function (gl, program) {
+      return {
+        time:         gl.getUniformLocation(program, 'u_time'),
+        res:          gl.getUniformLocation(program, 'u_resolution'),
+        rows:         gl.getUniformLocation(program, 'u_rows'),
+        cols:         gl.getUniformLocation(program, 'u_cols'),
+        minRadius:    gl.getUniformLocation(program, 'u_min_radius'),
+        maxRadius:    gl.getUniformLocation(program, 'u_max_radius'),
+        invert:       gl.getUniformLocation(program, 'u_invert'),
+        dotColor:     gl.getUniformLocation(program, 'u_dot_color'),
+        bgColor:      gl.getUniformLocation(program, 'u_bg_color'),
+        topMargin:    gl.getUniformLocation(program, 'u_top_margin'),
+        ratio:        gl.getUniformLocation(program, 'u_ratio'),
+        textTex:      gl.getUniformLocation(program, 'u_text_texture'),
+        textGridCols: gl.getUniformLocation(program, 'u_text_grid_cols'),
+        textGridRows: gl.getUniformLocation(program, 'u_text_grid_rows'),
+        textBlend:    gl.getUniformLocation(program, 'u_text_blend'),
+        textRadius:   gl.getUniformLocation(program, 'u_text_radius'),
+        textRatio:    gl.getUniformLocation(program, 'u_text_ratio'),
+        textColor:    gl.getUniformLocation(program, 'u_text_color'),
+        textBgColor:  gl.getUniformLocation(program, 'u_text_bg_color'),
+        paletteA:     gl.getUniformLocation(program, 'u_palette_a'),
+        paletteB:     gl.getUniformLocation(program, 'u_palette_b'),
+        paletteC:     gl.getUniformLocation(program, 'u_palette_c'),
+        paletteD:     gl.getUniformLocation(program, 'u_palette_d'),
+        colorMode:    gl.getUniformLocation(program, 'u_color_mode'),
+        transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
+      };
+    },
 
-  var program = gl.createProgram();
-  gl.attachShader(program, vert);
-  gl.attachShader(program, frag);
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.error('Program link error:', gl.getProgramInfoLog(program));
-    return;
-  }
-  gl.useProgram(program);
-
-  // Full-screen quad
-  var buf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
-  var posLoc = gl.getAttribLocation(program, 'a_position');
-  gl.enableVertexAttribArray(posLoc);
-  gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-
-  // Uniform locations
-  var uTime         = gl.getUniformLocation(program, 'u_time');
-  var uRes          = gl.getUniformLocation(program, 'u_resolution');
-  var uRows         = gl.getUniformLocation(program, 'u_rows');
-  var uCols         = gl.getUniformLocation(program, 'u_cols');
-  var uMinRadius    = gl.getUniformLocation(program, 'u_min_radius');
-  var uMaxRadius    = gl.getUniformLocation(program, 'u_max_radius');
-  var uInvert       = gl.getUniformLocation(program, 'u_invert');
-  var uDotColor     = gl.getUniformLocation(program, 'u_dot_color');
-  var uBgColor      = gl.getUniformLocation(program, 'u_bg_color');
-  var uTopMargin    = gl.getUniformLocation(program, 'u_top_margin');
-  var uRatio        = gl.getUniformLocation(program, 'u_ratio');
-  var uTextTex      = gl.getUniformLocation(program, 'u_text_texture');
-  var uTextGridCols = gl.getUniformLocation(program, 'u_text_grid_cols');
-  var uTextGridRows = gl.getUniformLocation(program, 'u_text_grid_rows');
-  var uTextBlend    = gl.getUniformLocation(program, 'u_text_blend');
-  var uTextRadius   = gl.getUniformLocation(program, 'u_text_radius');
-  var uTextRatio    = gl.getUniformLocation(program, 'u_text_ratio');
-  var uTextColor    = gl.getUniformLocation(program, 'u_text_color');
-  var uTextBgColor  = gl.getUniformLocation(program, 'u_text_bg_color');
-  var uPaletteA     = gl.getUniformLocation(program, 'u_palette_a');
-  var uPaletteB     = gl.getUniformLocation(program, 'u_palette_b');
-  var uPaletteC     = gl.getUniformLocation(program, 'u_palette_c');
-  var uPaletteD     = gl.getUniformLocation(program, 'u_palette_d');
-  var uColorMode      = gl.getUniformLocation(program, 'u_color_mode');
-  var uTransparentBg  = gl.getUniformLocation(program, 'u_transparent_bg');
-
-  // ── Text texture ──────────────────────────────────────────────────────────
-  var textCanvas    = document.createElement('canvas');
-  textCanvas.width  = 1024;
-  textCanvas.height = 1024;
-  var textCtx    = textCanvas.getContext('2d');
-  var textTex    = gl.createTexture();
-  var lastTextKey = null;
-  var lastTexW    = 0;
-  var lastTexH    = 0;
-
-  function drawAndUploadText(v, w, h) {
-    var size   = 1024;
-    var aspect = (w > 0 && h > 0) ? w / h : 1;
-
-    textCtx.fillStyle = '#000000';
-    textCtx.fillRect(0, 0, size, size);
-
-    var txt = v.text || '';
-    if (txt) {
-      textCtx.save();
-      textCtx.scale(1 / aspect, 1);
-      textCtx.fillStyle    = '#ffffff';
-      var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"IBM Plex Mono"';
-      textCtx.font         = (v.textFontSize || 460) + 'px ' + fontFamily + ', monospace';
-      textCtx.textAlign    = 'center';
-      textCtx.textBaseline = 'middle';
-      var tx = v.textX != null ? v.textX : 0.5;
-      var ty = v.textY != null ? v.textY : 0.79;
-      textCtx.fillText(txt, size * tx * aspect, size * (1 - ty));
-      textCtx.restore();
-    }
-
-    gl.bindTexture(gl.TEXTURE_2D, textTex);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCanvas);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  }
-
-  function resize() {
-    var dpr = window.devicePixelRatio || 1;
-    var w = canvas.offsetWidth;
-    var h = canvas.offsetHeight;
-    if (!w || !h) return;
-    canvas.style.width  = w + 'px';
-    canvas.style.height = h + 'px';
-    canvas.width  = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-  }
-  window.addEventListener('resize', resize);
-  resize();
-
-  var start = performance.now();
-
-  function render() {
-    var t = (performance.now() - start) / 1000.0;
-    var v = (window._shaderState && window._shaderState.values) || {};
-    var w = canvas.width;
-    var h = canvas.height;
-
-    if (w && h) {
-      // Regenerate text texture when content or canvas size changes
-      var textKey = JSON.stringify([v.text, v.textX, v.textY, v.textFontSize, v.textFont]);
-      var dirty   = window._shaderState && window._shaderState.textDirty;
-      if (dirty || textKey !== lastTextKey || w !== lastTexW || h !== lastTexH) {
-        drawAndUploadText(v, w, h);
-        lastTextKey = textKey;
-        lastTexW    = w;
-        lastTexH    = h;
-        if (window._shaderState) window._shaderState.textDirty = false;
-      }
-
+    render: function (gl, u, v, w, h, t, textTex) {
       var rows   = v.u_rows       != null ? v.u_rows       : 48;
       var cols   = v.u_cols       != null ? v.u_cols       : 37;
       var margin = v.u_top_margin != null ? v.u_top_margin : 0.0;
@@ -246,71 +130,60 @@
       var tGridRows = v.u_text_grid_rows != null ? v.u_text_grid_rows : 31;
       var tRatio    = (w / tGridCols) / (h / tGridRows);
 
-      gl.uniform1f(uTime,         t);
-      gl.uniform2f(uRes,          w, h);
-      gl.uniform1f(uRows,         rows);
-      gl.uniform1f(uCols,         cols);
-      gl.uniform1f(uMinRadius,    v.u_min_radius   != null ? v.u_min_radius   : 0.02);
-      gl.uniform1f(uMaxRadius,    v.u_max_radius   != null ? v.u_max_radius   : 0.55);
-      gl.uniform1f(uInvert,       v.u_invert       != null ? v.u_invert       : 1);
-      gl.uniform3fv(uDotColor,    v.u_dot_color    || [1.0, 1.0, 1.0]);
-      gl.uniform3fv(uBgColor,     v.u_bg_color     || [0.0, 0.0, 0.0]);
-      gl.uniform1f(uTopMargin,    margin);
-      gl.uniform1f(uRatio,        ratio);
-      gl.uniform1f(uTextGridCols, tGridCols);
-      gl.uniform1f(uTextGridRows, tGridRows);
-      gl.uniform1f(uTextBlend,    v.u_text_blend   != null ? v.u_text_blend   : 1.0);
-      gl.uniform1f(uTextRadius,   v.u_text_radius  != null ? v.u_text_radius  : 0.16);
-      gl.uniform1f(uTextRatio,    tRatio);
-      gl.uniform3fv(uTextColor,   v.u_text_color   || [1.0, 1.0, 1.0]);
-      gl.uniform3fv(uTextBgColor, v.u_text_bg_color || [0.0, 0.0, 0.0]);
-      gl.uniform3fv(uPaletteA,    v.u_palette_a    || [0.5, 0.5, 0.5]);
-      gl.uniform3fv(uPaletteB,    v.u_palette_b    || [0.5, 0.5, 0.5]);
-      gl.uniform3fv(uPaletteC,    v.u_palette_c    || [1.0, 1.0, 1.0]);
-      gl.uniform3fv(uPaletteD,    v.u_palette_d    || [0.263, 0.416, 0.557]);
-      gl.uniform1f(uColorMode,      v.u_color_mode      != null ? v.u_color_mode      : 0.0);
-      gl.uniform1f(uTransparentBg,  v.u_transparent_bg  != null ? v.u_transparent_bg  : 0.0);
+      gl.uniform1f(u.time,         t);
+      gl.uniform2f(u.res,          w, h);
+      gl.uniform1f(u.rows,         rows);
+      gl.uniform1f(u.cols,         cols);
+      gl.uniform1f(u.minRadius,    v.u_min_radius   != null ? v.u_min_radius   : 0.02);
+      gl.uniform1f(u.maxRadius,    v.u_max_radius   != null ? v.u_max_radius   : 0.55);
+      gl.uniform1f(u.invert,       v.u_invert       != null ? v.u_invert       : 1);
+      gl.uniform3fv(u.dotColor,    v.u_dot_color    || [1.0, 1.0, 1.0]);
+      gl.uniform3fv(u.bgColor,     v.u_bg_color     || [0.0, 0.0, 0.0]);
+      gl.uniform1f(u.topMargin,    margin);
+      gl.uniform1f(u.ratio,        ratio);
+      gl.uniform1f(u.textGridCols, tGridCols);
+      gl.uniform1f(u.textGridRows, tGridRows);
+      gl.uniform1f(u.textBlend,    v.u_text_blend   != null ? v.u_text_blend   : 1.0);
+      gl.uniform1f(u.textRadius,   v.u_text_radius  != null ? v.u_text_radius  : 0.16);
+      gl.uniform1f(u.textRatio,    tRatio);
+      gl.uniform3fv(u.textColor,   v.u_text_color   || [1.0, 1.0, 1.0]);
+      gl.uniform3fv(u.textBgColor, v.u_text_bg_color || [0.0, 0.0, 0.0]);
+      gl.uniform3fv(u.paletteA,    v.u_palette_a    || [0.5, 0.5, 0.5]);
+      gl.uniform3fv(u.paletteB,    v.u_palette_b    || [0.5, 0.5, 0.5]);
+      gl.uniform3fv(u.paletteC,    v.u_palette_c    || [1.0, 1.0, 1.0]);
+      gl.uniform3fv(u.paletteD,    v.u_palette_d    || [0.263, 0.416, 0.557]);
+      gl.uniform1f(u.colorMode,     v.u_color_mode     != null ? v.u_color_mode     : 0.0);
+      gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);
-      gl.uniform1i(uTextTex, 0);
+      gl.uniform1i(u.textTex, 0);
+    },
 
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    }
+    drawText: function (ctx, size, v, w, h) {
+      var aspect = (w > 0 && h > 0) ? w / h : 1;
 
-    requestAnimationFrame(render);
-  }
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, size, size);
 
-  render();
+      var txt = v.text || '';
+      if (txt) {
+        ctx.save();
+        ctx.scale(1 / aspect, 1);
+        ctx.fillStyle    = '#ffffff';
+        var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"IBM Plex Mono"';
+        ctx.font         = (v.textFontSize || 460) + 'px ' + fontFamily + ', monospace';
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'middle';
+        var tx = v.textX != null ? v.textX : 0.5;
+        var ty = v.textY != null ? v.textY : 0.79;
+        ctx.fillText(txt, size * tx * aspect, size * (1 - ty));
+        ctx.restore();
+      }
+    },
 
-  // Export the shader at print resolution and return base64 PNG via callback
-  window._shaderExport = function (targetW, targetH, callback) {
-    var prevW = canvas.width;
-    var prevH = canvas.height;
-
-    canvas.width  = targetW;
-    canvas.height = targetH;
-    gl.viewport(0, 0, targetW, targetH);
-
-    // Enable transparent background for export so dots render on transparent,
-    // not black — Printful composites the design onto the shirt color.
-    if (window._shaderState) window._shaderState.values.u_transparent_bg = 1.0;
-
-    // render() reads canvas.width/height and recalculates all uniforms (uRes, uRatio,
-    // uTextRatio, etc.) for the new size, then draws one frame.
-    render();
-
-    var dataUrl = canvas.toDataURL('image/png');
-
-    // Restore
-    canvas.width  = prevW;
-    canvas.height = prevH;
-    gl.viewport(0, 0, prevW, prevH);
-    if (window._shaderState) {
-      window._shaderState.values.u_transparent_bg = 0.0;
-      window._shaderState.textDirty = true;
-    }
-
-    callback(dataUrl.split(',')[1]); // base64 only
-  };
+    textKey: function (v) {
+      return JSON.stringify([v.text, v.textX, v.textY, v.textFontSize, v.textFont]);
+    },
+  });
 }());
