@@ -109,8 +109,10 @@
     '  vec3 textFillColor = mix(palColor, u_text_color, u_use_text_color);',
     '  vec3 finalColor    = mix(withOutline, textFillColor, fillSample);',
     '',
-    '  float contentAlpha = max(circleMask * lineMask * triMask * centerMask, max(fillSample, outlineSample));',
-    '  float alpha        = mix(1.0, contentAlpha, u_transparent_bg);',
+    '  float visibilityMask = circleMask * lineMask * triMask * centerMask;',
+    '  float textAlpha      = fillSample + outlineSample;',
+    '  float finalAlpha     = mix(visibilityMask, 1.0, textAlpha);',
+    '  float alpha          = mix(1.0, finalAlpha, u_transparent_bg);',
     '  gl_FragColor = vec4(finalColor, alpha);',
     '}'
   ].join('\n');
@@ -159,19 +161,19 @@
       gl.uniform3fv(u.paletteA,    v.u_palette_a  || [0.5, 0.5, 0.5]);
       gl.uniform3fv(u.paletteB,    v.u_palette_b  || [0.5, 0.5, 0.5]);
       gl.uniform3fv(u.paletteC,    v.u_palette_c  || [1.0, 1.0, 1.0]);
-      gl.uniform3fv(u.paletteD,    v.u_palette_d  || [0.263, 0.416, 0.557]);
+      gl.uniform3fv(u.paletteD,    v.u_palette_d  || [0.0, 0.33, 0.67]);
       gl.uniform3fv(u.textColor,   v.u_text_color    || [1.0, 1.0, 1.0]);
       gl.uniform1f(u.useTextColor, v.u_use_text_color       != null ? v.u_use_text_color       : 0.0);
       gl.uniform3fv(u.outlineColor, v.u_outline_color || [0.0, 0.0, 0.0]);
-      gl.uniform1f(u.textX,        v.textX                  != null ? v.textX                  : 0.5);
-      gl.uniform1f(u.textY,        v.textY                  != null ? v.textY                  : 0.5);
+      gl.uniform1f(u.textX,        v.textX                  != null ? v.textX                  : 0.3);
+      gl.uniform1f(u.textY,        v.textY                  != null ? v.textY                  : 0.85);
       gl.uniform1f(u.triEnabled,   v.u_tri_enabled          != null ? v.u_tri_enabled          : 1.0);
       gl.uniform1f(u.triRotation,  v.u_tri_rotation         != null ? v.u_tri_rotation         : 0.0);
       gl.uniform1f(u.triSize,      v.u_tri_size             != null ? v.u_tri_size             : 1.0);
-      // uTriWidth in radians; default 30° = equilateral half-angle
-      gl.uniform1f(u.triWidth,     v.u_tri_width            != null ? v.u_tri_width            : Math.PI / 6);
-      gl.uniform1f(u.centerCircleEnabled, v.u_center_circle_enabled != null ? v.u_center_circle_enabled : 0.0);
-      gl.uniform1f(u.centerCircleRadius,  v.u_center_circle_radius  != null ? v.u_center_circle_radius  : 0.05);
+      // uTriWidth in radians; default 45°
+      gl.uniform1f(u.triWidth,     v.u_tri_width            != null ? v.u_tri_width            : (45 * Math.PI) / 180);
+      gl.uniform1f(u.centerCircleEnabled, v.u_center_circle_enabled != null ? v.u_center_circle_enabled : 1.0);
+      gl.uniform1f(u.centerCircleRadius,  v.u_center_circle_radius  != null ? v.u_center_circle_radius  : 0.04);
       gl.uniform1f(u.transparentBg, v.u_transparent_bg      != null ? v.u_transparent_bg      : 0.0);
 
       gl.activeTexture(gl.TEXTURE0);
@@ -187,8 +189,8 @@
       if (txt) {
         var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"IBM Plex Mono"';
         var fontSize   = v.textFontSize || 120;
-        var tx         = v.textX != null ? v.textX : 0.5;
-        var ty         = v.textY != null ? v.textY : 0.5;
+        var tx         = v.textX != null ? v.textX : 0.3;
+        var ty         = v.textY != null ? v.textY : 0.85;
         var cx         = tx * size;
         // Canvas Y=0 is top; UNPACK_FLIP_Y maps it to UV y=1 (top).
         // Drawing at (1-ty)*size means ty=1→canvas top→UV top, ty=0→canvas bottom→UV bottom.
