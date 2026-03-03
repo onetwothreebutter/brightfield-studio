@@ -423,10 +423,11 @@ if (window.location.hash === '#shader') {
 
     } else if (ctrl.type === 'color') {
       var picker = document.createElement('input');
-      picker.type            = 'text';
-      picker.className       = 'shader-control__color';
-      picker.value           = ctrl.value;
-      picker.dataset.coloris = '';
+      picker.type             = 'text';
+      picker.className        = 'shader-control__color';
+      picker.value            = ctrl.value;
+      picker.dataset.coloris  = '';
+      picker.dataset.paramKey = ctrl.key;
 
       picker.addEventListener('input', function () {
         if (this.value.length < 7) return;

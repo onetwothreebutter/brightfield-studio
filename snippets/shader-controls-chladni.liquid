@@ -1,13 +1,13 @@
 var controls = [
   // ── Pattern ───────────────────────────────────────────────────────────────
   { type: 'header', label: 'Pattern' },
-  { key: 'u_n',         label: 'N Frequency', type: 'range', min: 1,    max: 12,   step: 0.5,   value: 8.5   },
-  { key: 'u_m',         label: 'M Frequency', type: 'range', min: 1,    max: 12,   step: 0.5,   value: 4.5   },
-  { key: 'u_a',         label: 'Coeff A',     type: 'range', min: -3,   max: 3,    step: 0.05,  value: -0.35 },
-  { key: 'u_b',         label: 'Coeff B',     type: 'range', min: -3,   max: 3,    step: 0.05,  value: -0.20 },
-  { key: 'u_threshold', label: 'Threshold',   type: 'range', min: 0.01, max: 0.35, step: 0.005, value: 0.135 },
-  { key: 'u_glow',      label: 'Glow',        type: 'range', min: 0,    max: 1.0,  step: 0.01,  value: 0.5   },
-  { key: 'u_rotation',  label: 'Rotation',    type: 'range', min: 0,    max: 360,  step: 1,     value: 90,   toRadians: true },
+  { key: 'u_n',         label: 'N Frequency', type: 'range', min: 1,    max: 12,   step: 0.5,   value: 3     },
+  { key: 'u_m',         label: 'M Frequency', type: 'range', min: 1,    max: 12,   step: 0.5,   value: 4     },
+  { key: 'u_a',         label: 'Coeff A',     type: 'range', min: -3,   max: 3,    step: 0.05,  value: -1    },
+  { key: 'u_b',         label: 'Coeff B',     type: 'range', min: -3,   max: 3,    step: 0.05,  value: 2.5   },
+  { key: 'u_threshold', label: 'Threshold',   type: 'range', min: 0.01, max: 0.35, step: 0.005, value: 0.105 },
+  { key: 'u_glow',      label: 'Glow',        type: 'range', min: 0,    max: 1.0,  step: 0.01,  value: 0.57  },
+  { key: 'u_rotation',  label: 'Rotation',    type: 'range', min: 0,    max: 360,  step: 1,     value: 335,  toRadians: true },
   // ── Color ─────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Color' },
   { key: 'u_grad_mode', label: 'Gradient Mode', type: 'select', value: 1,
@@ -18,8 +18,8 @@ var controls = [
       { label: 'Angular', value: 3 },
     ]
   },
-  { key: 'u_color1', label: 'Color 1',     type: 'color', value: '#00b8ff' },
-  { key: 'u_color2', label: 'Color 2',     type: 'color', value: '#ffb000' },
+  { key: 'u_color1', label: 'Color 1',     type: 'color', value: '#24c5f2' },
+  { key: 'u_color2', label: 'Color 2',     type: 'color', value: '#f2249a' },
   { key: 'u_chroma', label: 'Chroma Shift', type: 'range', min: 0, max: 6.0, step: 0.1, value: 1.5 },
 ];
 
@@ -34,6 +34,33 @@ var controls = [
 
   // stateValue lets callers store a converted value (e.g. radians) while
   // showing the raw slider value (e.g. degrees) in the UI.
+  // Returns a vivid hex color at a given hue (0–1), high saturation + brightness
+  function vividHex(hue) {
+    var s = 0.85, v = 0.95;
+    var i = Math.floor(hue * 6), f = hue * 6 - i;
+    var p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+    var r, g, b;
+    switch (i % 6) {
+      case 0: r = v; g = t; b = p; break;
+      case 1: r = q; g = v; b = p; break;
+      case 2: r = p; g = v; b = t; break;
+      case 3: r = p; g = q; b = v; break;
+      case 4: r = t; g = p; b = v; break;
+      case 5: r = v; g = p; b = q; break;
+    }
+    return '#' + [r, g, b].map(function (c) {
+      return Math.round(c * 255).toString(16).padStart(2, '0');
+    }).join('');
+  }
+
+  function setColor(key, hex) {
+    var inp = body.querySelector('[data-param-key="' + key + '"]');
+    if (!inp) return;
+    inp.value = hex;
+    // Fire input so Coloris swatch updates and the existing handler sets state
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
   function setSlider(key, value, stateValue) {
     var inp  = body.querySelector('[data-param-key="' + key + '"]');
     if (!inp) return;
@@ -62,7 +89,9 @@ var controls = [
     if (Math.abs(a) < 0.2 && Math.abs(b) < 0.2)
       a = (Math.random() > 0.5 ? 1 : -1) * rnd(0.5, 2.0, 0.05);
 
-    var rot = rnd(0, 360, 1);
+    var rot   = rnd(0, 360, 1);
+    var hue1  = Math.random();
+    var hue2  = (hue1 + 0.33 + Math.random() * 0.34) % 1;
 
     setSlider('u_n',         ni);
     setSlider('u_m',         mi);
@@ -71,6 +100,8 @@ var controls = [
     setSlider('u_threshold', +rnd(0.04, 0.18, 0.005).toFixed(3));
     setSlider('u_glow',      +rnd(0.1, 1.0, 0.01).toFixed(2));
     setSlider('u_rotation',  rot, rot * Math.PI / 180);
+    setColor('u_color1', vividHex(hue1));
+    setColor('u_color2', vividHex(hue2));
   });
 
   randRow.appendChild(randBtn);
