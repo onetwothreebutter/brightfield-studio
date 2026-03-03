@@ -1357,7 +1357,9 @@ h1, h2, h3, h4, h5, h6 {
   border-radius:  var(--radius);
   padding:        0.35rem 0.75rem;
   cursor:         pointer;
-  transition:     all var(--transition-fast);
+  transition:     color var(--transition-fast),
+                  background var(--transition-fast),
+                  border-color var(--transition-fast);
   margin-top:     0.25rem;
 }
 .shader-control__action:hover {
