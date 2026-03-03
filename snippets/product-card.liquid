@@ -42,7 +42,14 @@
     {%- else -%}
       <a href="{{ product.url }}" class="btn btn--primary btn--sm">Select Options</a>
     {%- endif -%}
-    {%- if product.tags contains 'custom-design' -%}
+    {%- assign has_shader = false -%}
+    {%- for tag in product.tags -%}
+      {%- if tag | slice: 0, 7 == 'shader-' -%}
+        {%- assign has_shader = true -%}
+        {%- break -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- if has_shader -%}
       <a href="{{ product.url }}#shader" class="btn btn--outline btn--sm product-card__customize-btn">
         Customize Design
       </a>
