@@ -166,7 +166,7 @@
       gl.uniform1f(u.useTextColor, v.u_use_text_color       != null ? v.u_use_text_color       : 0.0);
       gl.uniform3fv(u.outlineColor, v.u_outline_color || [0.0, 0.0, 0.0]);
       gl.uniform1f(u.textX,        v.textX                  != null ? v.textX                  : 0.3);
-      gl.uniform1f(u.textY,        v.textY                  != null ? v.textY                  : 0.85);
+      gl.uniform1f(u.textY,        v.textY                  != null ? v.textY                  : 0.71);
       gl.uniform1f(u.triEnabled,   v.u_tri_enabled          != null ? v.u_tri_enabled          : 1.0);
       gl.uniform1f(u.triRotation,  v.u_tri_rotation         != null ? v.u_tri_rotation         : 0.0);
       gl.uniform1f(u.triSize,      v.u_tri_size             != null ? v.u_tri_size             : 1.0);
@@ -187,7 +187,7 @@
 
       var txt = v.text || '';
       if (txt) {
-        var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"IBM Plex Mono"';
+        var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"Montserrat"';
         var fontSize   = v.textFontSize || 120;
         var tx         = v.textX != null ? v.textX : 0.3;
         var ty         = v.textY != null ? v.textY : 0.85;
