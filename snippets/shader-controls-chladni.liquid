@@ -1,0 +1,78 @@
+var controls = [
+  // ── Pattern ───────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Pattern' },
+  { key: 'u_n',         label: 'N Frequency', type: 'range', min: 1,    max: 12,   step: 0.5,   value: 8.5   },
+  { key: 'u_m',         label: 'M Frequency', type: 'range', min: 1,    max: 12,   step: 0.5,   value: 4.5   },
+  { key: 'u_a',         label: 'Coeff A',     type: 'range', min: -3,   max: 3,    step: 0.05,  value: -0.35 },
+  { key: 'u_b',         label: 'Coeff B',     type: 'range', min: -3,   max: 3,    step: 0.05,  value: -0.20 },
+  { key: 'u_threshold', label: 'Threshold',   type: 'range', min: 0.01, max: 0.35, step: 0.005, value: 0.135 },
+  { key: 'u_glow',      label: 'Glow',        type: 'range', min: 0,    max: 1.0,  step: 0.01,  value: 0.5   },
+  { key: 'u_rotation',  label: 'Rotation',    type: 'range', min: 0,    max: 360,  step: 1,     value: 90,   toRadians: true },
+  // ── Color ─────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Color' },
+  { key: 'u_grad_mode', label: 'Gradient Mode', type: 'select', value: 1,
+    options: [
+      { label: 'Flat',    value: 0 },
+      { label: 'Radial',  value: 1 },
+      { label: 'Linear',  value: 2 },
+      { label: 'Angular', value: 3 },
+    ]
+  },
+  { key: 'u_color1', label: 'Color 1',     type: 'color', value: '#00b8ff' },
+  { key: 'u_color2', label: 'Color 2',     type: 'color', value: '#ffb000' },
+  { key: 'u_chroma', label: 'Chroma Shift', type: 'range', min: 0, max: 6.0, step: 0.1, value: 1.5 },
+];
+
+// No text overlay — no fonts to preload
+
+// ── Randomize button ─────────────────────────────────────────────────────────
+(function () {
+  function rnd(min, max, step) {
+    var steps = Math.floor((max - min) / step);
+    return +(Math.min(max, min + Math.round(Math.random() * steps) * step).toFixed(10));
+  }
+
+  // stateValue lets callers store a converted value (e.g. radians) while
+  // showing the raw slider value (e.g. degrees) in the UI.
+  function setSlider(key, value, stateValue) {
+    var inp  = body.querySelector('[data-param-key="' + key + '"]');
+    if (!inp) return;
+    var disp = inp.parentElement.querySelector('.shader-control__value');
+    inp.value = value;
+    if (disp) disp.textContent = parseFloat(value);
+    window._shaderState.values[key] = stateValue !== undefined ? stateValue : value;
+  }
+
+  var randRow = document.createElement('div');
+  randRow.className = 'shader-control';
+  var randBtn = document.createElement('button');
+  randBtn.type        = 'button';
+  randBtn.className   = 'shader-control__action';
+  randBtn.textContent = 'Randomize Pattern';
+
+  randBtn.addEventListener('click', function () {
+    var pool = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+    var ni = pool[Math.floor(Math.random() * pool.length)];
+    var mi = pool[Math.floor(Math.random() * pool.length)];
+    if (ni === mi)
+      mi = pool[(pool.indexOf(mi) + 1 + Math.floor(Math.random() * (pool.length - 1))) % pool.length];
+
+    var a = rnd(-2.5, 2.5, 0.05);
+    var b = rnd(-2.5, 2.5, 0.05);
+    if (Math.abs(a) < 0.2 && Math.abs(b) < 0.2)
+      a = (Math.random() > 0.5 ? 1 : -1) * rnd(0.5, 2.0, 0.05);
+
+    var rot = rnd(0, 360, 1);
+
+    setSlider('u_n',         ni);
+    setSlider('u_m',         mi);
+    setSlider('u_a',         +a.toFixed(2));
+    setSlider('u_b',         +b.toFixed(2));
+    setSlider('u_threshold', +rnd(0.04, 0.18, 0.005).toFixed(3));
+    setSlider('u_glow',      +rnd(0.1, 1.0, 0.01).toFixed(2));
+    setSlider('u_rotation',  rot, rot * Math.PI / 180);
+  });
+
+  randRow.appendChild(randBtn);
+  body.appendChild(randRow);
+}());

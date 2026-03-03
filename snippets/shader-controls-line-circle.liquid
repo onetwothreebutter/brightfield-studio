@@ -1,0 +1,59 @@
+var controls = [
+  // ── Shape ─────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Shape' },
+  { key: 'u_radius',     label: 'Radius',       type: 'range', min: 0.05, max: 0.5,  step: 0.01, value: 0.4  },
+  { key: 'u_line_count', label: 'Lines',         type: 'range', min: 2,    max: 80,   step: 1,    value: 20   },
+  { key: 'u_power',      label: 'Power',         type: 'range', min: 0.5,  max: 6.0,  step: 0.1,  value: 2.5  },
+  { key: 'u_width_top',  label: 'Width Top',     type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.05 },
+  { key: 'u_width_bot',  label: 'Width Bottom',  type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.75 },
+  // ── Color Palette ──────────────────────────────────────────────────────────
+  { type: 'header', label: 'Color Palette' },
+  { key: 'u_palette_a', label: 'Palette A', type: 'color', value: '#808080',
+    tip: 'Offset — base brightness per channel. Sets the center point colors oscillate around.' },
+  { key: 'u_palette_b', label: 'Palette B', type: 'color', value: '#808080',
+    tip: 'Amplitude — color swing range per channel. Higher = more vivid, saturated output.' },
+  { key: 'u_palette_c', label: 'Palette C', type: 'color', value: '#ffffff',
+    tip: 'Frequency — how many times the palette cycles per channel.' },
+  { key: 'u_palette_d', label: 'Palette D', type: 'color', value: '#0054ab',
+    tip: 'Phase — shifts the starting hue of the color cycle.' },
+  // ── Triangle Mask ──────────────────────────────────────────────────────────
+  { type: 'header', label: 'Triangle Mask' },
+  { key: 'u_tri_enabled',  label: 'Enabled',    type: 'toggle', value: 1 },
+  { key: 'u_tri_rotation', label: 'Rotation',   type: 'range', min: 0,   max: 360, step: 1,    value: 0,  toRadians: true },
+  { key: 'u_tri_size',     label: 'Size',       type: 'range', min: 0.1, max: 2.0, step: 0.01, value: 1.0 },
+  { key: 'u_tri_width',    label: 'Base Width', type: 'range', min: 5,   max: 89,  step: 1,    value: 45, toRadians: true },
+  // ── Center Circle ──────────────────────────────────────────────────────────
+  { type: 'header', label: 'Center Circle' },
+  { key: 'u_center_circle_enabled', label: 'Enabled', type: 'toggle', value: 1 },
+  { key: 'u_center_circle_radius',  label: 'Radius',  type: 'range', min: 0.01, max: 0.45, step: 0.005, value: 0.04 },
+  // ── Text Overlay ───────────────────────────────────────────────────────────
+  { type: 'header', label: 'Text Overlay' },
+  { key: 'text',           label: 'Text',      type: 'text',   value: '',             textDirty: true },
+  { key: 'textFont',       label: 'Font',      type: 'select', value: 'IBM Plex Mono', textDirty: true,
+    options: [
+      { label: 'IBM Plex Mono',   value: 'IBM Plex Mono' },
+      { label: 'Space Mono',      value: 'Space Mono' },
+      { label: 'Roboto Mono',     value: 'Roboto Mono' },
+      { label: 'Source Code Pro', value: 'Source Code Pro' },
+      { label: 'JetBrains Mono',  value: 'JetBrains Mono' },
+      { label: 'Fira Code',       value: 'Fira Code' },
+      { label: 'Inconsolata',     value: 'Inconsolata' },
+      { label: 'Courier Prime',   value: 'Courier Prime' },
+      { label: 'Share Tech Mono', value: 'Share Tech Mono' },
+      { label: 'Cutive Mono',     value: 'Cutive Mono' },
+    ]
+  },
+  { key: 'textFontSize', label: 'Font Size', type: 'range', min: 8, max: 300, step: 1,    value: 120,  textDirty: true },
+  { key: 'textX',        label: 'Text X',    type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.3,  textDirty: true },
+  { key: 'textY',        label: 'Text Y',    type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.85, textDirty: true },
+  { key: 'u_use_text_color', label: 'Custom Text Color', type: 'toggle', value: 0 },
+  { key: 'u_text_color',    label: 'Text Color',    type: 'color',  value: '#ffffff' },
+  { key: 'outlineEnabled',  label: 'Outline',       type: 'toggle', value: 0, textDirty: true },
+  { key: 'outlineWidth',    label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true },
+  { key: 'u_outline_color', label: 'Outline Color', type: 'color',  value: '#000000' },
+];
+
+['IBM Plex Mono', 'Space Mono', 'Roboto Mono', 'Source Code Pro', 'JetBrains Mono',
+ 'Fira Code', 'Inconsolata', 'Courier Prime', 'Share Tech Mono', 'Cutive Mono'].forEach(function (f) {
+  document.fonts.load('500 48px "' + f + '"');
+});
