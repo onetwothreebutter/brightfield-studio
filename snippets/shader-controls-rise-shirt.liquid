@@ -1,0 +1,52 @@
+var controls = [
+  // ── Palette ───────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Color Palette' },
+  { key: 'u_color_mode',  label: 'Use Palette',   type: 'toggle',                         value: 1        },
+  { key: 'u_text_color',  label: 'Text Color',    type: 'color',  paletteDependent: true, value: '#ffffff' },
+  { key: 'u_dot_color',   label: 'Dot Color',     type: 'color',  paletteDependent: true, value: '#ffffff' },
+  { key: 'u_palette_a',   label: 'Palette A',     type: 'color',  value: '#808080',
+    tip: 'Offset — base brightness per channel. Sets the center point colors oscillate around.' },
+  { key: 'u_palette_b',   label: 'Palette B',     type: 'color',  value: '#808080',
+    tip: 'Amplitude — color swing range per channel. Higher = more vivid, saturated output.' },
+  { key: 'u_palette_c',   label: 'Palette C',     type: 'color',  value: '#ffffff',
+    tip: 'Frequency — how many times the palette cycles across the gradient per channel.' },
+  { key: 'u_palette_d',   label: 'Palette D',     type: 'color',  value: '#436a8e',
+    tip: 'Phase — shifts the starting hue of the color cycle. Rotates the overall color mood.' },
+  // ── Text overlay ──────────────────────────────────────────────────────────
+  { type: 'header', label: 'Text Overlay' },
+  { key: 'text',             label: 'Text',          type: 'text',                           value: 'GLOW', textDirty: true },
+  { key: 'textFont',         label: 'Font',          type: 'select', textDirty: true, value: 'IBM Plex Mono',
+    options: [
+      { label: 'IBM Plex Mono',    value: 'IBM Plex Mono' },
+      { label: 'Space Grotesk',    value: 'Space Grotesk' },
+      { label: 'Anton',            value: 'Anton' },
+      { label: 'Bebas Neue',       value: 'Bebas Neue' },
+      { label: 'Playfair Display', value: 'Playfair Display' },
+      { label: 'Oswald',           value: 'Oswald' },
+      { label: 'Orbitron',         value: 'Orbitron' },
+      { label: 'Teko',             value: 'Teko' },
+      { label: 'Righteous',        value: 'Righteous' },
+      { label: 'Russo One',        value: 'Russo One' },
+    ]
+  },
+  { key: 'textFontSize',     label: 'Font Size',     type: 'range',  min: 50,   max: 800,  step: 10,   value: 320,  textDirty: true },
+  { key: 'u_text_grid_cols', label: 'Text Cols',     type: 'range',  min: 1,    max: 50,   step: 1,    value: 28   },
+  { key: 'u_text_grid_rows', label: 'Text Rows',     type: 'range',  min: 1,    max: 100,  step: 1,    value: 39   },
+  { key: 'textX',            label: 'Text X',        type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 0.5,  textDirty: true },
+  { key: 'textY',            label: 'Text Y',        type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 0.79, textDirty: true },
+  { key: 'u_text_radius',    label: 'Text Dot Size', type: 'range',  min: 0.01, max: 1.5,  step: 0.01, value: 0.33 },
+  { key: 'u_text_blend',     label: 'Text Blend',    type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 1.0  },
+  // ── Dots ──────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Dots' },
+  { key: 'u_rows',           label: 'Rows',          type: 'range',  min: 10,   max: 200,  step: 1,    value: 23   },
+  { key: 'u_cols',           label: 'Cols',          type: 'range',  min: 1,    max: 50,   step: 1,    value: 27   },
+  { key: 'u_min_radius',     label: 'Min Radius',    type: 'range',  min: 0,    max: 0.5,  step: 0.01, value: 0.02 },
+  { key: 'u_max_radius',     label: 'Max Radius',    type: 'range',  min: 0.1,  max: 1.5,  step: 0.01, value: 0.55 },
+  { key: 'u_invert',         label: 'Invert',        type: 'toggle',                                   value: 1    },
+  { key: 'u_top_margin',     label: 'Top Margin',    type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 0.31 },
+];
+
+['IBM Plex Mono', 'Space Grotesk', 'Anton', 'Bebas Neue', 'Playfair Display',
+ 'Oswald', 'Orbitron', 'Teko', 'Righteous', 'Russo One'].forEach(function (f) {
+  document.fonts.load('bold 48px "' + f + '"');
+});
