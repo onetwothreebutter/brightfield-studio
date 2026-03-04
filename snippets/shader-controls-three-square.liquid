@@ -1,0 +1,121 @@
+var controls = [
+  // ── Squares ───────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Squares' },
+  { key: 'u_square_count', label: 'Count',           type: 'range', min: 2,    max: 4,    step: 1,    value: 3,
+    tip: 'Number of squares arranged diagonally.' },
+  { key: 'u_fill',         label: 'Fill',            type: 'range', min: 0.1,  max: 1.0,  step: 0.01, value: 0.85,
+    tip: 'How much of the available space each square occupies.' },
+  { key: 'u_offset',       label: 'Diagonal Offset', type: 'range', min: 0.0,  max: 0.45, step: 0.01, value: 0.2,
+    tip: 'Distance between square centers along the diagonal.' },
+  { key: 'u_density',      label: 'Column Density',  type: 'range', min: 2,    max: 40,   step: 1,    value: 10,
+    tip: 'Number of vertical columns across each square.' },
+  { key: 'u_col_width',    label: 'Column Width',    type: 'range', min: 0.05, max: 0.49, step: 0.01, value: 0.35,
+    tip: 'Half-width of each column in background areas.' },
+  // ── Palette ───────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Palette' },
+  { key: 'u_color_mode',     label: '4-Stop Mode',     type: 'toggle', value: 0,
+    tip: 'Off = cosine palette. On = 4-stop linear gradient.' },
+  { key: 'u_global_gradient', label: 'Global Gradient', type: 'toggle', value: 0,
+    tip: 'Off = each square has its own gradient. On = gradient spans all squares.' },
+  // Cosine palette controls (hidden when 4-Stop mode is on)
+  { key: '_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
+    options: [
+      { label: 'Rainbow',   value: 'Rainbow'   },
+      { label: 'Cool Blue', value: 'Cool Blue' },
+      { label: 'Neon Heat', value: 'Neon Heat' },
+      { label: 'Cyberpunk', value: 'Cyberpunk' },
+      { label: 'Golden',    value: 'Golden'    },
+    ]
+  },
+  { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
+    tip: 'Offset — base brightness per channel.' },
+  { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080',
+    tip: 'Amplitude — color swing range per channel.' },
+  { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff',
+    tip: 'Frequency — how many times the palette cycles per channel.' },
+  { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab',
+    tip: 'Phase — shifts the starting hue of the color cycle.' },
+  // 4-stop color controls (hidden when cosine/palette mode is on)
+  { key: 'u_color0', label: 'Color 1', type: 'color', stopDependent: true, value: '#ff3366' },
+  { key: 'u_color1', label: 'Color 2', type: 'color', stopDependent: true, value: '#ffcc00' },
+  { key: 'u_color2', label: 'Color 3', type: 'color', stopDependent: true, value: '#00ccff' },
+  { key: 'u_color3', label: 'Color 4', type: 'color', stopDependent: true, value: '#aa00ff' },
+  // ── Letters ───────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Letters' },
+  { key: 'u_letter1', label: 'Letter 1', type: 'text', value: 'A' },
+  { key: 'u_letter2', label: 'Letter 2', type: 'text', value: 'B' },
+  { key: 'u_letter3', label: 'Letter 3', type: 'text', value: 'C' },
+  { key: 'u_letter4', label: 'Letter 4', type: 'text', value: 'D',
+    tip: 'Only visible when Square Count is 4.' },
+  { key: 'u_font_family', label: 'Font', type: 'select', value: 'Montserrat',
+    options: [
+      { label: 'Space Mono',          value: 'Space Mono' },
+      { label: 'Roboto Mono',         value: 'Roboto Mono' },
+      { label: 'Fira Code',           value: 'Fira Code' },
+      { label: 'Inconsolata',         value: 'Inconsolata' },
+      { label: 'Courier Prime',       value: 'Courier Prime' },
+      { label: 'Fragment Mono',       value: 'Fragment Mono' },
+      { label: 'Azeret Mono',         value: 'Azeret Mono' },
+      { label: 'Spline Sans Mono',    value: 'Spline Sans Mono' },
+      { label: 'Geist Mono',          value: 'Geist Mono' },
+      { label: 'Syne',                value: 'Syne' },
+      { label: 'Unbounded',           value: 'Unbounded' },
+      { label: 'Bricolage Grotesque', value: 'Bricolage Grotesque' },
+      { label: 'Epilogue',            value: 'Epilogue' },
+      { label: 'DM Sans',             value: 'DM Sans' },
+      { label: 'Oswald',              value: 'Oswald' },
+      { label: 'Montserrat',          value: 'Montserrat' },
+    ]
+  },
+  { key: 'u_font_size',      label: 'Font Size',             type: 'range',  min: 50, max: 500, step: 10, value: 300 },
+  { key: 'u_col_width_wide', label: 'Column Width (Letter)', type: 'range',  min: 0.05, max: 0.49, step: 0.01, value: 0.45,
+    tip: 'Column half-width inside letter-filled areas.' },
+  { key: 'u_outline_enabled', label: 'Outline',       type: 'toggle', value: 0 },
+  { key: 'u_outline_width',   label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 12 },
+  { key: 'u_outline_color',   label: 'Outline Color', type: 'color',  value: '#000000' },
+];
+
+// Palette preset data (mirrors ThreeSquare.tsx palettes)
+var customAfterBuild = function () {
+  var presets = {
+    'Rainbow':   { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.0,   0.33,  0.67]  },
+    'Cool Blue': { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.263, 0.416, 0.557] },
+    'Neon Heat': { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.3,   0.2,   0.2]   },
+    'Cyberpunk': { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [2.0, 1.0, 0.0], d: [0.5,   0.2,   0.25]  },
+    'Golden':    { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 0.5], d: [0.8,   0.9,   0.3]   },
+  };
+
+  function toHex(v) {
+    return '#' + v.map(function (x) {
+      var b = Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16);
+      return b.length === 1 ? '0' + b : b;
+    }).join('');
+  }
+
+  function applyPreset(preset) {
+    var keys = ['u_a', 'u_b', 'u_c', 'u_d'];
+    var vals  = [preset.a, preset.b, preset.c, preset.d];
+    keys.forEach(function (key, i) {
+      // Update shader state directly (vec3 array, no hex roundtrip needed).
+      window._shaderState.values[key] = vals[i];
+      // Update the color picker input so it reflects the new value when opened.
+      var inp = document.querySelector('[data-param-key="' + key + '"]');
+      if (inp) inp.value = toHex(vals[i]);
+    });
+  }
+
+  var presetSel = document.querySelector('[data-param-key="_palette_preset"]');
+  if (presetSel) {
+    presetSel.addEventListener('change', function () {
+      var p = presets[this.value];
+      if (p) applyPreset(p);
+    });
+  }
+};
+
+['Space Mono', 'Roboto Mono', 'Fira Code', 'Inconsolata', 'Courier Prime',
+ 'Fragment Mono', 'Azeret Mono', 'Spline Sans Mono', 'Geist Mono', 'Syne',
+ 'Unbounded', 'Bricolage Grotesque', 'Epilogue', 'DM Sans', 'Oswald', 'Montserrat'
+].forEach(function (f) {
+  document.fonts.load('800 48px "' + f + '"');
+});
