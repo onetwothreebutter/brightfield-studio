@@ -267,10 +267,15 @@
       var outlineEnabled = v.u_outline_enabled ? true : false;
       var outlineWidth   = v.u_outline_width   != null ? v.u_outline_width   : 12;
 
-      // Derived: squareSize from count, offset, and fill (mirrors useFrame logic).
-      var outerCenter = ((squareCount - 1) / 2) * offset;
-      var squareSize  = Math.max(0.01, 0.5 - outerCenter) * fill;
+      // Derived: squareSize from count, offset, fill, and aspect.
+      // The constraint must hold on both axes in p-space:
+      //   Y range: [-0.5, 0.5]  →  squareSize ≤ 0.5 - outerCenter
+      //   X range: [-0.5*aspect, 0.5*aspect]  →  squareSize ≤ 0.5*aspect - outerCenter
+      // Use whichever axis is narrower (min), so squares stay in frame on portrait canvases.
       var aspect      = h > 0 ? w / h : 1.0;
+      var halfWidth   = 0.5 * Math.min(1.0, aspect);
+      var outerCenter = ((squareCount - 1) / 2) * offset;
+      var squareSize  = Math.max(0.01, halfWidth - outerCenter) * fill;
 
       // Re-draw and re-upload any letter texture whose key changed.
       var texUnits    = [gl.TEXTURE0, gl.TEXTURE1, gl.TEXTURE2, gl.TEXTURE3];
