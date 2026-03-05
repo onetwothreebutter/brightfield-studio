@@ -303,9 +303,10 @@ if (window.location.hash === '#shader') {
   if (!body) return;
 
   {% case shader_file %}
-  {% when 'chladni' %}    {% render 'shader-controls-chladni' %}
-  {% when 'line-circle' %}{% render 'shader-controls-line-circle' %}
-  {% else %}              {% render 'shader-controls-rise-shirt' %}
+  {% when 'chladni' %}      {% render 'shader-controls-chladni' %}
+  {% when 'line-circle' %}  {% render 'shader-controls-line-circle' %}
+  {% when 'three-square' %} {% render 'shader-controls-three-square' %}
+  {% else %}                {% render 'shader-controls-rise-shirt' %}
   {% endcase %}
 
   // Initialise shared state — shader.js reads this each frame
@@ -343,6 +344,7 @@ if (window.location.hash === '#shader') {
 
   // Build controls
   var paletteDependentRows = [];
+  var stopDependentRows   = [];
   var colorModeBtn = null;
 
   controls.forEach(function (ctrl) {
@@ -472,6 +474,7 @@ if (window.location.hash === '#shader') {
     }
 
     if (ctrl.paletteDependent) paletteDependentRows.push(row);
+    if (ctrl.stopDependent)   stopDependentRows.push(row);
 
     body.appendChild(row);
   });
@@ -482,9 +485,13 @@ if (window.location.hash === '#shader') {
     paletteDependentRows.forEach(function (r) {
       r.style.display = paletteOn ? 'none' : '';
     });
+    stopDependentRows.forEach(function (r) {
+      r.style.display = paletteOn ? '' : 'none';
+    });
   }
   if (colorModeBtn) colorModeBtn.addEventListener('click', applyPaletteVisibility);
-  applyPaletteVisibility(); // apply on load (palette starts On)
+  applyPaletteVisibility();
+  if (typeof customAfterBuild === 'function') customAfterBuild();
 
   // Mobile popout — draggable floating panel
   var popoutBtn   = document.getElementById('shader-gui-popout');
