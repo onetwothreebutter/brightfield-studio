@@ -16,6 +16,11 @@
     'uniform vec3  u_palette_b;',
     'uniform vec3  u_palette_c;',
     'uniform vec3  u_palette_d;',
+    'uniform float u_color_mode;',
+    'uniform vec3  u_color0;',
+    'uniform vec3  u_color1;',
+    'uniform vec3  u_color2;',
+    'uniform vec3  u_color3;',
     'uniform vec3  u_text_color;',
     'uniform float u_use_text_color;',
     'uniform vec3  u_outline_color;',
@@ -67,6 +72,16 @@
     '  // Cosine palette driven by vertical position',
     '  vec3 palColor = cosinePalette(t, u_palette_a, u_palette_b, u_palette_c, u_palette_d);',
     '',
+    '  // 4-stop linear gradient (same t driver)',
+    '  float t01 = clamp(t * 3.0, 0.0, 1.0);',
+    '  float t12 = clamp((t - 1.0 / 3.0) * 3.0, 0.0, 1.0);',
+    '  float t23 = clamp((t - 2.0 / 3.0) * 3.0, 0.0, 1.0);',
+    '  vec3 seg01 = mix(u_color0, u_color1, t01);',
+    '  vec3 seg12 = mix(u_color1, u_color2, t12);',
+    '  vec3 seg23 = mix(u_color2, u_color3, t23);',
+    '  vec3 gradColor = mix(mix(seg01, seg12, step(1.0 / 3.0, t)), seg23, step(2.0 / 3.0, t));',
+    '  vec3 finalPal = mix(palColor, gradColor, u_color_mode);',
+    '',
     '  // Triangle cutout — rotated in aspect-corrected space, apex at center',
     '  float cosR   = cos(u_tri_rotation);',
     '  float sinR   = sin(u_tri_rotation);',
@@ -94,7 +109,7 @@
     '  float centerMask  = mix(1.0, 1.0 - centerInner, u_center_circle_enabled);',
     '',
     '  // Circle + lines + triangle + center circle base color',
-    '  vec3 base = palColor * circleMask * lineMask * triMask * centerMask;',
+    '  vec3 base = finalPal * circleMask * lineMask * triMask * centerMask;',
     '',
     '  // Text overlay — aspect-corrected UV so glyphs appear undistorted',
     '  vec2 textAnchor    = vec2(u_text_x, u_text_y);',
@@ -106,7 +121,7 @@
     '  float outlineSample = smoothstep(0.05, 0.6, texSample.g);',
     '  vec3 withOutline   = mix(base, u_outline_color, outlineSample);',
     '  // Text fill uses palette color by default; custom color when u_use_text_color=1',
-    '  vec3 textFillColor = mix(palColor, u_text_color, u_use_text_color);',
+    '  vec3 textFillColor = mix(finalPal, u_text_color, u_use_text_color);',
     '  vec3 finalColor    = mix(withOutline, textFillColor, fillSample);',
     '',
     '  float visibilityMask = circleMask * lineMask * triMask * centerMask;',
@@ -134,6 +149,11 @@
         paletteB:            gl.getUniformLocation(program, 'u_palette_b'),
         paletteC:            gl.getUniformLocation(program, 'u_palette_c'),
         paletteD:            gl.getUniformLocation(program, 'u_palette_d'),
+        colorMode:           gl.getUniformLocation(program, 'u_color_mode'),
+        color0:              gl.getUniformLocation(program, 'u_color0'),
+        color1:              gl.getUniformLocation(program, 'u_color1'),
+        color2:              gl.getUniformLocation(program, 'u_color2'),
+        color3:              gl.getUniformLocation(program, 'u_color3'),
         textColor:           gl.getUniformLocation(program, 'u_text_color'),
         useTextColor:        gl.getUniformLocation(program, 'u_use_text_color'),
         outlineColor:        gl.getUniformLocation(program, 'u_outline_color'),
@@ -162,6 +182,11 @@
       gl.uniform3fv(u.paletteB,    v.u_palette_b  || [0.5, 0.5, 0.5]);
       gl.uniform3fv(u.paletteC,    v.u_palette_c  || [1.0, 1.0, 1.0]);
       gl.uniform3fv(u.paletteD,    v.u_palette_d  || [0.0, 0.33, 0.67]);
+      gl.uniform1f(u.colorMode,    v.u_color_mode  != null ? v.u_color_mode  : 0.0);
+      gl.uniform3fv(u.color0,      v.u_color0     || [1.0, 0.2,  0.4]);
+      gl.uniform3fv(u.color1,      v.u_color1     || [1.0, 0.8,  0.0]);
+      gl.uniform3fv(u.color2,      v.u_color2     || [0.0, 0.8,  1.0]);
+      gl.uniform3fv(u.color3,      v.u_color3     || [0.667, 0.0, 1.0]);
       gl.uniform3fv(u.textColor,   v.u_text_color    || [1.0, 1.0, 1.0]);
       gl.uniform1f(u.useTextColor, v.u_use_text_color       != null ? v.u_use_text_color       : 0.0);
       gl.uniform3fv(u.outlineColor, v.u_outline_color || [0.0, 0.0, 0.0]);

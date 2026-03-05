@@ -8,14 +8,38 @@ var controls = [
   { key: 'u_width_bot',  label: 'Width Bottom',  type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.75 },
   // ── Color Palette ──────────────────────────────────────────────────────────
   { type: 'header', label: 'Color Palette' },
-  { key: 'u_palette_a', label: 'Palette A', type: 'color', value: '#808080',
+  { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
+    tip: 'Off = cosine palette. On = 4-stop linear gradient from top to bottom.' },
+  { key: '_lc_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
+    options: [
+      { label: 'Rainbow', value: 'Rainbow' },
+      { label: 'Retro',   value: 'Retro'   },
+      { label: 'Cool Blue', value: 'Cool Blue' },
+      { label: 'Neon Heat', value: 'Neon Heat' },
+      { label: 'Golden',  value: 'Golden'  },
+    ]
+  },
+  { key: 'u_palette_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
     tip: 'Offset — base brightness per channel. Sets the center point colors oscillate around.' },
-  { key: 'u_palette_b', label: 'Palette B', type: 'color', value: '#808080',
+  { key: 'u_palette_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080',
     tip: 'Amplitude — color swing range per channel. Higher = more vivid, saturated output.' },
-  { key: 'u_palette_c', label: 'Palette C', type: 'color', value: '#ffffff',
+  { key: 'u_palette_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff',
     tip: 'Frequency — how many times the palette cycles per channel.' },
-  { key: 'u_palette_d', label: 'Palette D', type: 'color', value: '#0054ab',
+  { key: 'u_palette_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab',
     tip: 'Phase — shifts the starting hue of the color cycle.' },
+  { key: '_lc_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
+    options: [
+      { label: 'Neon',     value: 'Neon'     },
+      { label: 'Retro',    value: 'Retro'    },
+      { label: 'Sunset',   value: 'Sunset'   },
+      { label: 'Aurora',   value: 'Aurora'   },
+      { label: 'Dusk',     value: 'Dusk'     },
+    ]
+  },
+  { key: 'u_color0', label: 'Color 1 (Top)',    type: 'color', stopDependent: true, value: '#ff3366' },
+  { key: 'u_color1', label: 'Color 2',          type: 'color', stopDependent: true, value: '#ffcc00' },
+  { key: 'u_color2', label: 'Color 3',          type: 'color', stopDependent: true, value: '#00ccff' },
+  { key: 'u_color3', label: 'Color 4 (Bottom)', type: 'color', stopDependent: true, value: '#aa00ff' },
   // ── Triangle Mask ──────────────────────────────────────────────────────────
   { type: 'header', label: 'Triangle Mask' },
   { key: 'u_tri_enabled',  label: 'Enabled',    type: 'toggle', value: 1 },
@@ -64,6 +88,77 @@ var controls = [
   { key: 'outlineWidth',    label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true },
   { key: 'u_outline_color', label: 'Outline Color', type: 'color',  value: '#000000' },
 ];
+
+var customAfterBuild = function () {
+  function toHex(v) {
+    return '#' + v.map(function (x) {
+      var b = Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16);
+      return b.length === 1 ? '0' + b : b;
+    }).join('');
+  }
+
+  function applyColors(keyValPairs) {
+    keyValPairs.forEach(function (pair) {
+      window._shaderState.values[pair[0]] = pair[1];
+      var inp = document.querySelector('[data-param-key="' + pair[0] + '"]');
+      if (inp) inp.value = toHex(pair[1]);
+    });
+  }
+
+  // ── Cosine palette presets ────────────────────────────────────────────────
+  var cosinePresets = {
+    'Rainbow':   { a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 1.0 ], d: [0.0,  0.33, 0.67]  },
+    'Retro':     { a: [0.6,  0.5,  0.3 ], b: [0.4,  0.4,  0.3 ], c: [1.0, 0.7, 0.5 ], d: [0.0,  0.2,  0.4  ] },
+    'Cool Blue': { a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 1.0 ], d: [0.263,0.416,0.557] },
+    'Neon Heat': { a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 1.0 ], d: [0.3,  0.2,  0.2  ] },
+    'Golden':    { a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 0.5 ], d: [0.8,  0.9,  0.3  ] },
+  };
+  var cosineKeys = ['u_palette_a', 'u_palette_b', 'u_palette_c', 'u_palette_d'];
+
+  function applyCosinePreset(p) {
+    applyColors(cosineKeys.map(function (k, i) {
+      return [k, [p.a, p.b, p.c, p.d][i]];
+    }));
+  }
+
+  // Apply default on load so shader matches pickers.
+  applyCosinePreset(cosinePresets['Rainbow']);
+
+  var cosinePresetSel = document.querySelector('[data-param-key="_lc_palette_preset"]');
+  if (cosinePresetSel) {
+    cosinePresetSel.addEventListener('change', function () {
+      var p = cosinePresets[this.value];
+      if (p) applyCosinePreset(p);
+    });
+  }
+
+  // ── 4-color presets ───────────────────────────────────────────────────────
+  var fourColorPresets = {
+    // c0 = top, c3 = bottom
+    'Neon':    { c0: [1.0,  0.2,  0.4 ], c1: [1.0,  0.8,  0.0 ], c2: [0.0,  0.8,  1.0 ], c3: [0.667,0.0,  1.0  ] },
+    'Retro':   { c0: [0.91, 0.286,0.114], c1: [0.788,0.627,0.188], c2: [0.176,0.541,0.369], c3: [0.102,0.153,0.267] },
+    'Sunset':  { c0: [1.0,  0.318,0.184], c1: [0.867,0.141,0.463], c2: [0.541,0.169,0.886], c3: [0.098,0.098,0.439] },
+    'Aurora':  { c0: [0.0,  1.0,  0.533], c1: [0.0,  0.898,1.0  ], c2: [0.486,0.302,1.0  ], c3: [0.878,0.251,0.984] },
+    'Dusk':    { c0: [1.0,  0.6,  0.4  ], c1: [1.0,  0.369,0.384], c2: [0.8,  0.169,0.369], c3: [0.459,0.227,0.533] },
+  };
+
+  function apply4ColorPreset(p) {
+    applyColors([
+      ['u_color0', p.c0],
+      ['u_color1', p.c1],
+      ['u_color2', p.c2],
+      ['u_color3', p.c3],
+    ]);
+  }
+
+  var fourColorPresetSel = document.querySelector('[data-param-key="_lc_4color_preset"]');
+  if (fourColorPresetSel) {
+    fourColorPresetSel.addEventListener('change', function () {
+      var p = fourColorPresets[this.value];
+      if (p) apply4ColorPreset(p);
+    });
+  }
+};
 
 ['Space Mono', 'Roboto Mono', 'Source Code Pro', 'JetBrains Mono', 'IBM Plex Mono',
  'Fira Code', 'Inconsolata', 'Courier Prime', 'Share Tech Mono', 'Cutive Mono',
