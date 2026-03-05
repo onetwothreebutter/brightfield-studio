@@ -346,6 +346,7 @@ if (window.location.hash === '#shader') {
   var paletteDependentRows = [];
   var stopDependentRows   = [];
   var colorModeBtn = null;
+  var controlEls = []; // [{ctrl, el}] for randomisation
 
   controls.forEach(function (ctrl) {
     if (ctrl.type === 'header') {
@@ -402,6 +403,7 @@ if (window.location.hash === '#shader') {
       wrap.appendChild(input);
       wrap.appendChild(display);
       row.appendChild(wrap);
+      controlEls.push({ ctrl: ctrl, el: input });
 
     } else if (ctrl.type === 'toggle') {
       var isOn = ctrl.value === 1;
@@ -422,6 +424,7 @@ if (window.location.hash === '#shader') {
       if (ctrl.key === 'u_color_mode') colorModeBtn = btn;
 
       row.appendChild(btn);
+      controlEls.push({ ctrl: ctrl, el: btn });
 
     } else if (ctrl.type === 'color') {
       var picker = document.createElement('input');
@@ -438,6 +441,7 @@ if (window.location.hash === '#shader') {
       });
 
       row.appendChild(picker);
+      controlEls.push({ ctrl: ctrl, el: picker });
 
     } else if (ctrl.type === 'text') {
       var textInput       = document.createElement('input');
@@ -456,6 +460,7 @@ if (window.location.hash === '#shader') {
     } else if (ctrl.type === 'select') {
       var sel = document.createElement('select');
       sel.className = 'shader-control__select';
+      sel.dataset.paramKey = ctrl.key;
 
       ctrl.options.forEach(function (opt) {
         var option = document.createElement('option');
@@ -471,6 +476,7 @@ if (window.location.hash === '#shader') {
       });
 
       row.appendChild(sel);
+      controlEls.push({ ctrl: ctrl, el: sel });
     }
 
     if (ctrl.paletteDependent) paletteDependentRows.push(row);
@@ -492,6 +498,52 @@ if (window.location.hash === '#shader') {
   if (colorModeBtn) colorModeBtn.addEventListener('click', applyPaletteVisibility);
   applyPaletteVisibility();
   if (typeof customAfterBuild === 'function') customAfterBuild();
+
+  // Randomize button
+  function randomizeAll() {
+    controlEls.forEach(function (item) {
+      var ctrl = item.ctrl;
+      var el   = item.el;
+
+      if (ctrl.type === 'range') {
+        var steps = Math.round((ctrl.max - ctrl.min) / ctrl.step);
+        var val   = ctrl.min + Math.floor(Math.random() * (steps + 1)) * ctrl.step;
+        val = parseFloat(Math.max(ctrl.min, Math.min(ctrl.max, val)).toFixed(10));
+        el.value = val;
+        var display = el.parentNode.querySelector('.shader-control__value');
+        if (display) display.textContent = val;
+        window._shaderState.values[ctrl.key] = ctrl.toRadians ? val * Math.PI / 180 : val;
+
+      } else if (ctrl.type === 'toggle') {
+        var isOn = Math.random() < 0.5;
+        el.dataset.on  = isOn ? '1' : '0';
+        el.textContent = isOn ? 'On' : 'Off';
+        el.classList.toggle('is-on', isOn);
+        window._shaderState.values[ctrl.key] = isOn ? 1 : 0;
+
+      } else if (ctrl.type === 'color') {
+        var hex = '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0');
+        el.value = hex;
+        window._shaderState.values[ctrl.key] = hexToRgb(hex);
+
+      } else if (ctrl.type === 'select' && ctrl.key !== '_palette_preset') {
+        var opts   = ctrl.options;
+        var chosen = opts[Math.floor(Math.random() * opts.length)];
+        el.value = chosen.value;
+        window._shaderState.values[ctrl.key] = chosen.value;
+        if (ctrl.textDirty) window._shaderState.textDirty = true;
+      }
+    });
+    applyPaletteVisibility();
+    window._shaderState.textDirty = true;
+  }
+
+  var randomizeBtn       = document.createElement('button');
+  randomizeBtn.type      = 'button';
+  randomizeBtn.className = 'shader-control__randomize-btn';
+  randomizeBtn.textContent = 'Randomize';
+  randomizeBtn.addEventListener('click', randomizeAll);
+  body.insertBefore(randomizeBtn, body.firstChild);
 
   // Mobile popout — draggable floating panel
   var popoutBtn   = document.getElementById('shader-gui-popout');

@@ -256,11 +256,12 @@
       var color1       = v.u_color1           || [1.0, 0.8,  0.0];
       var color2       = v.u_color2           || [0.0, 0.8,  1.0];
       var color3       = v.u_color3           || [0.667, 0.0, 1.0];
+      var lettersEnabled = v.u_letters_enabled != null ? v.u_letters_enabled : 1;
       var letters      = [
-        v.u_letter1 != null ? v.u_letter1 : 'A',
-        v.u_letter2 != null ? v.u_letter2 : 'B',
-        v.u_letter3 != null ? v.u_letter3 : 'C',
-        v.u_letter4 != null ? v.u_letter4 : 'D',
+        lettersEnabled ? (v.u_letter1 != null ? v.u_letter1 : 'A') : '',
+        lettersEnabled ? (v.u_letter2 != null ? v.u_letter2 : 'B') : '',
+        lettersEnabled ? (v.u_letter3 != null ? v.u_letter3 : 'C') : '',
+        lettersEnabled ? (v.u_letter4 != null ? v.u_letter4 : 'D') : '',
       ];
       var fontFamily     = v.u_font_family     || 'Montserrat';
       var fontSize       = v.u_font_size       != null ? v.u_font_size       : 300;
