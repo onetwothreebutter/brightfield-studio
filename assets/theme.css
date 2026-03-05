@@ -1368,6 +1368,30 @@ h1, h2, h3, h4, h5, h6 {
   background:   var(--color-primary-dim);
 }
 
+.shader-control__randomize-btn {
+  display:        block;
+  width:          100%;
+  font-family:    var(--font-body);
+  font-size:      0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background:     transparent;
+  color:          var(--color-text-muted);
+  border:         1px dashed var(--color-border);
+  border-radius:  var(--radius);
+  padding:        0.4rem 0.75rem;
+  cursor:         pointer;
+  margin-bottom:  0.75rem;
+  transition:     color var(--transition-fast),
+                  background var(--transition-fast),
+                  border-color var(--transition-fast);
+}
+.shader-control__randomize-btn:hover {
+  border-color: var(--color-secondary);
+  color:        var(--color-secondary);
+  background:   var(--color-secondary-dim, transparent);
+}
+
 /* ── Control tips ───────────────────────────────────────────── */
 .shader-tip-btn {
   display:        inline-flex;
