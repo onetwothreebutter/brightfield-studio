@@ -130,7 +130,7 @@ describe('line-circle.js', () => {
     expect(aspectCall[1]).toBeCloseTo(1.5);
   });
 
-  it('render() defaults match the TSL source (textX=0.3, textY=0.85, triWidth=45°, centerCircle on at 0.04)', () => {
+  it('render() defaults match the TSL source (textX=0.3, textY=0.71, triWidth=45°, centerCircle on at 0.04)', () => {
     const gl = { getUniformLocation: vi.fn((_p, name) => ({ _loc: name })) };
     const uniforms = opts.setup(gl, {});
     const renderGl = makeRenderGl();
@@ -147,7 +147,7 @@ describe('line-circle.js', () => {
     }
 
     expect(findUniform1f(uniforms.textX)).toBeCloseTo(0.3);
-    expect(findUniform1f(uniforms.textY)).toBeCloseTo(0.85);
+    expect(findUniform1f(uniforms.textY)).toBeCloseTo(0.71);
     expect(findUniform1f(uniforms.triWidth)).toBeCloseTo((45 * Math.PI) / 180);
     expect(findUniform1f(uniforms.centerCircleEnabled)).toBe(1.0);
     expect(findUniform1f(uniforms.centerCircleRadius)).toBeCloseTo(0.04);
