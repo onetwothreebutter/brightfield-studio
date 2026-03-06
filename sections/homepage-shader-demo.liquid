@@ -71,7 +71,7 @@
       <button type="button" class="shader-control__randomize-btn" id="demo-randomize">Randomize</button>
 
       <!-- Text Overlay (revealed on first interaction) -->
-      <div id="demo-text-panel" style="display:none">
+      <div id="demo-text-panel">
 
         <p class="shader-demo__panel-label">Text Overlay</p>
 
@@ -160,14 +160,47 @@
 
       <hr class="shader-demo__divider">
 
-      <a href="{{ section.settings.product_url }}" class="btn btn--primary btn--full">
-        {{ section.settings.button_label | default: 'Customize This Design' }}
-      </a>
+      <div class="shader-demo__cta-row">
+        <button type="button" class="btn btn--outline" id="demo-preview-btn">
+          Preview on Shirt
+        </button>
+        <a href="{{ section.settings.product_url }}" class="btn btn--primary">
+          {{ section.settings.button_label | default: 'Customize This Design' }}
+        </a>
+      </div>
       <p class="shader-demo__note">Full controls available on the product page</p>
 
     </div>
   </div>
 </section>
+
+<!-- Mockup modal (reuses product page classes) -->
+<div class="mockup-modal mockup-modal--hidden" id="demo-mockup-modal" role="dialog" aria-modal="true" aria-label="Shirt preview">
+  <div class="mockup-modal__backdrop" id="demo-mockup-backdrop"></div>
+  <div class="mockup-modal__box">
+    <div class="mockup-modal__header">
+      <span class="mockup-modal__title">Preview on Shirt</span>
+      <button class="mockup-modal__close" id="demo-mockup-close" aria-label="Close preview">&times;</button>
+    </div>
+    <div class="mockup-modal__body">
+      <p id="demo-mockup-loading" style="text-align:center;padding:2rem;color:var(--color-text-muted)">Generating preview…</p>
+      <img class="mockup-modal__img" id="demo-mockup-img" src="" alt="Shirt mockup" style="display:none">
+      <p id="demo-mockup-error" style="display:none;text-align:center;padding:2rem;color:var(--color-text-muted)">Preview failed. Please try again.</p>
+    </div>
+    <div class="mockup-modal__footer" id="demo-mockup-footer" style="display:none">
+      <div class="mockup-modal__size" id="demo-mockup-size-wrap">
+        <label class="mockup-modal__size-label" for="demo-mockup-size">Size</label>
+        <select id="demo-mockup-size" class="mockup-modal__size-select">
+          <option value="">Loading…</option>
+        </select>
+      </div>
+      <div class="mockup-modal__footer-actions">
+        <a id="demo-mockup-download" class="btn btn--outline btn--sm" download="my-design.jpg">Download</a>
+        <button id="demo-mockup-order" class="btn btn--primary btn--sm">Order This Design</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -228,7 +261,7 @@
   var centerCircleDisp    = document.getElementById('demo-center-circle-display');
   var randomizeBtn        = document.getElementById('demo-randomize');
   var dotsWrap            = document.getElementById('demo-cycle-dots');
-  var textPanel           = document.getElementById('demo-text-panel');
+  var textPanel           = document.getElementById('demo-text-panel'); // revealed via .is-visible class
   var textInput           = document.getElementById('demo-text');
   var textFontSel         = document.getElementById('demo-text-font');
   var textSizeInput       = document.getElementById('demo-text-size');
@@ -243,6 +276,17 @@
   var outlineWidthInput   = document.getElementById('demo-outline-width');
   var outlineWidthDisp    = document.getElementById('demo-outline-width-display');
   var outlineColorInput   = document.getElementById('demo-outline-color');
+  var previewBtn          = document.getElementById('demo-preview-btn');
+  var mockupModal         = document.getElementById('demo-mockup-modal');
+  var mockupBackdrop      = document.getElementById('demo-mockup-backdrop');
+  var mockupClose         = document.getElementById('demo-mockup-close');
+  var mockupLoading       = document.getElementById('demo-mockup-loading');
+  var mockupImg           = document.getElementById('demo-mockup-img');
+  var mockupError         = document.getElementById('demo-mockup-error');
+  var mockupFooter        = document.getElementById('demo-mockup-footer');
+  var mockupSizeEl        = document.getElementById('demo-mockup-size');
+  var mockupDownload      = document.getElementById('demo-mockup-download');
+  var mockupOrder         = document.getElementById('demo-mockup-order');
 
   // ── Cycle dots ─────────────────────────────────────────────────────────────
   CYCLE_STEPS.forEach(function () {
@@ -338,7 +382,7 @@
     if (userInteracted) return;
     userInteracted = true;
     stopCycle();
-    textPanel.style.display = '';
+    textPanel.classList.add('is-visible');
   }
 
   // ── Control wiring ─────────────────────────────────────────────────────────
@@ -444,6 +488,128 @@
     window._demoState.dirty = true;
   });
 
+  // ── Preview on Shirt ───────────────────────────────────────────────────────
+  var MOCKUP_WORKER      = 'https://brightfield-mockup-worker.eric-d-johnson.workers.dev/generate-mockup';
+  var MOCKUP_VARIANT_ID  = 4017;
+  var PRODUCT_HANDLE     = {{ section.settings.product_handle | default: 'line-circle' | json }};
+  var currentDesignUrl   = null;
+  var variantsLoaded     = false;
+
+  function loadVariants() {
+    if (variantsLoaded) return;
+    variantsLoaded = true;
+    fetch('/products/' + PRODUCT_HANDLE + '.js')
+      .then(function (r) { return r.json(); })
+      .then(function (product) {
+        var sel = document.getElementById('demo-mockup-size');
+        if (!sel) return;
+        sel.innerHTML = '';
+        product.variants.forEach(function (v) {
+          var opt       = document.createElement('option');
+          opt.value     = v.id;
+          opt.textContent = v.title;
+          if (!v.available) opt.disabled = true;
+          sel.appendChild(opt);
+        });
+        // Hide size row if only one variant
+        var sizeWrap = document.getElementById('demo-mockup-size-wrap');
+        if (sizeWrap && product.variants.length <= 1) sizeWrap.style.display = 'none';
+      })
+      .catch(function () {
+        var sizeWrap = document.getElementById('demo-mockup-size-wrap');
+        if (sizeWrap) sizeWrap.style.display = 'none';
+      });
+  }
+
+  function openMockupModal() {
+    mockupModal.classList.remove('mockup-modal--hidden');
+    mockupLoading.style.display = '';
+    mockupImg.style.display = 'none';
+    mockupError.style.display = 'none';
+    if (mockupFooter) mockupFooter.style.display = 'none';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeMockupModal() {
+    mockupModal.classList.add('mockup-modal--hidden');
+    document.body.style.overflow = '';
+  }
+
+  mockupClose.addEventListener('click', closeMockupModal);
+  mockupBackdrop.addEventListener('click', closeMockupModal);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeMockupModal();
+  });
+
+  previewBtn.addEventListener('click', function () {
+    if (!window._demoExport) return;
+    loadVariants();
+    openMockupModal();
+    window._demoExport(1800, 2400, function (base64png) {
+      fetch(MOCKUP_WORKER, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64png, variant_id: MOCKUP_VARIANT_ID }),
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (!data.mockup_url) throw new Error('No mockup_url in response');
+          currentDesignUrl = data.design_url || null;
+          mockupLoading.style.display = 'none';
+          mockupImg.src = data.mockup_url;
+          mockupImg.style.display = '';
+          if (mockupDownload) mockupDownload.href = data.mockup_url;
+          if (mockupFooter) mockupFooter.style.display = '';
+        })
+        .catch(function () {
+          mockupLoading.style.display = 'none';
+          mockupError.style.display = '';
+        });
+    });
+  });
+
+  if (mockupOrder) {
+    mockupOrder.addEventListener('click', function () {
+      if (!currentDesignUrl) {
+        alert('Design URL not available. Try generating a new preview.');
+        return;
+      }
+      var variantId = mockupSizeEl ? mockupSizeEl.value : null;
+      if (!variantId) {
+        alert('Could not determine variant. Please select a size and try again.');
+        return;
+      }
+      mockupOrder.disabled    = true;
+      mockupOrder.textContent = 'Adding…';
+      fetch('/cart/add.js', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id:       Number(variantId),
+          quantity: 1,
+          properties: {
+            '_design_url':   currentDesignUrl,
+            '_mockup_url':   mockupImg.src,
+            'Customization': 'Custom Shader Design'
+          }
+        })
+      })
+      .then(function (r) {
+        if (!r.ok) return r.text().then(function (t) {
+          var msg = 'Cart error (' + r.status + ')';
+          try { msg = JSON.parse(t).description || msg; } catch (e) {}
+          throw new Error(msg);
+        });
+        window.location.href = '/cart';
+      })
+      .catch(function (err) {
+        alert('Could not add to cart: ' + err.message);
+        mockupOrder.disabled    = false;
+        mockupOrder.textContent = 'Order This Design';
+      });
+    });
+  }
+
   // ── Boot ───────────────────────────────────────────────────────────────────
   startCycle();
 }());
@@ -472,6 +638,13 @@
       "id": "subheading",
       "label": "Subheading",
       "info": "Optional — leave blank to hide"
+    },
+    {
+      "type": "text",
+      "id": "product_handle",
+      "label": "Product handle",
+      "default": "line-circle",
+      "info": "Used to load size options for ordering"
     },
     {
       "type": "url",
