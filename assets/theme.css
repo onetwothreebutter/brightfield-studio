@@ -3,7 +3,7 @@
    Palette: #080808 bg | #00ffff cyan | #ff00ff magenta
    ============================================================ */
 
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700;800&family=Anton&family=Bebas+Neue&family=Playfair+Display:wght@900&family=Oswald:wght@400;700&family=Orbitron:wght@900&family=Teko:wght@700&family=Righteous&family=Russo+One&family=Space+Mono:wght@400;700&family=Roboto+Mono:wght@400;500;700&family=Source+Code+Pro:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&family=Fira+Code:wght@300;400;500;700&family=Inconsolata:wght@400;500;700&family=Courier+Prime:wght@400;700&family=Share+Tech+Mono:wght@400&family=Cutive+Mono:wght@400&family=DM+Mono:wght@300;400;500&family=Fragment+Mono:wght@400&family=Azeret+Mono:wght@400;500;700&family=Spline+Sans+Mono:wght@400;500;700&family=Geist+Mono:wght@400;500;700&family=Syne:wght@400;500;700&family=Unbounded:wght@400;500;700&family=Bricolage+Grotesque:wght@400;500;700&family=Epilogue:wght@400;500;700&family=DM+Sans:wght@400;500;700&family=Montserrat:wght@400;500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700;800&family=Anton&family=Bebas+Neue&family=Playfair+Display:wght@900&family=Oswald:wght@400;700&family=Orbitron:wght@900&family=Teko:wght@700&family=Righteous&family=Russo+One&family=Big+Shoulders+Display:wght@400;700;900&family=Space+Mono:wght@400;700&family=Roboto+Mono:wght@400;500;700&family=Source+Code+Pro:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&family=Fira+Code:wght@300;400;500;700&family=Inconsolata:wght@400;500;700&family=Courier+Prime:wght@400;700&family=Share+Tech+Mono:wght@400&family=Cutive+Mono:wght@400&family=DM+Mono:wght@300;400;500&family=Fragment+Mono:wght@400&family=Azeret+Mono:wght@400;500;700&family=Spline+Sans+Mono:wght@400;500;700&family=Geist+Mono:wght@400;500;700&family=Syne:wght@400;500;700&family=Unbounded:wght@400;500;700&family=Bricolage+Grotesque:wght@400;500;700&family=Epilogue:wght@400;500;700&family=DM+Sans:wght@400;500;700&family=Montserrat:wght@400;500;700&display=swap");
 
 /* ─── Custom Properties ──────────────────────────────────── */
 :root {
@@ -1636,6 +1636,16 @@ h6 {
     border: none;
     border-top: 1px solid var(--color-border);
     margin: 1.25rem 0;
+}
+
+.shader-demo__panel-label {
+    font-size:      0.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color:          var(--color-primary);
+    border-top:     1px solid var(--color-border);
+    padding-top:    1rem;
+    margin:         1rem 0 0.25rem;
 }
 
 .shader-demo__note {

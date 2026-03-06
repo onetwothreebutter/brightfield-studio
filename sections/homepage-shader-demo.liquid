@@ -70,6 +70,94 @@
       <!-- Randomize -->
       <button type="button" class="shader-control__randomize-btn" id="demo-randomize">Randomize</button>
 
+      <!-- Text Overlay (revealed on first interaction) -->
+      <div id="demo-text-panel" style="display:none">
+
+        <p class="shader-demo__panel-label">Text Overlay</p>
+
+        <!-- Text -->
+        <div class="shader-control">
+          <label class="shader-control__label">Text</label>
+          <input type="text" class="shader-control__text-input" id="demo-text" value="" placeholder="Your text">
+        </div>
+
+        <!-- Font -->
+        <div class="shader-control">
+          <label class="shader-control__label">Font</label>
+          <select class="shader-control__select" id="demo-text-font">
+            <option value="Oswald">Oswald</option>
+            <option value="Unbounded">Unbounded</option>
+            <option value="Bricolage Grotesque">Bricolage Grotesque</option>
+            <option value="DM Mono">DM Mono</option>
+            <option value="Righteous">Righteous</option>
+            <option value="Teko">Teko</option>
+            <option value="Big Shoulders Display">Big Shoulders Display</option>
+            <option value="Anton">Anton</option>
+          </select>
+        </div>
+
+        <!-- Font Size -->
+        <div class="shader-control">
+          <label class="shader-control__label">Font Size</label>
+          <div class="shader-control__range-wrap">
+            <input type="range" class="shader-control__range" id="demo-text-size" min="8" max="300" step="1" value="120">
+            <span class="shader-control__value" id="demo-text-size-display">120</span>
+          </div>
+        </div>
+
+        <!-- Text X -->
+        <div class="shader-control">
+          <label class="shader-control__label">Text X</label>
+          <div class="shader-control__range-wrap">
+            <input type="range" class="shader-control__range" id="demo-text-x" min="0" max="1" step="0.01" value="0.5">
+            <span class="shader-control__value" id="demo-text-x-display">0.5</span>
+          </div>
+        </div>
+
+        <!-- Text Y -->
+        <div class="shader-control">
+          <label class="shader-control__label">Text Y</label>
+          <div class="shader-control__range-wrap">
+            <input type="range" class="shader-control__range" id="demo-text-y" min="0" max="1" step="0.01" value="0.5">
+            <span class="shader-control__value" id="demo-text-y-display">0.5</span>
+          </div>
+        </div>
+
+        <!-- Custom Text Color -->
+        <div class="shader-control">
+          <label class="shader-control__label">Custom Color</label>
+          <button type="button" class="shader-control__toggle" id="demo-use-text-color" data-on="0">Off</button>
+        </div>
+
+        <!-- Text Color -->
+        <div class="shader-control">
+          <label class="shader-control__label">Text Color</label>
+          <input type="color" class="shader-control__color" id="demo-text-color" value="#ffffff">
+        </div>
+
+        <!-- Outline -->
+        <div class="shader-control">
+          <label class="shader-control__label">Outline</label>
+          <button type="button" class="shader-control__toggle" id="demo-outline-enabled" data-on="0">Off</button>
+        </div>
+
+        <!-- Outline Width -->
+        <div class="shader-control">
+          <label class="shader-control__label">Outline Width</label>
+          <div class="shader-control__range-wrap">
+            <input type="range" class="shader-control__range" id="demo-outline-width" min="1" max="60" step="1" value="8">
+            <span class="shader-control__value" id="demo-outline-width-display">8</span>
+          </div>
+        </div>
+
+        <!-- Outline Color -->
+        <div class="shader-control">
+          <label class="shader-control__label">Outline Color</label>
+          <input type="color" class="shader-control__color" id="demo-outline-color" value="#000000">
+        </div>
+
+      </div>
+
       <hr class="shader-demo__divider">
 
       <a href="{{ section.settings.product_url }}" class="btn btn--primary btn--full">
@@ -98,16 +186,16 @@
     'Retro 4C':  { mode: 1, c0: [0.91, 0.286,0.114 ], c1: [0.788,0.627,0.188 ], c2: [0.176,0.541,0.369 ], c3: [0.102,0.153,0.267 ] },
   };
 
-  // Auto-cycle sequence — each step specifies preset + lineCount + power
+  // Auto-cycle sequence — each step specifies preset + lineCount + power + centerCircle
   var CYCLE_STEPS = [
-    { preset: 'Rainbow',  lineCount: 20, power: 2.5 },
-    { preset: 'Cool Blue',lineCount: 30, power: 1.5 },
-    { preset: 'Sunset',   lineCount: 15, power: 3.5 },
-    { preset: 'Neon Heat',lineCount: 25, power: 2.0 },
-    { preset: 'Aurora',   lineCount: 20, power: 4.0 },
-    { preset: 'Golden',   lineCount: 35, power: 2.0 },
-    { preset: 'Dusk',     lineCount: 12, power: 3.0 },
-    { preset: 'Retro',    lineCount: 18, power: 2.8 },
+    { preset: 'Rainbow',  lineCount: 20, power: 2.5, centerCircle: 0.04  },
+    { preset: 'Cool Blue',lineCount: 30, power: 1.5, centerCircle: 0.12  },
+    { preset: 'Sunset',   lineCount: 15, power: 3.5, centerCircle: 0.08  },
+    { preset: 'Neon Heat',lineCount: 25, power: 2.0, centerCircle: 0.18  },
+    { preset: 'Aurora',   lineCount: 20, power: 4.0, centerCircle: 0.06  },
+    { preset: 'Golden',   lineCount: 35, power: 2.0, centerCircle: 0.14  },
+    { preset: 'Dusk',     lineCount: 12, power: 3.0, centerCircle: 0.0   },
+    { preset: 'Retro',    lineCount: 18, power: 2.8, centerCircle: 0.10  },
   ];
   var CYCLE_INTERVAL_MS = 3000;
 
@@ -122,6 +210,10 @@
       u_palette_c: [1.0, 1.0, 1.0], u_palette_d: [0.0, 0.33, 0.67],
       u_color0: [1.0, 0.2, 0.4],   u_color1: [1.0, 0.8, 0.0],
       u_color2: [0.0, 0.8, 1.0],   u_color3: [0.667, 0.0, 1.0],
+      text: '', textFont: 'Oswald', textFontSize: 120,
+      textX: 0.5, textY: 0.5,
+      u_use_text_color: 0, u_text_color: [1.0, 1.0, 1.0],
+      outlineEnabled: false, outlineWidth: 8, u_outline_color: [0.0, 0.0, 0.0],
     },
     dirty: true,
   };
@@ -135,7 +227,22 @@
   var centerCircleInput   = document.getElementById('demo-center-circle');
   var centerCircleDisp    = document.getElementById('demo-center-circle-display');
   var randomizeBtn        = document.getElementById('demo-randomize');
-  var dotsWrap       = document.getElementById('demo-cycle-dots');
+  var dotsWrap            = document.getElementById('demo-cycle-dots');
+  var textPanel           = document.getElementById('demo-text-panel');
+  var textInput           = document.getElementById('demo-text');
+  var textFontSel         = document.getElementById('demo-text-font');
+  var textSizeInput       = document.getElementById('demo-text-size');
+  var textSizeDisp        = document.getElementById('demo-text-size-display');
+  var textXInput          = document.getElementById('demo-text-x');
+  var textXDisp           = document.getElementById('demo-text-x-display');
+  var textYInput          = document.getElementById('demo-text-y');
+  var textYDisp           = document.getElementById('demo-text-y-display');
+  var useTextColorBtn     = document.getElementById('demo-use-text-color');
+  var textColorInput      = document.getElementById('demo-text-color');
+  var outlineBtn          = document.getElementById('demo-outline-enabled');
+  var outlineWidthInput   = document.getElementById('demo-outline-width');
+  var outlineWidthDisp    = document.getElementById('demo-outline-width-display');
+  var outlineColorInput   = document.getElementById('demo-outline-color');
 
   // ── Cycle dots ─────────────────────────────────────────────────────────────
   CYCLE_STEPS.forEach(function () {
@@ -202,6 +309,7 @@
     applyPreset(step.preset);
     applyLineCount(step.lineCount);
     applyPower(step.power);
+    applyCenterCircle(step.centerCircle);
     setActiveDot(index);
   }
 
@@ -218,10 +326,19 @@
     dotsWrap.style.display = 'none';
   }
 
+  function hexToRgb(hex) {
+    return [
+      parseInt(hex.slice(1, 3), 16) / 255,
+      parseInt(hex.slice(3, 5), 16) / 255,
+      parseInt(hex.slice(5, 7), 16) / 255,
+    ];
+  }
+
   function onUserInteract() {
     if (userInteracted) return;
     userInteracted = true;
     stopCycle();
+    textPanel.style.display = '';
   }
 
   // ── Control wiring ─────────────────────────────────────────────────────────
@@ -256,6 +373,75 @@
     applyLineCount(lineCount);
     applyPower(power);
     applyCenterCircle(centerCircle);
+  });
+
+  // ── Text overlay wiring ────────────────────────────────────────────────────
+  textInput.addEventListener('input', function () {
+    window._demoState.values.text = this.value;
+    window._demoState.dirty = true;
+  });
+
+  textFontSel.addEventListener('change', function () {
+    window._demoState.values.textFont = this.value;
+    window._demoState.dirty = true;
+  });
+
+  textSizeInput.addEventListener('input', function () {
+    var n = parseInt(this.value, 10);
+    window._demoState.values.textFontSize = n;
+    textSizeDisp.textContent = n;
+    window._demoState.dirty = true;
+  });
+
+  textXInput.addEventListener('input', function () {
+    var n = parseFloat(this.value);
+    window._demoState.values.textX = n;
+    textXDisp.textContent = n;
+    window._demoState.dirty = true;
+  });
+
+  textYInput.addEventListener('input', function () {
+    var n = parseFloat(this.value);
+    window._demoState.values.textY = n;
+    textYDisp.textContent = n;
+    window._demoState.dirty = true;
+  });
+
+  useTextColorBtn.addEventListener('click', function () {
+    var isOn = this.dataset.on === '1';
+    var next = isOn ? 0 : 1;
+    window._demoState.values.u_use_text_color = next;
+    this.dataset.on  = next ? '1' : '0';
+    this.textContent = next ? 'On' : 'Off';
+    this.classList.toggle('is-on', !!next);
+    window._demoState.dirty = true;
+  });
+
+  textColorInput.addEventListener('input', function () {
+    window._demoState.values.u_text_color = hexToRgb(this.value);
+    window._demoState.dirty = true;
+  });
+
+  outlineBtn.addEventListener('click', function () {
+    var isOn = this.dataset.on === '1';
+    var next = isOn ? 0 : 1;
+    window._demoState.values.outlineEnabled = !!next;
+    this.dataset.on  = next ? '1' : '0';
+    this.textContent = next ? 'On' : 'Off';
+    this.classList.toggle('is-on', !!next);
+    window._demoState.dirty = true;
+  });
+
+  outlineWidthInput.addEventListener('input', function () {
+    var n = parseInt(this.value, 10);
+    window._demoState.values.outlineWidth = n;
+    outlineWidthDisp.textContent = n;
+    window._demoState.dirty = true;
+  });
+
+  outlineColorInput.addEventListener('input', function () {
+    window._demoState.values.u_outline_color = hexToRgb(this.value);
+    window._demoState.dirty = true;
   });
 
   // ── Boot ───────────────────────────────────────────────────────────────────
