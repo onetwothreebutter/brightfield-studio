@@ -1,7 +1,9 @@
 (function () {
   'use strict';
 
-  // LineCircle GLSL — stripped for demo (no text overlay, no export flag)
+  var TEX_SIZE = 512;
+
+  // LineCircle GLSL — with text overlay
   var fragSrc = [
     '#extension GL_OES_standard_derivatives : enable',
     'precision mediump float;',
@@ -27,6 +29,12 @@
     'uniform float u_tri_width;',
     'uniform float u_center_circle_enabled;',
     'uniform float u_center_circle_radius;',
+    'uniform vec3  u_text_color;',
+    'uniform float u_use_text_color;',
+    'uniform vec3  u_outline_color;',
+    'uniform float u_text_x;',
+    'uniform float u_text_y;',
+    'uniform sampler2D u_text_texture;',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
     '  return a + b * cos(6.28318 * (c * t + d));',
@@ -81,8 +89,23 @@
     '  float centerInner = 1.0 - smoothstep(-fwidth(centerSDF) * 0.5, fwidth(centerSDF) * 0.5, centerSDF);',
     '  float centerMask  = mix(1.0, 1.0 - centerInner, u_center_circle_enabled);',
     '',
-    '  float mask = circleMask * lineMask * triMask * centerMask;',
-    '  gl_FragColor = vec4(finalPal * mask, mask);',
+    '  float mask      = circleMask * lineMask * triMask * centerMask;',
+    '  vec3 baseColor  = finalPal * mask;',
+    '',
+    '  // Text overlay',
+    '  vec2 textAnchor     = vec2(u_text_x, u_text_y);',
+    '  vec2 textDelta      = uv - textAnchor;',
+    '  vec2 textUV         = vec2(textDelta.x * u_aspect, textDelta.y) + textAnchor;',
+    '  vec4 texSample      = texture2D(u_text_texture, textUV);',
+    '  float fillSample    = smoothstep(0.05, 0.6, texSample.r);',
+    '  float outlineSample = smoothstep(0.05, 0.6, texSample.g);',
+    '  vec3 withOutline    = mix(baseColor, u_outline_color, outlineSample);',
+    '  vec3 textFillColor  = mix(finalPal, u_text_color, u_use_text_color);',
+    '  vec3 finalColor     = mix(withOutline, textFillColor, fillSample);',
+    '',
+    '  float textAlpha  = clamp(fillSample + outlineSample, 0.0, 1.0);',
+    '  float finalAlpha = mix(mask, 1.0, textAlpha);',
+    '  gl_FragColor = vec4(finalColor, finalAlpha);',
     '}'
   ].join('\n');
 
@@ -156,7 +179,66 @@
     triWidth:            loc('u_tri_width'),
     centerCircleEnabled: loc('u_center_circle_enabled'),
     centerCircleRadius:  loc('u_center_circle_radius'),
+    textColor:           loc('u_text_color'),
+    useTextColor:        loc('u_use_text_color'),
+    outlineColor:        loc('u_outline_color'),
+    textX:               loc('u_text_x'),
+    textY:               loc('u_text_y'),
+    textTex:             loc('u_text_texture'),
   };
+
+  // ── Text texture ──────────────────────────────────────────────────────────
+  var texCanvas = document.createElement('canvas');
+  texCanvas.width = texCanvas.height = TEX_SIZE;
+  var texCtx = texCanvas.getContext('2d');
+
+  var glTextTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, glTextTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0,0,0,0]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  var drawnTextKey = null;
+
+  function drawText(v) {
+    texCtx.fillStyle = '#000000';
+    texCtx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+    var txt = v.text || '';
+    if (!txt) return;
+    var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"Montserrat"';
+    var fontSize   = v.textFontSize || 120;
+    var cx = (v.textX != null ? v.textX : 0.5) * TEX_SIZE;
+    var cy = (1 - (v.textY != null ? v.textY : 0.5)) * TEX_SIZE;
+    texCtx.font         = fontSize + 'px ' + fontFamily + ', monospace';
+    texCtx.textAlign    = 'center';
+    texCtx.textBaseline = 'middle';
+    if (v.outlineEnabled && v.outlineWidth > 0) {
+      texCtx.strokeStyle = 'rgb(0,255,0)';
+      texCtx.lineWidth   = (v.outlineWidth || 8) * 2;
+      texCtx.lineJoin    = 'round';
+      texCtx.strokeText(txt, cx, cy);
+    }
+    texCtx.fillStyle = 'rgb(255,0,0)';
+    texCtx.fillText(txt, cx, cy);
+  }
+
+  function uploadTextTex() {
+    gl.bindTexture(gl.TEXTURE_2D, glTextTex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texCanvas);
+  }
+
+  function textKey(v) {
+    return JSON.stringify([v.text, v.textFont, v.textFontSize, v.textX, v.textY, v.outlineEnabled, v.outlineWidth]);
+  }
+
+  // Preload fonts
+  ['Oswald', 'Unbounded', 'Bricolage Grotesque', 'DM Mono',
+   'Righteous', 'Teko', 'Big Shoulders Display', 'Anton'].forEach(function (f) {
+    document.fonts.load('500 48px "' + f + '"');
+  });
 
   function resize() {
     var dpr = window.devicePixelRatio || 1;
@@ -181,8 +263,17 @@
     var h = canvas.height;
     if (!w || !h) return;
 
+    // Redraw text texture if content changed
+    var tk = textKey(v);
+    if (tk !== drawnTextKey) {
+      drawText(v);
+      uploadTextTex();
+      drawnTextKey = tk;
+    }
+
     var aspect = w / h;
-    var radius = 0.414 * Math.min(1.0, aspect); // stays inside canvas on portrait
+    var radius = 0.414 * Math.min(1.0, aspect);
+
     gl.uniform2f(u.res,       w, h);
     gl.uniform1f(u.aspect,    aspect);
     gl.uniform1f(u.radius,    radius);
@@ -199,13 +290,21 @@
     gl.uniform3fv(u.color1,   v.u_color1 || [1.0, 0.8,  0.0]);
     gl.uniform3fv(u.color2,   v.u_color2 || [0.0, 0.8,  1.0]);
     gl.uniform3fv(u.color3,   v.u_color3 || [0.667, 0.0, 1.0]);
-    // Fixed triangle + center circle defaults
     gl.uniform1f(u.triEnabled,          1.0);
     gl.uniform1f(u.triRotation,         0.0);
     gl.uniform1f(u.triSize,             1.0);
     gl.uniform1f(u.triWidth,            (45 * Math.PI) / 180);
     gl.uniform1f(u.centerCircleEnabled, 1.0);
     gl.uniform1f(u.centerCircleRadius,  v.u_center_circle_radius != null ? v.u_center_circle_radius : 0.04);
+    gl.uniform3fv(u.textColor,   v.u_text_color    || [1.0, 1.0, 1.0]);
+    gl.uniform1f(u.useTextColor, v.u_use_text_color != null ? v.u_use_text_color : 0.0);
+    gl.uniform3fv(u.outlineColor, v.u_outline_color || [0.0, 0.0, 0.0]);
+    gl.uniform1f(u.textX,        v.textX != null ? v.textX : 0.5);
+    gl.uniform1f(u.textY,        v.textY != null ? v.textY : 0.5);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, glTextTex);
+    gl.uniform1i(u.textTex, 0);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
