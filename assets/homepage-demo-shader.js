@@ -1,157 +1,88 @@
 (function () {
   'use strict';
 
-  var CANVAS_SIZE  = 512;
-  var FONT_FAMILY  = 'Montserrat';
-  var FONT_SIZE    = 300;
-  var LETTERS      = ['B', 'F', 'S', 'T'];
-
-  function drawLetter(ctx, letter, font, size) {
-    var c = ctx.canvas;
-    c.width  = CANVAS_SIZE;
-    c.height = CANVAS_SIZE;
-    ctx.fillStyle = 'black';
-    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    if (letter) {
-      ctx.font         = 'bold ' + size + 'px "' + font + '", monospace';
-      ctx.textAlign    = 'center';
-      ctx.textBaseline = 'alphabetic';
-      var m = ctx.measureText(letter);
-      var y = CANVAS_SIZE / 2 +
-        (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
-      ctx.fillStyle = 'rgb(255,0,0)';
-      ctx.fillText(letter, CANVAS_SIZE / 2, y);
-    }
-  }
-
-  function uploadTex(gl, tex, canvas) {
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  }
-
-  // Three-square GLSL — same as three-square.js (cosine + 4-stop palette)
+  // LineCircle GLSL — stripped for demo (no text overlay, no export flag)
   var fragSrc = [
+    '#extension GL_OES_standard_derivatives : enable',
     'precision mediump float;',
-    '',
-    'uniform vec2      u_resolution;',
-    'uniform float     u_aspect;',
-    'uniform float     u_square_size;',
-    'uniform float     u_offset;',
-    'uniform float     u_density;',
-    'uniform float     u_col_width;',
-    'uniform float     u_col_width_wide;',
-    'uniform float     u_global_gradient;',
-    'uniform float     u_square_count;',
-    'uniform vec3      u_outline_color;',
-    'uniform vec3      u_a;',
-    'uniform vec3      u_b;',
-    'uniform vec3      u_c;',
-    'uniform vec3      u_d;',
-    'uniform float     u_color_mode;',
-    'uniform vec3      u_color0;',
-    'uniform vec3      u_color1;',
-    'uniform vec3      u_color2;',
-    'uniform vec3      u_color3;',
-    'uniform sampler2D u_tex1;',
-    'uniform sampler2D u_tex2;',
-    'uniform sampler2D u_tex3;',
-    'uniform sampler2D u_tex4;',
+    'uniform vec2  u_resolution;',
+    'uniform float u_aspect;',
+    'uniform float u_radius;',
+    'uniform float u_line_count;',
+    'uniform float u_power;',
+    'uniform float u_width_top;',
+    'uniform float u_width_bot;',
+    'uniform vec3  u_palette_a;',
+    'uniform vec3  u_palette_b;',
+    'uniform vec3  u_palette_c;',
+    'uniform vec3  u_palette_d;',
+    'uniform float u_color_mode;',
+    'uniform vec3  u_color0;',
+    'uniform vec3  u_color1;',
+    'uniform vec3  u_color2;',
+    'uniform vec3  u_color3;',
+    'uniform float u_tri_enabled;',
+    'uniform float u_tri_rotation;',
+    'uniform float u_tri_size;',
+    'uniform float u_tri_width;',
+    'uniform float u_center_circle_enabled;',
+    'uniform float u_center_circle_radius;',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
     '  return a + b * cos(6.28318 * (c * t + d));',
     '}',
     '',
-    'float sdBox2d(vec2 p, float s) {',
-    '  return max(abs(p.x), abs(p.y)) - s;',
-    '}',
-    '',
-    'void colLayer(',
-    '  vec2 p, vec2 center,',
-    '  sampler2D letterTex,',
-    '  float globalPalT,',
-    '  out float outAlpha, out vec3 outCol',
-    ') {',
-    '  vec2  localUV    = (p - center + u_square_size) / (u_square_size * 2.0);',
-    '  float scaledX    = localUV.x * u_density;',
-    '  float cellX      = fract(scaledX) - 0.5;',
-    '',
-    '  float fillSample = smoothstep(0.3, 0.7, texture2D(letterTex, localUV).r);',
-    '',
-    '  float effWidth  = mix(u_col_width, u_col_width_wide, fillSample);',
-    '  float colInside = 1.0 - step(0.0, abs(cellX) - effWidth);',
-    '',
-    '  float palT = mix(localUV.x, globalPalT, u_global_gradient);',
-    '',
-    '  vec3 cosineCol = cosinePalette(palT, u_a, u_b, u_c, u_d);',
-    '',
-    '  float t01 = clamp(palT * 3.0, 0.0, 1.0);',
-    '  float t12 = clamp((palT - 1.0 / 3.0) * 3.0, 0.0, 1.0);',
-    '  float t23 = clamp((palT - 2.0 / 3.0) * 3.0, 0.0, 1.0);',
-    '  vec3 gradCol = mix(',
-    '    mix(mix(u_color0, u_color1, t01), mix(u_color1, u_color2, t12), step(1.0 / 3.0, palT)),',
-    '    mix(u_color2, u_color3, t23),',
-    '    step(2.0 / 3.0, palT)',
-    '  );',
-    '',
-    '  outCol   = mix(cosineCol, gradCol, u_color_mode);',
-    '  outAlpha = colInside;',
-    '}',
-    '',
     'void main() {',
-    '  vec2 uv      = gl_FragCoord.xy / u_resolution;',
-    '  vec2 centered = uv - 0.5;',
-    '  vec2 p        = vec2(centered.x * u_aspect, centered.y);',
+    '  vec2 uv          = gl_FragCoord.xy / u_resolution;',
+    '  vec2 centeredUV  = uv - 0.5;',
+    '  vec2 correctedUV = vec2(centeredUV.x * u_aspect, centeredUV.y);',
     '',
-    '  float halfN = (u_square_count - 1.0) * 0.5;',
-    '  float c1x   = (0.0 - halfN) * u_offset;',
-    '  float c2x   = (1.0 - halfN) * u_offset;',
-    '  float c3x   = (2.0 - halfN) * u_offset;',
-    '  float c4x   = (3.0 - halfN) * u_offset;',
-    '  vec2  c1    = vec2(c1x, -c1x);',
-    '  vec2  c2    = vec2(c2x, -c2x);',
-    '  vec2  c3    = vec2(c3x, -c3x);',
-    '  vec2  c4    = vec2(c4x, -c4x);',
+    '  float circleSDF  = length(correctedUV) - u_radius;',
+    '  float aaCircle   = fwidth(circleSDF) * 0.5;',
+    '  float circleMask = 1.0 - smoothstep(-aaCircle, aaCircle, circleSDF);',
     '',
-    '  float sqMask1 = 1.0 - step(0.0, sdBox2d(p - c1, u_square_size));',
-    '  float sqMask2 = 1.0 - step(0.0, sdBox2d(p - c2, u_square_size));',
-    '  float sqMask3 = (1.0 - step(0.0, sdBox2d(p - c3, u_square_size))) * step(2.5, u_square_count);',
-    '  float sqMask4 = (1.0 - step(0.0, sdBox2d(p - c4, u_square_size))) * step(3.5, u_square_count);',
+    '  float circleTop = 0.5 + u_radius;',
+    '  float t         = clamp((circleTop - uv.y) / (u_radius * 2.0), 0.0, 1.0);',
+    '  float warped    = pow(t, u_power);',
+    '  float phase     = fract(warped * u_line_count);',
+    '  float lineWidth = mix(u_width_top, u_width_bot, t);',
+    '  float aaLine    = fwidth(phase) * 0.5;',
+    '  float lineMask  = 1.0 - smoothstep(lineWidth - aaLine, lineWidth + aaLine, phase);',
     '',
-    '  float outerCX          = halfN * u_offset;',
-    '  float gradientHalfWidth = outerCX + u_square_size;',
-    '  float globalPalT       = (p.x + gradientHalfWidth) / max(gradientHalfWidth * 2.0, 0.001);',
+    '  vec3 palColor = cosinePalette(t, u_palette_a, u_palette_b, u_palette_c, u_palette_d);',
     '',
-    '  float a1; vec3 col1;',
-    '  float a2; vec3 col2;',
-    '  float a3; vec3 col3;',
-    '  float a4; vec3 col4;',
-    '  colLayer(p, c1, u_tex1, globalPalT, a1, col1);',
-    '  colLayer(p, c2, u_tex2, globalPalT, a2, col2);',
-    '  colLayer(p, c3, u_tex3, globalPalT, a3, col3);',
-    '  colLayer(p, c4, u_tex4, globalPalT, a4, col4);',
+    '  float t01 = clamp(t * 3.0, 0.0, 1.0);',
+    '  float t12 = clamp((t - 1.0 / 3.0) * 3.0, 0.0, 1.0);',
+    '  float t23 = clamp((t - 2.0 / 3.0) * 3.0, 0.0, 1.0);',
+    '  vec3 gradColor = mix(',
+    '    mix(mix(u_color0, u_color1, t01), mix(u_color1, u_color2, t12), step(1.0 / 3.0, t)),',
+    '    mix(u_color2, u_color3, t23),',
+    '    step(2.0 / 3.0, t)',
+    '  );',
+    '  vec3 finalPal = mix(palColor, gradColor, u_color_mode);',
     '',
-    '  vec3  finalColor = vec3(0.0);',
-    '  float finalAlpha = 0.0;',
+    '  float cosR    = cos(u_tri_rotation);',
+    '  float sinR    = sin(u_tri_rotation);',
+    '  vec2  triUV   = vec2(',
+    '    correctedUV.x * cosR - correctedUV.y * sinR,',
+    '    correctedUV.x * sinR + correctedUV.y * cosR',
+    '  );',
+    '  float cosW     = cos(u_tri_width);',
+    '  float sinW     = sin(u_tri_width);',
+    '  float triEdgeL = triUV.x * cosW - triUV.y * sinW;',
+    '  float triEdgeR = -triUV.x * cosW - triUV.y * sinW;',
+    '  float triEdgeB = triUV.y + u_radius * u_tri_size;',
+    '  float triInner = smoothstep(-fwidth(triEdgeL) * 0.5, fwidth(triEdgeL) * 0.5, triEdgeL)',
+    '                 * smoothstep(-fwidth(triEdgeR) * 0.5, fwidth(triEdgeR) * 0.5, triEdgeR)',
+    '                 * smoothstep(-fwidth(triEdgeB) * 0.5, fwidth(triEdgeB) * 0.5, triEdgeB);',
+    '  float triMask  = mix(1.0, 1.0 - triInner, u_tri_enabled);',
     '',
-    '  float sq1 = a1 * sqMask1;',
-    '  finalColor = mix(finalColor, col1, sq1);',
-    '  finalAlpha = mix(finalAlpha, 1.0, sq1);',
-    '  float sq2 = a2 * sqMask2;',
-    '  finalColor = mix(finalColor, col2, sq2);',
-    '  finalAlpha = mix(finalAlpha, 1.0, sq2);',
-    '  float sq3 = a3 * sqMask3;',
-    '  finalColor = mix(finalColor, col3, sq3);',
-    '  finalAlpha = mix(finalAlpha, 1.0, sq3);',
-    '  float sq4 = a4 * sqMask4;',
-    '  finalColor = mix(finalColor, col4, sq4);',
-    '  finalAlpha = mix(finalAlpha, 1.0, sq4);',
+    '  float centerSDF   = length(correctedUV) - u_center_circle_radius;',
+    '  float centerInner = 1.0 - smoothstep(-fwidth(centerSDF) * 0.5, fwidth(centerSDF) * 0.5, centerSDF);',
+    '  float centerMask  = mix(1.0, 1.0 - centerInner, u_center_circle_enabled);',
     '',
-    '  gl_FragColor = vec4(finalColor, finalAlpha);',
+    '  float mask = circleMask * lineMask * triMask * centerMask;',
+    '  gl_FragColor = vec4(finalPal * mask, mask);',
     '}'
   ].join('\n');
 
@@ -160,6 +91,8 @@
 
   var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
   if (!gl) { canvas.style.display = 'none'; return; }
+
+  gl.getExtension('OES_standard_derivatives');
 
   function compileShader(src, type) {
     var s = gl.createShader(type);
@@ -201,46 +134,29 @@
 
   function loc(name) { return gl.getUniformLocation(program, name); }
   var u = {
-    res:          loc('u_resolution'),
-    aspect:       loc('u_aspect'),
-    squareSize:   loc('u_square_size'),
-    offset:       loc('u_offset'),
-    density:      loc('u_density'),
-    colWidth:     loc('u_col_width'),
-    colWidthWide: loc('u_col_width_wide'),
-    globalGrad:   loc('u_global_gradient'),
-    squareCount:  loc('u_square_count'),
-    outlineColor: loc('u_outline_color'),
-    palA:         loc('u_a'),
-    palB:         loc('u_b'),
-    palC:         loc('u_c'),
-    palD:         loc('u_d'),
-    colorMode:    loc('u_color_mode'),
-    color0:       loc('u_color0'),
-    color1:       loc('u_color1'),
-    color2:       loc('u_color2'),
-    color3:       loc('u_color3'),
-    tex1:         loc('u_tex1'),
-    tex2:         loc('u_tex2'),
-    tex3:         loc('u_tex3'),
-    tex4:         loc('u_tex4'),
+    res:                 loc('u_resolution'),
+    aspect:              loc('u_aspect'),
+    radius:              loc('u_radius'),
+    lineCount:           loc('u_line_count'),
+    power:               loc('u_power'),
+    widthTop:            loc('u_width_top'),
+    widthBot:            loc('u_width_bot'),
+    paletteA:            loc('u_palette_a'),
+    paletteB:            loc('u_palette_b'),
+    paletteC:            loc('u_palette_c'),
+    paletteD:            loc('u_palette_d'),
+    colorMode:           loc('u_color_mode'),
+    color0:              loc('u_color0'),
+    color1:              loc('u_color1'),
+    color2:              loc('u_color2'),
+    color3:              loc('u_color3'),
+    triEnabled:          loc('u_tri_enabled'),
+    triRotation:         loc('u_tri_rotation'),
+    triSize:             loc('u_tri_size'),
+    triWidth:            loc('u_tri_width'),
+    centerCircleEnabled: loc('u_center_circle_enabled'),
+    centerCircleRadius:  loc('u_center_circle_radius'),
   };
-
-  // Letter textures — fixed B F S T
-  var texCanvases = [], texCtxs = [], glTextures = [], drawnKeys = [];
-  for (var i = 0; i < 4; i++) {
-    var tc = document.createElement('canvas');
-    tc.width = tc.height = CANVAS_SIZE;
-    texCanvases.push(tc);
-    var tctx = tc.getContext('2d');
-    texCtxs.push(tctx);
-    tctx.fillStyle = 'black';
-    tctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    var gt = gl.createTexture();
-    glTextures.push(gt);
-    uploadTex(gl, gt, tc);
-    drawnKeys.push(null);
-  }
 
   function resize() {
     var dpr = window.devicePixelRatio || 1;
@@ -255,11 +171,6 @@
   window.addEventListener('resize', resize);
   resize();
 
-  // Invalidate letter cache once Montserrat is confirmed loaded so next frame redraws with correct font
-  document.fonts.load('bold ' + FONT_SIZE + 'px "' + FONT_FAMILY + '"').then(function () {
-    for (var i = 0; i < 4; i++) drawnKeys[i] = null;
-  });
-
   function render() {
     var state = window._demoState;
     if (!state || !state.dirty) return;
@@ -270,46 +181,31 @@
     var h = canvas.height;
     if (!w || !h) return;
 
-    var texUnits    = [gl.TEXTURE0, gl.TEXTURE1, gl.TEXTURE2, gl.TEXTURE3];
-    var texUniforms = [u.tex1, u.tex2, u.tex3, u.tex4];
-    for (var i = 0; i < 4; i++) {
-      var key = LETTERS[i] + '|' + FONT_SIZE;
-      if (key !== drawnKeys[i]) {
-        drawLetter(texCtxs[i], LETTERS[i], FONT_FAMILY, FONT_SIZE);
-        uploadTex(gl, glTextures[i], texCanvases[i]);
-        drawnKeys[i] = key;
-      }
-      gl.activeTexture(texUnits[i]);
-      gl.bindTexture(gl.TEXTURE_2D, glTextures[i]);
-      gl.uniform1i(texUniforms[i], i);
-    }
-
-    var squareCount = v.u_square_count != null ? v.u_square_count : 3;
-    var offset      = 0.2;
-    var aspect      = w / h;
-    var halfWidth   = 0.5 * Math.min(1.0, aspect);
-    var outerCenter = ((squareCount - 1) / 2) * offset;
-    var squareSize  = Math.max(0.01, halfWidth - outerCenter) * 0.85;
-
-    gl.uniform2f(u.res,          w, h);
-    gl.uniform1f(u.aspect,       aspect);
-    gl.uniform1f(u.squareSize,   squareSize);
-    gl.uniform1f(u.offset,       offset);
-    gl.uniform1f(u.density,      v.u_density != null ? v.u_density : 10);
-    gl.uniform1f(u.colWidth,     0.35);
-    gl.uniform1f(u.colWidthWide, 0.45);
-    gl.uniform1f(u.globalGrad,   0.0);
-    gl.uniform1f(u.squareCount,  squareCount);
-    gl.uniform3fv(u.outlineColor, [0.0, 0.0, 0.0]);
-    gl.uniform3fv(u.palA,        v.u_a      || [0.5, 0.5, 0.5]);
-    gl.uniform3fv(u.palB,        v.u_b      || [0.5, 0.5, 0.5]);
-    gl.uniform3fv(u.palC,        v.u_c      || [1.0, 1.0, 1.0]);
-    gl.uniform3fv(u.palD,        v.u_d      || [0.0, 0.33, 0.67]);
-    gl.uniform1f(u.colorMode,    v.u_color_mode != null ? v.u_color_mode : 0.0);
-    gl.uniform3fv(u.color0,      v.u_color0 || [1.0, 0.2,  0.4]);
-    gl.uniform3fv(u.color1,      v.u_color1 || [1.0, 0.8,  0.0]);
-    gl.uniform3fv(u.color2,      v.u_color2 || [0.0, 0.8,  1.0]);
-    gl.uniform3fv(u.color3,      v.u_color3 || [0.667, 0.0, 1.0]);
+    var aspect = w / h;
+    var radius = 0.414 * Math.min(1.0, aspect); // stays inside canvas on portrait
+    gl.uniform2f(u.res,       w, h);
+    gl.uniform1f(u.aspect,    aspect);
+    gl.uniform1f(u.radius,    radius);
+    gl.uniform1f(u.lineCount, v.u_line_count != null ? v.u_line_count : 20);
+    gl.uniform1f(u.power,     v.u_power      != null ? v.u_power      : 2.5);
+    gl.uniform1f(u.widthTop,  0.05);
+    gl.uniform1f(u.widthBot,  0.75);
+    gl.uniform3fv(u.paletteA, v.u_palette_a || [0.5, 0.5, 0.5]);
+    gl.uniform3fv(u.paletteB, v.u_palette_b || [0.5, 0.5, 0.5]);
+    gl.uniform3fv(u.paletteC, v.u_palette_c || [1.0, 1.0, 1.0]);
+    gl.uniform3fv(u.paletteD, v.u_palette_d || [0.0, 0.33, 0.67]);
+    gl.uniform1f(u.colorMode, v.u_color_mode != null ? v.u_color_mode : 0.0);
+    gl.uniform3fv(u.color0,   v.u_color0 || [1.0, 0.2,  0.4]);
+    gl.uniform3fv(u.color1,   v.u_color1 || [1.0, 0.8,  0.0]);
+    gl.uniform3fv(u.color2,   v.u_color2 || [0.0, 0.8,  1.0]);
+    gl.uniform3fv(u.color3,   v.u_color3 || [0.667, 0.0, 1.0]);
+    // Fixed triangle + center circle defaults
+    gl.uniform1f(u.triEnabled,          1.0);
+    gl.uniform1f(u.triRotation,         0.0);
+    gl.uniform1f(u.triSize,             1.0);
+    gl.uniform1f(u.triWidth,            (45 * Math.PI) / 180);
+    gl.uniform1f(u.centerCircleEnabled, 1.0);
+    gl.uniform1f(u.centerCircleRadius,  v.u_center_circle_radius != null ? v.u_center_circle_radius : 0.04);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
