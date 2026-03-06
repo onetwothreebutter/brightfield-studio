@@ -112,7 +112,8 @@
   var canvas = document.getElementById('demo-shader-canvas');
   if (!canvas) return;
 
-  var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  var glOpts = { preserveDrawingBuffer: true, alpha: true, antialias: true };
+  var gl = canvas.getContext('webgl', glOpts) || canvas.getContext('experimental-webgl', glOpts);
   if (!gl) { canvas.style.display = 'none'; return; }
 
   gl.getExtension('OES_standard_derivatives');
@@ -314,4 +315,20 @@
     requestAnimationFrame(loop);
   }
   loop();
+
+  window._demoExport = function (targetW, targetH, callback) {
+    var prevW = canvas.width;
+    var prevH = canvas.height;
+    canvas.width  = targetW;
+    canvas.height = targetH;
+    gl.viewport(0, 0, targetW, targetH);
+    if (window._demoState) window._demoState.dirty = true;
+    render();
+    var dataUrl = canvas.toDataURL('image/png');
+    canvas.width  = prevW;
+    canvas.height = prevH;
+    gl.viewport(0, 0, prevW, prevH);
+    if (window._demoState) window._demoState.dirty = true;
+    callback(dataUrl.split(',')[1]);
+  };
 }());

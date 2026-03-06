@@ -3,7 +3,7 @@
   "type": "module",
   "scripts": {
     "dev": "shopify theme dev --store brightfield-2.myshopify.com",
-    "push": "shopify theme push --store brightfield-2.myshopify.com",
+    "push": "shopify theme push --store brightfield-2.myshopify.com --theme 143500345459",
     "test": "vitest run",
     "test:watch": "vitest"
   },
