@@ -1,0 +1,307 @@
+<section class="shader-demo">
+  <div class="shader-demo__header container">
+    {%- if section.settings.eyebrow != blank -%}
+      <p class="shader-demo__eyebrow">{{ section.settings.eyebrow }}</p>
+    {%- endif -%}
+    <h2 class="shader-demo__heading">{{ section.settings.heading }}</h2>
+    {%- if section.settings.subheading != blank -%}
+      <p class="shader-demo__subheading">{{ section.settings.subheading }}</p>
+    {%- endif -%}
+  </div>
+
+  <div class="shader-demo__body container">
+    <div class="shader-demo__canvas-wrap">
+      <canvas id="demo-shader-canvas" class="shader-demo__canvas" aria-hidden="true"></canvas>
+    </div>
+
+    <div class="shader-demo__controls">
+
+      <!-- Cycle indicator dots -->
+      <div class="shader-demo__cycle-indicator" id="demo-cycle-dots" aria-hidden="true"></div>
+
+      <!-- Color Palette -->
+      <div class="shader-control">
+        <label class="shader-control__label">Color Palette</label>
+        <select class="shader-control__select" id="demo-preset">
+          <optgroup label="Cosine">
+            <option value="Rainbow">Rainbow</option>
+            <option value="Cool Blue">Cool Blue</option>
+            <option value="Neon Heat">Neon Heat</option>
+            <option value="Golden">Golden</option>
+            <option value="Retro">Retro</option>
+          </optgroup>
+          <optgroup label="4-Color">
+            <option value="Neon">Neon</option>
+            <option value="Sunset">Sunset</option>
+            <option value="Aurora">Aurora</option>
+            <option value="Dusk">Dusk</option>
+            <option value="Retro 4C">Retro</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <!-- Lines -->
+      <div class="shader-control">
+        <label class="shader-control__label">Lines</label>
+        <div class="shader-control__range-wrap">
+          <input type="range" class="shader-control__range" id="demo-line-count" min="5" max="60" step="1" value="20">
+          <span class="shader-control__value" id="demo-line-count-display">20</span>
+        </div>
+      </div>
+
+      <!-- Power -->
+      <div class="shader-control">
+        <label class="shader-control__label">Power</label>
+        <div class="shader-control__range-wrap">
+          <input type="range" class="shader-control__range" id="demo-power" min="0.5" max="6.0" step="0.1" value="2.5">
+          <span class="shader-control__value" id="demo-power-display">2.5</span>
+        </div>
+      </div>
+
+      <!-- Center Circle -->
+      <div class="shader-control">
+        <label class="shader-control__label">Center Circle</label>
+        <div class="shader-control__range-wrap">
+          <input type="range" class="shader-control__range" id="demo-center-circle" min="0.0" max="0.4" step="0.005" value="0.04">
+          <span class="shader-control__value" id="demo-center-circle-display">0.04</span>
+        </div>
+      </div>
+
+      <!-- Randomize -->
+      <button type="button" class="shader-control__randomize-btn" id="demo-randomize">Randomize</button>
+
+      <hr class="shader-demo__divider">
+
+      <a href="{{ section.settings.product_url }}" class="btn btn--primary btn--full">
+        {{ section.settings.button_label | default: 'Customize This Design' }}
+      </a>
+      <p class="shader-demo__note">Full controls available on the product page</p>
+
+    </div>
+  </div>
+</section>
+
+<script>
+(function () {
+  // ── Preset data ────────────────────────────────────────────────────────────
+  // Each preset is self-contained: mode 0 = cosine (a/b/c/d), mode 1 = 4-stop (c0–c3).
+  var PRESETS = {
+    'Rainbow':   { mode: 0, a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 1.0 ], d: [0.0,  0.33, 0.67]  },
+    'Cool Blue': { mode: 0, a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 1.0 ], d: [0.263,0.416,0.557] },
+    'Neon Heat': { mode: 0, a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 1.0 ], d: [0.3,  0.2,  0.2  ] },
+    'Golden':    { mode: 0, a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 0.5 ], d: [0.8,  0.9,  0.3  ] },
+    'Retro':     { mode: 0, a: [0.6,  0.5,  0.3 ], b: [0.4,  0.4,  0.3 ], c: [1.0, 0.7, 0.5 ], d: [0.0,  0.2,  0.4  ] },
+    'Neon':      { mode: 1, c0: [1.0,  0.2,  0.4  ], c1: [1.0,  0.8,  0.0  ], c2: [0.0,  0.8,  1.0  ], c3: [0.667,0.0,  1.0  ] },
+    'Sunset':    { mode: 1, c0: [1.0,  0.318,0.184 ], c1: [0.867,0.141,0.463 ], c2: [0.541,0.169,0.886 ], c3: [0.098,0.098,0.439 ] },
+    'Aurora':    { mode: 1, c0: [0.0,  1.0,  0.533 ], c1: [0.0,  0.898,1.0   ], c2: [0.486,0.302,1.0   ], c3: [0.878,0.251,0.984 ] },
+    'Dusk':      { mode: 1, c0: [1.0,  0.6,  0.4   ], c1: [1.0,  0.369,0.384 ], c2: [0.8,  0.169,0.369 ], c3: [0.459,0.227,0.533 ] },
+    'Retro 4C':  { mode: 1, c0: [0.91, 0.286,0.114 ], c1: [0.788,0.627,0.188 ], c2: [0.176,0.541,0.369 ], c3: [0.102,0.153,0.267 ] },
+  };
+
+  // Auto-cycle sequence — each step specifies preset + lineCount + power
+  var CYCLE_STEPS = [
+    { preset: 'Rainbow',  lineCount: 20, power: 2.5 },
+    { preset: 'Cool Blue',lineCount: 30, power: 1.5 },
+    { preset: 'Sunset',   lineCount: 15, power: 3.5 },
+    { preset: 'Neon Heat',lineCount: 25, power: 2.0 },
+    { preset: 'Aurora',   lineCount: 20, power: 4.0 },
+    { preset: 'Golden',   lineCount: 35, power: 2.0 },
+    { preset: 'Dusk',     lineCount: 12, power: 3.0 },
+    { preset: 'Retro',    lineCount: 18, power: 2.8 },
+  ];
+  var CYCLE_INTERVAL_MS = 3000;
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  window._demoState = {
+    values: {
+      u_line_count:  20,
+      u_power:       2.5,
+      u_color_mode:             0,
+      u_center_circle_radius:   0.04,
+      u_palette_a: [0.5, 0.5, 0.5], u_palette_b: [0.5, 0.5, 0.5],
+      u_palette_c: [1.0, 1.0, 1.0], u_palette_d: [0.0, 0.33, 0.67],
+      u_color0: [1.0, 0.2, 0.4],   u_color1: [1.0, 0.8, 0.0],
+      u_color2: [0.0, 0.8, 1.0],   u_color3: [0.667, 0.0, 1.0],
+    },
+    dirty: true,
+  };
+
+  // ── DOM refs ───────────────────────────────────────────────────────────────
+  var presetSel      = document.getElementById('demo-preset');
+  var lineCountInput = document.getElementById('demo-line-count');
+  var lineCountDisp  = document.getElementById('demo-line-count-display');
+  var powerInput          = document.getElementById('demo-power');
+  var powerDisp           = document.getElementById('demo-power-display');
+  var centerCircleInput   = document.getElementById('demo-center-circle');
+  var centerCircleDisp    = document.getElementById('demo-center-circle-display');
+  var randomizeBtn        = document.getElementById('demo-randomize');
+  var dotsWrap       = document.getElementById('demo-cycle-dots');
+
+  // ── Cycle dots ─────────────────────────────────────────────────────────────
+  CYCLE_STEPS.forEach(function () {
+    var dot = document.createElement('span');
+    dot.className = 'shader-demo__cycle-dot';
+    dotsWrap.appendChild(dot);
+  });
+  var dots = dotsWrap.querySelectorAll('.shader-demo__cycle-dot');
+
+  function setActiveDot(index) {
+    dots.forEach(function (d, i) {
+      d.classList.toggle('is-active', i === index);
+    });
+  }
+
+  // ── Apply helpers ──────────────────────────────────────────────────────────
+  function setMode(mode) {
+    window._demoState.values.u_color_mode = mode;
+  }
+
+  function applyPreset(name) {
+    var p = PRESETS[name];
+    if (!p) return;
+    var v = window._demoState.values;
+    setMode(p.mode);
+    if (p.mode === 0) {
+      v.u_palette_a = p.a; v.u_palette_b = p.b; v.u_palette_c = p.c; v.u_palette_d = p.d;
+    } else {
+      v.u_color0 = p.c0; v.u_color1 = p.c1;
+      v.u_color2 = p.c2; v.u_color3 = p.c3;
+    }
+    presetSel.value = name;
+    window._demoState.dirty = true;
+  }
+
+  function applyLineCount(n) {
+    window._demoState.values.u_line_count = n;
+    lineCountInput.value         = n;
+    lineCountDisp.textContent    = n;
+    window._demoState.dirty = true;
+  }
+
+  function applyPower(p) {
+    window._demoState.values.u_power = p;
+    powerInput.value      = p;
+    powerDisp.textContent = p;
+    window._demoState.dirty = true;
+  }
+
+  function applyCenterCircle(r) {
+    window._demoState.values.u_center_circle_radius = r;
+    centerCircleInput.value      = r;
+    centerCircleDisp.textContent = r;
+    window._demoState.dirty = true;
+  }
+
+  // ── Auto-cycle ─────────────────────────────────────────────────────────────
+  var cycleIndex    = 0;
+  var cycleTimer    = null;
+  var userInteracted = false;
+
+  function applyStep(index) {
+    var step = CYCLE_STEPS[index];
+    applyPreset(step.preset);
+    applyLineCount(step.lineCount);
+    applyPower(step.power);
+    setActiveDot(index);
+  }
+
+  function startCycle() {
+    applyStep(0);
+    cycleTimer = setInterval(function () {
+      cycleIndex = (cycleIndex + 1) % CYCLE_STEPS.length;
+      applyStep(cycleIndex);
+    }, CYCLE_INTERVAL_MS);
+  }
+
+  function stopCycle() {
+    if (cycleTimer) { clearInterval(cycleTimer); cycleTimer = null; }
+    dotsWrap.style.display = 'none';
+  }
+
+  function onUserInteract() {
+    if (userInteracted) return;
+    userInteracted = true;
+    stopCycle();
+  }
+
+  // ── Control wiring ─────────────────────────────────────────────────────────
+  presetSel.addEventListener('change', function () {
+    onUserInteract();
+    applyPreset(this.value);
+  });
+
+  lineCountInput.addEventListener('input', function () {
+    onUserInteract();
+    applyLineCount(parseInt(this.value, 10));
+  });
+
+  powerInput.addEventListener('input', function () {
+    onUserInteract();
+    applyPower(parseFloat(this.value));
+  });
+
+  centerCircleInput.addEventListener('input', function () {
+    onUserInteract();
+    applyCenterCircle(parseFloat(this.value));
+  });
+
+  randomizeBtn.addEventListener('click', function () {
+    onUserInteract();
+    var keys     = Object.keys(PRESETS);
+    var name     = keys[Math.floor(Math.random() * keys.length)];
+    var lineCount = Math.floor(Math.random() * 56) + 5;  // 5–60
+    var power     = parseFloat((Math.random() * 5.5 + 0.5).toFixed(1)); // 0.5–6.0
+    var centerCircle = parseFloat((Math.random() * 0.25 + 0.01).toFixed(3)); // 0.01–0.26
+    applyPreset(name);
+    applyLineCount(lineCount);
+    applyPower(power);
+    applyCenterCircle(centerCircle);
+  });
+
+  // ── Boot ───────────────────────────────────────────────────────────────────
+  startCycle();
+}());
+</script>
+
+<script src="{{ 'homepage-demo-shader.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Shader Demo",
+  "settings": [
+    {
+      "type": "text",
+      "id": "eyebrow",
+      "label": "Eyebrow text",
+      "default": "Make It Yours"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Every design is yours to customize"
+    },
+    {
+      "type": "textarea",
+      "id": "subheading",
+      "label": "Subheading",
+      "info": "Optional — leave blank to hide"
+    },
+    {
+      "type": "url",
+      "id": "product_url",
+      "label": "Product page link",
+      "info": "The Three-Square product page"
+    },
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Button label",
+      "default": "Customize This Design"
+    }
+  ],
+  "presets": [
+    { "name": "Shader Demo" }
+  ]
+}
+{% endschema %}
