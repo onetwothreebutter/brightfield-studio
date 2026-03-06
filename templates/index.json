@@ -10,6 +10,16 @@
         "cta_url": "/collections/all"
       }
     },
+    "shader-demo": {
+      "type": "homepage-shader-demo",
+      "settings": {
+        "eyebrow": "Make It Yours",
+        "heading": "Every design is yours to customize",
+        "subheading": "",
+        "product_url": "/products/three-square",
+        "button_label": "Customize This Design"
+      }
+    },
     "featured-collection": {
       "type": "featured-collection",
       "settings": {
@@ -21,5 +31,5 @@
       }
     }
   },
-  "order": ["hero", "featured-collection"]
+  "order": ["hero", "shader-demo", "featured-collection"]
 }

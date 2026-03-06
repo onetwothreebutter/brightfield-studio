@@ -1,0 +1,299 @@
+<section class="shader-demo">
+  <div class="shader-demo__header container">
+    {%- if section.settings.eyebrow != blank -%}
+      <p class="shader-demo__eyebrow">{{ section.settings.eyebrow }}</p>
+    {%- endif -%}
+    <h2 class="shader-demo__heading">{{ section.settings.heading }}</h2>
+    {%- if section.settings.subheading != blank -%}
+      <p class="shader-demo__subheading">{{ section.settings.subheading }}</p>
+    {%- endif -%}
+  </div>
+
+  <div class="shader-demo__body container">
+    <div class="shader-demo__canvas-wrap">
+      <canvas id="demo-shader-canvas" class="shader-demo__canvas" aria-hidden="true"></canvas>
+    </div>
+
+    <div class="shader-demo__controls">
+
+      <!-- Cycle indicator dots -->
+      <div class="shader-demo__cycle-indicator" id="demo-cycle-dots" aria-hidden="true"></div>
+
+      <!-- Color Mode -->
+      <div class="shader-control">
+        <label class="shader-control__label">Color Mode</label>
+        <button type="button" class="shader-control__toggle" id="demo-color-mode" data-on="0">Off</button>
+      </div>
+
+      <!-- Preset -->
+      <div class="shader-control">
+        <label class="shader-control__label">Preset</label>
+        <select class="shader-control__select" id="demo-preset">
+          <optgroup label="Cosine">
+            <option value="Rainbow">Rainbow</option>
+            <option value="Cool Blue">Cool Blue</option>
+            <option value="Neon Heat">Neon Heat</option>
+            <option value="Golden">Golden</option>
+            <option value="Retro">Retro</option>
+          </optgroup>
+          <optgroup label="4-Color">
+            <option value="Neon">Neon</option>
+            <option value="Sunset">Sunset</option>
+            <option value="Aurora">Aurora</option>
+            <option value="Dusk">Dusk</option>
+            <option value="Retro 4C">Retro</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <!-- Squares -->
+      <div class="shader-control">
+        <label class="shader-control__label">Squares</label>
+        <div class="shader-control__range-wrap">
+          <input type="range" class="shader-control__range" id="demo-count" min="2" max="4" step="1" value="3">
+          <span class="shader-control__value" id="demo-count-display">3</span>
+        </div>
+      </div>
+
+      <!-- Density -->
+      <div class="shader-control">
+        <label class="shader-control__label">Density</label>
+        <div class="shader-control__range-wrap">
+          <input type="range" class="shader-control__range" id="demo-density" min="2" max="40" step="1" value="10">
+          <span class="shader-control__value" id="demo-density-display">10</span>
+        </div>
+      </div>
+
+      <!-- Randomize -->
+      <button type="button" class="shader-control__randomize-btn" id="demo-randomize">Randomize</button>
+
+      <hr class="shader-demo__divider">
+
+      <a href="{{ section.settings.product_url }}" class="btn btn--primary btn--full">
+        {{ section.settings.button_label | default: 'Customize This Design' }}
+      </a>
+      <p class="shader-demo__note">Full controls available on the product page</p>
+
+    </div>
+  </div>
+</section>
+
+<script>
+(function () {
+  // ── Preset data ────────────────────────────────────────────────────────────
+  // Each preset is self-contained: mode 0 = cosine (a/b/c/d), mode 1 = 4-stop (c0–c3).
+  var PRESETS = {
+    'Rainbow':   { mode: 0, a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 1.0 ], d: [0.0,  0.33, 0.67]  },
+    'Cool Blue': { mode: 0, a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 1.0 ], d: [0.263,0.416,0.557] },
+    'Neon Heat': { mode: 0, a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 1.0 ], d: [0.3,  0.2,  0.2  ] },
+    'Golden':    { mode: 0, a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 0.5 ], d: [0.8,  0.9,  0.3  ] },
+    'Retro':     { mode: 0, a: [0.6,  0.5,  0.3 ], b: [0.4,  0.4,  0.3 ], c: [1.0, 0.7, 0.5 ], d: [0.0,  0.2,  0.4  ] },
+    'Neon':      { mode: 1, c0: [1.0,  0.2,  0.4  ], c1: [1.0,  0.8,  0.0  ], c2: [0.0,  0.8,  1.0  ], c3: [0.667,0.0,  1.0  ] },
+    'Sunset':    { mode: 1, c0: [1.0,  0.318,0.184 ], c1: [0.867,0.141,0.463 ], c2: [0.541,0.169,0.886 ], c3: [0.098,0.098,0.439 ] },
+    'Aurora':    { mode: 1, c0: [0.0,  1.0,  0.533 ], c1: [0.0,  0.898,1.0   ], c2: [0.486,0.302,1.0   ], c3: [0.878,0.251,0.984 ] },
+    'Dusk':      { mode: 1, c0: [1.0,  0.6,  0.4   ], c1: [1.0,  0.369,0.384 ], c2: [0.8,  0.169,0.369 ], c3: [0.459,0.227,0.533 ] },
+    'Retro 4C':  { mode: 1, c0: [0.91, 0.286,0.114 ], c1: [0.788,0.627,0.188 ], c2: [0.176,0.541,0.369 ], c3: [0.102,0.153,0.267 ] },
+  };
+
+  // Auto-cycle sequence — each step specifies preset + count + density
+  var CYCLE_STEPS = [
+    { preset: 'Rainbow',  count: 3, density: 10 },
+    { preset: 'Cool Blue',count: 2, density: 15 },
+    { preset: 'Sunset',   count: 3, density: 12 },
+    { preset: 'Neon Heat',count: 3, density: 8  },
+    { preset: 'Aurora',   count: 2, density: 18 },
+    { preset: 'Golden',   count: 3, density: 10 },
+    { preset: 'Dusk',     count: 3, density: 14 },
+    { preset: 'Retro',    count: 2, density: 12 },
+  ];
+  var CYCLE_INTERVAL_MS = 3000;
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  window._demoState = {
+    values: {
+      u_square_count: 3,
+      u_density:      10,
+      u_color_mode:   0,
+      u_a:  [0.5, 0.5, 0.5], u_b: [0.5, 0.5, 0.5],
+      u_c:  [1.0, 1.0, 1.0], u_d: [0.0, 0.33, 0.67],
+      u_color0: [1.0, 0.2, 0.4],   u_color1: [1.0, 0.8, 0.0],
+      u_color2: [0.0, 0.8, 1.0],   u_color3: [0.667, 0.0, 1.0],
+    },
+    dirty: true,
+  };
+
+  // ── DOM refs ───────────────────────────────────────────────────────────────
+  var modeBtn      = document.getElementById('demo-color-mode');
+  var presetSel    = document.getElementById('demo-preset');
+  var countInput   = document.getElementById('demo-count');
+  var countDisplay = document.getElementById('demo-count-display');
+  var densityInput = document.getElementById('demo-density');
+  var densityDisp  = document.getElementById('demo-density-display');
+  var randomizeBtn  = document.getElementById('demo-randomize');
+  var dotsWrap      = document.getElementById('demo-cycle-dots');
+
+  // ── Cycle dots ─────────────────────────────────────────────────────────────
+  CYCLE_STEPS.forEach(function () {
+    var dot = document.createElement('span');
+    dot.className = 'shader-demo__cycle-dot';
+    dotsWrap.appendChild(dot);
+  });
+  var dots = dotsWrap.querySelectorAll('.shader-demo__cycle-dot');
+
+  function setActiveDot(index) {
+    dots.forEach(function (d, i) {
+      d.classList.toggle('is-active', i === index);
+    });
+  }
+
+  // ── Apply helpers ──────────────────────────────────────────────────────────
+  function setMode(mode) {
+    var v = window._demoState.values;
+    v.u_color_mode = mode;
+    modeBtn.dataset.on  = mode ? '1' : '0';
+    modeBtn.textContent = mode ? 'On' : 'Off';
+    modeBtn.classList.toggle('is-on', !!mode);
+  }
+
+  function applyPreset(name) {
+    var p = PRESETS[name];
+    if (!p) return;
+    var v = window._demoState.values;
+    setMode(p.mode);
+    if (p.mode === 0) {
+      v.u_a = p.a; v.u_b = p.b; v.u_c = p.c; v.u_d = p.d;
+    } else {
+      v.u_color0 = p.c0; v.u_color1 = p.c1;
+      v.u_color2 = p.c2; v.u_color3 = p.c3;
+    }
+    presetSel.value = name;
+    window._demoState.dirty = true;
+  }
+
+  function applyCount(n) {
+    window._demoState.values.u_square_count = n;
+    countInput.value      = n;
+    countDisplay.textContent = n;
+    window._demoState.dirty = true;
+  }
+
+  function applyDensity(d) {
+    window._demoState.values.u_density = d;
+    densityInput.value      = d;
+    densityDisp.textContent = d;
+    window._demoState.dirty = true;
+  }
+
+  // ── Auto-cycle ─────────────────────────────────────────────────────────────
+  var cycleIndex    = 0;
+  var cycleTimer    = null;
+  var userInteracted = false;
+
+  function applyStep(index) {
+    var step = CYCLE_STEPS[index];
+    applyPreset(step.preset);
+    applyCount(step.count);
+    applyDensity(step.density);
+    setActiveDot(index);
+  }
+
+  function startCycle() {
+    applyStep(0);
+    cycleTimer = setInterval(function () {
+      cycleIndex = (cycleIndex + 1) % CYCLE_STEPS.length;
+      applyStep(cycleIndex);
+    }, CYCLE_INTERVAL_MS);
+  }
+
+  function stopCycle() {
+    if (cycleTimer) { clearInterval(cycleTimer); cycleTimer = null; }
+    dotsWrap.style.display = 'none';
+  }
+
+  function onUserInteract() {
+    if (userInteracted) return;
+    userInteracted = true;
+    stopCycle();
+  }
+
+  // ── Control wiring ─────────────────────────────────────────────────────────
+  modeBtn.addEventListener('click', function () {
+    onUserInteract();
+    var isOn = this.dataset.on === '1';
+    setMode(isOn ? 0 : 1);
+    window._demoState.dirty = true;
+  });
+
+  presetSel.addEventListener('change', function () {
+    onUserInteract();
+    applyPreset(this.value);
+  });
+
+  countInput.addEventListener('input', function () {
+    onUserInteract();
+    applyCount(parseInt(this.value, 10));
+  });
+
+  densityInput.addEventListener('input', function () {
+    onUserInteract();
+    applyDensity(parseInt(this.value, 10));
+  });
+
+  randomizeBtn.addEventListener('click', function () {
+    onUserInteract();
+    var keys     = Object.keys(PRESETS);
+    var name     = keys[Math.floor(Math.random() * keys.length)];
+    var count    = Math.floor(Math.random() * 3) + 2; // 2–4
+    var density  = Math.floor(Math.random() * 31) + 5; // 5–35
+    applyPreset(name);
+    applyCount(count);
+    applyDensity(density);
+  });
+
+  // ── Boot ───────────────────────────────────────────────────────────────────
+  startCycle();
+}());
+</script>
+
+<script src="{{ 'homepage-demo-shader.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Shader Demo",
+  "settings": [
+    {
+      "type": "text",
+      "id": "eyebrow",
+      "label": "Eyebrow text",
+      "default": "Make It Yours"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Every design is yours to customize"
+    },
+    {
+      "type": "textarea",
+      "id": "subheading",
+      "label": "Subheading",
+      "info": "Optional — leave blank to hide"
+    },
+    {
+      "type": "url",
+      "id": "product_url",
+      "label": "Product page link",
+      "info": "The Three-Square product page"
+    },
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Button label",
+      "default": "Customize This Design"
+    }
+  ],
+  "presets": [
+    { "name": "Shader Demo" }
+  ]
+}
+{% endschema %}

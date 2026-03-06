@@ -1392,6 +1392,101 @@ h1, h2, h3, h4, h5, h6 {
   background:   var(--color-secondary-dim, transparent);
 }
 
+/* ── Homepage shader demo ────────────────────────────────────── */
+.shader-demo {
+  padding: 5rem 0;
+}
+
+.shader-demo__header {
+  text-align:    center;
+  margin-bottom: 3rem;
+}
+
+.shader-demo__eyebrow {
+  font-family:    var(--font-body);
+  font-size:      0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color:          var(--color-primary);
+  margin-bottom:  0.5rem;
+}
+
+.shader-demo__heading {
+  font-family: var(--font-heading);
+  font-size:   clamp(1.4rem, 4vw, 2.2rem);
+  color:       var(--color-text);
+  margin:      0;
+}
+
+.shader-demo__subheading {
+  color:      var(--color-text-muted);
+  font-size:  0.9rem;
+  margin-top: 0.75rem;
+}
+
+.shader-demo__body {
+  display:               grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap:                   3rem;
+  align-items:           start;
+}
+
+@media (max-width: 800px) {
+  .shader-demo__body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.shader-demo__canvas-wrap {
+  position: sticky;
+  top:      1.5rem;
+}
+
+.shader-demo__canvas {
+  display:       block;
+  width:         100%;
+  aspect-ratio:  3 / 4;
+  border-radius: var(--radius);
+  background:    #000;
+}
+
+.shader-demo__controls {
+  display:        flex;
+  flex-direction: column;
+}
+
+.shader-demo__cycle-indicator {
+  display:         flex;
+  gap:             0.4rem;
+  margin-bottom:   1rem;
+}
+
+.shader-demo__cycle-dot {
+  width:         6px;
+  height:        6px;
+  border-radius: 50%;
+  background:    var(--color-border);
+  transition:    background var(--transition-fast);
+}
+
+.shader-demo__cycle-dot.is-active {
+  background: var(--color-primary);
+}
+
+.shader-demo__divider {
+  border:        none;
+  border-top:    1px solid var(--color-border);
+  margin:        1.25rem 0;
+}
+
+.shader-demo__note {
+  font-size:      0.7rem;
+  color:          var(--color-text-muted);
+  text-align:     center;
+  margin-top:     0.5rem;
+  letter-spacing: 0.04em;
+}
+
 /* ── Control tips ───────────────────────────────────────────── */
 .shader-tip-btn {
   display:        inline-flex;
