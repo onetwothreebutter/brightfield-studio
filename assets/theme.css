@@ -1593,6 +1593,29 @@ h6 {
     .shader-demo__body {
         grid-template-columns: 1fr;
     }
+
+    .shader-demo__header {
+        text-align: center;
+    }
+
+    .shader-demo__canvas-wrap {
+        position: relative;
+        max-width: 360px;
+        margin: 0 auto;
+    }
+
+    .shader-control__range {
+        touch-action: pan-y;
+        height: 2rem;
+    }
+
+    .shader-control {
+        padding: 0.45rem 0.75rem;
+    }
+
+    .shader-demo__cta-row {
+        flex-direction: column;
+    }
 }
 
 .shader-demo__canvas-wrap {
