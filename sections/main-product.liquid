@@ -344,9 +344,13 @@ if (window.location.hash === '#shader') {
   });
 
   // Build controls
-  var paletteDependentRows = [];
-  var stopDependentRows   = [];
-  var colorModeBtn = null;
+  var paletteDependentRows    = [];
+  var stopDependentRows       = [];
+  var textColorDependentRows  = [];
+  var outlineDependentRows    = [];
+  var colorModeBtn     = null;
+  var useTextColorBtn  = null;
+  var outlineToggleBtn = null;
   var controlEls = []; // [{ctrl, el}] for randomisation
 
   controls.forEach(function (ctrl) {
@@ -422,7 +426,9 @@ if (window.location.hash === '#shader') {
         if (ctrl.textDirty) window._shaderState.textDirty = true;
       });
 
-      if (ctrl.key === 'u_color_mode') colorModeBtn = btn;
+      if (ctrl.key === 'u_color_mode')    colorModeBtn     = btn;
+      if (ctrl.key === 'u_use_text_color') useTextColorBtn  = btn;
+      if (ctrl.key === 'outlineEnabled')   outlineToggleBtn = btn;
 
       row.appendChild(btn);
       controlEls.push({ ctrl: ctrl, el: btn });
@@ -480,8 +486,10 @@ if (window.location.hash === '#shader') {
       controlEls.push({ ctrl: ctrl, el: sel });
     }
 
-    if (ctrl.paletteDependent) paletteDependentRows.push(row);
-    if (ctrl.stopDependent)   stopDependentRows.push(row);
+    if (ctrl.paletteDependent)   paletteDependentRows.push(row);
+    if (ctrl.stopDependent)      stopDependentRows.push(row);
+    if (ctrl.textColorDependent) textColorDependentRows.push(row);
+    if (ctrl.outlineDependent)   outlineDependentRows.push(row);
 
     body.appendChild(row);
   });
@@ -498,6 +506,22 @@ if (window.location.hash === '#shader') {
   }
   if (colorModeBtn) colorModeBtn.addEventListener('click', applyPaletteVisibility);
   applyPaletteVisibility();
+
+  // Show/hide text-color row based on Custom Text Color toggle
+  function applyTextColorVisibility() {
+    var on = useTextColorBtn && useTextColorBtn.dataset.on === '1';
+    textColorDependentRows.forEach(function (r) { r.style.display = on ? '' : 'none'; });
+  }
+  if (useTextColorBtn) useTextColorBtn.addEventListener('click', applyTextColorVisibility);
+  applyTextColorVisibility();
+
+  // Show/hide outline rows based on Outline toggle
+  function applyOutlineVisibility() {
+    var on = outlineToggleBtn && outlineToggleBtn.dataset.on === '1';
+    outlineDependentRows.forEach(function (r) { r.style.display = on ? '' : 'none'; });
+  }
+  if (outlineToggleBtn) outlineToggleBtn.addEventListener('click', applyOutlineVisibility);
+  applyOutlineVisibility();
   if (typeof customAfterBuild === 'function') customAfterBuild();
 
   // Randomize button

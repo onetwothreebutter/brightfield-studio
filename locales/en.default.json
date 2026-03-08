@@ -10,7 +10,7 @@
     "product": {
       "add_to_cart": "Add to Cart",
       "sold_out": "Sold Out",
-      "select_options": "Select Options",
+      "select_options": "View Details",
       "quantity": "Quantity",
       "description": "Description",
       "vendor": "by {{ vendor }}"
