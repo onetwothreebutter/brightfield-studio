@@ -128,6 +128,20 @@ var customAfterBuild = function () {
     }));
   }
 
+  // Hide Noise Seed unless Height Mode = Noise
+  var body = document.getElementById('shader-gui-body');
+  var heightModeSel = document.querySelector('[data-param-key="u_height_mode"]');
+  var noiseSeedRow = (function () {
+    var el = document.querySelector('[data-param-key="u_noise_seed"]');
+    return el ? el.closest('.shader-control') : null;
+  }());
+  function applyNoiseSeedVis() {
+    if (!noiseSeedRow) return;
+    noiseSeedRow.style.display = heightModeSel && heightModeSel.value === 'Noise' ? '' : 'none';
+  }
+  if (heightModeSel) heightModeSel.addEventListener('change', applyNoiseSeedVis);
+  applyNoiseSeedVis();
+
   // Apply default on load so shader matches pickers.
   applyCosinePreset(cosinePresets['Rainbow']);
 
