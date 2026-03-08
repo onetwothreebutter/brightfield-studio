@@ -70,92 +70,104 @@
       <!-- Randomize -->
       <button type="button" class="shader-control__randomize-btn" id="demo-randomize">Randomize</button>
 
-      <!-- Text Overlay (revealed on first interaction) -->
-      <div id="demo-text-panel">
+      <!-- All Settings (collapsible) -->
+      <div class="shader-demo__all-settings">
+        <button type="button" class="shader-demo__all-settings-toggle" id="demo-all-settings-toggle" aria-expanded="false">
+          All Settings
+          <span class="shader-demo__all-settings-chevron" aria-hidden="true">&#9660;</span>
+        </button>
+        <div class="shader-demo__all-settings-body" id="demo-all-settings-body" hidden>
 
-        <p class="shader-demo__panel-label">Text Overlay</p>
+          <p class="shader-demo__panel-label">Text Overlay</p>
 
-        <!-- Text -->
-        <div class="shader-control">
-          <label class="shader-control__label">Text</label>
-          <input type="text" class="shader-control__text-input" id="demo-text" value="" placeholder="Your text">
-        </div>
-
-        <!-- Font -->
-        <div class="shader-control">
-          <label class="shader-control__label">Font</label>
-          <select class="shader-control__select" id="demo-text-font">
-            <option value="Oswald">Oswald</option>
-            <option value="Unbounded">Unbounded</option>
-            <option value="Bricolage Grotesque">Bricolage Grotesque</option>
-            <option value="DM Mono">DM Mono</option>
-            <option value="Righteous">Righteous</option>
-            <option value="Teko">Teko</option>
-            <option value="Big Shoulders Display">Big Shoulders Display</option>
-            <option value="Anton">Anton</option>
-          </select>
-        </div>
-
-        <!-- Font Size -->
-        <div class="shader-control">
-          <label class="shader-control__label">Font Size</label>
-          <div class="shader-control__range-wrap">
-            <input type="range" class="shader-control__range" id="demo-text-size" min="8" max="300" step="1" value="120">
-            <span class="shader-control__value" id="demo-text-size-display">120</span>
+          <!-- Enable Text -->
+          <div class="shader-control">
+            <label class="shader-control__label">Enable Text</label>
+            <button type="button" class="shader-control__toggle" id="demo-enable-text" data-on="0">Off</button>
           </div>
-        </div>
 
-        <!-- Text X -->
-        <div class="shader-control">
-          <label class="shader-control__label">Text X</label>
-          <div class="shader-control__range-wrap">
-            <input type="range" class="shader-control__range" id="demo-text-x" min="0" max="1" step="0.01" value="0.5">
-            <span class="shader-control__value" id="demo-text-x-display">0.5</span>
+          <!-- Text -->
+          <div class="shader-control">
+            <label class="shader-control__label">Text</label>
+            <input type="text" class="shader-control__text-input" id="demo-text" value="{{ 'now' | date: '%Y' }}" placeholder="Your text">
           </div>
-        </div>
 
-        <!-- Text Y -->
-        <div class="shader-control">
-          <label class="shader-control__label">Text Y</label>
-          <div class="shader-control__range-wrap">
-            <input type="range" class="shader-control__range" id="demo-text-y" min="0" max="1" step="0.01" value="0.5">
-            <span class="shader-control__value" id="demo-text-y-display">0.5</span>
+          <!-- Font -->
+          <div class="shader-control">
+            <label class="shader-control__label">Font</label>
+            <select class="shader-control__select" id="demo-text-font">
+              <option value="Oswald">Oswald</option>
+              <option value="Unbounded">Unbounded</option>
+              <option value="Bricolage Grotesque">Bricolage Grotesque</option>
+              <option value="DM Mono">DM Mono</option>
+              <option value="Righteous">Righteous</option>
+              <option value="Teko">Teko</option>
+              <option value="Big Shoulders Display">Big Shoulders Display</option>
+              <option value="Anton">Anton</option>
+            </select>
           </div>
-        </div>
 
-        <!-- Custom Text Color -->
-        <div class="shader-control">
-          <label class="shader-control__label">Custom Color</label>
-          <button type="button" class="shader-control__toggle" id="demo-use-text-color" data-on="0">Off</button>
-        </div>
-
-        <!-- Text Color -->
-        <div class="shader-control">
-          <label class="shader-control__label">Text Color</label>
-          <input type="color" class="shader-control__color" id="demo-text-color" value="#ffffff">
-        </div>
-
-        <!-- Outline -->
-        <div class="shader-control">
-          <label class="shader-control__label">Outline</label>
-          <button type="button" class="shader-control__toggle" id="demo-outline-enabled" data-on="0">Off</button>
-        </div>
-
-        <!-- Outline Width -->
-        <div class="shader-control">
-          <label class="shader-control__label">Outline Width</label>
-          <div class="shader-control__range-wrap">
-            <input type="range" class="shader-control__range" id="demo-outline-width" min="1" max="60" step="1" value="8">
-            <span class="shader-control__value" id="demo-outline-width-display">8</span>
+          <!-- Font Size -->
+          <div class="shader-control">
+            <label class="shader-control__label">Font Size</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-text-size" min="8" max="300" step="1" value="120">
+              <span class="shader-control__value" id="demo-text-size-display">120</span>
+            </div>
           </div>
-        </div>
 
-        <!-- Outline Color -->
-        <div class="shader-control">
-          <label class="shader-control__label">Outline Color</label>
-          <input type="color" class="shader-control__color" id="demo-outline-color" value="#000000">
-        </div>
+          <!-- Text X -->
+          <div class="shader-control">
+            <label class="shader-control__label">Text X</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-text-x" min="0" max="1" step="0.01" value="0.5">
+              <span class="shader-control__value" id="demo-text-x-display">0.5</span>
+            </div>
+          </div>
 
+          <!-- Text Y -->
+          <div class="shader-control">
+            <label class="shader-control__label">Text Y</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-text-y" min="0" max="1" step="0.01" value="0.5">
+              <span class="shader-control__value" id="demo-text-y-display">0.5</span>
+            </div>
+          </div>
+
+          <!-- Custom Text Color -->
+          <div class="shader-control">
+            <label class="shader-control__label">Custom Color</label>
+            <button type="button" class="shader-control__toggle" id="demo-use-text-color" data-on="0">Off</button>
+          </div>
+
+          <!-- Text Color -->
+          <div class="shader-control">
+            <label class="shader-control__label">Text Color</label>
+            <input type="color" class="shader-control__color" id="demo-text-color" value="#ffffff">
+          </div>
+
+          <!-- Outline -->
+          <div class="shader-control">
+            <label class="shader-control__label">Outline</label>
+            <button type="button" class="shader-control__toggle" id="demo-outline-enabled" data-on="0">Off</button>
+          </div>
+
+          <!-- Outline Width -->
+          <div class="shader-control">
+            <label class="shader-control__label">Outline Width</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-outline-width" min="1" max="60" step="1" value="8">
+              <span class="shader-control__value" id="demo-outline-width-display">8</span>
+            </div>
+          </div>
+
+          <!-- Outline Color -->
+          <div class="shader-control">
+            <label class="shader-control__label">Outline Color</label>
+            <input type="color" class="shader-control__color" id="demo-outline-color" value="#000000">
+          </div>
+
+        </div>
       </div>
 
     </div>
@@ -263,7 +275,9 @@
   var centerCircleDisp    = document.getElementById('demo-center-circle-display');
   var randomizeBtn        = document.getElementById('demo-randomize');
   var dotsWrap            = document.getElementById('demo-cycle-dots');
-  var textPanel           = document.getElementById('demo-text-panel'); // revealed via .is-visible class
+  var allSettingsToggle   = document.getElementById('demo-all-settings-toggle');
+  var allSettingsBody     = document.getElementById('demo-all-settings-body');
+  var enableTextBtn       = document.getElementById('demo-enable-text');
   var textInput           = document.getElementById('demo-text');
   var textFontSel         = document.getElementById('demo-text-font');
   var textSizeInput       = document.getElementById('demo-text-size');
@@ -384,7 +398,15 @@
     if (userInteracted) return;
     userInteracted = true;
     stopCycle();
-    textPanel.classList.add('is-visible');
+  }
+
+  // ── All Settings toggle ────────────────────────────────────────────────────
+  if (allSettingsToggle && allSettingsBody) {
+    allSettingsToggle.addEventListener('click', function () {
+      var isOpen = this.getAttribute('aria-expanded') === 'true';
+      this.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+      allSettingsBody.hidden = isOpen;
+    });
   }
 
   // ── Control wiring ─────────────────────────────────────────────────────────
@@ -422,7 +444,23 @@
   });
 
   // ── Text overlay wiring ────────────────────────────────────────────────────
+  function isTextEnabled() {
+    return enableTextBtn && enableTextBtn.dataset.on === '1';
+  }
+
+  if (enableTextBtn) {
+    enableTextBtn.addEventListener('click', function () {
+      var wasOn = this.dataset.on === '1';
+      this.dataset.on  = wasOn ? '0' : '1';
+      this.textContent = wasOn ? 'Off' : 'On';
+      this.classList.toggle('is-on', !wasOn);
+      window._demoState.values.text = wasOn ? '' : textInput.value;
+      window._demoState.dirty = true;
+    });
+  }
+
   textInput.addEventListener('input', function () {
+    if (!isTextEnabled()) return;
     window._demoState.values.text = this.value;
     window._demoState.dirty = true;
   });
@@ -619,9 +657,9 @@
 // ── Mobile: fade controls as they scroll past the canvas bottom ───────────────
 (function () {
   if (window.innerWidth > 800) return;
-  var canvasWrap = document.querySelector('.shader-demo__canvas-wrap');
-  var controlsEl = document.querySelector('.shader-demo__controls');
-  var textPanel  = document.getElementById('demo-text-panel');
+  var canvasWrap    = document.querySelector('.shader-demo__canvas-wrap');
+  var controlsEl    = document.querySelector('.shader-demo__controls');
+  var allSettingsEl = document.querySelector('.shader-demo__all-settings');
   if (!canvasWrap || !controlsEl) return;
 
   var FADE_ZONE = 72; // px — rows fade over this distance approaching canvas bottom
@@ -640,10 +678,16 @@
     var children = controlsEl.children;
     for (var i = 0; i < children.length; i++) {
       var child = children[i];
-      if (child === textPanel) {
-        // Fade text panel rows individually so each fades at its own position
-        for (var j = 0; j < child.children.length; j++) {
-          fadeRow(child.children[j], canvasBottom);
+      if (child === allSettingsEl) {
+        // Fade the toggle button as its own row
+        var toggle = child.querySelector('.shader-demo__all-settings-toggle');
+        if (toggle) fadeRow(toggle, canvasBottom);
+        // Fade each row in the body individually when expanded
+        var body = child.querySelector('.shader-demo__all-settings-body');
+        if (body && !body.hidden) {
+          for (var j = 0; j < body.children.length; j++) {
+            fadeRow(body.children[j], canvasBottom);
+          }
         }
       } else {
         fadeRow(child, canvasBottom);
