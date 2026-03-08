@@ -1053,6 +1053,20 @@ h6 {
         grid-template-columns: 1fr;
         gap: 2.5rem;
     }
+
+    /* Sticky-canvas layout when Customize tab is active on mobile */
+    .product-layout.shader-mode {
+        gap: 0;
+    }
+    .product-layout.shader-mode .product-media {
+        position: sticky;
+        top: var(--header-height);
+        z-index: 10;
+        background: var(--color-bg);
+    }
+    .product-layout.shader-mode .shader-gui__mobile-bar {
+        display: none;
+    }
 }
 
 @media (max-width: 768px) {
@@ -1310,11 +1324,6 @@ h6 {
 .shader-gui__preview {
     padding: 0 1rem;
     margin-bottom: 1rem;
-}
-/* When portalled below the canvas on mobile */
-.media-panel .shader-gui__preview {
-    padding: 0.75rem;
-    margin: 0;
 }
 .shader-gui__body {
     padding: 0.25rem 0;
