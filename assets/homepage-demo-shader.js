@@ -273,15 +273,14 @@
     }
 
     var aspect = w / h;
-    var radius = 0.414 * Math.min(1.0, aspect);
 
     gl.uniform2f(u.res,       w, h);
     gl.uniform1f(u.aspect,    aspect);
-    gl.uniform1f(u.radius,    radius);
+    gl.uniform1f(u.radius,    v.u_radius     != null ? v.u_radius     : 0.4);
     gl.uniform1f(u.lineCount, v.u_line_count != null ? v.u_line_count : 20);
     gl.uniform1f(u.power,     v.u_power      != null ? v.u_power      : 2.5);
-    gl.uniform1f(u.widthTop,  0.05);
-    gl.uniform1f(u.widthBot,  0.75);
+    gl.uniform1f(u.widthTop,  v.u_width_top  != null ? v.u_width_top  : 0.05);
+    gl.uniform1f(u.widthBot,  v.u_width_bot  != null ? v.u_width_bot  : 0.75);
     gl.uniform3fv(u.paletteA, v.u_palette_a || [0.5, 0.5, 0.5]);
     gl.uniform3fv(u.paletteB, v.u_palette_b || [0.5, 0.5, 0.5]);
     gl.uniform3fv(u.paletteC, v.u_palette_c || [1.0, 1.0, 1.0]);
@@ -291,12 +290,12 @@
     gl.uniform3fv(u.color1,   v.u_color1 || [1.0, 0.8,  0.0]);
     gl.uniform3fv(u.color2,   v.u_color2 || [0.0, 0.8,  1.0]);
     gl.uniform3fv(u.color3,   v.u_color3 || [0.667, 0.0, 1.0]);
-    gl.uniform1f(u.triEnabled,          1.0);
-    gl.uniform1f(u.triRotation,         0.0);
-    gl.uniform1f(u.triSize,             1.0);
-    gl.uniform1f(u.triWidth,            (45 * Math.PI) / 180);
-    gl.uniform1f(u.centerCircleEnabled, 1.0);
-    gl.uniform1f(u.centerCircleRadius,  v.u_center_circle_radius != null ? v.u_center_circle_radius : 0.04);
+    gl.uniform1f(u.triEnabled,   v.u_tri_enabled  != null ? v.u_tri_enabled  : 1.0);
+    gl.uniform1f(u.triRotation,  v.u_tri_rotation != null ? v.u_tri_rotation * Math.PI / 180 : 0.0);
+    gl.uniform1f(u.triSize,      v.u_tri_size     != null ? v.u_tri_size     : 1.0);
+    gl.uniform1f(u.triWidth,     v.u_tri_width    != null ? v.u_tri_width * Math.PI / 180 : (45 * Math.PI) / 180);
+    gl.uniform1f(u.centerCircleEnabled, v.u_center_circle_enabled != null ? v.u_center_circle_enabled : 1.0);
+    gl.uniform1f(u.centerCircleRadius,  v.u_center_circle_radius  != null ? v.u_center_circle_radius  : 0.04);
     gl.uniform3fv(u.textColor,   v.u_text_color    || [1.0, 1.0, 1.0]);
     gl.uniform1f(u.useTextColor, v.u_use_text_color != null ? v.u_use_text_color : 0.0);
     gl.uniform3fv(u.outlineColor, v.u_outline_color || [0.0, 0.0, 0.0]);
