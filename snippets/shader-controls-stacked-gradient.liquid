@@ -54,7 +54,8 @@ var controls = [
   { key: 'u_color3', label: 'Color 4', type: 'color', stopDependent: true, value: '#aa00ff' },
   // ── Text Overlay ───────────────────────────────────────────────────────────
   { type: 'header', label: 'Text Overlay' },
-  { key: 'text',             label: 'Text',              type: 'text',   value: '',            textDirty: true },
+  { key: 'u_text_enabled',   label: 'Text Overlay',      type: 'toggle', value: 0,             textDirty: true },
+  { key: 'text',             label: 'Text',              type: 'text',   value: '{{ "now" | date: "%Y" }}', textDirty: true },
   { key: 'textFont',         label: 'Font',              type: 'select', value: 'Montserrat',  textDirty: true,
     options: [
       { label: 'Space Mono',          value: 'Space Mono'          },
@@ -137,6 +138,28 @@ var customAfterBuild = function () {
       if (p) applyCosinePreset(p);
     });
   }
+
+  // Text Overlay enable toggle — hide all text controls when off
+  var body = document.getElementById('shader-gui-body');
+  var textEnabledRow = Array.from(body.children).find(function (el) {
+    var lbl = el.querySelector && el.querySelector('.shader-control__label');
+    return lbl && lbl.textContent.trim() === 'Text Overlay' && el.querySelector('.shader-control__toggle');
+  });
+  var textEnabledBtn = textEnabledRow && textEnabledRow.querySelector('.shader-control__toggle');
+
+  var textDependentRows = [];
+  var found = false;
+  Array.from(body.children).forEach(function (el) {
+    if (el === textEnabledRow) { found = true; return; }
+    if (found && el.classList.contains('shader-control')) textDependentRows.push(el);
+  });
+
+  function applyTextEnabledVis() {
+    var on = textEnabledBtn && textEnabledBtn.dataset.on === '1';
+    textDependentRows.forEach(function (r) { r.style.display = on ? '' : 'none'; });
+  }
+  if (textEnabledBtn) textEnabledBtn.addEventListener('click', applyTextEnabledVis);
+  applyTextEnabledVis();
 };
 
 // Preload all fonts so they are available when the text canvas is drawn.

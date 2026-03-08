@@ -313,7 +313,7 @@
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, size, size);
 
-      var txt = v.text || '';
+      var txt = v.u_text_enabled ? (v.text || '') : '';
       if (txt) {
         var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"Montserrat"';
         var fontSize   = v.textFontSize != null ? v.textFontSize : 180;
@@ -346,7 +346,7 @@
 
     textKey: function (v) {
       return JSON.stringify([
-        v.text, v.textX, v.textY, v.textFontSize, v.textFont,
+        v.u_text_enabled, v.text, v.textX, v.textY, v.textFontSize, v.textFont,
         v.u_text_rotation, v.outlineEnabled, v.outlineWidth,
       ]);
     },
