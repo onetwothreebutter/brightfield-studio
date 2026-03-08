@@ -1602,9 +1602,8 @@ h6 {
 
     .shader-demo__canvas-wrap {
         top: calc(var(--header-height) + 15px) !important;
-        width: 100%;
-        max-width: 360px;
-        margin: 0 auto;
+        width: calc(100% - 20px);
+        margin: auto;
         z-index: 2;
     }
 
@@ -1701,7 +1700,8 @@ h6 {
     transition: transform 200ms var(--ease-out);
     font-size: 0.6rem;
 }
-.shader-demo__all-settings-toggle[aria-expanded="true"] .shader-demo__all-settings-chevron {
+.shader-demo__all-settings-toggle[aria-expanded="true"]
+    .shader-demo__all-settings-chevron {
     transform: rotate(180deg);
 }
 .shader-demo__all-settings-body {
@@ -1715,6 +1715,147 @@ h6 {
     border-top: 1px solid var(--color-border);
     padding-top: 1rem;
     margin: 1rem 0 0.25rem;
+}
+
+.shader-control__with-help {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.shader-control__with-help .shader-control__select {
+    flex: 1;
+    min-width: 0;
+}
+
+.shader-demo__help-btn {
+    flex-shrink: 0;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
+    font-size: 0.6rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        border-color var(--transition-fast),
+        color var(--transition-fast);
+}
+
+.shader-demo__help-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* ── Cosine help modal ── */
+.shader-demo__help-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.shader-demo__help-modal--hidden {
+    display: none;
+}
+
+.shader-demo__help-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.shader-demo__help-modal__box {
+    position: relative;
+    background: var(--color-surface-1);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg, 8px);
+    width: min(420px, 92vw);
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.shader-demo__help-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.shader-demo__help-modal__title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text);
+}
+
+.shader-demo__help-modal__close {
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+}
+
+.shader-demo__help-modal__close:hover {
+    color: var(--color-text);
+}
+
+.shader-demo__help-modal__body {
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.shader-demo__help-modal__intro {
+    margin: 0;
+    font-size: 0.7rem;
+    line-height: 1.6;
+    color: var(--color-text-muted);
+}
+
+.shader-demo__help-modal__formula {
+    margin: 0;
+    padding: 0.6rem 0.9rem;
+    background: var(--color-surface-2);
+    border-radius: var(--radius);
+    font-size: 0.75rem;
+    text-align: center;
+}
+
+.shader-demo__help-modal__defs {
+    margin: 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.35rem 0.9rem;
+    align-items: baseline;
+}
+
+.shader-demo__help-modal__defs dt {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    white-space: nowrap;
+}
+
+.shader-demo__help-modal__defs dd {
+    margin: 0;
+    font-size: 0.65rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
 }
 
 .shader-demo__cta-row {

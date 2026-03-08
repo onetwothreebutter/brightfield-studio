@@ -78,6 +78,140 @@
         </button>
         <div class="shader-demo__all-settings-body" id="demo-all-settings-body" hidden>
 
+          <p class="shader-demo__panel-label">Shape</p>
+
+          <!-- Radius -->
+          <div class="shader-control">
+            <label class="shader-control__label">Radius</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-radius" min="0.05" max="0.5" step="0.01" value="0.31">
+              <span class="shader-control__value" id="demo-radius-display">0.31</span>
+            </div>
+          </div>
+
+          <!-- Width Top -->
+          <div class="shader-control">
+            <label class="shader-control__label">Width Top</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-width-top" min="0" max="1" step="0.01" value="0.05">
+              <span class="shader-control__value" id="demo-width-top-display">0.05</span>
+            </div>
+          </div>
+
+          <!-- Width Bottom -->
+          <div class="shader-control">
+            <label class="shader-control__label">Width Bottom</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-width-bot" min="0" max="1" step="0.01" value="0.75">
+              <span class="shader-control__value" id="demo-width-bot-display">0.75</span>
+            </div>
+          </div>
+
+          <p class="shader-demo__panel-label">Color Palette</p>
+
+          <!-- Color Mode -->
+          <div class="shader-control">
+            <label class="shader-control__label">Color Mode</label>
+            <div class="shader-control__with-help">
+              <select class="shader-control__select" id="demo-color-mode">
+                <option value="0">Cosine</option>
+                <option value="1">4-Color</option>
+              </select>
+              <button type="button" class="shader-demo__help-btn" id="demo-cosine-help" aria-label="About cosine palette">?</button>
+            </div>
+          </div>
+
+          <!-- Palette A -->
+          <div class="shader-control" id="demo-palette-a-row">
+            <label class="shader-control__label">Palette A</label>
+            <input type="color" class="shader-control__color" id="demo-palette-a" value="#808080">
+          </div>
+
+          <!-- Palette B -->
+          <div class="shader-control" id="demo-palette-b-row">
+            <label class="shader-control__label">Palette B</label>
+            <input type="color" class="shader-control__color" id="demo-palette-b" value="#808080">
+          </div>
+
+          <!-- Palette C -->
+          <div class="shader-control" id="demo-palette-c-row">
+            <label class="shader-control__label">Palette C</label>
+            <input type="color" class="shader-control__color" id="demo-palette-c" value="#ffffff">
+          </div>
+
+          <!-- Palette D -->
+          <div class="shader-control" id="demo-palette-d-row">
+            <label class="shader-control__label">Palette D</label>
+            <input type="color" class="shader-control__color" id="demo-palette-d" value="#0054ab">
+          </div>
+
+          <!-- Color 1 (Top) -->
+          <div class="shader-control" id="demo-color0-row" style="display:none">
+            <label class="shader-control__label">Color 1 (Top)</label>
+            <input type="color" class="shader-control__color" id="demo-color0" value="#ff3366">
+          </div>
+
+          <!-- Color 2 -->
+          <div class="shader-control" id="demo-color1-row" style="display:none">
+            <label class="shader-control__label">Color 2</label>
+            <input type="color" class="shader-control__color" id="demo-color1" value="#ffcc00">
+          </div>
+
+          <!-- Color 3 -->
+          <div class="shader-control" id="demo-color2-row" style="display:none">
+            <label class="shader-control__label">Color 3</label>
+            <input type="color" class="shader-control__color" id="demo-color2" value="#00ccff">
+          </div>
+
+          <!-- Color 4 (Bot) -->
+          <div class="shader-control" id="demo-color3-row" style="display:none">
+            <label class="shader-control__label">Color 4 (Bot)</label>
+            <input type="color" class="shader-control__color" id="demo-color3" value="#aa00ff">
+          </div>
+
+          <p class="shader-demo__panel-label">Triangle Mask</p>
+
+          <!-- Triangle Enabled -->
+          <div class="shader-control">
+            <label class="shader-control__label">Enabled</label>
+            <button type="button" class="shader-control__toggle is-on" id="demo-tri-enabled" data-on="1">On</button>
+          </div>
+
+          <!-- Triangle Rotation -->
+          <div class="shader-control">
+            <label class="shader-control__label">Rotation (°)</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-tri-rotation" min="0" max="360" step="1" value="0">
+              <span class="shader-control__value" id="demo-tri-rotation-display">0</span>
+            </div>
+          </div>
+
+          <!-- Triangle Size -->
+          <div class="shader-control">
+            <label class="shader-control__label">Size</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-tri-size" min="0.1" max="2.0" step="0.01" value="1.0">
+              <span class="shader-control__value" id="demo-tri-size-display">1</span>
+            </div>
+          </div>
+
+          <!-- Triangle Base Width -->
+          <div class="shader-control">
+            <label class="shader-control__label">Base Width (°)</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-tri-width" min="5" max="89" step="1" value="45">
+              <span class="shader-control__value" id="demo-tri-width-display">45</span>
+            </div>
+          </div>
+
+          <p class="shader-demo__panel-label">Center Circle</p>
+
+          <!-- Center Circle Enabled -->
+          <div class="shader-control">
+            <label class="shader-control__label">Enabled</label>
+            <button type="button" class="shader-control__toggle is-on" id="demo-center-circle-enabled" data-on="1">On</button>
+          </div>
+
           <p class="shader-demo__panel-label">Text Overlay</p>
 
           <!-- Enable Text -->
@@ -188,6 +322,31 @@
   </div>
 </section>
 
+<!-- Cosine palette explainer modal -->
+<div class="shader-demo__help-modal shader-demo__help-modal--hidden" id="demo-cosine-modal" role="dialog" aria-modal="true" aria-label="About cosine palette">
+  <div class="shader-demo__help-modal__backdrop" id="demo-cosine-backdrop"></div>
+  <div class="shader-demo__help-modal__box">
+    <div class="shader-demo__help-modal__header">
+      <span class="shader-demo__help-modal__title">Cosine Palette</span>
+      <button class="shader-demo__help-modal__close" id="demo-cosine-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="shader-demo__help-modal__body">
+      <p class="shader-demo__help-modal__intro">A cosine palette generates smooth, cyclical color progressions by oscillating each RGB channel independently using a cosine wave.</p>
+      <p class="shader-demo__help-modal__formula"><code>color = A + B &middot; cos(2&pi;(C &middot; t + D))</code></p>
+      <dl class="shader-demo__help-modal__defs">
+        <dt>A &mdash; Palette A</dt>
+        <dd>Brightness offset. Sets the center point that colors oscillate around.</dd>
+        <dt>B &mdash; Palette B</dt>
+        <dd>Amplitude. Controls the range of color swing — higher means more vivid output.</dd>
+        <dt>C &mdash; Palette C</dt>
+        <dd>Frequency. How many times the palette cycles across the gradient.</dd>
+        <dt>D &mdash; Palette D</dt>
+        <dd>Phase. Shifts the starting hue of the cycle.</dd>
+      </dl>
+    </div>
+  </div>
+</div>
+
 <!-- Mockup modal (reuses product page classes) -->
 <div class="mockup-modal mockup-modal--hidden" id="demo-mockup-modal" role="dialog" aria-modal="true" aria-label="Shirt preview">
   <div class="mockup-modal__backdrop" id="demo-mockup-backdrop"></div>
@@ -251,7 +410,15 @@
     values: {
       u_line_count:  20,
       u_power:       2.5,
+      u_radius:      0.31,
+      u_width_top:   0.05,
+      u_width_bot:   0.75,
       u_color_mode:             0,
+      u_tri_enabled:            1,
+      u_tri_rotation:           0,
+      u_tri_size:               1.0,
+      u_tri_width:              45,
+      u_center_circle_enabled:  1,
       u_center_circle_radius:   0.04,
       u_palette_a: [0.5, 0.5, 0.5], u_palette_b: [0.5, 0.5, 0.5],
       u_palette_c: [1.0, 1.0, 1.0], u_palette_d: [0.0, 0.33, 0.67],
@@ -277,6 +444,35 @@
   var dotsWrap            = document.getElementById('demo-cycle-dots');
   var allSettingsToggle   = document.getElementById('demo-all-settings-toggle');
   var allSettingsBody     = document.getElementById('demo-all-settings-body');
+  var radiusInput         = document.getElementById('demo-radius');
+  var radiusDisp          = document.getElementById('demo-radius-display');
+  var widthTopInput       = document.getElementById('demo-width-top');
+  var widthTopDisp        = document.getElementById('demo-width-top-display');
+  var widthBotInput       = document.getElementById('demo-width-bot');
+  var widthBotDisp        = document.getElementById('demo-width-bot-display');
+  var triEnabledBtn       = document.getElementById('demo-tri-enabled');
+  var triRotationInput    = document.getElementById('demo-tri-rotation');
+  var triRotationDisp     = document.getElementById('demo-tri-rotation-display');
+  var triSizeInput        = document.getElementById('demo-tri-size');
+  var triSizeDisp         = document.getElementById('demo-tri-size-display');
+  var triWidthInput       = document.getElementById('demo-tri-width');
+  var triWidthDisp        = document.getElementById('demo-tri-width-display');
+  var centerCircleEnabledBtn = document.getElementById('demo-center-circle-enabled');
+  var colorModeSel        = document.getElementById('demo-color-mode');
+  var cosineHelpBtn       = document.getElementById('demo-cosine-help');
+  var cosineModal         = document.getElementById('demo-cosine-modal');
+  var cosineBackdrop      = document.getElementById('demo-cosine-backdrop');
+  var cosineClose         = document.getElementById('demo-cosine-close');
+  var paletteAInput       = document.getElementById('demo-palette-a');
+  var paletteBInput       = document.getElementById('demo-palette-b');
+  var paletteCInput       = document.getElementById('demo-palette-c');
+  var paletteDInput       = document.getElementById('demo-palette-d');
+  var paletteRows         = ['demo-palette-a-row','demo-palette-b-row','demo-palette-c-row','demo-palette-d-row'].map(function(id){ return document.getElementById(id); });
+  var color0Input         = document.getElementById('demo-color0');
+  var color1Input         = document.getElementById('demo-color1');
+  var color2Input         = document.getElementById('demo-color2');
+  var color3Input         = document.getElementById('demo-color3');
+  var stopRows            = ['demo-color0-row','demo-color1-row','demo-color2-row','demo-color3-row'].map(function(id){ return document.getElementById(id); });
   var enableTextBtn       = document.getElementById('demo-enable-text');
   var textInput           = document.getElementById('demo-text');
   var textFontSel         = document.getElementById('demo-text-font');
@@ -333,9 +529,21 @@
     setMode(p.mode);
     if (p.mode === 0) {
       v.u_palette_a = p.a; v.u_palette_b = p.b; v.u_palette_c = p.c; v.u_palette_d = p.d;
+      if (paletteAInput) paletteAInput.value = rgbToHex(p.a);
+      if (paletteBInput) paletteBInput.value = rgbToHex(p.b);
+      if (paletteCInput) paletteCInput.value = rgbToHex(p.c);
+      if (paletteDInput) paletteDInput.value = rgbToHex(p.d);
     } else {
       v.u_color0 = p.c0; v.u_color1 = p.c1;
       v.u_color2 = p.c2; v.u_color3 = p.c3;
+      if (color0Input) color0Input.value = rgbToHex(p.c0);
+      if (color1Input) color1Input.value = rgbToHex(p.c1);
+      if (color2Input) color2Input.value = rgbToHex(p.c2);
+      if (color3Input) color3Input.value = rgbToHex(p.c3);
+    }
+    if (colorModeSel) {
+      colorModeSel.value = String(p.mode);
+      applyColorModeVisibility();
     }
     presetSel.value = name;
     window._demoState.dirty = true;
@@ -397,6 +605,19 @@
     ];
   }
 
+  function rgbToHex(arr) {
+    return '#' + arr.map(function (x) {
+      var b = Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16);
+      return b.length === 1 ? '0' + b : b;
+    }).join('');
+  }
+
+  function applyColorModeVisibility() {
+    var is4Color = colorModeSel && colorModeSel.value === '1';
+    paletteRows.forEach(function (r) { if (r) r.style.display = is4Color ? 'none' : 'grid'; });
+    stopRows.forEach(function (r)    { if (r) r.style.display = is4Color ? 'grid' : 'none'; });
+  }
+
   function onUserInteract() {
     if (userInteracted) return;
     userInteracted = true;
@@ -411,6 +632,133 @@
       allSettingsBody.hidden = isOpen;
     });
   }
+
+  // ── Cosine help modal ──────────────────────────────────────────────────────
+  function openCosineModal()  { if (cosineModal) cosineModal.classList.remove('shader-demo__help-modal--hidden'); }
+  function closeCosineModal() { if (cosineModal) cosineModal.classList.add('shader-demo__help-modal--hidden'); }
+  if (cosineHelpBtn)  cosineHelpBtn.addEventListener('click', openCosineModal);
+  if (cosineClose)    cosineClose.addEventListener('click', closeCosineModal);
+  if (cosineBackdrop) cosineBackdrop.addEventListener('click', closeCosineModal);
+
+  // ── All Settings control wiring ────────────────────────────────────────────
+  radiusInput.addEventListener('input', function () {
+    onUserInteract();
+    var n = parseFloat(this.value);
+    window._demoState.values.u_radius = n;
+    radiusDisp.textContent = n;
+    window._demoState.dirty = true;
+  });
+
+  widthTopInput.addEventListener('input', function () {
+    onUserInteract();
+    var n = parseFloat(this.value);
+    window._demoState.values.u_width_top = n;
+    widthTopDisp.textContent = n;
+    window._demoState.dirty = true;
+  });
+
+  widthBotInput.addEventListener('input', function () {
+    onUserInteract();
+    var n = parseFloat(this.value);
+    window._demoState.values.u_width_bot = n;
+    widthBotDisp.textContent = n;
+    window._demoState.dirty = true;
+  });
+
+  triEnabledBtn.addEventListener('click', function () {
+    onUserInteract();
+    var isOn = this.dataset.on === '1';
+    var next = isOn ? 0 : 1;
+    window._demoState.values.u_tri_enabled = next;
+    this.dataset.on  = next ? '1' : '0';
+    this.textContent = next ? 'On' : 'Off';
+    this.classList.toggle('is-on', !!next);
+    window._demoState.dirty = true;
+  });
+
+  triRotationInput.addEventListener('input', function () {
+    onUserInteract();
+    var n = parseInt(this.value, 10);
+    window._demoState.values.u_tri_rotation = n;
+    triRotationDisp.textContent = n;
+    window._demoState.dirty = true;
+  });
+
+  triSizeInput.addEventListener('input', function () {
+    onUserInteract();
+    var n = parseFloat(this.value);
+    window._demoState.values.u_tri_size = n;
+    triSizeDisp.textContent = n;
+    window._demoState.dirty = true;
+  });
+
+  triWidthInput.addEventListener('input', function () {
+    onUserInteract();
+    var n = parseInt(this.value, 10);
+    window._demoState.values.u_tri_width = n;
+    triWidthDisp.textContent = n;
+    window._demoState.dirty = true;
+  });
+
+  centerCircleEnabledBtn.addEventListener('click', function () {
+    onUserInteract();
+    var isOn = this.dataset.on === '1';
+    var next = isOn ? 0 : 1;
+    window._demoState.values.u_center_circle_enabled = next;
+    this.dataset.on  = next ? '1' : '0';
+    this.textContent = next ? 'On' : 'Off';
+    this.classList.toggle('is-on', !!next);
+    window._demoState.dirty = true;
+  });
+
+  colorModeSel.addEventListener('change', function () {
+    onUserInteract();
+    window._demoState.values.u_color_mode = parseInt(this.value, 10);
+    applyColorModeVisibility();
+    window._demoState.dirty = true;
+  });
+
+  paletteAInput.addEventListener('input', function () {
+    onUserInteract();
+    window._demoState.values.u_palette_a = hexToRgb(this.value);
+    window._demoState.dirty = true;
+  });
+  paletteBInput.addEventListener('input', function () {
+    onUserInteract();
+    window._demoState.values.u_palette_b = hexToRgb(this.value);
+    window._demoState.dirty = true;
+  });
+  paletteCInput.addEventListener('input', function () {
+    onUserInteract();
+    window._demoState.values.u_palette_c = hexToRgb(this.value);
+    window._demoState.dirty = true;
+  });
+  paletteDInput.addEventListener('input', function () {
+    onUserInteract();
+    window._demoState.values.u_palette_d = hexToRgb(this.value);
+    window._demoState.dirty = true;
+  });
+
+  color0Input.addEventListener('input', function () {
+    onUserInteract();
+    window._demoState.values.u_color0 = hexToRgb(this.value);
+    window._demoState.dirty = true;
+  });
+  color1Input.addEventListener('input', function () {
+    onUserInteract();
+    window._demoState.values.u_color1 = hexToRgb(this.value);
+    window._demoState.dirty = true;
+  });
+  color2Input.addEventListener('input', function () {
+    onUserInteract();
+    window._demoState.values.u_color2 = hexToRgb(this.value);
+    window._demoState.dirty = true;
+  });
+  color3Input.addEventListener('input', function () {
+    onUserInteract();
+    window._demoState.values.u_color3 = hexToRgb(this.value);
+    window._demoState.dirty = true;
+  });
 
   // ── Control wiring ─────────────────────────────────────────────────────────
   presetSel.addEventListener('change', function () {
@@ -584,7 +932,7 @@
   mockupClose.addEventListener('click', closeMockupModal);
   mockupBackdrop.addEventListener('click', closeMockupModal);
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closeMockupModal();
+    if (e.key === 'Escape') { closeMockupModal(); closeCosineModal(); }
   });
 
   previewBtn.addEventListener('click', function () {
@@ -657,6 +1005,7 @@
   }
 
   // ── Boot ───────────────────────────────────────────────────────────────────
+  applyColorModeVisibility();
   startCycle();
 }());
 
@@ -671,6 +1020,7 @@
   var FADE_ZONE = 72; // px — rows fade over this distance approaching canvas bottom
 
   function fadeRow(el, canvasBottom) {
+    if (el.style.display === 'none') return;
     var rect    = el.getBoundingClientRect();
     var rowMid  = (rect.top + rect.bottom) / 2;
     var dist    = rowMid - canvasBottom;
