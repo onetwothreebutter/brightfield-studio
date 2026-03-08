@@ -89,10 +89,10 @@ var controls = [
   { key: 'u_invert_text',    label: 'Invert Text Color', type: 'toggle', value: 1,
     tip: 'On = text shows inverted gradient color. Off = text matches the gradient.' },
   { key: 'u_use_text_color', label: 'Custom Text Color', type: 'toggle', value: 0 },
-  { key: 'u_text_color',     label: 'Text Color',        type: 'color',  value: '#ffffff' },
+  { key: 'u_text_color',     label: 'Text Color',        type: 'color',  value: '#ffffff', textColorDependent: true },
   { key: 'outlineEnabled',   label: 'Outline',           type: 'toggle', value: 0,            textDirty: true },
-  { key: 'outlineWidth',     label: 'Outline Width',     type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true },
-  { key: 'u_outline_color',  label: 'Outline Color',     type: 'color',  value: '#000000' },
+  { key: 'outlineWidth',     label: 'Outline Width',     type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true, outlineDependent: true },
+  { key: 'u_outline_color',  label: 'Outline Color',     type: 'color',  value: '#000000', outlineDependent: true },
 ];
 
 // Palette preset data (mirrors StackedGradient.tsx palettes)

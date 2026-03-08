@@ -111,8 +111,8 @@
           <div class="shader-control">
             <label class="shader-control__label">Font Size</label>
             <div class="shader-control__range-wrap">
-              <input type="range" class="shader-control__range" id="demo-text-size" min="8" max="300" step="1" value="120">
-              <span class="shader-control__value" id="demo-text-size-display">120</span>
+              <input type="range" class="shader-control__range" id="demo-text-size" min="8" max="300" step="1" value="69">
+              <span class="shader-control__value" id="demo-text-size-display">69</span>
             </div>
           </div>
 
@@ -129,8 +129,8 @@
           <div class="shader-control">
             <label class="shader-control__label">Text Y</label>
             <div class="shader-control__range-wrap">
-              <input type="range" class="shader-control__range" id="demo-text-y" min="0" max="1" step="0.01" value="0.5">
-              <span class="shader-control__value" id="demo-text-y-display">0.5</span>
+              <input type="range" class="shader-control__range" id="demo-text-y" min="0" max="1" step="0.01" value="0.2">
+              <span class="shader-control__value" id="demo-text-y-display">0.2</span>
             </div>
           </div>
 
@@ -141,7 +141,7 @@
           </div>
 
           <!-- Text Color -->
-          <div class="shader-control">
+          <div class="shader-control" id="demo-text-color-row" style="display:none">
             <label class="shader-control__label">Text Color</label>
             <input type="color" class="shader-control__color" id="demo-text-color" value="#ffffff">
           </div>
@@ -153,7 +153,7 @@
           </div>
 
           <!-- Outline Width -->
-          <div class="shader-control">
+          <div class="shader-control" id="demo-outline-width-row" style="display:none">
             <label class="shader-control__label">Outline Width</label>
             <div class="shader-control__range-wrap">
               <input type="range" class="shader-control__range" id="demo-outline-width" min="1" max="60" step="1" value="8">
@@ -162,7 +162,7 @@
           </div>
 
           <!-- Outline Color -->
-          <div class="shader-control">
+          <div class="shader-control" id="demo-outline-color-row" style="display:none">
             <label class="shader-control__label">Outline Color</label>
             <input type="color" class="shader-control__color" id="demo-outline-color" value="#000000">
           </div>
@@ -177,11 +177,11 @@
   <div class="shader-demo__footer container">
     <hr class="shader-demo__divider">
     <div class="shader-demo__cta-row">
-      <button type="button" class="btn btn--outline" id="demo-preview-btn">
+      <button type="button" class="btn btn--primary" id="demo-preview-btn">
         Preview on Shirt
       </button>
-      <a href="{{ section.settings.product_url }}" class="btn btn--primary">
-        {{ section.settings.button_label | default: 'Customize This Design' }}
+      <a href="{{ section.settings.product_url }}" class="btn btn--outline">
+        {{ section.settings.button_label | default: 'Buy Original' }}
       </a>
     </div>
     <p class="shader-demo__note">Full controls available on the product page</p>
@@ -257,8 +257,8 @@
       u_palette_c: [1.0, 1.0, 1.0], u_palette_d: [0.0, 0.33, 0.67],
       u_color0: [1.0, 0.2, 0.4],   u_color1: [1.0, 0.8, 0.0],
       u_color2: [0.0, 0.8, 1.0],   u_color3: [0.667, 0.0, 1.0],
-      text: '', textFont: 'Oswald', textFontSize: 120,
-      textX: 0.5, textY: 0.5,
+      text: '', textFont: 'Oswald', textFontSize: 69,
+      textX: 0.5, textY: 0.2,
       u_use_text_color: 0, u_text_color: [1.0, 1.0, 1.0],
       outlineEnabled: false, outlineWidth: 8, u_outline_color: [0.0, 0.0, 0.0],
     },
@@ -288,10 +288,13 @@
   var textYDisp           = document.getElementById('demo-text-y-display');
   var useTextColorBtn     = document.getElementById('demo-use-text-color');
   var textColorInput      = document.getElementById('demo-text-color');
+  var textColorRow        = document.getElementById('demo-text-color-row');
   var outlineBtn          = document.getElementById('demo-outline-enabled');
   var outlineWidthInput   = document.getElementById('demo-outline-width');
   var outlineWidthDisp    = document.getElementById('demo-outline-width-display');
+  var outlineWidthRow     = document.getElementById('demo-outline-width-row');
   var outlineColorInput   = document.getElementById('demo-outline-color');
+  var outlineColorRow     = document.getElementById('demo-outline-color-row');
   var previewBtn          = document.getElementById('demo-preview-btn');
   var mockupModal         = document.getElementById('demo-mockup-modal');
   var mockupBackdrop      = document.getElementById('demo-mockup-backdrop');
@@ -498,6 +501,7 @@
     this.dataset.on  = next ? '1' : '0';
     this.textContent = next ? 'On' : 'Off';
     this.classList.toggle('is-on', !!next);
+    if (textColorRow) textColorRow.style.display = next ? 'grid' : 'none';
     window._demoState.dirty = true;
   });
 
@@ -513,6 +517,8 @@
     this.dataset.on  = next ? '1' : '0';
     this.textContent = next ? 'On' : 'Off';
     this.classList.toggle('is-on', !!next);
+    if (outlineWidthRow) outlineWidthRow.style.display = next ? 'grid' : 'none';
+    if (outlineColorRow) outlineColorRow.style.display = next ? 'grid' : 'none';
     window._demoState.dirty = true;
   });
 
@@ -741,7 +747,7 @@
       "type": "text",
       "id": "button_label",
       "label": "Button label",
-      "default": "Customize This Design"
+      "default": "Buy Original Design"
     }
   ],
   "presets": [
