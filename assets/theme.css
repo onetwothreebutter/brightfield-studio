@@ -1675,12 +1675,37 @@ h6 {
         transform: translateY(0);
     }
 }
-#demo-text-panel {
-    display: none;
+.shader-demo__all-settings-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: none;
+    border: none;
+    border-top: 1px solid var(--color-border);
+    padding: 0.65rem 0.75rem;
+    margin-top: 0.25rem;
+    cursor: pointer;
+    color: var(--color-text-muted);
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    transition: color var(--transition-fast);
 }
-#demo-text-panel.is-visible {
-    display: block;
-    animation: panel-fade-in 350ms var(--ease-out) both;
+.shader-demo__all-settings-toggle:hover {
+    color: var(--color-text);
+}
+.shader-demo__all-settings-chevron {
+    display: inline-block;
+    transition: transform 200ms var(--ease-out);
+    font-size: 0.6rem;
+}
+.shader-demo__all-settings-toggle[aria-expanded="true"] .shader-demo__all-settings-chevron {
+    transform: rotate(180deg);
+}
+.shader-demo__all-settings-body {
+    animation: panel-fade-in 250ms var(--ease-out) both;
 }
 .shader-demo__panel-label {
     font-size: 0.6rem;
