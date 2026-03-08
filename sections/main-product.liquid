@@ -211,12 +211,13 @@
 <script>
 // ── Tab switcher ─────────────────────────────────────────────────────────────
 (function () {
-  var tabs        = document.querySelectorAll('.media-tab');
-  var panels      = document.querySelectorAll('.media-panel');
-  var price       = document.querySelector('.product-price');
-  var orderForm   = document.getElementById('product-order-form');
-  var shaderGui   = document.getElementById('shader-gui');
-  var defaultDesc = document.querySelector('.product-description');
+  var tabs          = document.querySelectorAll('.media-tab');
+  var panels        = document.querySelectorAll('.media-panel');
+  var price         = document.querySelector('.product-price');
+  var orderForm     = document.getElementById('product-order-form');
+  var shaderGui     = document.getElementById('shader-gui');
+  var defaultDesc   = document.querySelector('.product-description');
+  var productLayout = document.querySelector('.product-layout');
   if (!tabs.length) return;
 
   tabs.forEach(function (tab) {
@@ -230,44 +231,15 @@
       document.querySelector('[data-panel="' + target + '"]').classList.add('is-active');
 
       var isCustomize = target === 'shader';
-      if (price)       price.style.display       = isCustomize ? 'none'  : '';
-      if (orderForm)   orderForm.style.display   = isCustomize ? 'none'  : '';
-      if (shaderGui)   shaderGui.style.display   = isCustomize ? 'block' : 'none';
-      if (defaultDesc) defaultDesc.style.display = isCustomize ? 'none'  : '';
+      if (price)         price.style.display         = isCustomize ? 'none'  : '';
+      if (orderForm)     orderForm.style.display     = isCustomize ? 'none'  : '';
+      if (shaderGui)     shaderGui.style.display     = isCustomize ? 'block' : 'none';
+      if (defaultDesc)   defaultDesc.style.display   = isCustomize ? 'none'  : '';
+      if (productLayout) productLayout.classList.toggle('shader-mode', isCustomize);
 
       if (isCustomize) {
         window.dispatchEvent(new Event('resize'));
-        // On mobile, auto-popout the controls so the user sees canvas + controls at once
-        if (window.innerWidth <= 900 && !shaderGui.classList.contains('shader-gui--floating')) {
-          var pb     = document.getElementById('shader-gui-popout');
-          var panelW = Math.min(window.innerWidth * 0.85, 320);
-          shaderGui.classList.add('shader-gui--floating');
-          shaderGui.style.left      = Math.round((window.innerWidth - panelW) / 2) + 'px';
-          shaderGui.style.top       = Math.round(window.innerHeight * 0.72) + 'px';
-          shaderGui.style.right     = 'auto';
-          shaderGui.style.bottom    = 'auto';
-          shaderGui.style.maxHeight = Math.round(window.innerHeight * 0.26) + 'px';
-          if (pb) pb.textContent = 'Dock';
-          // Move preview button below the canvas (out of the floating panel)
-          var previewWrap = shaderGui.querySelector('.shader-gui__preview');
-          var shaderPanel = document.querySelector('[data-panel="shader"]');
-          if (previewWrap && shaderPanel) shaderPanel.appendChild(previewWrap);
-        }
-      } else {
-        // Dock the controls if they were floating when leaving Customize tab
-        var gui = document.getElementById('shader-gui');
-        var pb  = document.getElementById('shader-gui-popout');
-        if (gui && gui.classList.contains('shader-gui--floating')) {
-          gui.classList.remove('shader-gui--floating');
-          gui.style.cssText = '';
-          if (pb) pb.textContent = 'Popout';
-          // Move preview button back into the GUI panel
-          var previewWrap = document.querySelector('.shader-gui__preview');
-          var guiBody     = document.getElementById('shader-gui-body');
-          if (previewWrap && guiBody && !gui.contains(previewWrap)) {
-            gui.insertBefore(previewWrap, guiBody);
-          }
-        }
+        window.dispatchEvent(new CustomEvent('product-shader-mode'));
       }
     });
   });
@@ -570,7 +542,7 @@ if (window.location.hash === '#shader') {
   randomizeBtn.addEventListener('click', randomizeAll);
   body.insertBefore(randomizeBtn, body.firstChild);
 
-  // Mobile popout — draggable floating panel
+  // Desktop popout — draggable floating panel (desktop only)
   var popoutBtn   = document.getElementById('shader-gui-popout');
   var shaderGuiEl = document.getElementById('shader-gui');
   var mobileBar   = document.querySelector('.shader-gui__mobile-bar');
@@ -578,29 +550,23 @@ if (window.location.hash === '#shader') {
 
   if (popoutBtn) {
     popoutBtn.addEventListener('click', function () {
+      if (window.innerWidth <= 900) return;
       var isFloating = shaderGuiEl.classList.toggle('shader-gui--floating');
       this.textContent = isFloating ? 'Dock' : 'Popout';
       if (isFloating) {
-        // Start in top-right corner, offset from edge
         shaderGuiEl.style.top    = '70px';
         shaderGuiEl.style.right  = '8px';
         shaderGuiEl.style.left   = 'auto';
         shaderGuiEl.style.bottom = 'auto';
       } else {
         shaderGuiEl.style.cssText = '';
-        // Move preview button back into the GUI panel
-        var previewWrap = document.querySelector('.shader-gui__preview');
-        var guiBody     = document.getElementById('shader-gui-body');
-        if (previewWrap && guiBody && !shaderGuiEl.contains(previewWrap)) {
-          shaderGuiEl.insertBefore(previewWrap, guiBody);
-        }
       }
     });
   }
 
   if (mobileBar) {
-    // Touch drag
     mobileBar.addEventListener('touchstart', function (e) {
+      if (window.innerWidth <= 900) return;
       if (!shaderGuiEl.classList.contains('shader-gui--floating')) return;
       var touch = e.touches[0];
       var rect  = shaderGuiEl.getBoundingClientRect();
@@ -650,6 +616,41 @@ if (window.location.hash === '#shader') {
     });
   };
   document.head.appendChild(clrScript);
+}());
+
+// ── Mobile sticky-canvas fade for Customize controls ─────────────────────────
+(function () {
+  var guiBody = document.getElementById('shader-gui-body');
+  if (!guiBody) return;
+
+  var FADE_ZONE = 60;
+
+  function fadeRow(el, canvasBottom) {
+    if (el.style.display === 'none') return;
+    var rect    = el.getBoundingClientRect();
+    var rowMid  = (rect.top + rect.bottom) / 2;
+    var dist    = rowMid - canvasBottom;
+    var opacity = dist <= 0 ? 0 : dist < FADE_ZONE ? dist / FADE_ZONE : 1;
+    el.style.opacity       = opacity;
+    el.style.pointerEvents = opacity < 0.15 ? 'none' : '';
+  }
+
+  function applyFade() {
+    if (window.innerWidth > 900) return;
+    var productLayout = document.querySelector('.product-layout');
+    if (!productLayout || !productLayout.classList.contains('shader-mode')) return;
+    var mediaEl = document.querySelector('.product-media');
+    if (!mediaEl) return;
+    var canvasBottom = mediaEl.getBoundingClientRect().bottom;
+    var rows = guiBody.children;
+    for (var i = 0; i < rows.length; i++) {
+      fadeRow(rows[i], canvasBottom);
+    }
+  }
+
+  document.addEventListener('scroll', applyFade, { passive: true });
+  window.addEventListener('resize', applyFade);
+  window.addEventListener('product-shader-mode', applyFade);
 }());
 
 // ── Preview on Shirt ──────────────────────────────────────────────────────────
