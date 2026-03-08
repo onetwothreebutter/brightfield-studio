@@ -158,19 +158,21 @@
 
       </div>
 
-      <hr class="shader-demo__divider">
-
-      <div class="shader-demo__cta-row">
-        <button type="button" class="btn btn--outline" id="demo-preview-btn">
-          Preview on Shirt
-        </button>
-        <a href="{{ section.settings.product_url }}" class="btn btn--primary">
-          {{ section.settings.button_label | default: 'Customize This Design' }}
-        </a>
-      </div>
-      <p class="shader-demo__note">Full controls available on the product page</p>
-
     </div>
+
+  </div>
+
+  <div class="shader-demo__footer container">
+    <hr class="shader-demo__divider">
+    <div class="shader-demo__cta-row">
+      <button type="button" class="btn btn--outline" id="demo-preview-btn">
+        Preview on Shirt
+      </button>
+      <a href="{{ section.settings.product_url }}" class="btn btn--primary">
+        {{ section.settings.button_label | default: 'Customize This Design' }}
+      </a>
+    </div>
+    <p class="shader-demo__note">Full controls available on the product page</p>
   </div>
 </section>
 
@@ -612,6 +614,45 @@
 
   // ── Boot ───────────────────────────────────────────────────────────────────
   startCycle();
+}());
+
+// ── Mobile: fade controls as they scroll past the canvas bottom ───────────────
+(function () {
+  if (window.innerWidth > 800) return;
+  var canvasWrap = document.querySelector('.shader-demo__canvas-wrap');
+  var controlsEl = document.querySelector('.shader-demo__controls');
+  var textPanel  = document.getElementById('demo-text-panel');
+  if (!canvasWrap || !controlsEl) return;
+
+  var FADE_ZONE = 72; // px — rows fade over this distance approaching canvas bottom
+
+  function fadeRow(el, canvasBottom) {
+    var rect    = el.getBoundingClientRect();
+    var rowMid  = (rect.top + rect.bottom) / 2;
+    var dist    = rowMid - canvasBottom;
+    var opacity = dist <= 0 ? 0 : dist < FADE_ZONE ? dist / FADE_ZONE : 1;
+    el.style.opacity       = opacity;
+    el.style.pointerEvents = opacity < 0.15 ? 'none' : '';
+  }
+
+  function updateFade() {
+    var canvasBottom = canvasWrap.getBoundingClientRect().bottom;
+    var children = controlsEl.children;
+    for (var i = 0; i < children.length; i++) {
+      var child = children[i];
+      if (child === textPanel) {
+        // Fade text panel rows individually so each fades at its own position
+        for (var j = 0; j < child.children.length; j++) {
+          fadeRow(child.children[j], canvasBottom);
+        }
+      } else {
+        fadeRow(child, canvasBottom);
+      }
+    }
+  }
+
+  window.addEventListener('scroll', updateFade, { passive: true });
+  updateFade();
 }());
 </script>
 

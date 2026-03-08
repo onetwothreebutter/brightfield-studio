@@ -1585,13 +1585,15 @@ h6 {
 .shader-demo__body {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 5rem;
+    column-gap: 5rem;
+    row-gap: 0;
     align-items: start;
 }
 
 @media (max-width: 800px) {
     .shader-demo__body {
         grid-template-columns: 1fr;
+        row-gap: 2rem;
     }
 
     .shader-demo__header {
@@ -1599,9 +1601,11 @@ h6 {
     }
 
     .shader-demo__canvas-wrap {
-        position: relative;
+        top: calc(var(--header-height) + 15px) !important;
+        width: 100%;
         max-width: 360px;
         margin: 0 auto;
+        z-index: 2;
     }
 
     .shader-control__range {
@@ -1662,8 +1666,14 @@ h6 {
 }
 
 @keyframes panel-fade-in {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0);   }
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 #demo-text-panel {
     display: none;
@@ -1673,13 +1683,13 @@ h6 {
     animation: panel-fade-in 350ms var(--ease-out) both;
 }
 .shader-demo__panel-label {
-    font-size:      0.6rem;
+    font-size: 0.6rem;
     letter-spacing: 0.15em;
     text-transform: uppercase;
-    color:          var(--color-primary);
-    border-top:     1px solid var(--color-border);
-    padding-top:    1rem;
-    margin:         1rem 0 0.25rem;
+    color: var(--color-primary);
+    border-top: 1px solid var(--color-border);
+    padding-top: 1rem;
+    margin: 1rem 0 0.25rem;
 }
 
 .shader-demo__cta-row {

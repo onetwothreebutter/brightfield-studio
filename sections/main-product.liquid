@@ -305,8 +305,9 @@ if (window.location.hash === '#shader') {
   {% case shader_file %}
   {% when 'chladni' %}      {% render 'shader-controls-chladni' %}
   {% when 'line-circle' %}  {% render 'shader-controls-line-circle' %}
-  {% when 'three-square' %} {% render 'shader-controls-three-square' %}
-  {% else %}                {% render 'shader-controls-rise-shirt' %}
+  {% when 'three-square' %}       {% render 'shader-controls-three-square' %}
+  {% when 'stacked-gradient' %}   {% render 'shader-controls-stacked-gradient' %}
+  {% else %}                      {% render 'shader-controls-rise-shirt' %}
   {% endcase %}
 
   // Initialise shared state — shader.js reads this each frame
