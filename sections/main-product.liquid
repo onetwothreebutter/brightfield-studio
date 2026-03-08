@@ -51,7 +51,7 @@
         <!-- Shader panel — only shown when product has a shader-[file] tag -->
         {%- if shader_file -%}
         <div class="media-panel" data-panel="shader">
-          <canvas id="shader-canvas" class="product-shader__canvas"></canvas>
+          <canvas id="shader-canvas" class="product-shader__canvas{% if shader_file == 'stacked-gradient' %} product-shader__canvas--square{% endif %}"></canvas>
           <!-- Mockup modal -->
           <div id="mockup-modal" class="mockup-modal mockup-modal--hidden">
             <div class="mockup-modal__backdrop"></div>
