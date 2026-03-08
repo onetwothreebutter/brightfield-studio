@@ -176,24 +176,7 @@
             >Preview on Shirt</button>
             <p class="product-customize-actions__note">You'll select your size when you order.</p>
           </div>
-          <p class="shader-gui__intro">
-            Tweak the controls below to make the design your own.
-            {%- case shader_file -%}
-            {%- when 'chladni' -%}
-            <strong>Pattern</strong> adjusts the Chladni frequencies, threshold, and glow.
-            <strong>Color</strong> sets the gradient mode and two-color scheme.
-            {%- when 'line-circle' -%}
-            <strong>Color Palette</strong> changes the shader's color scheme.
-            <strong>Text Overlay</strong> lets you set custom text, font, size, and position.
-            <strong>Shape</strong> controls circle size, line density, and geometric masks.
-            {%- else -%}
-            <strong>Color Palette</strong> changes the shader's color scheme.
-            <strong>Text Overlay</strong> lets you set custom text, font, size, and position.
-            <strong>Dots</strong> adjusts the halftone grid density and dot size.
-            {%- endcase -%}
-            Hit <strong>Preview on Shirt</strong> when you're ready to see it on the tee.
-          </p>
-          <div class="shader-gui__body" id="shader-gui-body"></div>
+<div class="shader-gui__body" id="shader-gui-body"></div>
         </div>
         {%- endif -%}
 
