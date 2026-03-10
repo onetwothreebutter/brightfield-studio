@@ -176,7 +176,8 @@
     '  finalAlpha = mix(finalAlpha, 1.0, sq4);',
     '',
     '  float alpha = mix(1.0, finalAlpha, u_transparent_bg);',
-    '  gl_FragColor = vec4(finalColor, alpha);',
+    '  vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
+    '  gl_FragColor = vec4(encoded, alpha);',
     '}'
   ].join('\n');
 
@@ -265,8 +266,8 @@
       ];
       var fontFamily     = v.u_font_family     || 'Montserrat';
       var fontSize       = v.u_font_size       != null ? v.u_font_size       : 300;
-      var outlineEnabled = v.u_outline_enabled ? true : false;
-      var outlineWidth   = v.u_outline_width   != null ? v.u_outline_width   : 12;
+      var outlineEnabled = v.outlineEnabled ? true : false;
+      var outlineWidth   = v.outlineWidth   != null ? v.outlineWidth   : 12;
 
       // Derived: squareSize from count, offset, fill, and aspect.
       // The constraint must hold on both axes in p-space:
