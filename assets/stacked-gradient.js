@@ -155,7 +155,7 @@
     '  vec3 lch = u_oklch_a + u_oklch_b * cos(6.28318 * (u_oklch_c * t + u_oklch_d));',
     '  lch.x = clamp(lch.x, 0.0, 1.0);',
     '  lch.y = max(lch.y, 0.0);',
-    '  return oklab_to_linear_rgb(oklch_to_oklab(lch));',
+    '  return clamp(oklab_to_linear_rgb(oklch_to_oklab(lch)), 0.0, 1.0);',
     '}',
     '',
     'void main() {',
