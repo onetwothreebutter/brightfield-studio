@@ -51,7 +51,7 @@
         <!-- Shader panel — only shown when product has a shader-[file] tag -->
         {%- if shader_file -%}
         <div class="media-panel" data-panel="shader">
-          <canvas id="shader-canvas" class="product-shader__canvas"></canvas>
+          <canvas id="shader-canvas" class="product-shader__canvas{% if shader_file == 'stacked-gradient' %} product-shader__canvas--square{% endif %}"></canvas>
           <!-- Mockup modal -->
           <div id="mockup-modal" class="mockup-modal mockup-modal--hidden">
             <div class="mockup-modal__backdrop"></div>
@@ -301,9 +301,11 @@ if (window.location.hash === '#shader') {
   // Build controls
   var paletteDependentRows    = [];
   var stopDependentRows       = [];
+  var oklchDependentRows      = [];
   var textColorDependentRows  = [];
   var outlineDependentRows    = [];
   var colorModeBtn     = null;
+  var colorModeSel     = null;
   var useTextColorBtn  = null;
   var outlineToggleBtn = null;
   var controlEls = []; // [{ctrl, el}] for randomisation
@@ -437,12 +439,15 @@ if (window.location.hash === '#shader') {
         if (ctrl.textDirty) window._shaderState.textDirty = true;
       });
 
+      if (ctrl.key === 'u_color_mode') colorModeSel = sel;
+
       row.appendChild(sel);
       controlEls.push({ ctrl: ctrl, el: sel });
     }
 
     if (ctrl.paletteDependent)   paletteDependentRows.push(row);
     if (ctrl.stopDependent)      stopDependentRows.push(row);
+    if (ctrl.oklchDependent)     oklchDependentRows.push(row);
     if (ctrl.textColorDependent) textColorDependentRows.push(row);
     if (ctrl.outlineDependent)   outlineDependentRows.push(row);
 
@@ -451,15 +456,24 @@ if (window.location.hash === '#shader') {
 
   // Show/hide palette-dependent rows based on Use Palette toggle
   function applyPaletteVisibility() {
-    var paletteOn = colorModeBtn && colorModeBtn.dataset.on === '1';
+    var mode;
+    if (colorModeSel) {
+      mode = colorModeSel.value;
+    } else {
+      mode = (colorModeBtn && colorModeBtn.dataset.on === '1') ? '1' : '0';
+    }
     paletteDependentRows.forEach(function (r) {
-      r.style.display = paletteOn ? 'none' : '';
+      r.style.display = mode === '0' ? '' : 'none';
     });
     stopDependentRows.forEach(function (r) {
-      r.style.display = paletteOn ? '' : 'none';
+      r.style.display = mode === '1' ? '' : 'none';
+    });
+    oklchDependentRows.forEach(function (r) {
+      r.style.display = mode === '2' ? '' : 'none';
     });
   }
   if (colorModeBtn) colorModeBtn.addEventListener('click', applyPaletteVisibility);
+  if (colorModeSel) colorModeSel.addEventListener('change', applyPaletteVisibility);
   applyPaletteVisibility();
 
   // Show/hide text-color row based on Custom Text Color toggle
@@ -484,6 +498,7 @@ if (window.location.hash === '#shader') {
     controlEls.forEach(function (item) {
       var ctrl = item.ctrl;
       var el   = item.el;
+      if (ctrl.noRandomize) return;
 
       if (ctrl.type === 'range') {
         var steps = Math.round((ctrl.max - ctrl.min) / ctrl.step);
@@ -504,7 +519,7 @@ if (window.location.hash === '#shader') {
       } else if (ctrl.type === 'color') {
         var hex = '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0');
         el.value = hex;
-        window._shaderState.values[ctrl.key] = hexToRgb(hex);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
 
       } else if (ctrl.type === 'select' && ctrl.key !== '_palette_preset') {
         var opts   = ctrl.options;

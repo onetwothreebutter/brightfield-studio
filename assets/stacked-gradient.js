@@ -77,7 +77,7 @@
     'uniform float u_tilt_tan;',
     'uniform float u_width;',
     'uniform float u_offset_x;',
-    'uniform float u_same_gradient;',
+    'uniform float u_row_offset;',
     'uniform float u_use_thresholds;',
     'uniform vec4  u_thresh0;',
     'uniform vec4  u_thresh1;',
@@ -89,6 +89,10 @@
     'uniform vec3  u_c;',
     'uniform vec3  u_d;',
     'uniform float u_color_mode;',
+    'uniform vec3  u_oklch_a;',
+    'uniform vec3  u_oklch_b;',
+    'uniform vec3  u_oklch_c;',
+    'uniform vec3  u_oklch_d;',
     'uniform vec3  u_color0;',
     'uniform vec3  u_color1;',
     'uniform vec3  u_color2;',
@@ -100,8 +104,58 @@
     'uniform float u_use_text_color;',
     'uniform float u_invert_text;',
     'uniform vec3  u_outline_color;',
+    '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
     '  return a + b * cos(6.28318 * (c * t + d));',
+    '}',
+    '',
+    '// ── OKLCH color space helpers ──────────────────────────────────────────────',
+    'vec3 linear_rgb_to_oklab(vec3 c) {',
+    '  float l_ = 0.4122214708*c.r + 0.5363325363*c.g + 0.0514459929*c.b;',
+    '  float m_ = 0.2119034982*c.r + 0.6806995451*c.g + 0.1073969566*c.b;',
+    '  float s_ = 0.0883024619*c.r + 0.2817188376*c.g + 0.6299787005*c.b;',
+    '  float l = pow(max(l_, 0.0), 1.0/3.0);',
+    '  float m = pow(max(m_, 0.0), 1.0/3.0);',
+    '  float s = pow(max(s_, 0.0), 1.0/3.0);',
+    '  return vec3(',
+    '    0.2104542553*l + 0.7936177850*m - 0.0040720468*s,',
+    '    1.9779984951*l - 2.4285922050*m + 0.4505937099*s,',
+    '    0.0259040371*l + 0.4072456269*m - 0.4631496600*s',
+    '  );',
+    '}',
+    '',
+    'vec3 oklab_to_linear_rgb(vec3 lab) {',
+    '  float l_ = lab.x + 0.3963377774*lab.y + 0.2158037573*lab.z;',
+    '  float m_ = lab.x - 0.1055613458*lab.y - 0.0638541728*lab.z;',
+    '  float s_ = lab.x - 0.0894841775*lab.y - 1.2914855480*lab.z;',
+    '  float l = l_*l_*l_; float m = m_*m_*m_; float s = s_*s_*s_;',
+    '  return vec3(',
+    '     4.0767416621*l - 3.3077115913*m + 0.2309699292*s,',
+    '    -1.2684380046*l + 2.6097574011*m - 0.3413193965*s,',
+    '    -0.0041960863*l - 0.7034186147*m + 1.7076147010*s',
+    '  );',
+    '}',
+    '',
+    'vec3 oklab_to_oklch(vec3 lab) {',
+    '  return vec3(lab.x, sqrt(lab.y*lab.y + lab.z*lab.z), atan(lab.z, lab.y));',
+    '}',
+    '',
+    'vec3 oklch_to_oklab(vec3 lch) {',
+    '  return vec3(lch.x, lch.y*cos(lch.z), lch.y*sin(lch.z));',
+    '}',
+    '',
+    '// Interpolate two OKLCH colors with shortest-path hue wrapping.',
+    'vec3 mix_oklch(vec3 a, vec3 b, float t) {',
+    '  float dh = mod(b.z - a.z + 3.14159265, 6.28318530) - 3.14159265;',
+    '  return vec3(mix(a.x, b.x, t), mix(a.y, b.y, t), a.z + t * dh);',
+    '}',
+    '',
+    '// OKLCH cosine palette — a/b/c/d operate on [L, C, H_radians].',
+    'vec3 oklchPalette(float t) {',
+    '  vec3 lch = u_oklch_a + u_oklch_b * cos(6.28318 * (u_oklch_c * t + u_oklch_d));',
+    '  lch.x = clamp(lch.x, 0.0, 1.0);',
+    '  lch.y = max(lch.y, 0.0);',
+    '  return clamp(oklab_to_linear_rgb(oklch_to_oklab(lch)), 0.0, 1.0);',
     '}',
     '',
     'void main() {',
@@ -144,20 +198,31 @@
     '',
     '  // --- Gradient color ---',
     '  float normalizedX = clamp((xTilted - leftEdge) / (rightEdge - leftEdge), 0.0, 1.0);',
-    '  float rowOffset   = rowID / u_row_count * (1.0 - u_same_gradient);',
+    '  float rowOffset   = rowID / u_row_count * u_row_offset;',
     '  float palT        = normalizedX + rowOffset;',
     '',
     '  vec3 cosineCol = cosinePalette(palT, u_a, u_b, u_c, u_d);',
     '',
-    '  float t01   = clamp(palT * 3.0, 0.0, 1.0);',
-    '  float t12   = clamp((palT - 0.33333) * 3.0, 0.0, 1.0);',
-    '  float t23   = clamp((palT - 0.66667) * 3.0, 0.0, 1.0);',
-    '  vec3  seg01 = mix(u_color0, u_color1, t01);',
-    '  vec3  seg12 = mix(u_color1, u_color2, t12);',
-    '  vec3  seg23 = mix(u_color2, u_color3, t23);',
-    '  vec3  gradCol = mix(mix(seg01, seg12, step(0.33333, palT)), seg23, step(0.66667, palT));',
+    '  // 4-stop gradient interpolated in OKLCH for vivid midpoints.',
+    '  float t01 = clamp(palT * 3.0, 0.0, 1.0);',
+    '  float t12 = clamp((palT - 0.33333) * 3.0, 0.0, 1.0);',
+    '  float t23 = clamp((palT - 0.66667) * 3.0, 0.0, 1.0);',
+    '  vec3 lch0 = oklab_to_oklch(linear_rgb_to_oklab(u_color0));',
+    '  vec3 lch1 = oklab_to_oklch(linear_rgb_to_oklab(u_color1));',
+    '  vec3 lch2 = oklab_to_oklch(linear_rgb_to_oklab(u_color2));',
+    '  vec3 lch3 = oklab_to_oklch(linear_rgb_to_oklab(u_color3));',
+    '  vec3 seg01 = mix_oklch(lch0, lch1, t01);',
+    '  vec3 seg12 = mix_oklch(lch1, lch2, t12);',
+    '  vec3 seg23 = mix_oklch(lch2, lch3, t23);',
+    '  vec3 blendedLch = mix(mix(seg01, seg12, step(0.33333, palT)), seg23, step(0.66667, palT));',
+    '  vec3 gradCol = oklab_to_linear_rgb(oklch_to_oklab(blendedLch));',
     '',
-    '  vec3 col = mix(cosineCol, gradCol, u_color_mode);',
+    '  vec3 oklchCol = oklchPalette(palT);',
+    '  float isStop  = step(0.5, u_color_mode) * (1.0 - step(1.5, u_color_mode));',
+    '  float isOklch = step(1.5, u_color_mode);',
+    '  vec3 col = cosineCol;',
+    '  col = mix(col, gradCol,   isStop);',
+    '  col = mix(col, oklchCol,  isOklch);',
     '',
     '  // --- Edge fade to transparent ---',
     '  float fadeLeft  = smoothstep(leftEdge, leftEdge + u_fade_width, xTilted);',
@@ -183,7 +248,9 @@
     '',
     '  float textAlpha  = min(fillSample + outlineSample, 1.0);',
     '  float finalAlpha = mix(baseAlpha, 1.0, textAlpha);',
-    '  gl_FragColor = vec4(finalColor.xyz * finalAlpha, finalAlpha);',
+    '  // Linear -> sRGB to match Three.js renderer output',
+    '  vec3 encoded = pow(finalColor.xyz, vec3(1.0 / 2.2));',
+    '  gl_FragColor = vec4(encoded * finalAlpha, finalAlpha);',
     '}'
   ].join('\n');
 
@@ -200,7 +267,7 @@
         tiltTan:       gl.getUniformLocation(program, 'u_tilt_tan'),
         width:         gl.getUniformLocation(program, 'u_width'),
         offsetX:       gl.getUniformLocation(program, 'u_offset_x'),
-        sameGradient:  gl.getUniformLocation(program, 'u_same_gradient'),
+        rowOffset:     gl.getUniformLocation(program, 'u_row_offset'),
         useThresholds: gl.getUniformLocation(program, 'u_use_thresholds'),
         thresh0:       gl.getUniformLocation(program, 'u_thresh0'),
         thresh1:       gl.getUniformLocation(program, 'u_thresh1'),
@@ -212,6 +279,10 @@
         palC:          gl.getUniformLocation(program, 'u_c'),
         palD:          gl.getUniformLocation(program, 'u_d'),
         colorMode:     gl.getUniformLocation(program, 'u_color_mode'),
+        oklchA:        gl.getUniformLocation(program, 'u_oklch_a'),
+        oklchB:        gl.getUniformLocation(program, 'u_oklch_b'),
+        oklchC:        gl.getUniformLocation(program, 'u_oklch_c'),
+        oklchD:        gl.getUniformLocation(program, 'u_oklch_d'),
         color0:        gl.getUniformLocation(program, 'u_color0'),
         color1:        gl.getUniformLocation(program, 'u_color1'),
         color2:        gl.getUniformLocation(program, 'u_color2'),
@@ -236,14 +307,35 @@
       var tiltDeg      = v.u_tilt           != null ? v.u_tilt           : -5;
       var width        = v.u_width          != null ? v.u_width          : 0.5;
       var offsetX      = v.u_offset_x       != null ? v.u_offset_x       : 0.0;
-      var sameGradient = v.u_same_gradient  != null ? v.u_same_gradient  : 0.0;
+      var rowOffset    = v.u_row_offset     != null ? v.u_row_offset     : 1.0;
       var heightMode   = v.u_height_mode    || 'Golden Ratio';
       var noiseSeed    = v.u_noise_seed     != null ? v.u_noise_seed     : 0;
       var palA         = v.u_a              || [0.5, 0.5, 0.5];
       var palB         = v.u_b              || [0.5, 0.5, 0.5];
       var palC         = v.u_c              || [1.0, 1.0, 1.0];
       var palD         = v.u_d              || [0.0, 0.33, 0.67];
-      var colorMode    = v.u_color_mode     != null ? v.u_color_mode     : 0.0;
+      var colorMode    = v.u_color_mode     != null ? parseFloat(v.u_color_mode) : 0.0;
+      var DEG = Math.PI / 180;
+      var oklchA = [
+        v.u_oklch_aL != null ? v.u_oklch_aL : 0.70,
+        v.u_oklch_aC != null ? v.u_oklch_aC : 0.25,
+        (v.u_oklch_aH != null ? v.u_oklch_aH : 180) * DEG,
+      ];
+      var oklchB = [
+        v.u_oklch_bL != null ? v.u_oklch_bL : 0.00,
+        v.u_oklch_bC != null ? v.u_oklch_bC : 0.00,
+        (v.u_oklch_bH != null ? v.u_oklch_bH : 180) * DEG,
+      ];
+      var oklchC = [
+        v.u_oklch_cL != null ? v.u_oklch_cL : 0.5,
+        v.u_oklch_cC != null ? v.u_oklch_cC : 0.5,
+        v.u_oklch_cH != null ? v.u_oklch_cH : 0.5,
+      ];
+      var oklchD = [
+        v.u_oklch_dL != null ? v.u_oklch_dL : 0.0,
+        v.u_oklch_dC != null ? v.u_oklch_dC : 0.0,
+        v.u_oklch_dH != null ? v.u_oklch_dH : 0.0,
+      ];
       var color0       = v.u_color0         || [1.0, 0.2,  0.4];
       var color1       = v.u_color1         || [1.0, 0.8,  0.0];
       var color2       = v.u_color2         || [0.0, 0.8,  1.0];
@@ -281,7 +373,7 @@
       gl.uniform1f(u.tiltTan,       tiltTan);
       gl.uniform1f(u.width,         width);
       gl.uniform1f(u.offsetX,       offsetX);
-      gl.uniform1f(u.sameGradient,  sameGradient);
+      gl.uniform1f(u.rowOffset,     rowOffset);
       gl.uniform1f(u.useThresholds, useThresholds);
       gl.uniform4f(u.thresh0,       td[0],  td[1],  td[2],  td[3]);
       gl.uniform4f(u.thresh1,       td[4],  td[5],  td[6],  td[7]);
@@ -293,6 +385,10 @@
       gl.uniform3fv(u.palC,         palC);
       gl.uniform3fv(u.palD,         palD);
       gl.uniform1f(u.colorMode,     colorMode);
+      gl.uniform3fv(u.oklchA,       oklchA);
+      gl.uniform3fv(u.oklchB,       oklchB);
+      gl.uniform3fv(u.oklchC,       oklchC);
+      gl.uniform3fv(u.oklchD,       oklchD);
       gl.uniform3fv(u.color0,       color0);
       gl.uniform3fv(u.color1,       color1);
       gl.uniform3fv(u.color2,       color2);
@@ -313,13 +409,13 @@
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, size, size);
 
-      var txt = v.text || '';
+      var txt = v.u_text_enabled ? (v.text || '') : '';
       if (txt) {
         var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"Montserrat"';
         var fontSize   = v.textFontSize != null ? v.textFontSize : 180;
         var tx         = v.textX        != null ? v.textX        : 0.5;
         var ty         = v.textY        != null ? v.textY        : 0.5;
-        var textRotDeg = v.u_text_rotation != null ? v.u_text_rotation : 90;
+        var textRotDeg = v.u_text_rotation != null ? v.u_text_rotation : -90;
         var cx         = tx * size;
         var cy         = (1 - ty) * size;
         var rad        = textRotDeg * Math.PI / 180;
@@ -327,7 +423,7 @@
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(rad);
-        ctx.font         = fontSize + 'px ' + fontFamily + ', monospace';
+        ctx.font         = '700 ' + fontSize + 'px ' + fontFamily + ', monospace';
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
 
@@ -346,7 +442,7 @@
 
     textKey: function (v) {
       return JSON.stringify([
-        v.text, v.textX, v.textY, v.textFontSize, v.textFont,
+        v.u_text_enabled, v.text, v.textX, v.textY, v.textFontSize, v.textFont,
         v.u_text_rotation, v.outlineEnabled, v.outlineWidth,
       ]);
     },
