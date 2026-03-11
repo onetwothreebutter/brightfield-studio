@@ -1,0 +1,167 @@
+var controls = [
+  // ── Palette ───────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Palette' },
+  { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '0',
+    options: [
+      { label: 'Flat',   value: '0' },
+      { label: '4-Stop', value: '1' },
+      { label: 'Cosine', value: '2' },
+    ]
+  },
+  // Cosine palette controls (shown/hidden by customAfterBuild)
+  { key: '_et_palette_preset', label: 'Preset', type: 'select', value: 'Rainbow',
+    options: [
+      { label: 'Rainbow',   value: 'Rainbow'   },
+      { label: 'Cool Blue', value: 'Cool Blue' },
+      { label: 'Neon Heat', value: 'Neon Heat' },
+      { label: 'Cyberpunk', value: 'Cyberpunk' },
+      { label: 'Golden',    value: 'Golden'    },
+    ]
+  },
+  { key: 'u_a', label: 'Palette A', type: 'color', value: '#808080',
+    tip: 'Offset — base brightness per channel.' },
+  { key: 'u_b', label: 'Palette B', type: 'color', value: '#808080',
+    tip: 'Amplitude — color swing range per channel.' },
+  { key: 'u_c', label: 'Palette C', type: 'color', value: '#ffffff',
+    tip: 'Frequency — how many times the palette cycles per channel.' },
+  { key: 'u_d', label: 'Palette D', type: 'color', value: '#0054ab',
+    tip: 'Phase — shifts the starting hue of the color cycle.' },
+  // 4-stop colors (shown/hidden by customAfterBuild)
+  { key: 'u_color0', label: 'Color 1 (Top)',    type: 'color', value: '#ff3366' },
+  { key: 'u_color1', label: 'Color 2',          type: 'color', value: '#ffcc00' },
+  { key: 'u_color2', label: 'Color 3',          type: 'color', value: '#00ccff' },
+  { key: 'u_color3', label: 'Color 4 (Bottom)', type: 'color', value: '#aa00ff' },
+  // Snap strips (shown when not Flat mode)
+  { key: 'u_snap_strips', label: 'Flat Per Strip', type: 'toggle', value: 0,
+    tip: 'Snap the palette so each echo strip shows a single flat color.' },
+  // ── Text ──────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Text' },
+  { key: 'text',         label: 'Text',      type: 'text',   textDirty: true, value: 'ECHO' },
+  { key: 'textFont',     label: 'Font',      type: 'select', textDirty: true, value: 'Montserrat',
+    options: [
+      { label: 'Montserrat',          value: 'Montserrat'          },
+      { label: 'Oswald',              value: 'Oswald'              },
+      { label: 'Unbounded',           value: 'Unbounded'           },
+      { label: 'Syne',                value: 'Syne'                },
+      { label: 'Bricolage Grotesque', value: 'Bricolage Grotesque' },
+      { label: 'Epilogue',            value: 'Epilogue'            },
+      { label: 'DM Sans',             value: 'DM Sans'             },
+      { label: 'IBM Plex Mono',       value: 'IBM Plex Mono'       },
+      { label: 'Space Mono',          value: 'Space Mono'          },
+      { label: 'Roboto Mono',         value: 'Roboto Mono'         },
+      { label: 'Fira Code',           value: 'Fira Code'           },
+      { label: 'Inconsolata',         value: 'Inconsolata'         },
+      { label: 'Courier Prime',       value: 'Courier Prime'       },
+      { label: 'Fragment Mono',       value: 'Fragment Mono'       },
+      { label: 'Azeret Mono',         value: 'Azeret Mono'         },
+      { label: 'Geist Mono',          value: 'Geist Mono'          },
+    ]
+  },
+  { key: 'textFontSize', label: 'Font Size', type: 'range', textDirty: true, min: 50,   max: 800, step: 10, value: 300 },
+  { key: 'textRotation', label: 'Rotation',  type: 'range', textDirty: true, min: -180, max: 180, step: 1,  value: 0   },
+  { key: 'textX',        label: 'Text X',    type: 'range', textDirty: true, min: 0,    max: 1.0, step: 0.01, value: 0.5 },
+  { key: 'textY',        label: 'Text Y',    type: 'range', textDirty: true, min: 0,    max: 1.0, step: 0.01, value: 0.5 },
+  { key: 'u_text_color', label: 'Text Color', type: 'color', value: '#ffffff' },
+  // ── Outline ───────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Outline' },
+  { key: 'u_outline_enabled', label: 'Outline',       type: 'toggle', textDirty: true, value: 0 },
+  { key: 'u_outline_width',   label: 'Outline Width', type: 'range',  textDirty: true, min: 1, max: 60, step: 1, value: 8 },
+  { key: 'u_outline_color',   label: 'Outline Color', type: 'color',  value: '#000000' },
+  // ── Echo ──────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Echo' },
+  { key: 'u_repeat_strip',   label: 'Echo Repeat',    type: 'toggle', textDirty: true, value: 1 },
+  { key: 'u_strip_fraction', label: 'Strip Height',   type: 'range',  textDirty: true, min: 0.05, max: 0.5,  step: 0.01, value: 0.2  },
+  { key: 'u_strip_sample',   label: 'Strip Sample %', type: 'range',  textDirty: true, min: 0.0,  max: 1.0,  step: 0.01, value: 0.0  },
+  { key: 'u_repeat_count',   label: 'Repeat Count',   type: 'range',  textDirty: true, min: 1,    max: 30,   step: 1,    value: 10   },
+  { key: 'u_strip_gap',      label: 'Strip Gap (px)', type: 'range',  textDirty: true, min: 0,    max: 500,  step: 1,    value: 0    },
+  { key: 'u_solid_enabled',  label: 'Solid Columns',  type: 'toggle', textDirty: true, value: 0 },
+  { key: 'u_solid_height',   label: 'Solid Height (px)', type: 'range', textDirty: true, min: 0,    max: 600,  step: 1,    value: 200  },
+  { key: 'u_solid_sample',   label: 'Solid Sample %', type: 'range',  textDirty: true, min: 0.0,  max: 1.0,  step: 0.01, value: 0.2  },
+  { key: 'u_section_gap',    label: 'Section Gap (px)', type: 'range', textDirty: true, min: -200, max: 500, step: 1,    value: 0    },
+  // ── Stamps ────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Stamps' },
+  { key: 'u_drag_enabled',  label: 'Enable Stamps',   type: 'toggle', textDirty: true, value: 0    },
+  { key: 'u_drag_angle',    label: 'Angle (°)',        type: 'range',  textDirty: true, min: 0, max: 360, step: 1, value: 180 },
+  { key: 'u_drag_distance', label: 'Distance (px)',    type: 'range',  textDirty: true, min: 0, max: 800, step: 1, value: 120 },
+  { key: 'u_drag_steps',    label: 'Stamp Count',      type: 'range',  textDirty: true, min: 1, max: 30,  step: 1, value: 8   },
+  { key: 'u_drag_decay',    label: 'Stamp Decay',      type: 'range',  textDirty: true, min: 0.1, max: 1.0, step: 0.01, value: 0.7 },
+  // ── Blur ──────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Blur' },
+  { key: 'u_blur_enabled', label: 'Enable Blur',   type: 'toggle', value: 0 },
+  { key: 'u_blur_angle',   label: 'Blur Angle (°)', type: 'range', toRadians: true, min: 0, max: 360, step: 1,     value: 180  },
+  { key: 'u_blur_length',  label: 'Blur Length',   type: 'range', min: 0.0, max: 0.5, step: 0.005, value: 0.08 },
+  { key: 'u_blur_falloff', label: 'Blur Falloff',  type: 'range', min: 0.0, max: 1.0, step: 0.01,  value: 0.6  },
+  // ── Background ────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Background' },
+  { key: 'u_bg_color', label: 'Background', type: 'color', value: '#000000' },
+];
+
+// Palette preset data
+var customAfterBuild = function () {
+  var presets = {
+    'Rainbow':   { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.0,   0.33,  0.67]  },
+    'Cool Blue': { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.263, 0.416, 0.557] },
+    'Neon Heat': { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.3,   0.2,   0.2]   },
+    'Cyberpunk': { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [2.0, 1.0, 0.0], d: [0.5,   0.2,   0.25]  },
+    'Golden':    { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 0.5], d: [0.8,   0.9,   0.3]   },
+  };
+
+  function toHex(v) {
+    return '#' + v.map(function (x) {
+      var b = Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16);
+      return b.length === 1 ? '0' + b : b;
+    }).join('');
+  }
+
+  // Keys for each visibility group
+  var cosineKeys = ['_et_palette_preset', 'u_a', 'u_b', 'u_c', 'u_d'];
+  var stopKeys   = ['u_color0', 'u_color1', 'u_color2', 'u_color3'];
+
+  function rowFor(key) {
+    var el = document.querySelector('[data-param-key="' + key + '"]');
+    return el ? el.closest('.shader-control') : null;
+  }
+
+  function applyVisibility() {
+    var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
+    var mode   = modeEl ? modeEl.value : '0';
+
+    cosineKeys.forEach(function (key) {
+      var row = rowFor(key);
+      if (row) row.style.display = mode === '2' ? '' : 'none';
+    });
+    stopKeys.forEach(function (key) {
+      var row = rowFor(key);
+      if (row) row.style.display = mode === '1' ? '' : 'none';
+    });
+    var snapRow = rowFor('u_snap_strips');
+    if (snapRow) snapRow.style.display = mode !== '0' ? '' : 'none';
+  }
+
+  var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
+  if (modeEl) modeEl.addEventListener('change', applyVisibility);
+  applyVisibility();
+
+  // Cosine palette preset handler
+  var presetSel = document.querySelector('[data-param-key="_et_palette_preset"]');
+  if (presetSel) {
+    presetSel.addEventListener('change', function () {
+      var p = presets[this.value];
+      if (!p) return;
+      var keys = ['u_a', 'u_b', 'u_c', 'u_d'];
+      var vals = [p.a, p.b, p.c, p.d];
+      keys.forEach(function (key, i) {
+        window._shaderState.values[key] = vals[i];
+        var inp = document.querySelector('[data-param-key="' + key + '"]');
+        if (inp) inp.value = toHex(vals[i]);
+      });
+    });
+  }
+};
+
+['Montserrat', 'Oswald', 'Unbounded', 'Syne', 'Bricolage Grotesque', 'Epilogue', 'DM Sans',
+ 'IBM Plex Mono', 'Space Mono', 'Roboto Mono', 'Fira Code', 'Inconsolata', 'Courier Prime',
+ 'Fragment Mono', 'Azeret Mono', 'Geist Mono',
+].forEach(function (f) {
+  document.fonts.load('700 48px "' + f + '"');
+});
