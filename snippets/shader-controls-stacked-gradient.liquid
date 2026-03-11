@@ -90,30 +90,7 @@ var controls = [
   { key: 'u_text_enabled',   label: 'Text Overlay',      type: 'toggle', value: 0,             textDirty: true },
   { key: 'text',             label: 'Text',              type: 'text',   value: '{{ "now" | date: "%Y" }}', textDirty: true },
   { key: 'textFont',         label: 'Font',              type: 'select', value: 'Montserrat',  textDirty: true,
-    options: [
-      { label: 'Space Mono',          value: 'Space Mono'          },
-      { label: 'Roboto Mono',         value: 'Roboto Mono'         },
-      { label: 'Source Code Pro',     value: 'Source Code Pro'     },
-      { label: 'JetBrains Mono',      value: 'JetBrains Mono'      },
-      { label: 'IBM Plex Mono',       value: 'IBM Plex Mono'       },
-      { label: 'Fira Code',           value: 'Fira Code'           },
-      { label: 'Inconsolata',         value: 'Inconsolata'         },
-      { label: 'Courier Prime',       value: 'Courier Prime'       },
-      { label: 'Share Tech Mono',     value: 'Share Tech Mono'     },
-      { label: 'Cutive Mono',         value: 'Cutive Mono'         },
-      { label: 'DM Mono',             value: 'DM Mono'             },
-      { label: 'Fragment Mono',       value: 'Fragment Mono'       },
-      { label: 'Azeret Mono',         value: 'Azeret Mono'         },
-      { label: 'Spline Sans Mono',    value: 'Spline Sans Mono'    },
-      { label: 'Geist Mono',          value: 'Geist Mono'          },
-      { label: 'Syne',                value: 'Syne'                },
-      { label: 'Unbounded',           value: 'Unbounded'           },
-      { label: 'Bricolage Grotesque', value: 'Bricolage Grotesque' },
-      { label: 'Epilogue',            value: 'Epilogue'            },
-      { label: 'DM Sans',             value: 'DM Sans'             },
-      { label: 'Oswald',              value: 'Oswald'              },
-      { label: 'Montserrat',          value: 'Montserrat'          },
-    ]
+    options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
   },
   { key: 'textFontSize',     label: 'Font Size',         type: 'range',  min: 8, max: 750, step: 1,    value: 180,  textDirty: true, noRandomize: true },
   { key: 'u_text_rotation',  label: 'Rotation (°)',      type: 'range',  min: -180, max: 180, step: 1, value: -90,  textDirty: true,
@@ -129,32 +106,7 @@ var controls = [
   { key: 'u_outline_color',  label: 'Outline Color',     type: 'color',  value: '#000000', outlineDependent: true },
 ];
 
-// Palette preset data (mirrors StackedGradient.tsx palettes)
 var customAfterBuild = function () {
-  function toHex(v) {
-    return '#' + v.map(function (x) {
-      var b = Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16);
-      return b.length === 1 ? '0' + b : b;
-    }).join('');
-  }
-
-  function applyColors(keyValPairs) {
-    keyValPairs.forEach(function (pair) {
-      var inp = document.querySelector('[data-param-key="' + pair[0] + '"]');
-      if (inp) {
-        inp.value = toHex(pair[1]);
-        inp.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-    });
-  }
-
-  var cosinePresets = {
-    'Rainbow':   { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.0,   0.33,  0.67]  },
-    'Cool Blue': { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.263, 0.416, 0.557] },
-    'Neon Heat': { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.3,   0.2,   0.2]   },
-    'Cyberpunk': { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [2.0, 1.0, 0.0], d: [0.5,   0.2,   0.25]  },
-    'Golden':    { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 0.5], d: [0.8,   0.9,   0.3]   },
-  };
   var cosineKeys = ['u_a', 'u_b', 'u_c', 'u_d'];
 
   function applyCosinePreset(p) {
@@ -216,12 +168,12 @@ var customAfterBuild = function () {
   applyNoiseSeedVis();
 
   // Apply default on load so shader matches pickers.
-  applyCosinePreset(cosinePresets['Rainbow']);
+  applyCosinePreset(COSINE_PRESETS['Rainbow']);
 
   var presetSel = document.querySelector('[data-param-key="_sg_palette_preset"]');
   if (presetSel) {
     presetSel.addEventListener('change', function () {
-      var p = cosinePresets[this.value];
+      var p = COSINE_PRESETS[this.value];
       if (p) applyCosinePreset(p);
     });
   }
@@ -249,14 +201,3 @@ var customAfterBuild = function () {
   applyTextEnabledVis();
 };
 
-// Preload all fonts so they are available when the text canvas is drawn.
-[
-  'Space Mono', 'Roboto Mono', 'Source Code Pro', 'JetBrains Mono',
-  'IBM Plex Mono', 'Fira Code', 'Inconsolata', 'Courier Prime',
-  'Share Tech Mono', 'Cutive Mono', 'DM Mono', 'Fragment Mono',
-  'Azeret Mono', 'Spline Sans Mono', 'Geist Mono', 'Syne',
-  'Unbounded', 'Bricolage Grotesque', 'Epilogue', 'DM Sans',
-  'Oswald', 'Montserrat',
-].forEach(function (f) {
-  document.fonts.load('700 48px "' + f + '"');
-});

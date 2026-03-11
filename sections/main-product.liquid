@@ -257,12 +257,13 @@ if (window.location.hash === '#shader') {
   var body = document.getElementById('shader-gui-body');
   if (!body) return;
 
+  {% render 'shader-controls-base' %}
   {% case shader_file %}
-  {% when 'chladni' %}      {% render 'shader-controls-chladni' %}
-  {% when 'line-circle' %}  {% render 'shader-controls-line-circle' %}
-  {% when 'three-square' %}       {% render 'shader-controls-three-square' %}
-  {% when 'stacked-gradient' %}   {% render 'shader-controls-stacked-gradient' %}
-  {% else %}                      {% render 'shader-controls-rise-shirt' %}
+  {% when 'chladni' %}          {% render 'shader-controls-chladni' %}
+  {% when 'line-circle' %}      {% render 'shader-controls-line-circle' %}
+  {% when 'three-square' %}     {% render 'shader-controls-three-square' %}
+  {% when 'stacked-gradient' %} {% render 'shader-controls-stacked-gradient' %}
+  {% else %}                    {% render 'shader-controls-rise-shirt' %}
   {% endcase %}
 
   // Initialise shared state — shader.js reads this each frame
