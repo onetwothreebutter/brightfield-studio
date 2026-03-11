@@ -23,11 +23,12 @@
     'uniform float u_text_ratio;',
     'uniform vec3  u_text_color;',
     'uniform vec3  u_text_bg_color;',
-    'uniform vec3  u_palette_a;',
-    'uniform vec3  u_palette_b;',
-    'uniform vec3  u_palette_c;',
-    'uniform vec3  u_palette_d;',
+    'uniform vec3  u_a;',
+    'uniform vec3  u_b;',
+    'uniform vec3  u_c;',
+    'uniform vec3  u_d;',
     'uniform float u_color_mode;',
+    'uniform float u_invert_text;',
     'uniform float u_transparent_bg;',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
@@ -57,9 +58,12 @@
     '  float eps      = 0.005;',
     '  float mainMask = 1.0 - smoothstep(radius - eps, radius + eps, dist);',
     '',
-    '  vec3 paletteColor = cosinePalette(mixFactor, u_palette_a, u_palette_b, u_palette_c, u_palette_d);',
-    '  vec3 dotColor     = mix(u_dot_color, paletteColor, step(0.5, u_color_mode));',
-    '  vec3 mainColor    = mix(u_bg_color, dotColor, mainMask);',
+    '  vec3 paletteColor   = cosinePalette(mixFactor, u_a, u_b, u_c, u_d);',
+    '  vec3 invertedPal    = 1.0 - paletteColor;',
+    '  vec3 activePal      = mix(paletteColor, invertedPal, u_invert_text);',
+    '  // mode=0: cosine palette  mode=1: solid color',
+    '  vec3 dotColor       = mix(activePal, u_dot_color, step(0.5, u_color_mode));',
+    '  vec3 mainColor      = mix(u_bg_color, dotColor, mainMask);',
     '',
     '  // ── Text dot grid (margin area) ───────────────────────────────────',
     '  vec2  tGridUv    = uv * vec2(u_text_grid_cols, u_text_grid_rows);',
@@ -73,13 +77,17 @@
     '  float circleMask      = 1.0 - smoothstep(u_text_radius - eps, u_text_radius + eps, tDist);',
     '  float textMask        = circleMask * tSample * u_text_blend;',
     '  float textMixFactor   = mix(tCenterUv.y, 1.0 - tCenterUv.y, u_invert);',
-    '  vec3  textPalette     = cosinePalette(textMixFactor, u_palette_a, u_palette_b, u_palette_c, u_palette_d);',
-    '  vec3  textDotColor    = mix(u_text_color, textPalette, step(0.5, u_color_mode));',
+    '  vec3  textPalette     = cosinePalette(textMixFactor, u_a, u_b, u_c, u_d);',
+    '  vec3  invertedTextPal = 1.0 - textPalette;',
+    '  vec3  activeTextPal   = mix(textPalette, invertedTextPal, u_invert_text);',
+    '  vec3  textDotColor    = mix(activeTextPal, u_text_color, step(0.5, u_color_mode));',
     '  vec3  marginColor     = mix(u_text_bg_color, textDotColor, textMask);',
     '',
     '  float dotAlpha = mix(mainMask, textMask, inMargin);',
     '  float alpha    = mix(1.0, dotAlpha, u_transparent_bg);',
-    '  gl_FragColor   = vec4(mix(mainColor, marginColor, inMargin), alpha);',
+    '  vec3 finalCol  = mix(mainColor, marginColor, inMargin);',
+    '  vec3 encoded   = pow(max(finalCol, 0.0), vec3(1.0 / 2.2));',
+    '  gl_FragColor   = vec4(encoded, alpha);',
     '}'
   ].join('\n');
 
@@ -107,11 +115,12 @@
         textRatio:    gl.getUniformLocation(program, 'u_text_ratio'),
         textColor:    gl.getUniformLocation(program, 'u_text_color'),
         textBgColor:  gl.getUniformLocation(program, 'u_text_bg_color'),
-        paletteA:     gl.getUniformLocation(program, 'u_palette_a'),
-        paletteB:     gl.getUniformLocation(program, 'u_palette_b'),
-        paletteC:     gl.getUniformLocation(program, 'u_palette_c'),
-        paletteD:     gl.getUniformLocation(program, 'u_palette_d'),
+        palA:         gl.getUniformLocation(program, 'u_a'),
+        palB:         gl.getUniformLocation(program, 'u_b'),
+        palC:         gl.getUniformLocation(program, 'u_c'),
+        palD:         gl.getUniformLocation(program, 'u_d'),
         colorMode:    gl.getUniformLocation(program, 'u_color_mode'),
+        invertText:   gl.getUniformLocation(program, 'u_invert_text'),
         transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
       };
     },
@@ -148,11 +157,12 @@
       gl.uniform1f(u.textRatio,    tRatio);
       gl.uniform3fv(u.textColor,   v.u_text_color   || [1.0, 1.0, 1.0]);
       gl.uniform3fv(u.textBgColor, v.u_text_bg_color || [0.0, 0.0, 0.0]);
-      gl.uniform3fv(u.paletteA,    v.u_palette_a    || [0.5, 0.5, 0.5]);
-      gl.uniform3fv(u.paletteB,    v.u_palette_b    || [0.5, 0.5, 0.5]);
-      gl.uniform3fv(u.paletteC,    v.u_palette_c    || [1.0, 1.0, 1.0]);
-      gl.uniform3fv(u.paletteD,    v.u_palette_d    || [0.263, 0.416, 0.557]);
-      gl.uniform1f(u.colorMode,     v.u_color_mode     != null ? v.u_color_mode     : 0.0);
+      gl.uniform3fv(u.palA,        v.u_a            || [0.5, 0.5, 0.5]);
+      gl.uniform3fv(u.palB,        v.u_b            || [0.5, 0.5, 0.5]);
+      gl.uniform3fv(u.palC,        v.u_c            || [1.0, 1.0, 1.0]);
+      gl.uniform3fv(u.palD,        v.u_d            || [0.263, 0.416, 0.557]);
+      gl.uniform1f(u.colorMode,    v.u_color_mode   != null ? v.u_color_mode   : 0.0);
+      gl.uniform1f(u.invertText,   v.u_invert_text  != null ? v.u_invert_text  : 0.0);
       gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);
 
       gl.activeTexture(gl.TEXTURE0);
@@ -168,22 +178,29 @@
 
       var txt = v.text || '';
       if (txt) {
-        ctx.save();
-        ctx.scale(1 / aspect, 1);
-        ctx.fillStyle    = '#ffffff';
         var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"IBM Plex Mono"';
-        ctx.font         = (v.textFontSize || 460) + 'px ' + fontFamily + ', monospace';
-        ctx.textAlign    = 'center';
-        ctx.textBaseline = 'middle';
         var tx = v.textX != null ? v.textX : 0.5;
         var ty = v.textY != null ? v.textY : 0.79;
-        ctx.fillText(txt, size * tx * aspect, size * (1 - ty));
+        var textRotDeg = v.u_text_rotation != null ? v.u_text_rotation : 0;
+        var cx  = size * tx;
+        var cy  = size * (1 - ty);
+        var rad = textRotDeg * Math.PI / 180;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rad);
+        ctx.scale(1 / aspect, 1);
+        ctx.fillStyle    = 'rgb(255,255,255)';
+        ctx.font         = 'bold ' + (v.textFontSize || 460) + 'px ' + fontFamily + ', monospace';
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(txt, 0, 0);
         ctx.restore();
       }
     },
 
     textKey: function (v) {
-      return JSON.stringify([v.text, v.textX, v.textY, v.textFontSize, v.textFont]);
+      return JSON.stringify([v.text, v.textX, v.textY, v.textFontSize, v.textFont, v.u_text_rotation]);
     },
   });
 }());

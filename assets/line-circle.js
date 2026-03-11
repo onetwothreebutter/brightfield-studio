@@ -12,10 +12,10 @@
     'uniform float u_power;',
     'uniform float u_width_top;',
     'uniform float u_width_bot;',
-    'uniform vec3  u_palette_a;',
-    'uniform vec3  u_palette_b;',
-    'uniform vec3  u_palette_c;',
-    'uniform vec3  u_palette_d;',
+    'uniform vec3  u_a;',
+    'uniform vec3  u_b;',
+    'uniform vec3  u_c;',
+    'uniform vec3  u_d;',
     'uniform float u_color_mode;',
     'uniform vec3  u_color0;',
     'uniform vec3  u_color1;',
@@ -70,7 +70,7 @@
     '  float lineMask = 1.0 - smoothstep(lineWidth - aaLine, lineWidth + aaLine, phase);',
     '',
     '  // Cosine palette driven by vertical position',
-    '  vec3 palColor = cosinePalette(t, u_palette_a, u_palette_b, u_palette_c, u_palette_d);',
+    '  vec3 palColor = cosinePalette(t, u_a, u_b, u_c, u_d);',
     '',
     '  // 4-stop linear gradient (same t driver)',
     '  float t01 = clamp(t * 3.0, 0.0, 1.0);',
@@ -128,7 +128,8 @@
     '  float textAlpha      = fillSample + outlineSample;',
     '  float finalAlpha     = mix(visibilityMask, 1.0, textAlpha);',
     '  float alpha          = mix(1.0, finalAlpha, u_transparent_bg);',
-    '  gl_FragColor = vec4(finalColor, alpha);',
+    '  vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
+    '  gl_FragColor = vec4(encoded, alpha);',
     '}'
   ].join('\n');
 
@@ -145,10 +146,10 @@
         power:               gl.getUniformLocation(program, 'u_power'),
         widthTop:            gl.getUniformLocation(program, 'u_width_top'),
         widthBot:            gl.getUniformLocation(program, 'u_width_bot'),
-        paletteA:            gl.getUniformLocation(program, 'u_palette_a'),
-        paletteB:            gl.getUniformLocation(program, 'u_palette_b'),
-        paletteC:            gl.getUniformLocation(program, 'u_palette_c'),
-        paletteD:            gl.getUniformLocation(program, 'u_palette_d'),
+        palA:                gl.getUniformLocation(program, 'u_a'),
+        palB:                gl.getUniformLocation(program, 'u_b'),
+        palC:                gl.getUniformLocation(program, 'u_c'),
+        palD:                gl.getUniformLocation(program, 'u_d'),
         colorMode:           gl.getUniformLocation(program, 'u_color_mode'),
         color0:              gl.getUniformLocation(program, 'u_color0'),
         color1:              gl.getUniformLocation(program, 'u_color1'),
@@ -178,10 +179,10 @@
       gl.uniform1f(u.power,        v.u_power                != null ? v.u_power                : 2.5);
       gl.uniform1f(u.widthTop,     v.u_width_top            != null ? v.u_width_top            : 0.05);
       gl.uniform1f(u.widthBot,     v.u_width_bot            != null ? v.u_width_bot            : 0.75);
-      gl.uniform3fv(u.paletteA,    v.u_palette_a  || [0.5, 0.5, 0.5]);
-      gl.uniform3fv(u.paletteB,    v.u_palette_b  || [0.5, 0.5, 0.5]);
-      gl.uniform3fv(u.paletteC,    v.u_palette_c  || [1.0, 1.0, 1.0]);
-      gl.uniform3fv(u.paletteD,    v.u_palette_d  || [0.0, 0.33, 0.67]);
+      gl.uniform3fv(u.palA,        v.u_a  || [0.5, 0.5, 0.5]);
+      gl.uniform3fv(u.palB,        v.u_b  || [0.5, 0.5, 0.5]);
+      gl.uniform3fv(u.palC,        v.u_c  || [1.0, 1.0, 1.0]);
+      gl.uniform3fv(u.palD,        v.u_d  || [0.0, 0.33, 0.67]);
       gl.uniform1f(u.colorMode,    v.u_color_mode  != null ? v.u_color_mode  : 0.0);
       gl.uniform3fv(u.color0,      v.u_color0     || [1.0, 0.2,  0.4]);
       gl.uniform3fv(u.color1,      v.u_color1     || [1.0, 0.8,  0.0]);
@@ -221,7 +222,7 @@
         // Drawing at (1-ty)*size means ty=1→canvas top→UV top, ty=0→canvas bottom→UV bottom.
         var cy         = (1 - ty) * size;
 
-        ctx.font         = fontSize + 'px ' + fontFamily + ', monospace';
+        ctx.font         = 'bold ' + fontSize + 'px ' + fontFamily + ', monospace';
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
 
@@ -240,7 +241,7 @@
     },
 
     textKey: function (v) {
-      return JSON.stringify([v.text, v.textX, v.textY, v.textFontSize, v.textFont, v.outlineEnabled, v.outlineWidth]);
+      return JSON.stringify([v.text, v.textX, v.textY, v.textFontSize, v.textFont, v.outlineEnabled, v.outlineWidth, v.u_outline_color]);
     },
   });
 }());

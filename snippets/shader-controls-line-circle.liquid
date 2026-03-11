@@ -12,20 +12,20 @@ var controls = [
     tip: 'Off = cosine palette. On = 4-stop linear gradient from top to bottom.' },
   { key: '_lc_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
     options: [
-      { label: 'Rainbow', value: 'Rainbow' },
-      { label: 'Retro',   value: 'Retro'   },
+      { label: 'Rainbow',   value: 'Rainbow'   },
       { label: 'Cool Blue', value: 'Cool Blue' },
       { label: 'Neon Heat', value: 'Neon Heat' },
-      { label: 'Golden',  value: 'Golden'  },
+      { label: 'Cyberpunk', value: 'Cyberpunk' },
+      { label: 'Golden',    value: 'Golden'    },
     ]
   },
-  { key: 'u_palette_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
+  { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
     tip: 'Offset — base brightness per channel. Sets the center point colors oscillate around.' },
-  { key: 'u_palette_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080',
+  { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080',
     tip: 'Amplitude — color swing range per channel. Higher = more vivid, saturated output.' },
-  { key: 'u_palette_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff',
+  { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff',
     tip: 'Frequency — how many times the palette cycles per channel.' },
-  { key: 'u_palette_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab',
+  { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab',
     tip: 'Phase — shifts the starting hue of the color cycle.' },
   { key: '_lc_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
     options: [
@@ -40,6 +40,7 @@ var controls = [
   { key: 'u_color1', label: 'Color 2',          type: 'color', stopDependent: true, value: '#ffcc00' },
   { key: 'u_color2', label: 'Color 3',          type: 'color', stopDependent: true, value: '#00ccff' },
   { key: 'u_color3', label: 'Color 4 (Bottom)', type: 'color', stopDependent: true, value: '#aa00ff' },
+  { key: 'u_transparent_bg', label: 'Transparent BG', type: 'toggle', value: 0 },
   // ── Triangle Mask ──────────────────────────────────────────────────────────
   { type: 'header', label: 'Triangle Mask' },
   { key: 'u_tri_enabled',  label: 'Enabled',    type: 'toggle', value: 1 },
@@ -54,21 +55,12 @@ var controls = [
   { type: 'header', label: 'Text Overlay' },
   { key: 'text',           label: 'Text',      type: 'text',   value: '2001',         textDirty: true },
   { key: 'textFont',       label: 'Font',      type: 'select', value: 'Oswald', textDirty: true,
-    options: [
-      { label: 'Oswald',               value: 'Oswald' },
-      { label: 'Unbounded',            value: 'Unbounded' },
-      { label: 'Bricolage Grotesque',  value: 'Bricolage Grotesque' },
-      { label: 'DM Mono',              value: 'DM Mono' },
-      { label: 'Righteous',            value: 'Righteous' },
-      { label: 'Teko',                 value: 'Teko' },
-      { label: 'Big Shoulders Display',value: 'Big Shoulders Display' },
-      { label: 'Anton',                value: 'Anton' },
-    ]
+    options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
   },
   { key: 'textFontSize', label: 'Font Size', type: 'range', min: 8, max: 300, step: 1,    value: 69,  textDirty: true },
   { key: 'textX',        label: 'Text X',    type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.3,  textDirty: true },
   { key: 'textY',        label: 'Text Y',    type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.2, textDirty: true },
-  { key: 'u_use_text_color', label: 'Custom Text Color', type: 'toggle', value: 0 },
+  { key: 'u_use_text_color', label: 'Custom Color', type: 'toggle', value: 0 },
   { key: 'u_text_color',    label: 'Text Color',    type: 'color',  value: '#ffffff', textColorDependent: true },
   { key: 'outlineEnabled',  label: 'Outline',       type: 'toggle', value: 0, textDirty: true },
   { key: 'outlineWidth',    label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true, outlineDependent: true },
@@ -76,57 +68,13 @@ var controls = [
 ];
 
 var customAfterBuild = function () {
-  function toHex(v) {
-    return '#' + v.map(function (x) {
-      var b = Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16);
-      return b.length === 1 ? '0' + b : b;
-    }).join('');
-  }
-
-  function applyColors(keyValPairs) {
-    keyValPairs.forEach(function (pair) {
-      window._shaderState.values[pair[0]] = pair[1];
-      var inp = document.querySelector('[data-param-key="' + pair[0] + '"]');
-      if (inp) inp.value = toHex(pair[1]);
-    });
-  }
-
-  // ── Cosine palette presets ────────────────────────────────────────────────
-  var cosinePresets = {
-    'Rainbow':   { a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 1.0 ], d: [0.0,  0.33, 0.67]  },
-    'Retro':     { a: [0.6,  0.5,  0.3 ], b: [0.4,  0.4,  0.3 ], c: [1.0, 0.7, 0.5 ], d: [0.0,  0.2,  0.4  ] },
-    'Cool Blue': { a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 1.0 ], d: [0.263,0.416,0.557] },
-    'Neon Heat': { a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 1.0 ], d: [0.3,  0.2,  0.2  ] },
-    'Golden':    { a: [0.5,  0.5,  0.5 ], b: [0.5,  0.5,  0.5 ], c: [1.0, 1.0, 0.5 ], d: [0.8,  0.9,  0.3  ] },
-  };
-  var cosineKeys = ['u_palette_a', 'u_palette_b', 'u_palette_c', 'u_palette_d'];
+  var cosineKeys = ['u_a', 'u_b', 'u_c', 'u_d'];
 
   function applyCosinePreset(p) {
     applyColors(cosineKeys.map(function (k, i) {
       return [k, [p.a, p.b, p.c, p.d][i]];
     }));
   }
-
-  // Apply default on load so shader matches pickers.
-  applyCosinePreset(cosinePresets['Rainbow']);
-
-  var cosinePresetSel = document.querySelector('[data-param-key="_lc_palette_preset"]');
-  if (cosinePresetSel) {
-    cosinePresetSel.addEventListener('change', function () {
-      var p = cosinePresets[this.value];
-      if (p) applyCosinePreset(p);
-    });
-  }
-
-  // ── 4-color presets ───────────────────────────────────────────────────────
-  var fourColorPresets = {
-    // c0 = top, c3 = bottom
-    'Neon':    { c0: [1.0,  0.2,  0.4 ], c1: [1.0,  0.8,  0.0 ], c2: [0.0,  0.8,  1.0 ], c3: [0.667,0.0,  1.0  ] },
-    'Retro':   { c0: [0.91, 0.286,0.114], c1: [0.788,0.627,0.188], c2: [0.176,0.541,0.369], c3: [0.102,0.153,0.267] },
-    'Sunset':  { c0: [1.0,  0.318,0.184], c1: [0.867,0.141,0.463], c2: [0.541,0.169,0.886], c3: [0.098,0.098,0.439] },
-    'Aurora':  { c0: [0.0,  1.0,  0.533], c1: [0.0,  0.898,1.0  ], c2: [0.486,0.302,1.0  ], c3: [0.878,0.251,0.984] },
-    'Dusk':    { c0: [1.0,  0.6,  0.4  ], c1: [1.0,  0.369,0.384], c2: [0.8,  0.169,0.369], c3: [0.459,0.227,0.533] },
-  };
 
   function apply4ColorPreset(p) {
     applyColors([
@@ -137,16 +85,23 @@ var customAfterBuild = function () {
     ]);
   }
 
+  // Apply default on load so shader matches pickers.
+  applyCosinePreset(COSINE_PRESETS['Rainbow']);
+
+  var cosinePresetSel = document.querySelector('[data-param-key="_lc_palette_preset"]');
+  if (cosinePresetSel) {
+    cosinePresetSel.addEventListener('change', function () {
+      var p = COSINE_PRESETS[this.value];
+      if (p) applyCosinePreset(p);
+    });
+  }
+
   var fourColorPresetSel = document.querySelector('[data-param-key="_lc_4color_preset"]');
   if (fourColorPresetSel) {
     fourColorPresetSel.addEventListener('change', function () {
-      var p = fourColorPresets[this.value];
+      var p = FOUR_STOP_PRESETS[this.value];
       if (p) apply4ColorPreset(p);
     });
   }
 };
 
-['Oswald', 'Unbounded', 'Bricolage Grotesque', 'DM Mono',
- 'Righteous', 'Teko', 'Big Shoulders Display', 'Anton'].forEach(function (f) {
-  document.fonts.load('500 48px "' + f + '"');
-});
