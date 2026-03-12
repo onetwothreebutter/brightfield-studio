@@ -80,5 +80,7 @@ export function make2DContextMock() {
     save:        vi.fn(),
     restore:     vi.fn(),
     scale:       vi.fn(),
+    translate:   vi.fn(),
+    rotate:      vi.fn(),
   };
 }

@@ -36,15 +36,15 @@ describe('line-circle.js', () => {
     expect(window.ShaderBase.create).toHaveBeenCalledOnce();
   });
 
-  it('sets useDerivatives: true', () => {
-    expect(opts.useDerivatives).toBe(true);
+  it('does not set useDerivatives (fwidth is built-in in WebGL 2)', () => {
+    expect(opts.useDerivatives).toBeFalsy();
   });
 
   // ── fragSrc ───────────────────────────────────────────────────────────────────
 
-  it('fragSrc starts with the OES_standard_derivatives extension directive', () => {
+  it('fragSrc starts with #version 300 es (WebGL 2)', () => {
     const frag = Array.isArray(opts.fragSrc) ? opts.fragSrc.join('\n') : opts.fragSrc;
-    expect(frag.trimStart()).toMatch(/^#extension GL_OES_standard_derivatives : enable/);
+    expect(frag.trimStart()).toMatch(/^#version 300 es/);
   });
 
   it('fragSrc uses fwidth() for antialiasing instead of hardcoded constants', () => {
@@ -71,7 +71,7 @@ describe('line-circle.js', () => {
     [
       'u_resolution', 'u_aspect', 'u_radius', 'u_line_count', 'u_power',
       'u_width_top', 'u_width_bot',
-      'u_palette_a', 'u_palette_b', 'u_palette_c', 'u_palette_d',
+      'u_a', 'u_b', 'u_c', 'u_d',
       'u_text_color', 'u_use_text_color', 'u_outline_color',
       'u_text_x', 'u_text_y', 'u_text_texture',
       'u_tri_enabled', 'u_tri_rotation', 'u_tri_size', 'u_tri_width',
@@ -89,7 +89,7 @@ describe('line-circle.js', () => {
     const uniforms = opts.setup(gl, {});
     [
       'res', 'aspect', 'radius', 'lineCount', 'power', 'widthTop', 'widthBot',
-      'paletteA', 'paletteB', 'paletteC', 'paletteD',
+      'palA', 'palB', 'palC', 'palD',
       'textColor', 'useTextColor', 'outlineColor', 'textX', 'textY', 'textTex',
       'triEnabled', 'triRotation', 'triSize', 'triWidth',
       'centerCircleEnabled', 'centerCircleRadius', 'transparentBg',
@@ -151,7 +151,7 @@ describe('line-circle.js', () => {
     expect(findUniform1f(uniforms.triWidth)).toBeCloseTo((45 * Math.PI) / 180);
     expect(findUniform1f(uniforms.centerCircleEnabled)).toBe(1.0);
     expect(findUniform1f(uniforms.centerCircleRadius)).toBeCloseTo(0.04);
-    expect(findUniform3fv(uniforms.paletteD)).toEqual([0.0, 0.33, 0.67]);
+    expect(findUniform3fv(uniforms.palD)).toEqual([0.0, 0.33, 0.67]);
   });
 
   // ── textKey() ─────────────────────────────────────────────────────────────────
@@ -162,7 +162,7 @@ describe('line-circle.js', () => {
       outlineEnabled: true, outlineWidth: 8,
     };
     expect(opts.textKey(v)).toBe(
-      JSON.stringify(['X', 0.5, 0.5, 120, 'IBM Plex Mono', true, 8])
+      JSON.stringify(['X', 0.5, 0.5, 120, 'IBM Plex Mono', true, 8, null])
     );
   });
 
