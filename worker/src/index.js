@@ -14,7 +14,7 @@ function corsHeaders(origin) {
   const allowed = ALLOWED_ORIGINS.has(origin);
   return {
     'Access-Control-Allow-Origin':  allowed ? origin : 'https://brightfield.studio',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
 }
@@ -34,6 +34,10 @@ export default {
       return handleGenerateMockup(request, env, origin);
     }
 
+    if (request.method === 'GET' && url.pathname === '/list-designs') {
+      return handleListDesigns(request, env, origin);
+    }
+
     return new Response('Not found', { status: 404 });
   }
 };
@@ -48,7 +52,7 @@ async function handleGenerateMockup(request, env, origin) {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
   }
 
-  const { image, variant_id } = body;
+  const { image, variant_id, deviceId, shader, productHandle, values } = body;
   if (!image || !variant_id) {
     return new Response(JSON.stringify({ error: 'Missing image or variant_id' }), { status: 400, headers });
   }
@@ -123,6 +127,20 @@ async function handleGenerateMockup(request, env, origin) {
     }
 
     // 4. Keep the design file in R2 — merchant needs the URL to submit to Printful when fulfilling
+    // 5. Save design entry for the device gallery (best-effort)
+    if (deviceId) {
+      const entry = {
+        id: crypto.randomUUID(),
+        shader: shader || '',
+        productHandle: productHandle || '',
+        designUrl: imageUrl,
+        mockupUrl,
+        values: values || {},
+        timestamp: Math.floor(Date.now() / 1000),
+      };
+      await saveDesignEntry(env, deviceId, entry).catch(() => {});
+    }
+
     return new Response(JSON.stringify({ mockup_url: mockupUrl, design_url: imageUrl }), { status: 200, headers });
 
   } catch (err) {
@@ -134,4 +152,37 @@ async function handleGenerateMockup(request, env, origin) {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function handleListDesigns(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+  const url = new URL(request.url);
+  const deviceId = url.searchParams.get('deviceId');
+  if (!deviceId) {
+    return new Response(JSON.stringify([]), { status: 200, headers });
+  }
+  try {
+    const obj = await env.MOCKUP_STAGING.get(`device-designs/${deviceId}.json`);
+    if (!obj) return new Response(JSON.stringify([]), { status: 200, headers });
+    const text = await obj.text();
+    return new Response(text, { status: 200, headers });
+  } catch {
+    return new Response(JSON.stringify([]), { status: 200, headers });
+  }
+}
+
+async function saveDesignEntry(env, deviceId, entry) {
+  const key = `device-designs/${deviceId}.json`;
+  let designs = [];
+  try {
+    const obj = await env.MOCKUP_STAGING.get(key);
+    if (obj) {
+      designs = JSON.parse(await obj.text());
+    }
+  } catch { designs = []; }
+  designs.unshift(entry);
+  if (designs.length > 20) designs = designs.slice(0, 20);
+  await env.MOCKUP_STAGING.put(key, JSON.stringify(designs), {
+    httpMetadata: { contentType: 'application/json' },
+  });
 }
