@@ -10,6 +10,7 @@
   var _stripUVH = 0.05;
 
   var fragSrc = [
+    '#version 300 es',
     'precision mediump float;',
     '',
     'uniform vec2      u_resolution;',
@@ -46,6 +47,8 @@
     '  return a + b * cos(6.28318 * (c * t + d));',
     '}',
     '',
+    'out vec4 fragColor;',
+    '',
     'void main() {',
     '  vec2 uv = gl_FragCoord.xy / u_resolution;',
     '',
@@ -56,14 +59,14 @@
     '',
     '  // Directional blur: 8 samples along blur direction, max-weighted by falloff.',
     '  vec2  dragDir = vec2(cos(u_blur_angle), sin(u_blur_angle)) * u_blur_length;',
-    '  vec4  s0 = texture2D(u_text_texture, texUV);',
-    '  vec4  s1 = texture2D(u_text_texture, texUV + dragDir * (1.0 / 8.0));',
-    '  vec4  s2 = texture2D(u_text_texture, texUV + dragDir * (2.0 / 8.0));',
-    '  vec4  s3 = texture2D(u_text_texture, texUV + dragDir * (3.0 / 8.0));',
-    '  vec4  s4 = texture2D(u_text_texture, texUV + dragDir * (4.0 / 8.0));',
-    '  vec4  s5 = texture2D(u_text_texture, texUV + dragDir * (5.0 / 8.0));',
-    '  vec4  s6 = texture2D(u_text_texture, texUV + dragDir * (6.0 / 8.0));',
-    '  vec4  s7 = texture2D(u_text_texture, texUV + dragDir * (7.0 / 8.0));',
+    '  vec4  s0 = texture(u_text_texture, texUV);',
+    '  vec4  s1 = texture(u_text_texture, texUV + dragDir * (1.0 / 8.0));',
+    '  vec4  s2 = texture(u_text_texture, texUV + dragDir * (2.0 / 8.0));',
+    '  vec4  s3 = texture(u_text_texture, texUV + dragDir * (3.0 / 8.0));',
+    '  vec4  s4 = texture(u_text_texture, texUV + dragDir * (4.0 / 8.0));',
+    '  vec4  s5 = texture(u_text_texture, texUV + dragDir * (5.0 / 8.0));',
+    '  vec4  s6 = texture(u_text_texture, texUV + dragDir * (6.0 / 8.0));',
+    '  vec4  s7 = texture(u_text_texture, texUV + dragDir * (7.0 / 8.0));',
     '',
     '  float w1 = pow(u_blur_falloff, 1.0);',
     '  float w2 = pow(u_blur_falloff, 2.0);',
@@ -112,7 +115,7 @@
     '',
     '  float inkAlpha = max(fillAlpha, outlineAlpha);',
     '  float alpha    = mix(1.0, inkAlpha, u_transparent_bg);',
-    '  gl_FragColor   = vec4(color, alpha);',
+    '  fragColor   = vec4(color, alpha);',
     '}'
   ].join('\n');
 

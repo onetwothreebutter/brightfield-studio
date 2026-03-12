@@ -44,6 +44,7 @@
   }
 
   var fragSrc = [
+    '#version 300 es',
     'precision mediump float;',
     '',
     'uniform vec2      u_resolution;',
@@ -71,6 +72,8 @@
     'uniform sampler2D u_tex4;',
     'uniform float     u_transparent_bg;',
     '',
+    'out vec4 fragColor;',
+    '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
     '  return a + b * cos(6.28318 * (c * t + d));',
     '}',
@@ -93,7 +96,7 @@
     '  float scaledX       = localUV.x * u_density;',
     '  float cellX         = fract(scaledX) - 0.5;',
     '',
-    '  vec4  texSample     = texture2D(letterTex, localUV);',
+    '  vec4  texSample     = texture(letterTex, localUV);',
     '  float fillSample    = smoothstep(0.3, 0.7, texSample.r);',
     '  float outlineSample = smoothstep(0.3, 0.7, texSample.g);',
     '',
@@ -177,7 +180,7 @@
     '',
     '  float alpha = mix(1.0, finalAlpha, u_transparent_bg);',
     '  vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
-    '  gl_FragColor = vec4(encoded, alpha);',
+    '  fragColor = vec4(encoded, alpha);',
     '}'
   ].join('\n');
 

@@ -3,7 +3,7 @@
 
   // LineCircle port — faithful to the Three.js TSL original
   var fragSrc = [
-    '#extension GL_OES_standard_derivatives : enable',
+    '#version 300 es',
     'precision mediump float;',
     'uniform vec2  u_resolution;',
     'uniform float u_aspect;',
@@ -37,6 +37,8 @@
     'uniform float u_center_circle_radius;',
     // Export
     'uniform float u_transparent_bg;',
+    '',
+    'out vec4 fragColor;',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
     '  return a + b * cos(6.28318 * (c * t + d));',
@@ -115,7 +117,7 @@
     '  vec2 textAnchor    = vec2(u_text_x, u_text_y);',
     '  vec2 textDelta     = uv - textAnchor;',
     '  vec2 textUV        = vec2(textDelta.x * u_aspect, textDelta.y) + textAnchor;',
-    '  vec4 texSample     = texture2D(u_text_texture, textUV);',
+    '  vec4 texSample     = texture(u_text_texture, textUV);',
     '  // R channel = fill, G channel = outline',
     '  float fillSample    = smoothstep(0.05, 0.6, texSample.r);',
     '  float outlineSample = smoothstep(0.05, 0.6, texSample.g);',
@@ -129,14 +131,12 @@
     '  float finalAlpha     = mix(visibilityMask, 1.0, textAlpha);',
     '  float alpha          = mix(1.0, finalAlpha, u_transparent_bg);',
     '  vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
-    '  gl_FragColor = vec4(encoded, alpha);',
+    '  fragColor = vec4(encoded, alpha);',
     '}'
   ].join('\n');
 
   window.ShaderBase.create({
     fragSrc: fragSrc,
-    useDerivatives: true,
-
     setup: function (gl, program) {
       return {
         res:                 gl.getUniformLocation(program, 'u_resolution'),

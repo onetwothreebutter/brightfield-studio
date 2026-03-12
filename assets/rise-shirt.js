@@ -3,6 +3,7 @@
 
   // RiseShirt dot-halftone port — faithful to the Three.js TSL original
   var fragSrc = [
+    '#version 300 es',
     'precision mediump float;',
     'uniform float u_time;',
     'uniform vec2  u_resolution;',
@@ -30,6 +31,8 @@
     'uniform float u_color_mode;',
     'uniform float u_invert_text;',
     'uniform float u_transparent_bg;',
+    '',
+    'out vec4 fragColor;',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
     '  return a + b * cos(6.28318 * (c * t + d));',
@@ -72,7 +75,7 @@
     '  float tDist      = length(tCorrected);',
     '  vec2  tCellIdx   = floor(tGridUv);',
     '  vec2  tCenterUv  = (tCellIdx + 0.5) / vec2(u_text_grid_cols, u_text_grid_rows);',
-    '  float tSample    = texture2D(u_text_texture, tCenterUv).r;',
+    '  float tSample    = texture(u_text_texture, tCenterUv).r;',
     '',
     '  float circleMask      = 1.0 - smoothstep(u_text_radius - eps, u_text_radius + eps, tDist);',
     '  float textMask        = circleMask * tSample * u_text_blend;',
@@ -87,7 +90,7 @@
     '  float alpha    = mix(1.0, dotAlpha, u_transparent_bg);',
     '  vec3 finalCol  = mix(mainColor, marginColor, inMargin);',
     '  vec3 encoded   = pow(max(finalCol, 0.0), vec3(1.0 / 2.2));',
-    '  gl_FragColor   = vec4(encoded, alpha);',
+    '  fragColor   = vec4(encoded, alpha);',
     '}'
   ].join('\n');
 

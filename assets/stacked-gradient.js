@@ -67,6 +67,7 @@
   // thresh4.xyz  = boundaries 16-18  (thresh4.w is padding, always 1.0)
 
   var fragSrc = [
+    '#version 300 es',
     'precision mediump float;',
     '',
     'uniform vec2  u_resolution;',
@@ -104,6 +105,8 @@
     'uniform float u_use_text_color;',
     'uniform float u_invert_text;',
     'uniform vec3  u_outline_color;',
+    '',
+    'out vec4 fragColor;',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
     '  return a + b * cos(6.28318 * (c * t + d));',
@@ -234,7 +237,7 @@
     '  vec2  textAnchor    = vec2(u_text_x, u_text_y);',
     '  vec2  textDelta     = uv - textAnchor;',
     '  vec2  textUV        = vec2(textDelta.x * u_aspect, textDelta.y) + textAnchor;',
-    '  vec4  texSample     = texture2D(u_text_tex, textUV);',
+    '  vec4  texSample     = texture(u_text_tex, textUV);',
     '  float fillSample    = smoothstep(0.05, 0.6, texSample.r);',
     '  float outlineSample = smoothstep(0.05, 0.6, texSample.g);',
     '',
@@ -250,7 +253,7 @@
     '  float finalAlpha = mix(baseAlpha, 1.0, textAlpha);',
     '  // Linear -> sRGB to match Three.js renderer output',
     '  vec3 encoded = pow(finalColor.xyz, vec3(1.0 / 2.2));',
-    '  gl_FragColor = vec4(encoded * finalAlpha, finalAlpha);',
+    '  fragColor = vec4(encoded * finalAlpha, finalAlpha);',
     '}'
   ].join('\n');
 

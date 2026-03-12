@@ -4,14 +4,15 @@
   var canvas = document.getElementById('hero-shader-canvas');
   if (!canvas) return;
 
-  var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  var gl = canvas.getContext('webgl2');
   if (!gl) {
     canvas.style.display = 'none';
     return;
   }
 
   var vertSrc = [
-    'attribute vec2 a_position;',
+    '#version 300 es',
+    'in vec2 a_position;',
     'void main() {',
     '  gl_Position = vec4(a_position, 0.0, 1.0);',
     '}'
@@ -19,9 +20,12 @@
 
   // Neon plasma — cyan (#00ffff) + magenta (#ff00ff) on dark
   var fragSrc = [
+    '#version 300 es',
     'precision mediump float;',
     'uniform float u_time;',
     'uniform vec2  u_resolution;',
+    '',
+    'out vec4 fragColor;',
     '',
     'void main() {',
     '  vec2 uv = gl_FragCoord.xy / u_resolution;',
@@ -47,7 +51,7 @@
     '  r += scan; g += scan; b += scan;',
     '',
     '  float vign = 1.0 - smoothstep(0.5, 1.4, length(p * 0.6));',
-    '  gl_FragColor = vec4(r * vign, g * vign, b * vign, 1.0);',
+    '  fragColor = vec4(r * vign, g * vign, b * vign, 1.0);',
     '}'
   ].join('\n');
 
