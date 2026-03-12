@@ -503,8 +503,20 @@ if (window.location.hash === '#shader') {
       if (ctrl.noRandomize) return;
 
       if (ctrl.type === 'range') {
-        var steps = Math.round((ctrl.max - ctrl.min) / ctrl.step);
-        var val   = ctrl.min + Math.floor(Math.random() * (steps + 1)) * ctrl.step;
+        var lo  = ctrl.randomMin != null ? ctrl.randomMin : ctrl.min;
+        var hi  = ctrl.randomMax != null ? ctrl.randomMax : ctrl.max;
+        var raw;
+        if (ctrl.gaussian) {
+          var mean   = (lo + hi) / 2;
+          var stddev = (hi - lo) / 6;
+          var u = 1 - Math.random();
+          var v = Math.random();
+          raw = mean + stddev * Math.sqrt(-2 * Math.log(u)) * Math.cos(6.28318 * v);
+        } else {
+          var steps = Math.round((hi - lo) / ctrl.step);
+          raw = lo + Math.floor(Math.random() * (steps + 1)) * ctrl.step;
+        }
+        var val = Math.round((raw - ctrl.min) / ctrl.step) * ctrl.step + ctrl.min;
         val = parseFloat(Math.max(ctrl.min, Math.min(ctrl.max, val)).toFixed(10));
         el.value = val;
         var display = el.parentNode.querySelector('.shader-control__value');
