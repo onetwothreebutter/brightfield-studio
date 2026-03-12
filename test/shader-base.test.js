@@ -34,7 +34,7 @@ describe('shader-base.js', () => {
     // creates with document.createElement('canvas') — silencing jsdom's
     // "Not implemented: getContext('2d')" warnings.
     mockGl = makeWebGLMock();
-    canvas.getContext = vi.fn((type) => (type === 'webgl' || type === 'experimental-webgl') ? mockGl : null);
+    canvas.getContext = vi.fn((type) => (type === 'webgl2' || type === 'webgl' || type === 'experimental-webgl') ? mockGl : null);
     const stub2D = { fillStyle: '', strokeStyle: '', fillRect: vi.fn(), fillText: vi.fn(), strokeText: vi.fn(), save: vi.fn(), restore: vi.fn(), scale: vi.fn(), font: '', textAlign: '', textBaseline: '', lineWidth: 0, lineJoin: '' };
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (type) {
       if (type === '2d') return stub2D;
@@ -138,12 +138,7 @@ describe('shader-base.js', () => {
 
   // ── useDerivatives ───────────────────────────────────────────────────────────
 
-  it('calls gl.getExtension("OES_standard_derivatives") when useDerivatives is true', () => {
-    window.ShaderBase.create({ fragSrc: DUMMY_FRAG, useDerivatives: true, setup: () => ({}), render: vi.fn() });
-    expect(mockGl.getExtension).toHaveBeenCalledWith('OES_standard_derivatives');
-  });
-
-  it('does not call gl.getExtension when useDerivatives is omitted', () => {
+  it('does not call gl.getExtension — fwidth is built-in in WebGL 2', () => {
     window.ShaderBase.create({ fragSrc: DUMMY_FRAG, setup: () => ({}), render: vi.fn() });
     expect(mockGl.getExtension).not.toHaveBeenCalled();
   });

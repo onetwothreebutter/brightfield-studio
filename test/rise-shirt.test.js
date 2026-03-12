@@ -52,7 +52,7 @@ describe('rise-shirt.js', () => {
       'u_text_texture', 'u_text_grid_cols', 'u_text_grid_rows',
       'u_text_blend', 'u_text_radius', 'u_text_ratio',
       'u_text_color', 'u_text_bg_color',
-      'u_palette_a', 'u_palette_b', 'u_palette_c', 'u_palette_d',
+      'u_a', 'u_b', 'u_c', 'u_d',
       'u_color_mode', 'u_transparent_bg',
     ].forEach((name) => {
       expect(frag, `missing uniform ${name}`).toContain(name);
@@ -75,7 +75,7 @@ describe('rise-shirt.js', () => {
       'dotColor', 'bgColor', 'topMargin', 'ratio',
       'textTex', 'textGridCols', 'textGridRows', 'textBlend', 'textRadius', 'textRatio',
       'textColor', 'textBgColor',
-      'paletteA', 'paletteB', 'paletteC', 'paletteD',
+      'palA', 'palB', 'palC', 'palD',
       'colorMode', 'transparentBg',
     ].forEach((key) => {
       expect(uniforms, `setup() is missing key "${key}"`).toHaveProperty(key);
@@ -105,7 +105,7 @@ describe('rise-shirt.js', () => {
 
   it('textKey() serializes [text, textX, textY, textFontSize, textFont]', () => {
     const v = { text: 'HELLO', textX: 0.5, textY: 0.8, textFontSize: 200, textFont: 'Anton', irrelevant: 42 };
-    expect(opts.textKey(v)).toBe(JSON.stringify(['HELLO', 0.5, 0.8, 200, 'Anton']));
+    expect(opts.textKey(v)).toBe(JSON.stringify(['HELLO', 0.5, 0.8, 200, 'Anton', null]));
   });
 
   it('textKey() produces different values when text changes', () => {
@@ -131,7 +131,7 @@ describe('rise-shirt.js', () => {
     const ctx = make2DContextMock();
     opts.drawText(ctx, 1024, { text: 'GLOW', textFontSize: 100, textFont: 'IBM Plex Mono' }, 500, 500);
     expect(ctx.fillText).toHaveBeenCalledWith('GLOW', expect.any(Number), expect.any(Number));
-    expect(ctx.fillStyle).toBe('#ffffff');
+    expect(ctx.fillStyle).toBe('rgb(255,255,255)');
   });
 
   it('drawText() skips fillText when text is empty', () => {
