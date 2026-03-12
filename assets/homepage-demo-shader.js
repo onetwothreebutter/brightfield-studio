@@ -5,7 +5,7 @@
 
   // LineCircle GLSL — with text overlay
   var fragSrc = [
-    '#extension GL_OES_standard_derivatives : enable',
+    '#version 300 es',
     'precision mediump float;',
     'uniform vec2  u_resolution;',
     'uniform float u_aspect;',
@@ -35,6 +35,8 @@
     'uniform float u_text_x;',
     'uniform float u_text_y;',
     'uniform sampler2D u_text_texture;',
+    '',
+    'out vec4 fragColor;',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
     '  return a + b * cos(6.28318 * (c * t + d));',
@@ -96,7 +98,7 @@
     '  vec2 textAnchor     = vec2(u_text_x, u_text_y);',
     '  vec2 textDelta      = uv - textAnchor;',
     '  vec2 textUV         = vec2(textDelta.x * u_aspect, textDelta.y) + textAnchor;',
-    '  vec4 texSample      = texture2D(u_text_texture, textUV);',
+    '  vec4 texSample      = texture(u_text_texture, textUV);',
     '  float fillSample    = smoothstep(0.05, 0.6, texSample.r);',
     '  float outlineSample = smoothstep(0.05, 0.6, texSample.g);',
     '  vec3 withOutline    = mix(baseColor, u_outline_color, outlineSample);',
@@ -105,7 +107,7 @@
     '',
     '  float textAlpha  = clamp(fillSample + outlineSample, 0.0, 1.0);',
     '  float finalAlpha = mix(mask, 1.0, textAlpha);',
-    '  gl_FragColor = vec4(finalColor, finalAlpha);',
+    '  fragColor = vec4(finalColor, finalAlpha);',
     '}'
   ].join('\n');
 
@@ -113,10 +115,8 @@
   if (!canvas) return;
 
   var glOpts = { preserveDrawingBuffer: true, alpha: true, antialias: true };
-  var gl = canvas.getContext('webgl', glOpts) || canvas.getContext('experimental-webgl', glOpts);
+  var gl = canvas.getContext('webgl2', glOpts);
   if (!gl) { canvas.style.display = 'none'; return; }
-
-  gl.getExtension('OES_standard_derivatives');
 
   function compileShader(src, type) {
     var s = gl.createShader(type);
@@ -131,7 +131,8 @@
   }
 
   var vertSrc = [
-    'attribute vec2 a_position;',
+    '#version 300 es',
+    'in vec2 a_position;',
     'void main() { gl_Position = vec4(a_position, 0.0, 1.0); }'
   ].join('\n');
 

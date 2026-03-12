@@ -3,6 +3,7 @@
 
   // Chladni figure shader — converted from Shadertoy mainImage() to WebGL 1.0
   var fragSrc = [
+    '#version 300 es',
     'precision highp float;',
     'uniform vec2  u_resolution;',
     'uniform float u_n;',
@@ -17,6 +18,8 @@
     'uniform vec3  u_color1;',
     'uniform vec3  u_color2;',
     'uniform float u_transparent_bg;',
+    '',
+    'out vec4 fragColor;',
     '',
     'const float PI = 3.14159265359;',
     '',
@@ -67,7 +70,7 @@
     '  // For print export: make background transparent based on luminance',
     '  float luma  = dot(col, vec3(0.299, 0.587, 0.114));',
     '  float alpha = mix(1.0, smoothstep(0.01, 0.05, luma), u_transparent_bg);',
-    '  gl_FragColor = vec4(col, alpha);',
+    '  fragColor = vec4(col, alpha);',
     '}'
   ].join('\n');
 

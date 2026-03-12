@@ -6,15 +6,12 @@
     if (!canvas) return;
 
     var glOpts = { preserveDrawingBuffer: true, alpha: true, antialias: true };
-    var gl = canvas.getContext('webgl', glOpts) || canvas.getContext('experimental-webgl', glOpts);
+    var gl = canvas.getContext('webgl2', glOpts);
     if (!gl) { canvas.style.display = 'none'; return; }
 
-    if (opts.useDerivatives) {
-      gl.getExtension('OES_standard_derivatives');
-    }
-
     var vertSrc = [
-      'attribute vec2 a_position;',
+      '#version 300 es',
+      'in vec2 a_position;',
       'void main() {',
       '  gl_Position = vec4(a_position, 0.0, 1.0);',
       '}'
