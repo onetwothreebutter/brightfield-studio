@@ -549,11 +549,11 @@ SHADERS['stacked-gradient'] = {
       ]
     },
     { key: 'u_noise_seed',  label: 'Noise Seed',  type: 'range', min: 0,    max: 99,  step: 1,    value: 0,    tip: 'Only applies in Noise mode.' },
-    { key: 'u_stagger',     label: 'Stagger',     type: 'range', min: 0,    max: 0.5, step: 0.01, value: 0.25 },
-    { key: 'u_fade_width',  label: 'Fade Width',  type: 'range', min: 0,    max: 0.3, step: 0.005,value: 0.08 },
+    { key: 'u_stagger',     label: 'Stagger',     type: 'range', min: 0,    max: 0.5, step: 0.01, value: 0.25, gaussian: true, randomMin: 0.05, randomMax: 0.4  },
+    { key: 'u_fade_width',  label: 'Fade Width',  type: 'range', min: 0,    max: 0.3, step: 0.005,value: 0.08, gaussian: true, randomMin: 0.02, randomMax: 0.2  },
     { key: 'u_tilt',        label: 'Tilt (°)',    type: 'range', min: -45,  max: 45,  step: 1,    value: -5   },
-    { key: 'u_width',       label: 'Strip Width', type: 'range', min: 0.05, max: 1.5, step: 0.01, value: 0.5  },
-    { key: 'u_offset_x',   label: 'Shift X',     type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0  },
+    { key: 'u_width',       label: 'Strip Width', type: 'range', min: 0.05, max: 1.5, step: 0.01, value: 0.5,  gaussian: true, randomMin: 0.3,  randomMax: 1.1  },
+    { key: 'u_offset_x',   label: 'Shift X',     type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0,  gaussian: true  },
     { type: 'header', label: 'Palette' },
     { key: 'u_color_mode',    label: '4-Stop Mode',  type: 'toggle', value: 0 },
     { key: 'u_same_gradient', label: 'Same Per Row', type: 'toggle', value: 0 },
@@ -586,13 +586,13 @@ SHADERS['stacked-gradient'] = {
       ]
     },
     { key: 'textFontSize',     label: 'Font Size',         type: 'range', min: 8,    max: 750, step: 1,    value: 180, textDirty: true },
-    { key: 'u_text_rotation',  label: 'Rotation (°)',      type: 'range', min: -180, max: 180, step: 1,    value: 90,  textDirty: true },
+    { key: 'u_text_rotation',  label: 'Rotation (°)',      type: 'range', min: -180, max: 180, step: 1,    value: 90,  textDirty: true, noRandomize: true },
     { key: 'textX',            label: 'Text X',            type: 'range', min: 0,    max: 1.0, step: 0.01, value: 0.5, textDirty: true },
     { key: 'textY',            label: 'Text Y',            type: 'range', min: 0,    max: 1.0, step: 0.01, value: 0.5, textDirty: true },
     { key: 'u_invert_text',    label: 'Invert Text Color', type: 'toggle', value: 1 },
-    { key: 'u_use_text_color', label: 'Custom Text Color', type: 'toggle', value: 0 },
+    { key: 'u_use_text_color', label: 'Custom Text Color', type: 'toggle', value: 0, noRandomize: true },
     { key: 'u_text_color',     label: 'Text Color',        type: 'color', value: '#ffffff', textColorDependent: true },
-    { key: 'outlineEnabled',   label: 'Outline',           type: 'toggle', value: 0,            textDirty: true },
+    { key: 'outlineEnabled',   label: 'Outline',           type: 'toggle', value: 0,            textDirty: true, noRandomize: true },
     { key: 'outlineWidth',     label: 'Outline Width',     type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true, outlineDependent: true },
     { key: 'u_outline_color',  label: 'Outline Color',     type: 'color',  value: '#000000', outlineDependent: true },
   ],
@@ -677,7 +677,7 @@ SHADERS['echo-text'] = {
     { key: 'textY',        label: 'Text Y',    type: 'range', textDirty: true, noRandomize: true, min: 0,    max: 1.0, step: 0.01, value: 0.5 },
     { key: 'u_text_color', label: 'Text Color', type: 'color', value: '#ffffff' },
     { type: 'header', label: 'Outline' },
-    { key: 'u_outline_enabled', label: 'Outline',       type: 'toggle', textDirty: true, value: 0 },
+    { key: 'u_outline_enabled', label: 'Outline',       type: 'toggle', textDirty: true, value: 0, noRandomize: true },
     { key: 'u_outline_width',   label: 'Outline Width', type: 'range',  textDirty: true, min: 1, max: 60, step: 1, value: 8 },
     { key: 'u_outline_color',   label: 'Outline Color', type: 'color',  value: '#000000' },
     { type: 'header', label: 'Echo' },
@@ -934,8 +934,18 @@ function buildGUI(shader) {
       var ctrl=item.ctrl, el=item.el;
       if (ctrl.noRandomize) return;
       if (ctrl.type==='range') {
-        var steps=Math.round((ctrl.max-ctrl.min)/ctrl.step);
-        var val=ctrl.min+Math.floor(Math.random()*(steps+1))*ctrl.step;
+        var lo=ctrl.randomMin!=null?ctrl.randomMin:ctrl.min;
+        var hi=ctrl.randomMax!=null?ctrl.randomMax:ctrl.max;
+        var raw;
+        if (ctrl.gaussian) {
+          var mean=(lo+hi)/2, stddev=(hi-lo)/6;
+          var u=1-Math.random(), v=Math.random();
+          raw=mean+stddev*Math.sqrt(-2*Math.log(u))*Math.cos(6.28318*v);
+        } else {
+          var steps=Math.round((hi-lo)/ctrl.step);
+          raw=lo+Math.floor(Math.random()*(steps+1))*ctrl.step;
+        }
+        var val=Math.round((raw-ctrl.min)/ctrl.step)*ctrl.step+ctrl.min;
         val=parseFloat(Math.max(ctrl.min,Math.min(ctrl.max,val)).toFixed(10));
         el.value=val;
         var disp=el.parentNode.querySelector('.shader-control__value');
