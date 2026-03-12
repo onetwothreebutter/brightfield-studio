@@ -17,7 +17,6 @@
     'uniform float     u_aspect;',
     'uniform float     u_text_x;',
     'uniform float     u_text_y;',
-    'uniform vec3      u_bg_color;',
     'uniform vec3      u_text_color;',
     'uniform vec3      u_outline_color;',
     'uniform float     u_transparent_bg;',
@@ -107,7 +106,7 @@
     '    step(1.5, u_color_mode)',
     '  );',
     '',
-    '  vec3 color = u_bg_color;',
+    '  vec3 color = vec3(0.0);',
     '  color = mix(color, u_outline_color, outlineAlpha);',
     '  color = mix(color, fillCol,         fillAlpha);',
     '',
@@ -127,8 +126,7 @@
         aspect:        gl.getUniformLocation(program, 'u_aspect'),
         textX:         gl.getUniformLocation(program, 'u_text_x'),
         textY:         gl.getUniformLocation(program, 'u_text_y'),
-        bgColor:       gl.getUniformLocation(program, 'u_bg_color'),
-        textColor:     gl.getUniformLocation(program, 'u_text_color'),
+textColor:     gl.getUniformLocation(program, 'u_text_color'),
         outlineColor:  gl.getUniformLocation(program, 'u_outline_color'),
         transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
         // Palette
@@ -174,8 +172,7 @@
       gl.uniform1f(u.aspect,        aspect);
       gl.uniform1f(u.textX,         v.textX            != null ? v.textX            : 0.5);
       gl.uniform1f(u.textY,         v.textY            != null ? v.textY            : 0.5);
-      gl.uniform3fv(u.bgColor,      v.u_bg_color       || [0.0, 0.0, 0.0]);
-      gl.uniform3fv(u.textColor,    v.u_text_color     || [1.0, 1.0, 1.0]);
+gl.uniform3fv(u.textColor,    v.u_text_color     || [1.0, 1.0, 1.0]);
       gl.uniform3fv(u.outlineColor, v.u_outline_color  || [0.0, 0.0, 0.0]);
       gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);
       // Palette
@@ -206,10 +203,9 @@
     drawText: function (ctx, size, v, w, h) {
       var text           = v.text              || '';
       var fontFamily     = v.textFont          || 'Montserrat';
-      var fontSize       = v.textFontSize      != null ? v.textFontSize      : 300;
-      var rotation       = v.textRotation      != null ? v.textRotation      : 0;
-      var tx             = v.textX             != null ? v.textX             : 0.5;
-      var ty             = v.textY             != null ? v.textY             : 0.5;
+      var fontSize       = v.textFontSize      != null ? v.textFontSize      : 180;
+var tx             = v.textX             != null ? v.textX             : 0.5;
+      var ty             = v.textY             != null ? v.textY             : 0.32;
       var outlineEnabled = (v.u_outline_enabled != null ? v.u_outline_enabled : 0) > 0.5;
       var outlineWidth   = v.u_outline_width   != null ? v.u_outline_width   : 8;
       var repeatStrip    = (v.u_repeat_strip   != null ? v.u_repeat_strip    : 1) > 0.5;
@@ -235,8 +231,6 @@
       // Flip Y: textY is a UV coord (0=bottom), canvas Y increases downward.
       var cx  = tx * size;
       var cy  = (1 - ty) * size;
-      var rad = (rotation * Math.PI) / 180;
-
       ctx.font         = fontSize + 'px "' + fontFamily + '", monospace';
       ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
@@ -249,7 +243,6 @@
       // Draw main text.
       ctx.save();
       ctx.translate(cx, cy);
-      ctx.rotate(rad);
       if (outlineEnabled && outlineWidth > 0) {
         ctx.strokeStyle = 'rgb(0,255,0)';
         ctx.lineWidth   = outlineWidth * 2;
@@ -274,7 +267,6 @@
           ctx.textAlign    = 'center';
           ctx.textBaseline = 'middle';
           ctx.translate(cx + dx * i, cy + dy * i);
-          ctx.rotate(rad);
           if (outlineEnabled && outlineWidth > 0) {
             ctx.strokeStyle = 'rgb(0,255,0)';
             ctx.lineWidth   = outlineWidth * 2;
@@ -345,8 +337,7 @@
 
     textKey: function (v) {
       return JSON.stringify([
-        v.text, v.textFont, v.textFontSize, v.textRotation,
-        v.textX, v.textY,
+        v.text, v.textFont, v.textFontSize, v.textX, v.textY,
         v.u_outline_enabled, v.u_outline_width,
         v.u_repeat_strip, v.u_strip_fraction, v.u_repeat_count, v.u_strip_gap,
         v.u_solid_enabled, v.u_solid_height, v.u_solid_sample, v.u_section_gap,
