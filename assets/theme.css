@@ -1997,3 +1997,58 @@ h6 {
 .shader-control__select:focus {
     border-color: var(--color-primary);
 }
+
+/* ─── Recent Designs (homepage + product page) ───────────── */
+.product-recent-designs {
+    margin-top: 24px;
+    border-top: 1px solid var(--color-border);
+    padding-top: 16px;
+}
+.product-recent-designs__heading {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-muted);
+    margin-bottom: 12px;
+}
+.recent-designs__strip {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+}
+.recent-designs__card {
+    flex: 0 0 120px;
+    cursor: pointer;
+    transition: opacity var(--transition-fast);
+}
+.recent-designs__card:hover {
+    opacity: 0.8;
+}
+.recent-designs__card-img {
+    width: 120px;
+    height: 180px;
+    object-fit: cover;
+    display: block;
+    border-radius: var(--radius);
+    border: 1px solid var(--color-border);
+}
+.recent-designs__card-label {
+    padding: 5px 0;
+}
+.recent-designs__card-name {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: capitalize;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.recent-designs__card-time {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--color-text-muted);
+}
