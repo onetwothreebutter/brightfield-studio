@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shader Test</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Azeret+Mono:wght@900&family=Bebas+Neue&family=Big+Shoulders+Display:wght@700&family=Bricolage+Grotesque:wght@800&family=Courier+Prime:wght@700&family=Cutive+Mono&family=DM+Mono:wght@500&family=DM+Sans:wght@900&family=Epilogue:wght@900&family=Fira+Code:wght@700&family=Fragment+Mono&family=Geist+Mono:wght@900&family=IBM+Plex+Mono:wght@700&family=Inconsolata:wght@900&family=JetBrains+Mono:wght@800&family=Montserrat:wght@900&family=Orbitron:wght@700&family=Oswald:wght@700&family=Playfair+Display:wght@700&family=Righteous&family=Roboto+Mono:wght@700&family=Russo+One&family=Share+Tech+Mono&family=Source+Code+Pro:wght@900&family=Space+Mono:wght@700&family=Spline+Sans+Mono:wght@700&family=Syne:wght@800&family=Teko:wght@500&family=Unbounded:wght@900" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background: #111;
+      color: #eee;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      overflow: hidden;
+    }
+
+    /* ── Top bar ── */
+    #topbar {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: #0d0d0d;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    #topbar label {
+      color: #666;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    #shader-picker {
+      background: #1a1a1a;
+      border: 1px solid #444;
+      border-radius: 3px;
+      color: #0cf;
+      font-family: inherit;
+      font-size: 12px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+
+    #export-btn {
+      margin-left: auto;
+      background: #1a1a1a;
+      border: 1px solid #444;
+      border-radius: 3px;
+      color: #0cf;
+      font-family: inherit;
+      font-size: 12px;
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+    #export-btn:hover { border-color: #0cf; }
+    #export-btn:disabled { opacity: 0.4; cursor: default; }
+
+    /* ── Main layout ── */
+    #main {
+      flex: 1 1 auto;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Canvas ── */
+    #canvas-wrap {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: #000;
+    }
+    #shader-canvas {
+      display: block;
+      width: 720px;
+      height: 960px;
+    }
+
+    /* ── Controls panel ── */
+    #panel {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      padding: 10px 12px;
+      background: #1a1a1a;
+      border-left: 1px solid #333;
+      min-width: 260px;
+      max-width: 320px;
+    }
+
+    .shader-control__section-header {
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #666;
+      margin: 14px 0 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .shader-control__section-header:first-child { margin-top: 0; }
+
+    .shader-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+      min-height: 26px;
+    }
+    .shader-control__label {
+      flex: 0 0 110px;
+      color: #aaa;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .shader-control__range-wrap { display: flex; align-items: center; gap: 6px; flex: 1; }
+    .shader-control__range { flex: 1; accent-color: #0cf; cursor: pointer; }
+    .shader-control__value { color: #0cf; font-size: 10px; min-width: 36px; text-align: right; }
+
+    .shader-control__toggle {
+      padding: 3px 10px;
+      border: 1px solid #444;
+      border-radius: 3px;
+      background: #222;
+      color: #888;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+    }
+    .shader-control__toggle.is-on { background: #003344; border-color: #0cf; color: #0cf; }
+
+    .shader-control__color {
+      width: 40px; height: 24px;
+      border: 1px solid #444; border-radius: 3px;
+      padding: 1px 2px; background: #222; cursor: pointer;
+    }
+
+    .shader-control__text-input {
+      flex: 1;
+      background: #222; border: 1px solid #444; border-radius: 3px;
+      color: #eee; font-family: inherit; font-size: 11px; padding: 3px 6px;
+    }
+    .shader-control__text-input:focus { outline: 1px solid #0cf; }
+
+    .shader-control__select {
+      flex: 1;
+      background: #222; border: 1px solid #444; border-radius: 3px;
+      color: #eee; font-family: inherit; font-size: 11px; padding: 3px 4px; cursor: pointer;
+    }
+
+    .shader-control__action,
+    .shader-control__randomize-btn {
+      display: block; width: 100%; margin-bottom: 8px; padding: 6px;
+      background: #003344; border: 1px solid #0cf; border-radius: 3px;
+      color: #0cf; font-family: inherit; font-size: 11px;
+      letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+    }
+    .shader-control__action:hover,
+    .shader-control__randomize-btn:hover { background: #004455; }
+
+    .shader-tip-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 1px solid #555; background: transparent;
+      color: #666; font-size: 9px; cursor: pointer; margin-left: 3px; vertical-align: middle;
+    }
+    .shader-tip__popup {
+      position: fixed; z-index: 999;
+      background: #222; border: 1px solid #0cf; border-radius: 4px;
+      padding: 6px 10px; font-size: 11px; color: #ccc;
+      max-width: 240px; line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+<div id="topbar">
+  <label for="shader-picker">Shader</label>
+  <select id="shader-picker">
+    <option value="rise-shirt">Rise Shirt</option>
+    <option value="chladni">Chladni</option>
+    <option value="line-circle">Line Circle</option>
+    <option value="three-square">Three Square</option>
+    <option value="stacked-gradient">Stacked Gradient</option>
+    <option value="echo-text">Echo Text</option>
+  </select>
+  <button id="export-btn">Export PNG</button>
+</div>
+
+<div id="main">
+  <div id="canvas-wrap">
+    <canvas id="shader-canvas"></canvas>
+  </div>
+  <div id="panel">
+    <div id="shader-gui-body"></div>
+  </div>
+</div>
+
+<script src="assets/shader-base.js"></script>
+
+<script>
+// ── Shader definitions ────────────────────────────────────────────────────────
+var SHADERS = {};
+
+// ── Rise Shirt ────────────────────────────────────────────────────────────────
+SHADERS['rise-shirt'] = {
+  controls: [
+    { type: 'header', label: 'Color Palette' },
+    { key: 'u_color_mode',  label: 'Use Palette',   type: 'toggle',                         value: 1        },
+    { key: 'u_text_color',  label: 'Text Color',    type: 'color',  paletteDependent: true, value: '#ffffff' },
+    { key: 'u_dot_color',   label: 'Dot Color',     type: 'color',  paletteDependent: true, value: '#ffffff' },
+    { key: 'u_palette_a',   label: 'Palette A',     type: 'color',  value: '#808080',
+      tip: 'Offset — base brightness per channel.' },
+    { key: 'u_palette_b',   label: 'Palette B',     type: 'color',  value: '#808080',
+      tip: 'Amplitude — color swing range per channel.' },
+    { key: 'u_palette_c',   label: 'Palette C',     type: 'color',  value: '#ffffff',
+      tip: 'Frequency — cycles per channel.' },
+    { key: 'u_palette_d',   label: 'Palette D',     type: 'color',  value: '#436a8e',
+      tip: 'Phase — starting hue shift.' },
+    { type: 'header', label: 'Text Overlay' },
+    { key: 'text',             label: 'Text',          type: 'text',   value: 'GLOW', textDirty: true },
+    { key: 'textFont',         label: 'Font',          type: 'select', textDirty: true, value: 'IBM Plex Mono',
+      options: [
+        { label: 'IBM Plex Mono',    value: 'IBM Plex Mono' },
+        { label: 'Space Grotesk',    value: 'Space Grotesk' },
+        { label: 'Anton',            value: 'Anton' },
+        { label: 'Bebas Neue',       value: 'Bebas Neue' },
+        { label: 'Playfair Display', value: 'Playfair Display' },
+        { label: 'Oswald',           value: 'Oswald' },
+        { label: 'Orbitron',         value: 'Orbitron' },
+        { label: 'Teko',             value: 'Teko' },
+        { label: 'Righteous',        value: 'Righteous' },
+        { label: 'Russo One',        value: 'Russo One' },
+      ]
+    },
+    { key: 'textFontSize',     label: 'Font Size',     type: 'range', min: 50,   max: 800,  step: 10,   value: 320,  textDirty: true },
+    { key: 'u_text_grid_cols', label: 'Text Cols',     type: 'range', min: 1,    max: 50,   step: 1,    value: 28   },
+    { key: 'u_text_grid_rows', label: 'Text Rows',     type: 'range', min: 1,    max: 100,  step: 1,    value: 39   },
+    { key: 'textX',            label: 'Text X',        type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.5,  textDirty: true },
+    { key: 'textY',            label: 'Text Y',        type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.79, textDirty: true },
+    { key: 'u_text_radius',    label: 'Text Dot Size', type: 'range', min: 0.01, max: 1.5,  step: 0.01, value: 0.33 },
+    { key: 'u_text_blend',     label: 'Text Blend',    type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 1.0  },
+    { type: 'header', label: 'Dots' },
+    { key: 'u_rows',           label: 'Rows',          type: 'range', min: 10,   max: 200,  step: 1,    value: 23   },
+    { key: 'u_cols',           label: 'Cols',          type: 'range', min: 1,    max: 50,   step: 1,    value: 27   },
+    { key: 'u_min_radius',     label: 'Min Radius',    type: 'range', min: 0,    max: 0.5,  step: 0.01, value: 0.02 },
+    { key: 'u_max_radius',     label: 'Max Radius',    type: 'range', min: 0.1,  max: 1.5,  step: 0.01, value: 0.55 },
+    { key: 'u_invert',         label: 'Invert',        type: 'toggle',                                  value: 1    },
+    { key: 'u_top_margin',     label: 'Top Margin',    type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.31 },
+  ],
+  fonts: ['IBM Plex Mono', 'Anton', 'Bebas Neue', 'Playfair Display', 'Oswald', 'Orbitron', 'Teko', 'Righteous', 'Russo One'],
+};
+
+// ── Chladni ───────────────────────────────────────────────────────────────────
+SHADERS['chladni'] = {
+  controls: [
+    { type: 'header', label: 'Pattern' },
+    { key: 'u_n',         label: 'N Frequency', type: 'range', min: 1,    max: 12,   step: 0.5,   value: 3     },
+    { key: 'u_m',         label: 'M Frequency', type: 'range', min: 1,    max: 12,   step: 0.5,   value: 4     },
+    { key: 'u_a',         label: 'Coeff A',     type: 'range', min: -3,   max: 3,    step: 0.05,  value: -1    },
+    { key: 'u_b',         label: 'Coeff B',     type: 'range', min: -3,   max: 3,    step: 0.05,  value: 2.5   },
+    { key: 'u_threshold', label: 'Threshold',   type: 'range', min: 0.01, max: 0.35, step: 0.005, value: 0.105 },
+    { key: 'u_glow',      label: 'Glow',        type: 'range', min: 0,    max: 1.0,  step: 0.01,  value: 0.57  },
+    { key: 'u_rotation',  label: 'Rotation',    type: 'range', min: 0,    max: 360,  step: 1,     value: 335,  toRadians: true },
+    { type: 'header', label: 'Color' },
+    { key: 'u_grad_mode', label: 'Gradient Mode', type: 'select', value: 1,
+      options: [
+        { label: 'Flat',    value: 0 },
+        { label: 'Radial',  value: 1 },
+        { label: 'Linear',  value: 2 },
+        { label: 'Angular', value: 3 },
+      ]
+    },
+    { key: 'u_color1', label: 'Color 1',      type: 'color', value: '#24c5f2' },
+    { key: 'u_color2', label: 'Color 2',      type: 'color', value: '#f2249a' },
+    { key: 'u_chroma', label: 'Chroma Shift', type: 'range', min: 0, max: 6.0, step: 0.1, value: 1.5 },
+  ],
+  fonts: [],
+  customAfterBuild: function (body) {
+    function rnd(min, max, step) {
+      var steps = Math.floor((max - min) / step);
+      return +(Math.min(max, min + Math.round(Math.random() * steps) * step).toFixed(10));
+    }
+    function vividHex(hue) {
+      var s = 0.85, v = 0.95;
+      var i = Math.floor(hue * 6), f = hue * 6 - i;
+      var p = v * (1-s), q = v * (1-f*s), t = v * (1-(1-f)*s);
+      var r, g, b;
+      switch (i % 6) {
+        case 0: r=v; g=t; b=p; break; case 1: r=q; g=v; b=p; break;
+        case 2: r=p; g=v; b=t; break; case 3: r=p; g=q; b=v; break;
+        case 4: r=t; g=p; b=v; break; case 5: r=v; g=p; b=q; break;
+      }
+      return '#' + [r,g,b].map(function(c){ return Math.round(c*255).toString(16).padStart(2,'0'); }).join('');
+    }
+    function setColor(key, hex) {
+      var inp = body.querySelector('[data-param-key="' + key + '"]');
+      if (!inp) return;
+      inp.value = hex;
+      inp.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    function setSlider(key, value, stateValue) {
+      var inp = body.querySelector('[data-param-key="' + key + '"]');
+      if (!inp) return;
+      var disp = inp.parentElement.querySelector('.shader-control__value');
+      inp.value = value;
+      if (disp) disp.textContent = parseFloat(value);
+      window._shaderState.values[key] = stateValue !== undefined ? stateValue : parseFloat(value);
+    }
+    var randRow = document.createElement('div');
+    randRow.className = 'shader-control';
+    var randBtn = document.createElement('button');
+    randBtn.type = 'button';
+    randBtn.className = 'shader-control__action';
+    randBtn.textContent = 'Randomize Pattern';
+    randBtn.addEventListener('click', function () {
+      var pool = [2,3,4,5,6,7,8,9,10];
+      var ni = pool[Math.floor(Math.random()*pool.length)];
+      var mi = pool[Math.floor(Math.random()*pool.length)];
+      if (ni === mi) mi = pool[(pool.indexOf(mi)+1+Math.floor(Math.random()*(pool.length-1)))%pool.length];
+      var a = rnd(-2.5,2.5,0.05), b = rnd(-2.5,2.5,0.05);
+      if (Math.abs(a)<0.2 && Math.abs(b)<0.2) a=(Math.random()>0.5?1:-1)*rnd(0.5,2.0,0.05);
+      var rot = rnd(0,360,1), hue1 = Math.random(), hue2 = (hue1+0.33+Math.random()*0.34)%1;
+      setSlider('u_n', ni); setSlider('u_m', mi);
+      setSlider('u_a', +a.toFixed(2)); setSlider('u_b', +b.toFixed(2));
+      setSlider('u_threshold', +rnd(0.04,0.18,0.005).toFixed(3));
+      setSlider('u_glow', +rnd(0.1,1.0,0.01).toFixed(2));
+      setSlider('u_rotation', rot, rot*Math.PI/180);
+      setColor('u_color1', vividHex(hue1)); setColor('u_color2', vividHex(hue2));
+    });
+    randRow.appendChild(randBtn);
+    body.appendChild(randRow);
+  },
+};
+
+// ── Line Circle ───────────────────────────────────────────────────────────────
+SHADERS['line-circle'] = {
+  controls: [
+    { type: 'header', label: 'Shape' },
+    { key: 'u_radius',     label: 'Radius',      type: 'range', min: 0.05, max: 0.5,  step: 0.01, value: 0.4  },
+    { key: 'u_line_count', label: 'Lines',        type: 'range', min: 2,    max: 80,   step: 1,    value: 20   },
+    { key: 'u_power',      label: 'Power',        type: 'range', min: 0.5,  max: 6.0,  step: 0.1,  value: 2.5  },
+    { key: 'u_width_top',  label: 'Width Top',    type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.05 },
+    { key: 'u_width_bot',  label: 'Width Bottom', type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.75 },
+    { type: 'header', label: 'Color Palette' },
+    { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
+      tip: 'Off = cosine palette. On = 4-stop linear gradient.' },
+    { key: '_lc_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
+      options: [
+        { label: 'Rainbow',   value: 'Rainbow'   },
+        { label: 'Retro',     value: 'Retro'     },
+        { label: 'Cool Blue', value: 'Cool Blue' },
+        { label: 'Neon Heat', value: 'Neon Heat' },
+        { label: 'Golden',    value: 'Golden'    },
+      ]
+    },
+    { key: 'u_palette_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080', tip: 'Offset.' },
+    { key: 'u_palette_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080', tip: 'Amplitude.' },
+    { key: 'u_palette_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff', tip: 'Frequency.' },
+    { key: 'u_palette_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab', tip: 'Phase.' },
+    { key: '_lc_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
+      options: [
+        { label: 'Neon',   value: 'Neon'   }, { label: 'Retro',  value: 'Retro'  },
+        { label: 'Sunset', value: 'Sunset' }, { label: 'Aurora', value: 'Aurora' },
+        { label: 'Dusk',   value: 'Dusk'   },
+      ]
+    },
+    { key: 'u_color0', label: 'Color 1 (Top)',    type: 'color', stopDependent: true, value: '#ff3366' },
+    { key: 'u_color1', label: 'Color 2',          type: 'color', stopDependent: true, value: '#ffcc00' },
+    { key: 'u_color2', label: 'Color 3',          type: 'color', stopDependent: true, value: '#00ccff' },
+    { key: 'u_color3', label: 'Color 4 (Bottom)', type: 'color', stopDependent: true, value: '#aa00ff' },
+    { type: 'header', label: 'Triangle Mask' },
+    { key: 'u_tri_enabled',  label: 'Enabled',    type: 'toggle', value: 1 },
+    { key: 'u_tri_rotation', label: 'Rotation',   type: 'range', min: 0,   max: 360, step: 1,    value: 0,   toRadians: true },
+    { key: 'u_tri_size',     label: 'Size',       type: 'range', min: 0.1, max: 2.0, step: 0.01, value: 1.0 },
+    { key: 'u_tri_width',    label: 'Base Width', type: 'range', min: 5,   max: 89,  step: 1,    value: 45,  toRadians: true },
+    { type: 'header', label: 'Center Circle' },
+    { key: 'u_center_circle_enabled', label: 'Enabled', type: 'toggle', value: 1 },
+    { key: 'u_center_circle_radius',  label: 'Radius',  type: 'range', min: 0.01, max: 0.45, step: 0.005, value: 0.04 },
+    { type: 'header', label: 'Text Overlay' },
+    { key: 'text',           label: 'Text',      type: 'text',   value: '2001', textDirty: true },
+    { key: 'textFont',       label: 'Font',      type: 'select', value: 'Oswald', textDirty: true,
+      options: [
+        { label: 'Oswald',                value: 'Oswald'                },
+        { label: 'Unbounded',             value: 'Unbounded'             },
+        { label: 'Bricolage Grotesque',   value: 'Bricolage Grotesque'   },
+        { label: 'DM Mono',               value: 'DM Mono'               },
+        { label: 'Righteous',             value: 'Righteous'             },
+        { label: 'Teko',                  value: 'Teko'                  },
+        { label: 'Big Shoulders Display', value: 'Big Shoulders Display' },
+        { label: 'Anton',                 value: 'Anton'                 },
+      ]
+    },
+    { key: 'textFontSize', label: 'Font Size', type: 'range', min: 8,  max: 300, step: 1,    value: 69,  textDirty: true },
+    { key: 'textX',        label: 'Text X',    type: 'range', min: 0,  max: 1.0, step: 0.01, value: 0.3,  textDirty: true },
+    { key: 'textY',        label: 'Text Y',    type: 'range', min: 0,  max: 1.0, step: 0.01, value: 0.2, textDirty: true },
+    { key: 'u_use_text_color', label: 'Custom Text Color', type: 'toggle', value: 0 },
+    { key: 'u_text_color',     label: 'Text Color',    type: 'color', value: '#ffffff', textColorDependent: true },
+    { key: 'outlineEnabled',   label: 'Outline',       type: 'toggle', value: 0, textDirty: true },
+    { key: 'outlineWidth',     label: 'Outline Width', type: 'range', min: 1, max: 60, step: 1, value: 8, textDirty: true, outlineDependent: true },
+    { key: 'u_outline_color',  label: 'Outline Color', type: 'color', value: '#000000', outlineDependent: true },
+  ],
+  fonts: ['Oswald', 'Unbounded', 'Bricolage Grotesque', 'DM Mono', 'Righteous', 'Teko', 'Big Shoulders Display', 'Anton'],
+  customAfterBuild: function (body) {
+    var cosinePresets = {
+      'Rainbow':   { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.0,  0.33, 0.67]  },
+      'Retro':     { a:[0.6,0.5,0.3], b:[0.4,0.4,0.3], c:[1.0,0.7,0.5], d:[0.0,  0.2,  0.4 ]  },
+      'Cool Blue': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.263,0.416,0.557] },
+      'Neon Heat': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.3,  0.2,  0.2 ]  },
+      'Golden':    { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,0.5], d:[0.8,  0.9,  0.3 ]  },
+    };
+    var fourColorPresets = {
+      'Neon':   { c0:[1.0, 0.2, 0.4  ], c1:[1.0, 0.8, 0.0  ], c2:[0.0, 0.8, 1.0  ], c3:[0.667,0.0,  1.0  ] },
+      'Retro':  { c0:[0.91,0.286,0.114], c1:[0.788,0.627,0.188], c2:[0.176,0.541,0.369], c3:[0.102,0.153,0.267] },
+      'Sunset': { c0:[1.0, 0.318,0.184], c1:[0.867,0.141,0.463], c2:[0.541,0.169,0.886], c3:[0.098,0.098,0.439] },
+      'Aurora': { c0:[0.0, 1.0, 0.533], c1:[0.0, 0.898,1.0  ], c2:[0.486,0.302,1.0  ], c3:[0.878,0.251,0.984] },
+      'Dusk':   { c0:[1.0, 0.6, 0.4  ], c1:[1.0, 0.369,0.384], c2:[0.8, 0.169,0.369], c3:[0.459,0.227,0.533] },
+    };
+    var cosineKeys = ['u_palette_a','u_palette_b','u_palette_c','u_palette_d'];
+    function applyColors(pairs) {
+      pairs.forEach(function(pair) {
+        window._shaderState.values[pair[0]] = pair[1];
+        var inp = document.querySelector('[data-param-key="' + pair[0] + '"]');
+        if (inp) inp.value = toHex(pair[1]);
+      });
+    }
+    function applyCosinePreset(p) {
+      applyColors(cosineKeys.map(function(k,i){ return [k,[p.a,p.b,p.c,p.d][i]]; }));
+    }
+    applyCosinePreset(cosinePresets['Rainbow']);
+    var cSel = document.querySelector('[data-param-key="_lc_palette_preset"]');
+    if (cSel) cSel.addEventListener('change', function(){ var p=cosinePresets[this.value]; if(p) applyCosinePreset(p); });
+    var fSel = document.querySelector('[data-param-key="_lc_4color_preset"]');
+    if (fSel) fSel.addEventListener('change', function(){
+      var p = fourColorPresets[this.value]; if (!p) return;
+      applyColors([['u_color0',p.c0],['u_color1',p.c1],['u_color2',p.c2],['u_color3',p.c3]]);
+    });
+  },
+};
+
+// ── Three Square ──────────────────────────────────────────────────────────────
+SHADERS['three-square'] = {
+  controls: [
+    { type: 'header', label: 'Squares' },
+    { key: 'u_square_count', label: 'Count',           type: 'range', min: 2,    max: 4,    step: 1,    value: 3,
+      tip: 'Number of squares arranged diagonally.' },
+    { key: 'u_fill',         label: 'Fill',            type: 'range', min: 0.1,  max: 1.0,  step: 0.01, value: 0.85 },
+    { key: 'u_offset',       label: 'Diagonal Offset', type: 'range', min: 0.0,  max: 0.45, step: 0.01, value: 0.2  },
+    { key: 'u_density',      label: 'Column Density',  type: 'range', min: 2,    max: 40,   step: 1,    value: 10   },
+    { key: 'u_col_width',    label: 'Column Width',    type: 'range', min: 0.05, max: 0.49, step: 0.01, value: 0.35 },
+    { type: 'header', label: 'Palette' },
+    { key: 'u_color_mode',     label: '4-Stop Mode',     type: 'toggle', value: 0,
+      tip: 'Off = cosine palette. On = 4-stop linear gradient.' },
+    { key: 'u_global_gradient', label: 'Global Gradient', type: 'toggle', value: 0 },
+    { key: '_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
+      options: [
+        { label: 'Rainbow',   value: 'Rainbow'   }, { label: 'Cool Blue', value: 'Cool Blue' },
+        { label: 'Neon Heat', value: 'Neon Heat' }, { label: 'Cyberpunk', value: 'Cyberpunk' },
+        { label: 'Golden',    value: 'Golden'    },
+      ]
+    },
+    { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080', tip: 'Offset.' },
+    { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080', tip: 'Amplitude.' },
+    { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff', tip: 'Frequency.' },
+    { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab', tip: 'Phase.' },
+    { key: 'u_color0', label: 'Color 1', type: 'color', stopDependent: true, value: '#ff3366' },
+    { key: 'u_color1', label: 'Color 2', type: 'color', stopDependent: true, value: '#ffcc00' },
+    { key: 'u_color2', label: 'Color 3', type: 'color', stopDependent: true, value: '#00ccff' },
+    { key: 'u_color3', label: 'Color 4', type: 'color', stopDependent: true, value: '#aa00ff' },
+    { type: 'header', label: 'Letters' },
+    { key: 'u_letters_enabled', label: 'Show Letters', type: 'toggle', value: 1 },
+    { key: 'u_letter1', label: 'Letter 1', type: 'text', value: 'A' },
+    { key: 'u_letter2', label: 'Letter 2', type: 'text', value: 'B' },
+    { key: 'u_letter3', label: 'Letter 3', type: 'text', value: 'C' },
+    { key: 'u_letter4', label: 'Letter 4', type: 'text', value: 'D' },
+    { key: 'u_font_family', label: 'Font', type: 'select', value: 'Montserrat',
+      options: [
+        { label: 'Space Mono',          value: 'Space Mono'          },
+        { label: 'Roboto Mono',         value: 'Roboto Mono'         },
+        { label: 'Fira Code',           value: 'Fira Code'           },
+        { label: 'Inconsolata',         value: 'Inconsolata'         },
+        { label: 'Courier Prime',       value: 'Courier Prime'       },
+        { label: 'Fragment Mono',       value: 'Fragment Mono'       },
+        { label: 'Azeret Mono',         value: 'Azeret Mono'         },
+        { label: 'Spline Sans Mono',    value: 'Spline Sans Mono'    },
+        { label: 'Geist Mono',          value: 'Geist Mono'          },
+        { label: 'Syne',                value: 'Syne'                },
+        { label: 'Unbounded',           value: 'Unbounded'           },
+        { label: 'Bricolage Grotesque', value: 'Bricolage Grotesque' },
+        { label: 'Epilogue',            value: 'Epilogue'            },
+        { label: 'DM Sans',             value: 'DM Sans'             },
+        { label: 'Oswald',              value: 'Oswald'              },
+        { label: 'Montserrat',          value: 'Montserrat'          },
+      ]
+    },
+    { key: 'u_font_size',      label: 'Font Size',             type: 'range', min: 50, max: 500, step: 10, value: 300 },
+    { key: 'u_col_width_wide', label: 'Column Width (Letter)', type: 'range', min: 0.05, max: 0.49, step: 0.01, value: 0.45 },
+    { key: 'u_outline_enabled', label: 'Outline',       type: 'toggle', value: 0 },
+    { key: 'u_outline_width',   label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 12 },
+    { key: 'u_outline_color',   label: 'Outline Color', type: 'color',  value: '#000000' },
+  ],
+  fonts: ['Space Mono','Roboto Mono','Fira Code','Inconsolata','Courier Prime','Fragment Mono',
+          'Azeret Mono','Spline Sans Mono','Geist Mono','Syne','Unbounded','Bricolage Grotesque',
+          'Epilogue','DM Sans','Oswald','Montserrat'],
+  customAfterBuild: function (body) {
+    var presets = {
+      'Rainbow':   { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.0,  0.33, 0.67]  },
+      'Cool Blue': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.263,0.416,0.557] },
+      'Neon Heat': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.3,  0.2,  0.2 ]  },
+      'Cyberpunk': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[2.0,1.0,0.0], d:[0.5,  0.2,  0.25]  },
+      'Golden':    { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,0.5], d:[0.8,  0.9,  0.3 ]  },
+    };
+    var presetSel = document.querySelector('[data-param-key="_palette_preset"]');
+    if (presetSel) {
+      presetSel.addEventListener('change', function () {
+        var p = presets[this.value]; if (!p) return;
+        ['u_a','u_b','u_c','u_d'].forEach(function(key,i){
+          var val = [p.a,p.b,p.c,p.d][i];
+          window._shaderState.values[key] = val;
+          var inp = document.querySelector('[data-param-key="'+key+'"]');
+          if (inp) inp.value = toHex(val);
+        });
+      });
+    }
+  },
+};
+
+// ── Stacked Gradient ──────────────────────────────────────────────────────────
+SHADERS['stacked-gradient'] = {
+  controls: [
+    { type: 'header', label: 'Rows' },
+    { key: 'u_row_count',   label: 'Row Count',   type: 'range',  min: 2, max: 20, step: 1, value: 8 },
+    { key: 'u_height_mode', label: 'Height Mode', type: 'select', value: 'Golden Ratio',
+      options: [
+        { label: 'Golden Ratio',      value: 'Golden Ratio'      },
+        { label: 'Fibonacci',         value: 'Fibonacci'         },
+        { label: 'Equal Temperament', value: 'Equal Temperament' },
+        { label: 'Sine',              value: 'Sine'              },
+        { label: 'Noise',             value: 'Noise'             },
+      ]
+    },
+    { key: 'u_noise_seed',  label: 'Noise Seed',  type: 'range', min: 0,    max: 99,  step: 1,    value: 0,    tip: 'Only applies in Noise mode.' },
+    { key: 'u_stagger',     label: 'Stagger',     type: 'range', min: 0,    max: 0.5, step: 0.01, value: 0.25 },
+    { key: 'u_fade_width',  label: 'Fade Width',  type: 'range', min: 0,    max: 0.3, step: 0.005,value: 0.08 },
+    { key: 'u_tilt',        label: 'Tilt (°)',    type: 'range', min: -45,  max: 45,  step: 1,    value: -5   },
+    { key: 'u_width',       label: 'Strip Width', type: 'range', min: 0.05, max: 1.5, step: 0.01, value: 0.5  },
+    { key: 'u_offset_x',   label: 'Shift X',     type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0  },
+    { type: 'header', label: 'Palette' },
+    { key: 'u_color_mode',    label: '4-Stop Mode',  type: 'toggle', value: 0 },
+    { key: 'u_same_gradient', label: 'Same Per Row', type: 'toggle', value: 0 },
+    { key: '_sg_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
+      options: [
+        { label: 'Rainbow',   value: 'Rainbow'   }, { label: 'Cool Blue', value: 'Cool Blue' },
+        { label: 'Neon Heat', value: 'Neon Heat' }, { label: 'Cyberpunk', value: 'Cyberpunk' },
+        { label: 'Golden',    value: 'Golden'    },
+      ]
+    },
+    { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080' },
+    { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080' },
+    { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff' },
+    { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab' },
+    { key: 'u_color0', label: 'Color 1', type: 'color', stopDependent: true, value: '#ff3366' },
+    { key: 'u_color1', label: 'Color 2', type: 'color', stopDependent: true, value: '#ffcc00' },
+    { key: 'u_color2', label: 'Color 3', type: 'color', stopDependent: true, value: '#00ccff' },
+    { key: 'u_color3', label: 'Color 4', type: 'color', stopDependent: true, value: '#aa00ff' },
+    { type: 'header', label: 'Text Overlay' },
+    { key: 'text',             label: 'Text',              type: 'text',   value: '',           textDirty: true },
+    { key: 'textFont',         label: 'Font',              type: 'select', value: 'Montserrat', textDirty: true,
+      options: [
+        { label: 'Space Mono',      value: 'Space Mono'      }, { label: 'Roboto Mono',  value: 'Roboto Mono'  },
+        { label: 'IBM Plex Mono',   value: 'IBM Plex Mono'   }, { label: 'Fira Code',    value: 'Fira Code'    },
+        { label: 'Inconsolata',     value: 'Inconsolata'     }, { label: 'Courier Prime',value: 'Courier Prime'},
+        { label: 'Fragment Mono',   value: 'Fragment Mono'   }, { label: 'Geist Mono',   value: 'Geist Mono'   },
+        { label: 'Syne',            value: 'Syne'            }, { label: 'Unbounded',    value: 'Unbounded'    },
+        { label: 'Bricolage Grotesque',value:'Bricolage Grotesque'},{ label:'DM Sans',   value: 'DM Sans'      },
+        { label: 'Oswald',          value: 'Oswald'          }, { label: 'Montserrat',   value: 'Montserrat'   },
+      ]
+    },
+    { key: 'textFontSize',     label: 'Font Size',         type: 'range', min: 8,    max: 750, step: 1,    value: 180, textDirty: true },
+    { key: 'u_text_rotation',  label: 'Rotation (°)',      type: 'range', min: -180, max: 180, step: 1,    value: 90,  textDirty: true },
+    { key: 'textX',            label: 'Text X',            type: 'range', min: 0,    max: 1.0, step: 0.01, value: 0.5, textDirty: true },
+    { key: 'textY',            label: 'Text Y',            type: 'range', min: 0,    max: 1.0, step: 0.01, value: 0.5, textDirty: true },
+    { key: 'u_invert_text',    label: 'Invert Text Color', type: 'toggle', value: 1 },
+    { key: 'u_use_text_color', label: 'Custom Text Color', type: 'toggle', value: 0 },
+    { key: 'u_text_color',     label: 'Text Color',        type: 'color', value: '#ffffff', textColorDependent: true },
+    { key: 'outlineEnabled',   label: 'Outline',           type: 'toggle', value: 0,            textDirty: true },
+    { key: 'outlineWidth',     label: 'Outline Width',     type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true, outlineDependent: true },
+    { key: 'u_outline_color',  label: 'Outline Color',     type: 'color',  value: '#000000', outlineDependent: true },
+  ],
+  fonts: ['Space Mono','Roboto Mono','IBM Plex Mono','Fira Code','Inconsolata','Courier Prime',
+          'Fragment Mono','Geist Mono','Syne','Unbounded','Bricolage Grotesque','DM Sans','Oswald','Montserrat'],
+  customAfterBuild: function (body) {
+    var cosinePresets = {
+      'Rainbow':   { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.0,  0.33, 0.67]  },
+      'Cool Blue': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.263,0.416,0.557] },
+      'Neon Heat': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.3,  0.2,  0.2 ]  },
+      'Cyberpunk': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[2.0,1.0,0.0], d:[0.5,  0.2,  0.25]  },
+      'Golden':    { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,0.5], d:[0.8,  0.9,  0.3 ]  },
+    };
+    var cosineKeys = ['u_a','u_b','u_c','u_d'];
+    function applyColors(pairs) {
+      pairs.forEach(function(pair){
+        window._shaderState.values[pair[0]] = pair[1];
+        var inp = document.querySelector('[data-param-key="'+pair[0]+'"]');
+        if (inp) inp.value = toHex(pair[1]);
+      });
+    }
+    function applyCosinePreset(p) {
+      applyColors(cosineKeys.map(function(k,i){ return [k,[p.a,p.b,p.c,p.d][i]]; }));
+    }
+    applyCosinePreset(cosinePresets['Rainbow']);
+    var presetSel = document.querySelector('[data-param-key="_sg_palette_preset"]');
+    if (presetSel) presetSel.addEventListener('change', function(){ var p=cosinePresets[this.value]; if(p) applyCosinePreset(p); });
+  },
+};
+
+// ── Echo Text ─────────────────────────────────────────────────────────────────
+SHADERS['echo-text'] = {
+  controls: [
+    { type: 'header', label: 'Palette' },
+    { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '0',
+      options: [
+        { label: 'Flat',   value: '0' },
+        { label: '4-Stop', value: '1' },
+        { label: 'Cosine', value: '2' },
+      ]
+    },
+    { key: '_et_palette_preset', label: 'Preset', type: 'select', value: 'Rainbow',
+      options: [
+        { label: 'Rainbow',   value: 'Rainbow'   }, { label: 'Cool Blue', value: 'Cool Blue' },
+        { label: 'Neon Heat', value: 'Neon Heat' }, { label: 'Cyberpunk', value: 'Cyberpunk' },
+        { label: 'Golden',    value: 'Golden'    },
+      ]
+    },
+    { key: 'u_a', label: 'Palette A', type: 'color', value: '#808080', tip: 'Offset.' },
+    { key: 'u_b', label: 'Palette B', type: 'color', value: '#808080', tip: 'Amplitude.' },
+    { key: 'u_c', label: 'Palette C', type: 'color', value: '#ffffff', tip: 'Frequency.' },
+    { key: 'u_d', label: 'Palette D', type: 'color', value: '#0054ab', tip: 'Phase.' },
+    { key: 'u_color0', label: 'Color 1 (Top)',    type: 'color', value: '#ff3366' },
+    { key: 'u_color1', label: 'Color 2',          type: 'color', value: '#ffcc00' },
+    { key: 'u_color2', label: 'Color 3',          type: 'color', value: '#00ccff' },
+    { key: 'u_color3', label: 'Color 4 (Bottom)', type: 'color', value: '#aa00ff' },
+    { key: 'u_snap_strips', label: 'Flat Per Strip', type: 'toggle', value: 0 },
+    { type: 'header', label: 'Text' },
+    { key: 'text',         label: 'Text',      type: 'text',   textDirty: true, value: 'ECHO' },
+    { key: 'textFont',     label: 'Font',      type: 'select', textDirty: true, value: 'Montserrat',
+      options: [
+        { label: 'Montserrat',          value: 'Montserrat'          },
+        { label: 'Oswald',              value: 'Oswald'              },
+        { label: 'Unbounded',           value: 'Unbounded'           },
+        { label: 'Syne',                value: 'Syne'                },
+        { label: 'Bricolage Grotesque', value: 'Bricolage Grotesque' },
+        { label: 'Epilogue',            value: 'Epilogue'            },
+        { label: 'DM Sans',             value: 'DM Sans'             },
+        { label: 'IBM Plex Mono',       value: 'IBM Plex Mono'       },
+        { label: 'Space Mono',          value: 'Space Mono'          },
+        { label: 'Roboto Mono',         value: 'Roboto Mono'         },
+        { label: 'Fira Code',           value: 'Fira Code'           },
+        { label: 'Inconsolata',         value: 'Inconsolata'         },
+        { label: 'Courier Prime',       value: 'Courier Prime'       },
+        { label: 'Fragment Mono',       value: 'Fragment Mono'       },
+        { label: 'Azeret Mono',         value: 'Azeret Mono'         },
+        { label: 'Geist Mono',          value: 'Geist Mono'          },
+      ]
+    },
+    { key: 'textFontSize', label: 'Font Size', type: 'range', textDirty: true, min: 50,   max: 800, step: 10, value: 300 },
+    { key: 'textRotation', label: 'Rotation',  type: 'range', textDirty: true, min: -180, max: 180, step: 1,  value: 0   },
+    { key: 'textX',        label: 'Text X',    type: 'range', textDirty: true, min: 0,    max: 1.0, step: 0.01, value: 0.5 },
+    { key: 'textY',        label: 'Text Y',    type: 'range', textDirty: true, min: 0,    max: 1.0, step: 0.01, value: 0.5 },
+    { key: 'u_text_color', label: 'Text Color', type: 'color', value: '#ffffff' },
+    { type: 'header', label: 'Outline' },
+    { key: 'u_outline_enabled', label: 'Outline',       type: 'toggle', textDirty: true, value: 0 },
+    { key: 'u_outline_width',   label: 'Outline Width', type: 'range',  textDirty: true, min: 1, max: 60, step: 1, value: 8 },
+    { key: 'u_outline_color',   label: 'Outline Color', type: 'color',  value: '#000000' },
+    { type: 'header', label: 'Echo' },
+    { key: 'u_repeat_strip',   label: 'Echo Repeat',      type: 'toggle', textDirty: true, value: 1 },
+    { key: 'u_strip_fraction', label: 'Strip Height',     type: 'range',  textDirty: true, min: 0.05, max: 0.5,  step: 0.01, value: 0.2  },
+    { key: 'u_strip_sample',   label: 'Strip Sample %',   type: 'range',  textDirty: true, min: 0.0,  max: 1.0,  step: 0.01, value: 0.0  },
+    { key: 'u_repeat_count',   label: 'Repeat Count',     type: 'range',  textDirty: true, min: 1,    max: 30,   step: 1,    value: 10   },
+    { key: 'u_strip_gap',      label: 'Strip Gap (px)',   type: 'range',  textDirty: true, min: 0,    max: 500,  step: 1,    value: 0    },
+    { key: 'u_solid_enabled',  label: 'Solid Columns',    type: 'toggle', textDirty: true, value: 0 },
+    { key: 'u_solid_height',   label: 'Solid Height (px)', type: 'range', textDirty: true, min: 0,    max: 600,  step: 1,    value: 200  },
+    { key: 'u_solid_sample',   label: 'Solid Sample %',   type: 'range',  textDirty: true, min: 0.0,  max: 1.0,  step: 0.01, value: 0.2  },
+    { key: 'u_section_gap',    label: 'Section Gap (px)', type: 'range',  textDirty: true, min: -200, max: 500,  step: 1,    value: 0    },
+    { type: 'header', label: 'Stamps' },
+    { key: 'u_drag_enabled',  label: 'Enable Stamps',  type: 'toggle', textDirty: true, value: 0 },
+    { key: 'u_drag_angle',    label: 'Angle (°)',       type: 'range',  textDirty: true, min: 0, max: 360, step: 1,    value: 180 },
+    { key: 'u_drag_distance', label: 'Distance (px)',   type: 'range',  textDirty: true, min: 0, max: 800, step: 1,    value: 120 },
+    { key: 'u_drag_steps',    label: 'Stamp Count',     type: 'range',  textDirty: true, min: 1, max: 30,  step: 1,    value: 8   },
+    { key: 'u_drag_decay',    label: 'Stamp Decay',     type: 'range',  textDirty: true, min: 0.1, max: 1.0, step: 0.01, value: 0.7 },
+    { type: 'header', label: 'Blur' },
+    { key: 'u_blur_enabled', label: 'Enable Blur',    type: 'toggle', value: 0 },
+    { key: 'u_blur_angle',   label: 'Blur Angle (°)', type: 'range', toRadians: true, min: 0, max: 360, step: 1,     value: 180  },
+    { key: 'u_blur_length',  label: 'Blur Length',    type: 'range', min: 0.0, max: 0.5, step: 0.005, value: 0.08 },
+    { key: 'u_blur_falloff', label: 'Blur Falloff',   type: 'range', min: 0.0, max: 1.0, step: 0.01,  value: 0.6  },
+    { type: 'header', label: 'Background' },
+    { key: 'u_bg_color', label: 'Background', type: 'color', value: '#000000' },
+  ],
+  fonts: ['Montserrat','Oswald','Unbounded','Syne','Bricolage Grotesque','Epilogue','DM Sans',
+          'IBM Plex Mono','Space Mono','Roboto Mono','Fira Code','Inconsolata','Courier Prime',
+          'Fragment Mono','Azeret Mono','Geist Mono'],
+  customAfterBuild: function (body) {
+    var presets = {
+      'Rainbow':   { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.0,  0.33, 0.67]  },
+      'Cool Blue': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.263,0.416,0.557] },
+      'Neon Heat': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.3,  0.2,  0.2 ]  },
+      'Cyberpunk': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[2.0,1.0,0.0], d:[0.5,  0.2,  0.25]  },
+      'Golden':    { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,0.5], d:[0.8,  0.9,  0.3 ]  },
+    };
+    var cosineKeys = ['_et_palette_preset', 'u_a', 'u_b', 'u_c', 'u_d'];
+    var stopKeys   = ['u_color0', 'u_color1', 'u_color2', 'u_color3'];
+
+    function rowFor(key) {
+      var el = document.querySelector('[data-param-key="' + key + '"]');
+      return el ? el.closest('.shader-control') : null;
+    }
+    function applyVisibility() {
+      var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
+      var mode = modeEl ? modeEl.value : '0';
+      cosineKeys.forEach(function(key){ var r=rowFor(key); if(r) r.style.display = mode==='2'?'':'none'; });
+      stopKeys.forEach(function(key){ var r=rowFor(key); if(r) r.style.display = mode==='1'?'':'none'; });
+      var snapRow = rowFor('u_snap_strips');
+      if (snapRow) snapRow.style.display = mode!=='0'?'':'none';
+    }
+    var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
+    if (modeEl) modeEl.addEventListener('change', applyVisibility);
+    applyVisibility();
+
+    var presetSel = document.querySelector('[data-param-key="_et_palette_preset"]');
+    if (presetSel) {
+      presetSel.addEventListener('change', function () {
+        var p = presets[this.value]; if (!p) return;
+        ['u_a','u_b','u_c','u_d'].forEach(function(key,i){
+          var val=[p.a,p.b,p.c,p.d][i];
+          window._shaderState.values[key]=val;
+          var inp=document.querySelector('[data-param-key="'+key+'"]');
+          if(inp) inp.value=toHex(val);
+        });
+      });
+    }
+  },
+};
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+function hexToRgb(hex) {
+  return [
+    parseInt(hex.slice(1,3),16)/255,
+    parseInt(hex.slice(3,5),16)/255,
+    parseInt(hex.slice(5,7),16)/255
+  ];
+}
+function toHex(v) {
+  return '#' + v.map(function(x){
+    var b = Math.round(Math.max(0,Math.min(1,x))*255).toString(16);
+    return b.length===1?'0'+b:b;
+  }).join('');
+}
+
+// ── GUI builder ───────────────────────────────────────────────────────────────
+function buildGUI(shader) {
+  var body     = document.getElementById('shader-gui-body');
+  var controls = shader.controls;
+
+  // Tooltip
+  var tipEl = document.createElement('div');
+  tipEl.className = 'shader-tip__popup';
+  tipEl.style.display = 'none';
+  document.body.appendChild(tipEl);
+  var activeTipBtn = null;
+  function showTip(btn, text) {
+    var rect = btn.getBoundingClientRect();
+    tipEl.textContent = text; tipEl.style.display = 'block';
+    tipEl.style.top = (rect.bottom+6)+'px'; tipEl.style.left = rect.left+'px';
+    if (activeTipBtn) activeTipBtn.classList.remove('is-open');
+    activeTipBtn = btn; btn.classList.add('is-open');
+  }
+  function hideTip() {
+    tipEl.style.display='none';
+    if(activeTipBtn){activeTipBtn.classList.remove('is-open');activeTipBtn=null;}
+  }
+  document.addEventListener('click', function(e){
+    if(activeTipBtn&&!activeTipBtn.contains(e.target)) hideTip();
+  });
+
+  // Dependency tracking
+  var paletteDependentRows   = [];
+  var stopDependentRows      = [];
+  var textColorDependentRows = [];
+  var outlineDependentRows   = [];
+  var colorModeBtn    = null;
+  var useTextColorBtn = null;
+  var outlineToggleBtn= null;
+  var controlEls = [];
+
+  controls.forEach(function(ctrl) {
+    if (ctrl.type === 'header') {
+      var h = document.createElement('div');
+      h.className = 'shader-control__section-header';
+      h.textContent = ctrl.label;
+      body.appendChild(h);
+      return;
+    }
+
+    var row = document.createElement('div');
+    row.className = 'shader-control';
+
+    var label = document.createElement('label');
+    label.className = 'shader-control__label';
+    label.textContent = ctrl.label;
+    if (ctrl.tip) {
+      var tipBtn = document.createElement('button');
+      tipBtn.type = 'button'; tipBtn.className = 'shader-tip-btn'; tipBtn.textContent = '?';
+      tipBtn.addEventListener('click', (function(t){ return function(e){
+        e.stopPropagation(); activeTipBtn===this ? hideTip() : showTip(this,t);
+      }; })(ctrl.tip));
+      label.appendChild(tipBtn);
+    }
+    row.appendChild(label);
+
+    if (ctrl.type === 'range') {
+      var wrap  = document.createElement('div'); wrap.className = 'shader-control__range-wrap';
+      var input = document.createElement('input');
+      input.type='range'; input.className='shader-control__range';
+      input.min=ctrl.min; input.max=ctrl.max; input.step=ctrl.step; input.value=ctrl.value;
+      input.dataset.paramKey = ctrl.key;
+      var display = document.createElement('span');
+      display.className='shader-control__value'; display.textContent=ctrl.value;
+      input.addEventListener('input', (function(c,d){ return function(){
+        var v=parseFloat(this.value); d.textContent=v;
+        window._shaderState.values[c.key]=c.toRadians?v*Math.PI/180:v;
+        if(c.textDirty) window._shaderState.textDirty=true;
+      }; })(ctrl,display));
+      wrap.appendChild(input); wrap.appendChild(display); row.appendChild(wrap);
+      controlEls.push({ctrl:ctrl,el:input});
+
+    } else if (ctrl.type === 'toggle') {
+      var isOn = ctrl.value===1;
+      var btn  = document.createElement('button');
+      btn.type='button'; btn.className='shader-control__toggle'+(isOn?' is-on':'');
+      btn.textContent=isOn?'On':'Off'; btn.dataset.on=isOn?'1':'0';
+      btn.dataset.paramKey = ctrl.key;
+      btn.addEventListener('click', (function(c){ return function(){
+        var wasOn=this.dataset.on==='1';
+        this.dataset.on=wasOn?'0':'1'; this.textContent=wasOn?'Off':'On';
+        this.classList.toggle('is-on',!wasOn);
+        window._shaderState.values[c.key]=wasOn?0:1;
+        if(c.textDirty) window._shaderState.textDirty=true;
+        // Re-run dependency visibility
+        applyPaletteVisibility();
+        applyTextColorVisibility();
+        applyOutlineVisibility();
+      }; })(ctrl));
+      if (ctrl.key==='u_color_mode')    colorModeBtn     = btn;
+      if (ctrl.key==='u_use_text_color') useTextColorBtn = btn;
+      if (ctrl.key==='outlineEnabled')  outlineToggleBtn = btn;
+      row.appendChild(btn); controlEls.push({ctrl:ctrl,el:btn});
+
+    } else if (ctrl.type === 'color') {
+      var picker = document.createElement('input');
+      picker.type='color'; picker.className='shader-control__color';
+      picker.value=ctrl.value; picker.dataset.paramKey=ctrl.key;
+      picker.addEventListener('input', (function(c){ return function(){
+        window._shaderState.values[c.key]=hexToRgb(this.value);
+        if(c.textDirty) window._shaderState.textDirty=true;
+      }; })(ctrl));
+      row.appendChild(picker); controlEls.push({ctrl:ctrl,el:picker});
+
+    } else if (ctrl.type === 'text') {
+      var textInput = document.createElement('input');
+      textInput.type='text'; textInput.className='shader-control__text-input';
+      textInput.value=ctrl.value; textInput.placeholder='e.g. GLOW';
+      textInput.addEventListener('input', (function(c){ return function(){
+        window._shaderState.values[c.key]=this.value; window._shaderState.textDirty=true;
+      }; })(ctrl));
+      row.appendChild(textInput);
+
+    } else if (ctrl.type === 'select') {
+      var sel = document.createElement('select');
+      sel.className='shader-control__select'; sel.dataset.paramKey=ctrl.key;
+      ctrl.options.forEach(function(opt){
+        var option=document.createElement('option');
+        option.value=opt.value; option.textContent=opt.label;
+        if (String(opt.value)===String(ctrl.value)) option.selected=true;
+        sel.appendChild(option);
+      });
+      sel.addEventListener('change', (function(c){ return function(){
+        window._shaderState.values[c.key]=this.value;
+        if(c.textDirty) window._shaderState.textDirty=true;
+      }; })(ctrl));
+      row.appendChild(sel); controlEls.push({ctrl:ctrl,el:sel});
+    }
+
+    if (ctrl.paletteDependent)   paletteDependentRows.push(row);
+    if (ctrl.stopDependent)      stopDependentRows.push(row);
+    if (ctrl.textColorDependent) textColorDependentRows.push(row);
+    if (ctrl.outlineDependent)   outlineDependentRows.push(row);
+
+    body.appendChild(row);
+  });
+
+  // Visibility functions
+  function applyPaletteVisibility() {
+    var on = colorModeBtn && colorModeBtn.dataset.on==='1';
+    paletteDependentRows.forEach(function(r){ r.style.display=on?'none':''; });
+    stopDependentRows.forEach(function(r){ r.style.display=on?'':'none'; });
+  }
+  function applyTextColorVisibility() {
+    var on = useTextColorBtn && useTextColorBtn.dataset.on==='1';
+    textColorDependentRows.forEach(function(r){ r.style.display=on?'':'none'; });
+  }
+  function applyOutlineVisibility() {
+    var on = outlineToggleBtn && outlineToggleBtn.dataset.on==='1';
+    outlineDependentRows.forEach(function(r){ r.style.display=on?'':'none'; });
+  }
+  applyPaletteVisibility();
+  applyTextColorVisibility();
+  applyOutlineVisibility();
+
+  // customAfterBuild
+  if (typeof shader.customAfterBuild === 'function') shader.customAfterBuild(body);
+
+  // Randomize button (prepend)
+  var randBtn = document.createElement('button');
+  randBtn.type='button'; randBtn.className='shader-control__randomize-btn';
+  randBtn.textContent='Randomize';
+  randBtn.addEventListener('click', function(){
+    controlEls.forEach(function(item){
+      var ctrl=item.ctrl, el=item.el;
+      if (ctrl.type==='range') {
+        var steps=Math.round((ctrl.max-ctrl.min)/ctrl.step);
+        var val=ctrl.min+Math.floor(Math.random()*(steps+1))*ctrl.step;
+        val=parseFloat(Math.max(ctrl.min,Math.min(ctrl.max,val)).toFixed(10));
+        el.value=val;
+        var disp=el.parentNode.querySelector('.shader-control__value');
+        if(disp) disp.textContent=val;
+        window._shaderState.values[ctrl.key]=ctrl.toRadians?val*Math.PI/180:val;
+      } else if (ctrl.type==='toggle') {
+        var isOn=Math.random()<0.5;
+        el.dataset.on=isOn?'1':'0'; el.textContent=isOn?'On':'Off';
+        el.classList.toggle('is-on',isOn);
+        window._shaderState.values[ctrl.key]=isOn?1:0;
+      } else if (ctrl.type==='color') {
+        var hex='#'+Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0');
+        el.value=hex; window._shaderState.values[ctrl.key]=hexToRgb(hex);
+      } else if (ctrl.type==='select') {
+        var opts=ctrl.options, chosen=opts[Math.floor(Math.random()*opts.length)];
+        el.value=chosen.value; window._shaderState.values[ctrl.key]=chosen.value;
+        if(ctrl.textDirty) window._shaderState.textDirty=true;
+      }
+    });
+    applyPaletteVisibility(); applyTextColorVisibility(); applyOutlineVisibility();
+    window._shaderState.textDirty=true;
+  });
+  body.insertBefore(randBtn, body.firstChild);
+
+  // Font preload
+  (shader.fonts||[]).forEach(function(f){ document.fonts.load('700 48px "'+f+'"'); });
+}
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+var params     = new URLSearchParams(window.location.search);
+var shaderName = params.get('shader') || 'echo-text';
+var shaderDef  = SHADERS[shaderName];
+
+// Set dropdown to match current shader
+var picker = document.getElementById('shader-picker');
+picker.value = shaderName;
+picker.addEventListener('change', function () {
+  window.location.href = '?shader=' + this.value;
+});
+
+var exportBtn = document.getElementById('export-btn');
+exportBtn.addEventListener('click', function () {
+  if (!window._shaderExport) return;
+  exportBtn.disabled = true;
+  exportBtn.textContent = 'Exporting…';
+  window._shaderExport(3000, 4000, function (b64) {
+    var a = document.createElement('a');
+    a.href = 'data:image/png;base64,' + b64;
+    a.download = shaderName + '-3000.png';
+    a.click();
+    exportBtn.disabled = false;
+    exportBtn.textContent = 'Export PNG';
+  });
+});
+
+if (shaderDef) {
+  // Initialise shared state from controls defaults
+  var values = {};
+  shaderDef.controls.forEach(function(c) {
+    if (!c.key) return;
+    values[c.key] = c.type==='color'
+      ? hexToRgb(c.value)
+      : (c.toRadians ? c.value*Math.PI/180 : c.value);
+  });
+  window._shaderState = { values: values, textDirty: true };
+
+  // Dynamically load the shader script, then build the GUI
+  var s = document.createElement('script');
+  s.src = 'assets/' + shaderName + '.js';
+  s.onload = function () { buildGUI(shaderDef); };
+  document.head.appendChild(s);
+}
+</script>
+
+</body>
+</html>
