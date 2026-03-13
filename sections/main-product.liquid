@@ -188,6 +188,14 @@
       </div>
 
     </div>
+
+    {%- if shader_file -%}
+    <div class="product-recent-designs" id="product-recent-designs" style="display:none">
+      <h3 class="product-recent-designs__heading">Your Recent Designs</h3>
+      <div id="product-recent-designs-container"></div>
+    </div>
+    {%- endif -%}
+
   </div>
 </div>
 
@@ -274,6 +282,25 @@ if (window.location.hash === '#shader') {
     values[c.key] = c.type === 'color' ? hexToRgb(c.value) : (c.toRadians ? c.value * Math.PI / 180 : c.value);
   });
   window._shaderState = { values: values, textDirty: true };
+
+  // Restore saved design if user clicked a gallery card
+  (function () {
+    var raw = localStorage.getItem('brightfield_restore');
+    if (!raw) return;
+    try {
+      var saved = JSON.parse(raw);
+      localStorage.removeItem('brightfield_restore');
+      if (saved.shader !== '{{ shader_file }}') return;
+      Object.keys(saved.values).forEach(function (k) {
+        if (k in window._shaderState.values) {
+          window._shaderState.values[k] = saved.values[k];
+        }
+      });
+      window._shaderState.textDirty = true;
+    } catch (e) {
+      localStorage.removeItem('brightfield_restore');
+    }
+  }());
 
   // Shared tooltip for control tips
   var tipEl = document.createElement('div');
@@ -495,6 +522,27 @@ if (window.location.hash === '#shader') {
   applyOutlineVisibility();
   if (typeof customAfterBuild === 'function') customAfterBuild();
 
+  // Load product-specific recent designs filmstrip
+  document.addEventListener('DOMContentLoaded', function () {
+    var rdContainer = document.getElementById('product-recent-designs-container');
+    var rdSection   = document.getElementById('product-recent-designs');
+    if (!rdContainer || !window.RecentDesigns) return;
+    RecentDesigns.fetchDesigns('{{ shader_file }}').then(function (designs) {
+      if (!designs || !designs.length) return;
+      rdSection.style.display = '';
+      RecentDesigns.renderFilmstrip(rdContainer, designs, function (design) {
+        Object.keys(design.values).forEach(function (k) {
+          if (k in window._shaderState.values) {
+            window._shaderState.values[k] = design.values[k];
+          }
+        });
+        window._shaderState.textDirty = true;
+        var shaderTab = document.querySelector('.media-tab[data-tab="shader"]');
+        if (shaderTab && !shaderTab.classList.contains('is-active')) shaderTab.click();
+      });
+    });
+  });
+
   // Randomize button
   function randomizeAll() {
     controlEls.forEach(function (item) {
@@ -695,7 +743,14 @@ if (window.location.hash === '#shader') {
       fetch(workerUrl + '/generate-mockup', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ image: base64png, variant_id: variantId })
+        body:    JSON.stringify({
+          image:         base64png,
+          variant_id:    variantId,
+          deviceId:      window.RecentDesigns ? window.RecentDesigns.getDeviceId() : null,
+          shader:        '{{ shader_file }}',
+          productHandle: '{{ product.handle }}',
+          values:        window._shaderState ? window._shaderState.values : {}
+        })
       })
       .then(function (r) { return r.json(); })
       .then(function (data) {
@@ -781,6 +836,7 @@ if (window.location.hash === '#shader') {
 {%- if shader_file -%}
 <script src="{{ 'shader-base.js' | asset_url }}" defer></script>
 <script src="{{ shader_file | append: '.js' | asset_url }}" defer></script>
+<script src="{{ 'recent-designs.js' | asset_url }}" defer></script>
 {%- endif -%}
 
 {% schema %}

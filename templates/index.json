@@ -20,6 +20,10 @@
         "button_label": "Buy Original Design"
       }
     },
+    "recent-designs": {
+      "type": "recent-designs",
+      "settings": {}
+    },
     "featured-collection": {
       "type": "featured-collection",
       "settings": {
@@ -31,5 +35,5 @@
       }
     }
   },
-  "order": ["hero", "shader-demo", "featured-collection"]
+  "order": ["hero", "shader-demo", "recent-designs", "featured-collection"]
 }
