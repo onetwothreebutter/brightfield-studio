@@ -177,10 +177,6 @@
             <p class="product-customize-actions__note">You'll select your size when you order.</p>
           </div>
 <div class="shader-gui__body" id="shader-gui-body"></div>
-          <div class="product-recent-designs" id="product-recent-designs" style="display:none">
-            <h3 class="product-recent-designs__heading">Your Recent Designs</h3>
-            <div id="product-recent-designs-container"></div>
-          </div>
         </div>
         {%- endif -%}
 
@@ -192,6 +188,14 @@
       </div>
 
     </div>
+
+    {%- if shader_file -%}
+    <div class="product-recent-designs" id="product-recent-designs" style="display:none">
+      <h3 class="product-recent-designs__heading">Your Recent Designs</h3>
+      <div id="product-recent-designs-container"></div>
+    </div>
+    {%- endif -%}
+
   </div>
 </div>
 
@@ -526,7 +530,16 @@ if (window.location.hash === '#shader') {
     RecentDesigns.fetchDesigns('{{ shader_file }}').then(function (designs) {
       if (!designs || !designs.length) return;
       rdSection.style.display = '';
-      RecentDesigns.renderFilmstrip(rdContainer, designs);
+      RecentDesigns.renderFilmstrip(rdContainer, designs, function (design) {
+        Object.keys(design.values).forEach(function (k) {
+          if (k in window._shaderState.values) {
+            window._shaderState.values[k] = design.values[k];
+          }
+        });
+        window._shaderState.textDirty = true;
+        var shaderTab = document.querySelector('.media-tab[data-tab="shader"]');
+        if (shaderTab && !shaderTab.classList.contains('is-active')) shaderTab.click();
+      });
     });
   });
 

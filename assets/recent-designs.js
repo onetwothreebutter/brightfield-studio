@@ -38,7 +38,7 @@
     return Math.floor(diff / 86400) + 'd ago';
   }
 
-  function renderFilmstrip(container, designs) {
+  function renderFilmstrip(container, designs, onCardClick) {
     container.innerHTML = '';
     if (!designs || !designs.length) {
       var section = container.closest('.recent-designs-section');
@@ -77,11 +77,15 @@
 
       (function (d) {
         card.addEventListener('click', function () {
-          localStorage.setItem(RESTORE_KEY, JSON.stringify({
-            values: d.values,
-            shader: d.shader
-          }));
-          window.location.href = '/products/' + d.productHandle + '#shader';
+          if (onCardClick) {
+            onCardClick(d);
+          } else {
+            localStorage.setItem(RESTORE_KEY, JSON.stringify({
+              values: d.values,
+              shader: d.shader
+            }));
+            window.location.href = '/products/' + d.productHandle + '#shader';
+          }
         });
       }(design));
 

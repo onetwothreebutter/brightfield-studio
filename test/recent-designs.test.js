@@ -174,6 +174,19 @@ describe('card click', () => {
     expect(window.location.href).toBe('/products/echo-text-shirt#shader');
   });
 
+  it('calls onCardClick with the design instead of navigating when provided', () => {
+    vi.stubGlobal('location', { href: '' });
+    const design = makeDesign({ shader: 'echo-text', values: { u_speed: 1.5 } });
+    const container = document.createElement('div');
+    const onCardClick = vi.fn();
+    window.RecentDesigns.renderFilmstrip(container, [design], onCardClick);
+
+    container.querySelector('.recent-designs__card').click();
+
+    expect(onCardClick).toHaveBeenCalledWith(design);
+    expect(window.location.href).toBe('');
+  });
+
   it('each card navigates to its own product', () => {
     vi.stubGlobal('location', { href: '' });
     const container = document.createElement('div');
