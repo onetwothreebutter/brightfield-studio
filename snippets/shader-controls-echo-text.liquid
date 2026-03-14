@@ -61,11 +61,6 @@ var controls = [
 { key: 'textX',        label: 'Text X',    type: 'range', textDirty: true, noRandomize: true, min: 0,    max: 1.0, step: 0.01, value: 0.5 },
   { key: 'textY',        label: 'Text Y',    type: 'range', textDirty: true, noRandomize: true, min: 0,    max: 1.0, step: 0.01, value: 0.32 },
   { key: 'u_text_color', label: 'Text Color', type: 'color', value: '#ffffff' },
-  // ── Outline ───────────────────────────────────────────────────────────────
-  { type: 'header', label: 'Outline' },
-  { key: 'u_outline_enabled', label: 'Outline',       type: 'toggle', textDirty: true, value: 0, noRandomize: true },
-  { key: 'u_outline_width',   label: 'Outline Width', type: 'range',  textDirty: true, min: 1, max: 60, step: 1, value: 8 },
-  { key: 'u_outline_color',   label: 'Outline Color', type: 'color',  value: '#000000' },
   // ── Echo ──────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Echo' },
   { key: 'u_repeat_strip',   label: 'Echo Repeat',    type: 'toggle', textDirty: true, value: 1 },
@@ -90,6 +85,11 @@ var controls = [
   { key: 'u_blur_angle',   label: 'Blur Angle (°)', type: 'range', toRadians: true, min: 0, max: 360, step: 1,     value: 180  },
   { key: 'u_blur_length',  label: 'Blur Length',   type: 'range', min: 0.0, max: 0.5, step: 0.005, value: 0.08, gaussian: true, randomMin: 0.01, randomMax: 0.25 },
   { key: 'u_blur_falloff', label: 'Blur Falloff',  type: 'range', min: 0.0, max: 1.0, step: 0.01,  value: 0.6,  gaussian: true, randomMin: 0.3,  randomMax: 0.9  },
+  // ── Outline ───────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Outline' },
+  { key: 'u_outline_enabled', label: 'Outline',       type: 'toggle', textDirty: true, value: 0, noRandomize: true },
+  { key: 'u_outline_width',   label: 'Outline Width', type: 'range',  textDirty: true, min: 1, max: 60, step: 1, value: 8 },
+  { key: 'u_outline_color',   label: 'Outline Color', type: 'color',  value: '#000000' },
 ];
 
 // Palette preset data
