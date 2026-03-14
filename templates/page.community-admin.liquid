@@ -1,14 +1,17 @@
-<div class="community-admin" id="community-admin">
-  <div class="community-admin__login" id="community-admin-login">
-    <h1 class="community-admin__heading">Community Admin</h1>
-    <div class="community-admin__login-form">
-      <input type="password" id="admin-token-input" class="community-admin__token-input" placeholder="Admin token">
-      <button class="btn btn--primary" id="admin-login-btn">Login</button>
-      <p class="community-admin__error" id="admin-login-error" style="display:none">Invalid token.</p>
-    </div>
+{% unless customer and customer.tags contains 'admin' %}
+  <div style="max-width:900px;margin:4rem auto;padding:0 1rem;text-align:center;">
+    <p style="color:var(--color-text-muted);font-size:0.9rem;margin-bottom:1rem;">
+      {% if customer %}
+        You don't have access to this page.
+      {% else %}
+        Please <a href="/account/login?return_url=/pages/community-admin" style="color:var(--color-primary)">log in</a> to continue.
+      {% endif %}
+    </p>
   </div>
+{% else %}
 
-  <div class="community-admin__panel" id="community-admin-panel" style="display:none">
+<div class="community-admin" id="community-admin">
+  <div class="community-admin__panel" id="community-admin-panel">
     <div class="community-admin__tabs">
       <button class="community-admin__tab community-admin__tab--active" data-tab="pending">Pending</button>
       <button class="community-admin__tab" data-tab="approved">Approved</button>
@@ -20,19 +23,6 @@
 
 <style>
 .community-admin { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
-.community-admin__heading { font-size: 1.25rem; margin-bottom: 1rem; }
-.community-admin__login-form { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
-.community-admin__token-input {
-  font-family: monospace;
-  font-size: 0.8rem;
-  background: var(--color-surface-2);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 0.35rem 0.6rem;
-  width: 280px;
-}
-.community-admin__error { color: #e05; font-size: 0.75rem; margin: 0; }
 .community-admin__tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--color-border); padding-bottom: 0.5rem; }
 .community-admin__tab {
   background: none;
@@ -60,20 +50,15 @@
 
 <script>
 (function () {
-  var WORKER_URL = 'https://brightfield-mockup-worker.eric-d-johnson.workers.dev';
-  var adminToken = null;
-  var currentTab = 'pending';
+  var WORKER_URL  = 'https://brightfield-mockup-worker.eric-d-johnson.workers.dev';
+  var ADMIN_TOKEN = {{ settings.community_admin_token | json }};
+  var currentTab  = 'pending';
 
-  var loginSection  = document.getElementById('community-admin-login');
-  var panel         = document.getElementById('community-admin-panel');
-  var loginBtn      = document.getElementById('admin-login-btn');
-  var tokenInput    = document.getElementById('admin-token-input');
-  var loginError    = document.getElementById('admin-login-error');
-  var content       = document.getElementById('community-admin-content');
-  var tabs          = document.querySelectorAll('.community-admin__tab');
+  var content = document.getElementById('community-admin-content');
+  var tabs    = document.querySelectorAll('.community-admin__tab');
 
   function authHeaders() {
-    return { 'Authorization': 'Bearer ' + adminToken, 'Content-Type': 'application/json' };
+    return { 'Authorization': 'Bearer ' + ADMIN_TOKEN, 'Content-Type': 'application/json' };
   }
 
   function timeAgo(timestamp) {
@@ -178,32 +163,6 @@
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  loginBtn.addEventListener('click', function () {
-    var token = tokenInput.value.trim();
-    if (!token) return;
-    loginBtn.disabled = true;
-    loginBtn.textContent = 'Checking…';
-    fetch(WORKER_URL + '/community/pending', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    })
-      .then(function (r) {
-        if (!r.ok) throw new Error('invalid');
-        adminToken = token;
-        loginSection.style.display = 'none';
-        panel.style.display = '';
-        loadTab('pending');
-      })
-      .catch(function () {
-        loginError.style.display = '';
-        loginBtn.disabled = false;
-        loginBtn.textContent = 'Login';
-      });
-  });
-
-  tokenInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') loginBtn.click();
-  });
-
   tabs.forEach(function (tab) {
     tab.addEventListener('click', function () {
       tabs.forEach(function (t) { t.classList.remove('community-admin__tab--active'); });
@@ -211,5 +170,9 @@
       loadTab(tab.dataset.tab);
     });
   });
+
+  loadTab('pending');
 }());
 </script>
+
+{% endunless %}

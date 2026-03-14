@@ -71,6 +71,17 @@
     ]
   },
   {
+    "name": "Community",
+    "settings": [
+      {
+        "type": "text",
+        "id": "community_admin_token",
+        "label": "Community admin token",
+        "info": "Must match the ADMIN_TOKEN secret set on the Cloudflare Worker"
+      }
+    ]
+  },
+  {
     "name": "Shader",
     "settings": [
       {
