@@ -2068,3 +2068,142 @@ h6 {
     font-size: 0.65rem;
     color: var(--color-text);
 }
+
+/* ─── Community Designs ──────────────────────────────────── */
+.community-designs-section {
+    padding: 2rem var(--page-gutter);
+}
+.community-designs__header {
+    margin-bottom: 1rem;
+}
+.community-designs__heading {
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text);
+    margin: 0;
+}
+.community-designs__strip {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+}
+.community-designs__card {
+    flex: 0 0 120px;
+    cursor: pointer;
+    transition: opacity var(--transition-fast);
+}
+.community-designs__card:hover {
+    opacity: 0.8;
+}
+.community-designs__card-img {
+    width: 120px;
+    height: 180px;
+    object-fit: cover;
+    display: block;
+    border-radius: var(--radius);
+    border: 1px solid var(--color-border);
+}
+.community-designs__card-label {
+    padding: 5px 0;
+}
+.community-designs__card-name {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.community-designs__card-shader {
+    display: block;
+    font-size: 0.65rem;
+    text-transform: capitalize;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.community-designs__card-time {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--color-text-muted);
+}
+.community-designs__like-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 4px;
+    padding: 0.15rem 0.35rem;
+    font-size: 0.65rem;
+    color: var(--color-text-muted);
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition:
+        color var(--transition-fast),
+        border-color var(--transition-fast);
+}
+.community-designs__like-btn:hover,
+.community-designs__like-btn--liked {
+    color: #e05;
+    border-color: #e05;
+}
+.community-designs__like-icon {
+    line-height: 1;
+}
+
+/* Product page community strip */
+.product-community-designs {
+    margin-top: 24px;
+    border-top: 1px solid var(--color-border);
+    padding-top: 16px;
+}
+
+/* ─── Mockup modal community form ────────────────────────── */
+.mockup-modal__community {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+}
+.mockup-modal__community-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+.mockup-modal__community-input {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    background: var(--color-surface-2);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0.35rem 0.6rem;
+    width: 100%;
+    outline: none;
+    transition: border-color var(--transition-fast);
+}
+.mockup-modal__community-input:focus {
+    border-color: var(--color-primary);
+}
+.mockup-modal__community-note {
+    font-size: 0.65rem;
+    color: var(--color-text-muted);
+    margin: 0;
+}
+.mockup-modal__community-success {
+    font-size: 0.75rem;
+    color: var(--color-primary);
+    margin-top: 0.75rem;
+}
+.mockup-modal__community-error {
+    font-size: 0.75rem;
+    color: #e05;
+    margin: 0;
+}

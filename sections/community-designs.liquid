@@ -1,0 +1,32 @@
+<section class="community-designs-section">
+  <div class="community-designs__header">
+    <h2 class="community-designs__heading">Community Designs</h2>
+  </div>
+  <div id="community-designs-container"></div>
+</section>
+
+<script src="{{ 'recent-designs.js' | asset_url }}" defer></script>
+<script src="{{ 'community-designs.js' | asset_url }}" defer></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var container = document.getElementById('community-designs-container');
+    if (!container || !window.CommunityDesigns) return;
+    CommunityDesigns.fetchCommunityDesigns().then(function (designs) {
+      if (!designs || !designs.length) {
+        document.querySelector('.community-designs-section').style.display = 'none';
+        return;
+      }
+      CommunityDesigns.renderStrip(container, designs, {
+        getDeviceId: window.RecentDesigns && window.RecentDesigns.getDeviceId
+      });
+    });
+  });
+</script>
+
+{% schema %}
+{
+  "name": "Community Designs",
+  "settings": [],
+  "presets": [{ "name": "Community Designs" }]
+}
+{% endschema %}

@@ -122,6 +122,19 @@
                   <a id="mockup-modal-download" class="btn btn--outline btn--sm" download="mockup.jpg">Download</a>
                   <button id="mockup-modal-order" class="btn btn--primary btn--sm">Order This Design</button>
                 </div>
+                <div class="mockup-modal__community">
+                  <button class="btn btn--ghost btn--sm" id="community-toggle">Share with Community</button>
+                  <div class="mockup-modal__community-form" id="community-form" style="display:none">
+                    <input type="text" id="community-name" class="mockup-modal__community-input" placeholder="Your name (displayed publicly)">
+                    <input type="email" id="community-email" class="mockup-modal__community-input" placeholder="Email (kept private)">
+                    <button class="btn btn--primary btn--sm" id="community-submit">Submit Design</button>
+                    <p class="mockup-modal__community-error" id="community-error" style="display:none">Submission failed. Please try again.</p>
+                    <p class="mockup-modal__community-note">Designs are reviewed before appearing publicly.</p>
+                  </div>
+                  <p class="mockup-modal__community-success" id="community-success" style="display:none">
+                    Submitted! Your design will appear after review.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -235,6 +248,10 @@
     <div class="product-recent-designs" id="product-recent-designs" style="display:none">
       <h3 class="product-recent-designs__heading">Your Recent Designs</h3>
       <div id="product-recent-designs-container"></div>
+    </div>
+    <div class="product-community-designs" id="product-community-designs" style="display:none">
+      <h3 class="product-recent-designs__heading">Community Designs</h3>
+      <div id="product-community-designs-container"></div>
     </div>
     {%- endif -%}
 
@@ -768,6 +785,20 @@ if (window.location.hash === '#shader') {
     document.addEventListener('brightfield:design-saved', function (e) {
       renderStrip([e.detail].concat(currentDesigns));
     });
+
+    // ── Product community designs strip ──────────────────────
+    var communityContainer = document.getElementById('product-community-designs-container');
+    var communitySection   = document.getElementById('product-community-designs');
+    if (communityContainer && window.CommunityDesigns) {
+      CommunityDesigns.fetchCommunityDesigns('{{ shader_file }}').then(function (designs) {
+        if (!designs || !designs.length) return;
+        communitySection.style.display = '';
+        CommunityDesigns.renderStrip(communityContainer, designs, {
+          getDeviceId: RecentDesigns.getDeviceId,
+          onCardClick: function (design) { onCardClick(design, null); }
+        });
+      });
+    }
   });
 
   // Randomize button
@@ -953,6 +984,7 @@ if (window.location.hash === '#shader') {
   if (!btn) return;
 
   var currentDesignUrl = null;
+  var _lastMockupData  = null;
 
   btn.addEventListener('click', function () {
     if (!window._shaderExport) {
@@ -987,6 +1019,21 @@ if (window.location.hash === '#shader') {
         modalDl.href        = data.mockup_url;
         modal.classList.remove('mockup-modal--hidden');
         document.body.style.overflow = 'hidden';
+        _lastMockupData = {
+          mockupUrl:     data.mockup_url,
+          shader:        '{{ shader_file }}',
+          productHandle: '{{ product.handle }}',
+          values:        JSON.parse(JSON.stringify(window._shaderState ? window._shaderState.values : {}))
+        };
+        // Reset community form state on each new mockup
+        var communityForm    = document.getElementById('community-form');
+        var communitySuccess = document.getElementById('community-success');
+        var communityError   = document.getElementById('community-error');
+        var communitySubmit  = document.getElementById('community-submit');
+        if (communityForm)    { communityForm.style.display = 'none'; }
+        if (communitySuccess) { communitySuccess.style.display = 'none'; }
+        if (communityError)   { communityError.style.display = 'none'; }
+        if (communitySubmit)  { communitySubmit.disabled = false; communitySubmit.textContent = 'Submit Design'; }
         document.dispatchEvent(new CustomEvent('brightfield:design-saved', { detail: {
           mockupUrl:     data.mockup_url,
           shader:        '{{ shader_file }}',
@@ -1064,6 +1111,58 @@ if (window.location.hash === '#shader') {
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeModal();
   });
+
+  // ── Community submit form ───────────────────────────────────
+  var communityToggle  = document.getElementById('community-toggle');
+  var communityForm    = document.getElementById('community-form');
+  var communitySuccess = document.getElementById('community-success');
+  var communityError   = document.getElementById('community-error');
+  var communitySubmit  = document.getElementById('community-submit');
+  var communityName    = document.getElementById('community-name');
+  var communityEmail   = document.getElementById('community-email');
+
+  if (communityToggle && communityForm) {
+    communityToggle.addEventListener('click', function () {
+      communityForm.style.display = communityForm.style.display === 'none' ? '' : 'none';
+    });
+  }
+
+  if (communitySubmit) {
+    communitySubmit.addEventListener('click', function () {
+      if (!_lastMockupData) return;
+      var name  = communityName  ? communityName.value.trim()  : '';
+      var email = communityEmail ? communityEmail.value.trim() : '';
+      if (!name)  { communityName  && communityName.focus();  return; }
+      if (!email) { communityEmail && communityEmail.focus(); return; }
+
+      communitySubmit.disabled    = true;
+      communitySubmit.textContent = 'Submitting…';
+      if (communityError) communityError.style.display = 'none';
+
+      fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/community/submit', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          shader:        _lastMockupData.shader,
+          productHandle: _lastMockupData.productHandle,
+          mockupUrl:     _lastMockupData.mockupUrl,
+          values:        _lastMockupData.values,
+          creatorName:   name,
+          creatorEmail:  email
+        })
+      })
+      .then(function (r) {
+        if (!r.ok) throw new Error('Submit failed');
+        communityForm.style.display    = 'none';
+        communitySuccess.style.display = '';
+      })
+      .catch(function () {
+        communitySubmit.disabled    = false;
+        communitySubmit.textContent = 'Submit Design';
+        if (communityError) communityError.style.display = '';
+      });
+    });
+  }
 }());
 </script>
 
@@ -1071,6 +1170,7 @@ if (window.location.hash === '#shader') {
 <script src="{{ 'shader-base.js' | asset_url }}" defer></script>
 <script src="{{ shader_file | append: '.js' | asset_url }}" defer></script>
 <script src="{{ 'recent-designs.js' | asset_url }}" defer></script>
+<script src="{{ 'community-designs.js' | asset_url }}" defer></script>
 {%- endif -%}
 
 {% schema %}
