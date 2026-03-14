@@ -234,7 +234,7 @@ var tx             = v.textX             != null ? v.textX             : 0.5;
       // Flip Y: textY is a UV coord (0=bottom), canvas Y increases downward.
       var cx  = tx * size;
       var cy  = (1 - ty) * size;
-      ctx.font         = fontSize + 'px "' + fontFamily + '", monospace';
+      ctx.font         = 'bold ' + fontSize + 'px "' + fontFamily + '", monospace';
       ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
 
@@ -266,7 +266,7 @@ var tx             = v.textX             != null ? v.textX             : 0.5;
           var alpha = Math.pow(dragDecay, i);
           ctx.save();
           ctx.globalAlpha = alpha;
-          ctx.font = fontSize + 'px "' + fontFamily + '", monospace';
+          ctx.font = 'bold ' + fontSize + 'px "' + fontFamily + '", monospace';
           ctx.textAlign    = 'center';
           ctx.textBaseline = 'middle';
           ctx.translate(cx + dx * i, cy + dy * i);
