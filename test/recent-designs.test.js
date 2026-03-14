@@ -183,7 +183,7 @@ describe('card click', () => {
 
     container.querySelector('.recent-designs__card').click();
 
-    expect(onCardClick).toHaveBeenCalledWith(design);
+    expect(onCardClick).toHaveBeenCalledWith(design, expect.any(Object));
     expect(window.location.href).toBe('');
   });
 

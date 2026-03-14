@@ -1048,11 +1048,17 @@ h6 {
 }
 
 /* ─── Responsive ─────────────────────────────────────────── */
+.product-title-mobile { display: none; }
+
 @media (max-width: 900px) {
     .product-layout {
         grid-template-columns: 1fr;
         gap: 2.5rem;
     }
+
+    .product-title-mobile { display: block; }
+    .product-info .product-vendor,
+    .product-info .product-title { display: none; }
 
     /* Sticky-canvas layout when Customize tab is active on mobile */
     .product-layout.shader-mode {
@@ -1330,6 +1336,16 @@ h6 {
 }
 .shader-gui__body {
     padding: 0.25rem 0;
+}
+
+@keyframes shaderGuiGlow {
+    0%   { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0); }
+    30%  { box-shadow: 0 0 var(--glow-blur, 40px) var(--glow-spread, 10px) rgba(0, 255, 255, var(--glow-peak-opacity, 0.5)); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0); }
+}
+.shader-gui-glow {
+    animation: shaderGuiGlow var(--glow-duration, 0.8s) var(--glow-easing, ease-out) var(--glow-delay, 0s);
+    border-radius: var(--radius);
 }
 
 /* ── Mockup modal ─────────────────────────────────────────────────────────── */

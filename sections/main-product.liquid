@@ -1,16 +1,58 @@
+{%- assign shader_file = nil -%}
+{%- for tag in product.tags -%}
+  {%- assign tag_prefix = tag | slice: 0, 7 -%}
+  {%- if tag_prefix == 'shader-' -%}
+    {%- assign shader_file = tag | remove_first: 'shader-' -%}
+    {%- break -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{%- if shader_file -%}
+<style>
+.anim-settings-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  background: #1a1a1a;
+  color: #00ffff;
+  border: 1px solid #00ffff;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  padding: 0.4rem 1rem;
+  border-radius: 4px;
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 10002;
+}
+.anim-settings-toast--visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+</style>
+{%- endif -%}
+
 <div class="product-page section-padding">
   <div class="container">
     <div class="product-layout">
 
-      <!-- Media -->
-      {%- assign shader_file = nil -%}
-      {%- for tag in product.tags -%}
-        {%- assign tag_prefix = tag | slice: 0, 7 -%}
-        {%- if tag_prefix == 'shader-' -%}
-          {%- assign shader_file = tag | remove_first: 'shader-' -%}
-          {%- break -%}
+      <!-- Vendor + title duplicated for mobile — hidden on desktop -->
+      <div class="product-title-mobile">
+        {%- if product.vendor != blank -%}
+          <p class="product-vendor">{{ product.vendor }}</p>
         {%- endif -%}
-      {%- endfor -%}
+        <h1
+          class="product-title glitch"
+          data-text="{{ product.title | escape }}"
+        >
+          {{ product.title | escape }}
+        </h1>
+      </div>
+
+      <!-- Media -->
       <div class="product-media">
 
         <div class="media-tabs">
@@ -520,23 +562,200 @@ if (window.location.hash === '#shader') {
   applyOutlineVisibility();
   if (typeof customAfterBuild === 'function') customAfterBuild();
 
+  // Animation settings (exposed for browser debugging)
+  window._animationSettings = {
+    tweenDuration: 900,
+    tweenDelay: 0,
+    flyTranslateDuration: 900,
+    flyTranslateEasing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+    flyScaleDuration: 700,
+    flyScaleEasing: 'ease-in',
+    glowDuration: 800,
+    glowDelay: 0,
+    glowEasing: 'ease-out',
+    glowPeakOpacity: 0.5,
+    glowBlur: 40,
+    glowSpread: 10
+  };
+
   // Load product-specific recent designs filmstrip
   document.addEventListener('DOMContentLoaded', function () {
     var rdContainer = document.getElementById('product-recent-designs-container');
     var rdSection   = document.getElementById('product-recent-designs');
     if (!rdContainer || !window.RecentDesigns) return;
+
+    var toastEl = document.createElement('div');
+    toastEl.className = 'anim-settings-toast';
+    toastEl.textContent = 'Design applied';
+    document.body.appendChild(toastEl);
+    var toastTimer;
+    function showToast() {
+      clearTimeout(toastTimer);
+      toastEl.classList.remove('anim-settings-toast--visible');
+      void toastEl.offsetWidth;
+      toastEl.classList.add('anim-settings-toast--visible');
+      toastTimer = setTimeout(function () {
+        toastEl.classList.remove('anim-settings-toast--visible');
+      }, 2000);
+    }
     RecentDesigns.fetchDesigns('{{ shader_file }}').then(function (designs) {
       if (!designs || !designs.length) return;
       rdSection.style.display = '';
-      RecentDesigns.renderFilmstrip(rdContainer, designs, function (design) {
-        Object.keys(design.values).forEach(function (k) {
-          if (k in window._shaderState.values) {
-            window._shaderState.values[k] = design.values[k];
+      RecentDesigns.renderFilmstrip(rdContainer, designs, function (design, cardElement) {
+        var startValues = JSON.parse(JSON.stringify(window._shaderState.values));
+        var endValues = design.values;
+        var duration = window._animationSettings.tweenDuration;
+        var startTime;
+
+        function updateControlsUI(key, val) {
+          // Update the range/color/toggle inputs in the DOM
+          var input = document.querySelector('[data-param-key="' + key + '"]');
+          if (!input) return;
+
+          if (input.type === 'range') {
+            input.value = val;
+            var display = input.parentNode.querySelector('.shader-control__value');
+            if (display) display.textContent = val.toFixed(input.step.includes('.') ? input.step.split('.')[1].length : 0);
+          } else if (input.tagName === 'SELECT') {
+            input.value = val;
+          } else if (input.classList.contains('shader-control__toggle')) {
+            var isOn = val === 1;
+            input.dataset.on = isOn ? '1' : '0';
+            input.textContent = isOn ? 'On' : 'Off';
+            input.classList.toggle('is-on', isOn);
+          } else if (input.classList.contains('shader-control__color')) {
+            // val is [r,g,b]
+            var hex = '#' + val.map(function(c) {
+              var s = Math.round(c * 255).toString(16);
+              return s.length === 1 ? '0' + s : s;
+            }).join('');
+            input.value = hex;
           }
-        });
-        window._shaderState.textDirty = true;
+        }
+
+        function startValuesAnimation() {
+          var startTime = performance.now();
+          function animate(now) {
+            var elapsed = now - startTime;
+            var progress = Math.min(elapsed / duration, 1);
+            // Ease out cubic
+            var e = 1 - Math.pow(1 - progress, 3);
+
+            Object.keys(endValues).forEach(function (k) {
+              if (!(k in startValues)) return;
+              var start = startValues[k];
+              var end = endValues[k];
+
+              if (Array.isArray(start) && Array.isArray(end)) {
+                // Color [r,g,b]
+                window._shaderState.values[k] = [
+                  start[0] + (end[0] - start[0]) * e,
+                  start[1] + (end[1] - start[1]) * e,
+                  start[2] + (end[2] - start[2]) * e
+                ];
+              } else if (typeof start === 'number' && typeof end === 'number') {
+                window._shaderState.values[k] = start + (end - start) * e;
+              } else {
+                // String or boolean-ish
+                if (progress === 1) window._shaderState.values[k] = end;
+              }
+              
+              // Update UI at the end or occasionally
+              if (progress === 1 || Math.random() > 0.8) {
+                var displayVal = window._shaderState.values[k];
+                // Convert back from radians if necessary for the UI input
+                var ctrl = controls.find(function(c) { return c.key === k; });
+                if (ctrl && ctrl.toRadians && typeof displayVal === 'number') {
+                  displayVal = displayVal * 180 / Math.PI;
+                }
+                updateControlsUI(k, displayVal);
+              }
+            });
+
+            window._shaderState.textDirty = true;
+
+            if (progress < 1) {
+              requestAnimationFrame(animate);
+            } else {
+              if (typeof applyPaletteVisibility === 'function') applyPaletteVisibility();
+              showToast();
+            }
+          }
+          requestAnimationFrame(animate);
+        }
+
         var shaderTab = document.querySelector('.media-tab[data-tab="shader"]');
         if (shaderTab && !shaderTab.classList.contains('is-active')) shaderTab.click();
+
+        // Animate clicked image into the settings panel
+        var img = cardElement ? cardElement.querySelector('img') : null;
+        var target = document.getElementById('shader-canvas');
+        var targetContainer = document.querySelector('.media-panel[data-panel="shader"]');
+        
+        function scheduleTween() {
+          if (fa.tweenDelay <= 0) { startValuesAnimation(); }
+          else { setTimeout(startValuesAnimation, fa.tweenDelay); }
+        }
+
+        if (!img || !target || !targetContainer) {
+          scheduleTween();
+          return;
+        }
+
+        var imgRect = img.getBoundingClientRect();
+        var targetRect = target.getBoundingClientRect();
+
+        var clone = img.cloneNode(true);
+        clone.style.position = 'fixed';
+        clone.style.left = imgRect.left + 'px';
+        clone.style.top = imgRect.top + 'px';
+        clone.style.width = imgRect.width + 'px';
+        clone.style.height = imgRect.height + 'px';
+        clone.style.zIndex = '9999';
+        var fa = window._animationSettings;
+        var tSec = (fa.flyTranslateDuration / 1000) + 's';
+        var sSec = (fa.flyScaleDuration     / 1000) + 's';
+        clone.style.transition = [
+          'left '      + tSec + ' ' + fa.flyTranslateEasing,
+          'top '       + tSec + ' ' + fa.flyTranslateEasing,
+          'transform ' + sSec + ' ' + fa.flyScaleEasing,
+          'opacity '   + sSec + ' ' + fa.flyScaleEasing
+        ].join(', ');
+        clone.style.borderRadius = '4px';
+        clone.style.pointerEvents = 'none';
+
+        document.body.appendChild(clone);
+
+        // Force reflow
+        clone.getBoundingClientRect();
+
+        var targetCenterX = targetRect.left + targetRect.width / 2;
+        var targetCenterY = targetRect.top + targetRect.height / 2;
+        
+        clone.style.left = (targetCenterX - imgRect.width / 2) + 'px';
+        clone.style.top = (targetCenterY - imgRect.height / 2) + 'px';
+        clone.style.transform = 'scale(0.1)';
+        clone.style.opacity = '0';
+
+        // Fly cleanup + glow: fires when the longer of the two fly animations ends
+        setTimeout(function() {
+          if (document.body.contains(clone)) document.body.removeChild(clone);
+          var gs = window._animationSettings;
+          var root = document.documentElement;
+          root.style.setProperty('--glow-duration',     (gs.glowDuration    / 1000) + 's');
+          root.style.setProperty('--glow-delay',        (gs.glowDelay       / 1000) + 's');
+          root.style.setProperty('--glow-easing',        gs.glowEasing);
+          root.style.setProperty('--glow-peak-opacity',  gs.glowPeakOpacity);
+          root.style.setProperty('--glow-blur',          gs.glowBlur   + 'px');
+          root.style.setProperty('--glow-spread',        gs.glowSpread + 'px');
+          targetContainer.classList.add('shader-gui-glow');
+          setTimeout(function() {
+            targetContainer.classList.remove('shader-gui-glow');
+          }, gs.glowDuration + gs.glowDelay);
+        }, Math.max(fa.flyTranslateDuration, fa.flyScaleDuration));
+
+        // Tween start: fires independently at tweenDelay ms after fly begins
+        scheduleTween();
       });
     });
   });
