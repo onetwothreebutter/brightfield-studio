@@ -24,6 +24,10 @@
       "type": "recent-designs",
       "settings": {}
     },
+    "community-designs": {
+      "type": "community-designs",
+      "settings": {}
+    },
     "featured-collection": {
       "type": "featured-collection",
       "settings": {
@@ -35,5 +39,5 @@
       }
     }
   },
-  "order": ["hero", "shader-demo", "recent-designs", "featured-collection"]
+  "order": ["hero", "shader-demo", "recent-designs", "community-designs", "featured-collection"]
 }

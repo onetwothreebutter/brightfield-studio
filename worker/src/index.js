@@ -15,7 +15,7 @@ function corsHeaders(origin) {
   return {
     'Access-Control-Allow-Origin':  allowed ? origin : 'https://brightfield.studio',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
 }
 
@@ -28,15 +28,24 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
 
-    const url = new URL(request.url);
+    const url      = new URL(request.url);
+    const method   = request.method;
+    const pathname = url.pathname;
 
-    if (request.method === 'POST' && url.pathname === '/generate-mockup') {
+    if (method === 'POST' && pathname === '/generate-mockup') {
       return handleGenerateMockup(request, env, origin);
     }
 
-    if (request.method === 'GET' && url.pathname === '/list-designs') {
+    if (method === 'GET' && pathname === '/list-designs') {
       return handleListDesigns(request, env, origin);
     }
+
+    if (method === 'POST' && pathname === '/community/submit')  return handleCommunitySubmit(request, env, origin);
+    if (method === 'GET'  && pathname === '/community/list')    return handleCommunityList(request, env, origin);
+    if (method === 'POST' && pathname === '/community/like')    return handleCommunityLike(request, env, origin);
+    if (method === 'GET'  && pathname === '/community/pending') return handleCommunityPending(request, env, origin);
+    if (method === 'POST' && pathname === '/community/approve') return handleCommunityModerate(request, env, origin, 'approved');
+    if (method === 'POST' && pathname === '/community/reject')  return handleCommunityModerate(request, env, origin, 'rejected');
 
     return new Response('Not found', { status: 404 });
   }
@@ -170,6 +179,161 @@ async function handleListDesigns(request, env, origin) {
     return new Response(JSON.stringify([]), { status: 200, headers });
   }
 }
+
+// ── Community helpers ────────────────────────────────────────────────────────
+
+function requireAdmin(request, env) {
+  const auth = request.headers.get('Authorization') || '';
+  return auth === `Bearer ${env.ADMIN_TOKEN}`;
+}
+
+async function readJson(env, key) {
+  try {
+    const obj = await env.MOCKUP_STAGING.get(key);
+    if (!obj) return null;
+    return JSON.parse(await obj.text());
+  } catch { return null; }
+}
+
+async function writeJson(env, key, data) {
+  await env.MOCKUP_STAGING.put(key, JSON.stringify(data), {
+    httpMetadata: { contentType: 'application/json' },
+  });
+}
+
+// ── Community handlers ───────────────────────────────────────────────────────
+
+async function handleCommunitySubmit(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+  let body;
+  try { body = await request.json(); } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
+  }
+
+  const { shader, productHandle, mockupUrl, values, creatorName, creatorEmail } = body;
+  if (!mockupUrl || !creatorName || !shader) {
+    return new Response(JSON.stringify({ error: 'Missing required fields: mockupUrl, creatorName, shader' }), { status: 400, headers });
+  }
+
+  const id = crypto.randomUUID();
+  const submission = {
+    id,
+    shader,
+    productHandle: productHandle || '',
+    mockupUrl,
+    values: values || {},
+    timestamp: Math.floor(Date.now() / 1000),
+    status: 'pending',
+    creatorName,
+    creatorEmail: creatorEmail || '',
+    likes: 0,
+  };
+
+  await writeJson(env, `community/submissions/${id}.json`, submission);
+
+  const list = (await readJson(env, 'community/list.json')) || [];
+  list.unshift(id);
+  await writeJson(env, 'community/list.json', list);
+
+  return new Response(JSON.stringify({ id }), { status: 201, headers });
+}
+
+async function handleCommunityList(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+  const url = new URL(request.url);
+  const shaderFilter = url.searchParams.get('shader');
+
+  const list = (await readJson(env, 'community/list.json')) || [];
+  const ids = list.slice(0, 100);
+
+  const submissions = (
+    await Promise.all(ids.map(id => readJson(env, `community/submissions/${id}.json`)))
+  ).filter(s => s && s.status === 'approved');
+
+  const filtered = shaderFilter
+    ? submissions.filter(s => s.shader === shaderFilter)
+    : submissions;
+
+  const sanitized = filtered.map(({ creatorEmail: _omit, ...rest }) => rest);
+  return new Response(JSON.stringify(sanitized), { status: 200, headers });
+}
+
+async function handleCommunityLike(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+  let body;
+  try { body = await request.json(); } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
+  }
+
+  const { id, deviceId } = body;
+  if (!id || !deviceId) {
+    return new Response(JSON.stringify({ error: 'Missing id or deviceId' }), { status: 400, headers });
+  }
+
+  const submission = await readJson(env, `community/submissions/${id}.json`);
+  if (!submission) {
+    return new Response(JSON.stringify({ error: 'Submission not found' }), { status: 404, headers });
+  }
+
+  const likeKey = `community/likes/${id}/${deviceId}`;
+  const existing = await env.MOCKUP_STAGING.get(likeKey);
+  let liked;
+
+  if (!existing) {
+    submission.likes = (submission.likes || 0) + 1;
+    await env.MOCKUP_STAGING.put(likeKey, '1');
+    liked = true;
+  } else {
+    submission.likes = Math.max(0, (submission.likes || 0) - 1);
+    await env.MOCKUP_STAGING.delete(likeKey);
+    liked = false;
+  }
+
+  await writeJson(env, `community/submissions/${id}.json`, submission);
+  return new Response(JSON.stringify({ likes: submission.likes, liked }), { status: 200, headers });
+}
+
+async function handleCommunityPending(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+  if (!requireAdmin(request, env)) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
+  }
+
+  const list = (await readJson(env, 'community/list.json')) || [];
+  const submissions = (
+    await Promise.all(list.map(id => readJson(env, `community/submissions/${id}.json`)))
+  ).filter(s => s && s.status === 'pending');
+
+  return new Response(JSON.stringify(submissions), { status: 200, headers });
+}
+
+async function handleCommunityModerate(request, env, origin, newStatus) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+  if (!requireAdmin(request, env)) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
+  }
+
+  let body;
+  try { body = await request.json(); } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
+  }
+
+  const { id } = body;
+  if (!id) {
+    return new Response(JSON.stringify({ error: 'Missing id' }), { status: 400, headers });
+  }
+
+  const submission = await readJson(env, `community/submissions/${id}.json`);
+  if (!submission) {
+    return new Response(JSON.stringify({ error: 'Submission not found' }), { status: 404, headers });
+  }
+
+  submission.status = newStatus;
+  await writeJson(env, `community/submissions/${id}.json`, submission);
+  return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+}
+
+// ── Device design gallery ────────────────────────────────────────────────────
 
 async function saveDesignEntry(env, deviceId, entry) {
   const key = `device-designs/${deviceId}.json`;
