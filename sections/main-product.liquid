@@ -598,10 +598,8 @@ if (window.location.hash === '#shader') {
         toastEl.classList.remove('anim-settings-toast--visible');
       }, 2000);
     }
-    RecentDesigns.fetchDesigns('{{ shader_file }}').then(function (designs) {
-      if (!designs || !designs.length) return;
-      rdSection.style.display = '';
-      RecentDesigns.renderFilmstrip(rdContainer, designs, function (design, cardElement) {
+    var currentDesigns = [];
+    function onCardClick(design, cardElement) {
         var startValues = JSON.parse(JSON.stringify(window._shaderState.values));
         var endValues = design.values;
         var duration = window._animationSettings.tweenDuration;
@@ -756,7 +754,19 @@ if (window.location.hash === '#shader') {
 
         // Tween start: fires independently at tweenDelay ms after fly begins
         scheduleTween();
-      });
+    }
+
+    function renderStrip(designs) {
+      currentDesigns = designs || [];
+      if (!currentDesigns.length) return;
+      rdSection.style.display = '';
+      RecentDesigns.renderFilmstrip(rdContainer, currentDesigns, onCardClick);
+    }
+
+    RecentDesigns.fetchDesigns('{{ shader_file }}').then(renderStrip);
+
+    document.addEventListener('brightfield:design-saved', function (e) {
+      renderStrip([e.detail].concat(currentDesigns));
     });
   });
 
@@ -977,6 +987,13 @@ if (window.location.hash === '#shader') {
         modalDl.href        = data.mockup_url;
         modal.classList.remove('mockup-modal--hidden');
         document.body.style.overflow = 'hidden';
+        document.dispatchEvent(new CustomEvent('brightfield:design-saved', { detail: {
+          mockupUrl:     data.mockup_url,
+          shader:        '{{ shader_file }}',
+          productHandle: '{{ product.handle }}',
+          values:        JSON.parse(JSON.stringify(window._shaderState ? window._shaderState.values : {})),
+          timestamp:     Math.floor(Date.now() / 1000)
+        }}));
       })
       .catch(function (err) {
         alert('Mockup failed: ' + err.message);
