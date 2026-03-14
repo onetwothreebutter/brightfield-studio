@@ -78,7 +78,7 @@
       (function (d) {
         card.addEventListener('click', function () {
           if (onCardClick) {
-            onCardClick(d);
+            onCardClick(d, card);
           } else {
             localStorage.setItem(RESTORE_KEY, JSON.stringify({
               values: d.values,
