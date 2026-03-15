@@ -44,6 +44,22 @@
   </div>
 </header>
 
+<script>
+(function () {
+  var header = document.querySelector('.site-header');
+  var lastY  = window.scrollY;
+  window.addEventListener('scroll', function () {
+    var y = window.scrollY;
+    if (y > lastY && y > header.offsetHeight) {
+      header.classList.add('is-hidden');
+    } else {
+      header.classList.remove('is-hidden');
+    }
+    lastY = y;
+  }, { passive: true });
+})();
+</script>
+
 {% schema %}
 {
   "name": "Header",
