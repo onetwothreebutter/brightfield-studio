@@ -1,7 +1,7 @@
 var controls = [
   // ── Shape ─────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Shape' },
-  { key: 'u_radius',     label: 'Radius',       type: 'range', min: 0.05, max: 0.5,  step: 0.01, value: 0.4  },
+  { key: 'u_radius',     label: 'Radius',       type: 'range', min: 0.05, max: 0.5,  step: 0.01, value: 0.4, noRandomize: true  },
   { key: 'u_line_count', label: 'Lines',         type: 'range', min: 2,    max: 80,   step: 1,    value: 20   },
   { key: 'u_power',      label: 'Power',         type: 'range', min: 0.5,  max: 6.0,  step: 0.1,  value: 2.5  },
   { key: 'u_width_top',  label: 'Width Top',     type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.05 },
@@ -58,13 +58,13 @@ var controls = [
     options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
   },
   { key: 'textFontSize', label: 'Font Size', type: 'range', min: 8, max: 300, step: 1,    value: 69,  textDirty: true },
-  { key: 'textX',        label: 'Text X',    type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.3,  textDirty: true },
-  { key: 'textY',        label: 'Text Y',    type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.2, textDirty: true },
+  { key: 'textX',        label: 'Text X',    type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.3,  textDirty: true, noRandomize: true },
+  { key: 'textY',        label: 'Text Y',    type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.2, textDirty: true, noRandomize: true },
   { key: 'u_use_text_color', label: 'Custom Color', type: 'toggle', value: 0 },
   { key: 'u_text_color',    label: 'Text Color',    type: 'color',  value: '#ffffff', textColorDependent: true },
-  { key: 'outlineEnabled',  label: 'Outline',       type: 'toggle', value: 0, textDirty: true },
-  { key: 'outlineWidth',    label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true, outlineDependent: true },
-  { key: 'u_outline_color', label: 'Outline Color', type: 'color',  value: '#000000', outlineDependent: true },
+  { key: 'outlineEnabled',  label: 'Outline',       type: 'toggle', value: 0, textDirty: true, noRandomize: true },
+  { key: 'outlineWidth',    label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true, outlineDependent: true, noRandomize: true },
+  { key: 'u_outline_color', label: 'Outline Color', type: 'color',  value: '#000000', outlineDependent: true, noRandomize: true },
 ];
 
 var customAfterBuild = function () {
