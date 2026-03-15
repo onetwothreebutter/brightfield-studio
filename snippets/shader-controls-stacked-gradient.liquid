@@ -87,7 +87,7 @@ var controls = [
   { key: 'u_oklch_dH', label: 'H Phase',         type: 'range', min: 0,    max: 1,    step: 0.01, value: 0.0,  oklchDependent: true },
   // ── Text Overlay ───────────────────────────────────────────────────────────
   { type: 'header', label: 'Text Overlay' },
-  { key: 'u_text_enabled',   label: 'Text Overlay',      type: 'toggle', value: 0,             textDirty: true },
+  { key: 'u_text_enabled',   label: 'Text Overlay',      type: 'toggle', value: 0,             textDirty: true, noRandomize: true },
   { key: 'text',             label: 'Text',              type: 'text',   value: '{{ "now" | date: "%Y" }}', textDirty: true },
   { key: 'textFont',         label: 'Font',              type: 'select', value: 'Montserrat',  textDirty: true,
     options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
