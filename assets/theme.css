@@ -2020,6 +2020,47 @@ h6 {
     border-color: var(--color-primary);
 }
 
+@media (max-width: 900px) {
+    /* Taller rows so fingers don't need to be pixel-precise */
+    .shader-control {
+        padding: 0.55rem 0.75rem;
+        gap: 0.5rem;
+    }
+
+    /* Sliders: tall enough to grab comfortably; pan-y lets the panel scroll */
+    .shader-control__range {
+        height: 2.5rem;
+        touch-action: pan-y;
+    }
+
+    /* Toggle buttons: fat finger friendly */
+    .shader-control__toggle {
+        padding: 0.6rem 1.1rem;
+        min-height: 2.75rem;
+        font-size: 0.7rem;
+    }
+
+    /* Selects: match toggle height */
+    .shader-control__select {
+        padding: 0.55rem 0.5rem;
+        min-height: 2.75rem;
+        font-size: 0.75rem;
+    }
+
+    /* Color swatches: easier to tap */
+    .shader-control__color {
+        padding: 0.45rem 0.4rem;
+        min-height: 2.75rem;
+    }
+
+    /* Text inputs */
+    .shader-control__text-input {
+        padding: 0.45rem 0.4rem;
+        min-height: 2.75rem;
+        font-size: 0.75rem;
+    }
+}
+
 /* ─── Recent Designs (homepage + product page) ───────────── */
 .product-recent-designs {
     margin-top: 24px;
