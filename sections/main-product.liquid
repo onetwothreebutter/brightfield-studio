@@ -579,6 +579,38 @@ if (window.location.hash === '#shader') {
   applyOutlineVisibility();
   if (typeof customAfterBuild === 'function') customAfterBuild();
 
+  // Generic section-level collapse ─────────────────────────────────────────
+  // For any section whose first control row is a toggle, hide/show all
+  // subsequent rows in that section when the toggle is Off/On.
+  // Buttons already wired by the palette / outline / text-color systems
+  // are skipped so those handlers remain the sole source of truth.
+  (function () {
+    var skipBtns = [colorModeBtn, useTextColorBtn, outlineToggleBtn].filter(Boolean);
+    var kids = Array.from(body.children);
+    for (var i = 0; i < kids.length; i++) {
+      if (!kids[i].classList.contains('shader-control__section-header')) continue;
+      var firstRow = kids[i + 1];
+      if (!firstRow || !firstRow.classList.contains('shader-control')) continue;
+      var tBtn = firstRow.querySelector('.shader-control__toggle');
+      if (!tBtn || skipBtns.indexOf(tBtn) !== -1) continue;
+      // Collect sibling rows until the next section header
+      var secRows = [];
+      for (var j = i + 2; j < kids.length; j++) {
+        if (kids[j].classList.contains('shader-control__section-header')) break;
+        secRows.push(kids[j]);
+      }
+      if (!secRows.length) continue;
+      (function (btn, rows) {
+        function applyVis() {
+          var on = btn.dataset.on === '1';
+          rows.forEach(function (r) { r.style.display = on ? '' : 'none'; });
+        }
+        btn.addEventListener('click', applyVis);
+        applyVis();
+      }(tBtn, secRows));
+    }
+  }());
+
   // Animation settings (exposed for browser debugging)
   window._animationSettings = {
     tweenDuration: 900,
