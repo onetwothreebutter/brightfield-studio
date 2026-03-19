@@ -6,6 +6,8 @@ var controls = [
   { key: 'u_power',      label: 'Power',         type: 'range', min: 0.5,  max: 6.0,  step: 0.1,  value: 2.5  },
   { key: 'u_width_top',  label: 'Width Top',     type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.05 },
   { key: 'u_width_bot',  label: 'Width Bottom',  type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.75 },
+  { key: 'u_offset_y',  label: 'Shift Y',       type: 'range', min: -0.5, max: 0.5,  step: 0.01, value: 0.0,
+    tip: 'Moves the whole design up or down on the canvas.' },
   // ── Color Palette ──────────────────────────────────────────────────────────
   { type: 'header', label: 'Color Palette' },
   { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,

@@ -23,6 +23,8 @@ var controls = [
     tip: 'Width of each gradient strip relative to its available span.' },
   { key: 'u_offset_x',  label: 'Shift X',      type: 'range',  min: -0.5, max: 0.5,  step: 0.01,  value: 0.0,   gaussian: true,
     tip: 'Horizontal offset applied to all strips.' },
+  { key: 'u_offset_y',  label: 'Shift Y',      type: 'range',  min: -0.5, max: 0.5,  step: 0.01,  value: 0.0,   gaussian: true,
+    tip: 'Vertical offset applied to all strips. Wraps seamlessly.' },
   // ── Palette ───────────────────────────────────────────────────────────────
   { type: 'header', label: 'Palette' },
   { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '0',
@@ -87,7 +89,7 @@ var controls = [
   { key: 'u_oklch_dH', label: 'H Phase',         type: 'range', min: 0,    max: 1,    step: 0.01, value: 0.0,  oklchDependent: true },
   // ── Text Overlay ───────────────────────────────────────────────────────────
   { type: 'header', label: 'Text Overlay' },
-  { key: 'u_text_enabled',   label: 'Text Overlay',      type: 'toggle', value: 0,             textDirty: true },
+  { key: 'u_text_enabled',   label: 'Text Overlay',      type: 'toggle', value: 0,             textDirty: true, noRandomize: true },
   { key: 'text',             label: 'Text',              type: 'text',   value: '{{ "now" | date: "%Y" }}', textDirty: true },
   { key: 'textFont',         label: 'Font',              type: 'select', value: 'Montserrat',  textDirty: true,
     options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })

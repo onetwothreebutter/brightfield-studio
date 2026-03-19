@@ -78,6 +78,7 @@
     'uniform float u_tilt_tan;',
     'uniform float u_width;',
     'uniform float u_offset_x;',
+    'uniform float u_offset_y;',
     'uniform float u_row_offset;',
     'uniform float u_use_thresholds;',
     'uniform vec4  u_thresh0;',
@@ -165,27 +166,28 @@
     '  vec2  uv = gl_FragCoord.xy / u_resolution;',
     '  float x  = uv.x;',
     '  float y  = uv.y;',
+    '  float yOff = fract(y + u_offset_y);',
     '',
     '  // --- Golden ratio row layout ---',
     '  float numPairs    = u_row_count * 0.5;',
-    '  float pairID      = floor(y * numPairs);',
-    '  float pairY       = fract(y * numPairs);',
+    '  float pairID      = floor(yOff * numPairs);',
+    '  float pairY       = fract(yOff * numPairs);',
     '  float inTall      = 1.0 - step(0.618034, pairY);',
     '  float goldenRowID = pairID * 2.0 + (1.0 - inTall);',
     '',
     '  // --- Threshold-based row layout (Fibonacci / EqTemp / Sine / Noise) ---',
     '  // 19 boundaries unrolled across 5 vec4 uniforms; no array indexing needed.',
     '  float threshRowID =',
-    '    step(u_thresh0.x, y) + step(u_thresh0.y, y) +',
-    '    step(u_thresh0.z, y) + step(u_thresh0.w, y) +',
-    '    step(u_thresh1.x, y) + step(u_thresh1.y, y) +',
-    '    step(u_thresh1.z, y) + step(u_thresh1.w, y) +',
-    '    step(u_thresh2.x, y) + step(u_thresh2.y, y) +',
-    '    step(u_thresh2.z, y) + step(u_thresh2.w, y) +',
-    '    step(u_thresh3.x, y) + step(u_thresh3.y, y) +',
-    '    step(u_thresh3.z, y) + step(u_thresh3.w, y) +',
-    '    step(u_thresh4.x, y) + step(u_thresh4.y, y) +',
-    '    step(u_thresh4.z, y);',
+    '    step(u_thresh0.x, yOff) + step(u_thresh0.y, yOff) +',
+    '    step(u_thresh0.z, yOff) + step(u_thresh0.w, yOff) +',
+    '    step(u_thresh1.x, yOff) + step(u_thresh1.y, yOff) +',
+    '    step(u_thresh1.z, yOff) + step(u_thresh1.w, yOff) +',
+    '    step(u_thresh2.x, yOff) + step(u_thresh2.y, yOff) +',
+    '    step(u_thresh2.z, yOff) + step(u_thresh2.w, yOff) +',
+    '    step(u_thresh3.x, yOff) + step(u_thresh3.y, yOff) +',
+    '    step(u_thresh3.z, yOff) + step(u_thresh3.w, yOff) +',
+    '    step(u_thresh4.x, yOff) + step(u_thresh4.y, yOff) +',
+    '    step(u_thresh4.z, yOff);',
     '',
     '  float rowID = mix(goldenRowID, threshRowID, u_use_thresholds);',
     '',
@@ -270,6 +272,7 @@
         tiltTan:       gl.getUniformLocation(program, 'u_tilt_tan'),
         width:         gl.getUniformLocation(program, 'u_width'),
         offsetX:       gl.getUniformLocation(program, 'u_offset_x'),
+        offsetY:       gl.getUniformLocation(program, 'u_offset_y'),
         rowOffset:     gl.getUniformLocation(program, 'u_row_offset'),
         useThresholds: gl.getUniformLocation(program, 'u_use_thresholds'),
         thresh0:       gl.getUniformLocation(program, 'u_thresh0'),
@@ -310,6 +313,7 @@
       var tiltDeg      = v.u_tilt           != null ? v.u_tilt           : -5;
       var width        = v.u_width          != null ? v.u_width          : 0.5;
       var offsetX      = v.u_offset_x       != null ? v.u_offset_x       : 0.0;
+      var offsetY      = v.u_offset_y       != null ? v.u_offset_y       : 0.0;
       var rowOffset    = v.u_row_offset     != null ? v.u_row_offset     : 1.0;
       var heightMode   = v.u_height_mode    || 'Golden Ratio';
       var noiseSeed    = v.u_noise_seed     != null ? v.u_noise_seed     : 0;
@@ -376,6 +380,7 @@
       gl.uniform1f(u.tiltTan,       tiltTan);
       gl.uniform1f(u.width,         width);
       gl.uniform1f(u.offsetX,       offsetX);
+      gl.uniform1f(u.offsetY,       offsetY);
       gl.uniform1f(u.rowOffset,     rowOffset);
       gl.uniform1f(u.useThresholds, useThresholds);
       gl.uniform4f(u.thresh0,       td[0],  td[1],  td[2],  td[3]);

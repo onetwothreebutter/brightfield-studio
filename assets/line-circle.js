@@ -37,6 +37,7 @@
     'uniform float u_center_circle_radius;',
     // Export
     'uniform float u_transparent_bg;',
+    'uniform float u_offset_y;',
     '',
     'out vec4 fragColor;',
     '',
@@ -46,7 +47,8 @@
     '',
     'void main() {',
     '  vec2 uv = gl_FragCoord.xy / u_resolution;',
-    '  vec2 centeredUV = uv - 0.5;',
+    '  vec2 uvShifted = vec2(uv.x, uv.y + u_offset_y);',
+    '  vec2 centeredUV = uvShifted - 0.5;',
     '',
     '  // Aspect-corrected circle SDF',
     '  vec2  correctedUV = vec2(centeredUV.x * u_aspect, centeredUV.y);',
@@ -56,7 +58,7 @@
     '',
     '  // t: 0 at top of circle, 1 at bottom',
     '  float circleTop = 0.5 + u_radius;',
-    '  float t = clamp((circleTop - uv.y) / (u_radius * 2.0), 0.0, 1.0);',
+    '  float t = clamp((circleTop - uvShifted.y) / (u_radius * 2.0), 0.0, 1.0);',
     '',
     '  // Power-warp t so line spacing compresses toward the bottom',
     '  float warped = pow(t, u_power);',
@@ -168,6 +170,7 @@
         centerCircleEnabled: gl.getUniformLocation(program, 'u_center_circle_enabled'),
         centerCircleRadius:  gl.getUniformLocation(program, 'u_center_circle_radius'),
         transparentBg:       gl.getUniformLocation(program, 'u_transparent_bg'),
+        offsetY:             gl.getUniformLocation(program, 'u_offset_y'),
       };
     },
 
@@ -201,6 +204,7 @@
       gl.uniform1f(u.centerCircleEnabled, v.u_center_circle_enabled != null ? v.u_center_circle_enabled : 1.0);
       gl.uniform1f(u.centerCircleRadius,  v.u_center_circle_radius  != null ? v.u_center_circle_radius  : 0.04);
       gl.uniform1f(u.transparentBg, v.u_transparent_bg      != null ? v.u_transparent_bg      : 0.0);
+      gl.uniform1f(u.offsetY,      v.u_offset_y             != null ? v.u_offset_y             : 0.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);
