@@ -71,8 +71,22 @@
     'uniform sampler2D u_tex3;',
     'uniform sampler2D u_tex4;',
     'uniform float     u_transparent_bg;',
+    'uniform float     u_opacity;',
+    'uniform float     u_distress;',
+    'uniform float     u_distress_scale;',
     '',
     'out vec4 fragColor;',
+    '',
+    'float hash21(vec2 p) {',
+    '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);',
+    '}',
+    'float distressNoise(vec2 uv, float scale) {',
+    '  vec2 p = uv * scale; vec2 i = floor(p); vec2 f = fract(p);',
+    '  float a = hash21(i), b = hash21(i + vec2(1,0)),',
+    '        c = hash21(i + vec2(0,1)), d = hash21(i + vec2(1,1));',
+    '  vec2 u = f * f * (3.0 - 2.0 * f);',
+    '  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);',
+    '}',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
     '  return a + b * cos(6.28318 * (c * t + d));',
@@ -179,6 +193,10 @@
     '  finalAlpha = mix(finalAlpha, 1.0, sq4);',
     '',
     '  float alpha = mix(1.0, finalAlpha, u_transparent_bg);',
+    '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
+    '  float dn = distressNoise(dUV, u_distress_scale) * 0.67',
+    '           + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
+    '  alpha = alpha * step(u_distress, dn) * u_opacity;',
     '  vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
     '  fragColor = vec4(encoded, alpha);',
     '}'
@@ -234,6 +252,9 @@
         tex3:         gl.getUniformLocation(program, 'u_tex3'),
         tex4:         gl.getUniformLocation(program, 'u_tex4'),
         transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
+        opacity:       gl.getUniformLocation(program, 'u_opacity'),
+        distress:      gl.getUniformLocation(program, 'u_distress'),
+        distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
         // Internal letter-texture state (not uniform locations).
         _texCanvases:    texCanvases,
         _texCtxs:        texCtxs,
@@ -317,6 +338,9 @@
       gl.uniform3fv(u.color2,      color2);
       gl.uniform3fv(u.color3,      color3);
       gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);
+      gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
+      gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
+      gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
     },
   });
 }());
