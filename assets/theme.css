@@ -2066,6 +2066,35 @@ h6 {
         min-height: 2.75rem;
         font-size: 0.75rem;
     }
+
+    /* ── Coloris: compact centered modal on small screens ────────────────── */
+    /* Coloris sets inline top/left — !important overrides those on mobile.  */
+    .clr-picker {
+        position: fixed !important;
+        left: 50% !important;
+        top: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        width: min(280px, calc(100vw - 2rem)) !important;
+        z-index: 10000 !important;
+        border-radius: 14px;
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
+    }
+
+    /* Shorter gradient square so the whole picker fits without scrolling */
+    .clr-gradient {
+        height: 150px !important;
+    }
+
+    /* Backdrop — shown via JS when picker opens */
+    .clr-mobile-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 9999;
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+    }
 }
 
 /* ─── Recent Designs (homepage + product page) ───────────── */

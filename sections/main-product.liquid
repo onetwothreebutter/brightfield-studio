@@ -932,6 +932,25 @@ if (window.location.hash === '#shader') {
       closeButton:      true,
       closeButtonLabel: 'Done'
     });
+
+    // On touch devices, add a tap-to-dismiss backdrop so the picker feels
+    // like a compact modal rather than a floating element.
+    if ('ontouchstart' in window) {
+      var backdrop = document.createElement('div');
+      backdrop.className = 'clr-mobile-backdrop';
+      backdrop.style.display = 'none';
+      document.body.appendChild(backdrop);
+
+      document.addEventListener('open.coloris', function () {
+        backdrop.style.display = 'block';
+      });
+      document.addEventListener('close.coloris', function () {
+        backdrop.style.display = 'none';
+      });
+      backdrop.addEventListener('click', function () {
+        Coloris.close();
+      });
+    }
   };
   document.head.appendChild(clrScript);
 }());
