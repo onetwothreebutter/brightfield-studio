@@ -1581,7 +1581,6 @@ h6 {
 /* ── Homepage shader demo ────────────────────────────────────── */
 .shader-demo {
     padding: 5rem 0;
-    top: 10px;
 }
 
 .shader-demo__header {
