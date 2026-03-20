@@ -1751,7 +1751,7 @@ h6 {
     padding: 0.65rem 0.75rem;
     margin-top: 0.25rem;
     cursor: pointer;
-    color: var(--color-text-muted);
+    color: var(--color-text);
     font-family: var(--font-body);
     font-size: 0.7rem;
     letter-spacing: 0.12em;
