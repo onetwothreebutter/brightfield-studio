@@ -192,6 +192,7 @@
     <option value="three-square">Three Square</option>
     <option value="stacked-gradient">Stacked Gradient</option>
     <option value="echo-text">Echo Text</option>
+    <option value="four-circles">Four Circles</option>
   </select>
   <button id="export-btn">Export PNG</button>
 </div>
@@ -742,6 +743,138 @@ SHADERS['echo-text'] = {
           var inp=document.querySelector('[data-param-key="'+key+'"]');
           if(inp) inp.value=toHex(val);
         });
+      });
+    }
+  },
+};
+
+// ── Four Circles ──────────────────────────────────────────────────────────────
+SHADERS['four-circles'] = {
+  controls: [
+    { type: 'header', label: 'Circles' },
+    { key: 'u_circle_size', label: 'Circle Size',    type: 'range', min: 0.05, max: 0.49,  step: 0.01, value: 0.42 },
+    { key: 'u_tri_size',    label: 'Triangle Size',  type: 'range', min: 0.01, max: 1.0,   step: 0.01, value: 0.22 },
+    { key: 'u_tri_angle',   label: 'Triangle Angle', type: 'range', min: -180, max: 180,   step: 1,    value: 0 },
+    { key: 'u_tri_apex',    label: 'Triangle Width', type: 'range', min: 5,    max: 175,   step: 1,    value: 90 },
+    { key: 'u_offset_x',    label: 'X Spacing',      type: 'range', min: -1.0, max: 0.4,   step: 0.01, value: 0.0 },
+    { key: 'u_offset_y',    label: 'Y Spacing',      type: 'range', min: -1.0, max: 0.4,   step: 0.01, value: 0.0 },
+    { type: 'header', label: 'Rotation' },
+    { key: 'u_rot1', label: 'Top Left',     type: 'range', min: -180, max: 180, step: 1, value: 0 },
+    { key: 'u_rot2', label: 'Top Right',    type: 'range', min: -180, max: 180, step: 1, value: 0 },
+    { key: 'u_rot3', label: 'Bottom Left',  type: 'range', min: -180, max: 180, step: 1, value: 0 },
+    { key: 'u_rot4', label: 'Bottom Right', type: 'range', min: -180, max: 180, step: 1, value: 0 },
+    { type: 'header', label: 'Palette' },
+    { key: 'u_color_mode',  label: '4-Stop Mode',     type: 'toggle', value: 0 },
+    { key: 'u_global_grad', label: 'Global Gradient', type: 'toggle', value: 0 },
+    { key: '_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
+      options: [
+        { label: 'Rainbow',   value: 'Rainbow'   }, { label: 'Cool Blue', value: 'Cool Blue' },
+        { label: 'Neon Heat', value: 'Neon Heat' }, { label: 'Cyberpunk', value: 'Cyberpunk' },
+        { label: 'Golden',    value: 'Golden'    },
+      ]
+    },
+    { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080' },
+    { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080' },
+    { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff' },
+    { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab' },
+    { key: '_fc_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
+      options: [
+        { label: 'Neon',   value: 'Neon'   }, { label: 'Retro',  value: 'Retro'  },
+        { label: 'Sunset', value: 'Sunset' }, { label: 'Aurora', value: 'Aurora' },
+        { label: 'Dusk',   value: 'Dusk'   },
+      ]
+    },
+    { key: 'u_color0', label: 'Color 1', type: 'color', stopDependent: true, value: '#ff3366' },
+    { key: 'u_color1', label: 'Color 2', type: 'color', stopDependent: true, value: '#ffcc00' },
+    { key: 'u_color2', label: 'Color 3', type: 'color', stopDependent: true, value: '#00ccff' },
+    { key: 'u_color3', label: 'Color 4', type: 'color', stopDependent: true, value: '#aa00ff' },
+    { type: 'header', label: 'Text' },
+    { key: 'u_text_enabled', label: 'Show Text',    type: 'toggle', value: 1 },
+    { key: 'u_letter1',      label: 'Top Left',     type: 'text',   value: 'A' },
+    { key: 'u_letter2',      label: 'Top Right',    type: 'text',   value: 'B' },
+    { key: 'u_letter3',      label: 'Bottom Left',  type: 'text',   value: 'C' },
+    { key: 'u_letter4',      label: 'Bottom Right', type: 'text',   value: 'D' },
+    { key: 'u_font_family',  label: 'Font',         type: 'select', value: 'Montserrat',
+      options: [
+        { label: 'Space Mono',          value: 'Space Mono'          },
+        { label: 'Roboto Mono',         value: 'Roboto Mono'         },
+        { label: 'Source Code Pro',     value: 'Source Code Pro'     },
+        { label: 'JetBrains Mono',      value: 'JetBrains Mono'      },
+        { label: 'IBM Plex Mono',       value: 'IBM Plex Mono'       },
+        { label: 'Fira Code',           value: 'Fira Code'           },
+        { label: 'Inconsolata',         value: 'Inconsolata'         },
+        { label: 'Courier Prime',       value: 'Courier Prime'       },
+        { label: 'Share Tech Mono',     value: 'Share Tech Mono'     },
+        { label: 'Cutive Mono',         value: 'Cutive Mono'         },
+        { label: 'DM Mono',             value: 'DM Mono'             },
+        { label: 'Fragment Mono',       value: 'Fragment Mono'       },
+        { label: 'Azeret Mono',         value: 'Azeret Mono'         },
+        { label: 'Spline Sans Mono',    value: 'Spline Sans Mono'    },
+        { label: 'Geist Mono',          value: 'Geist Mono'          },
+        { label: 'Syne',                value: 'Syne'                },
+        { label: 'Unbounded',           value: 'Unbounded'           },
+        { label: 'Bricolage Grotesque', value: 'Bricolage Grotesque' },
+        { label: 'Epilogue',            value: 'Epilogue'            },
+        { label: 'DM Sans',             value: 'DM Sans'             },
+        { label: 'Oswald',              value: 'Oswald'              },
+        { label: 'Montserrat',          value: 'Montserrat'          },
+      ]
+    },
+    { key: 'u_font_size',    label: 'Font Size',    type: 'range',  min: 50, max: 500, step: 10, value: 300 },
+    { key: 'outlineEnabled', label: 'Outline',      type: 'toggle', value: 0 },
+    { key: 'outlineWidth',   label: 'Outline Width', type: 'range', min: 1, max: 60, step: 1, value: 12 },
+    { key: 'u_outline_color', label: 'Outline Color', type: 'color', value: '#000000' },
+    { type: 'header', label: 'Finish' },
+    { key: 'u_opacity',        label: 'Opacity',  type: 'range', min: 0, max: 1,    step: 0.01, value: 1.0, noRandomize: true },
+    { key: 'u_distress',       label: 'Distress', type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0 },
+    { key: 'u_distress_scale', label: 'Grain',    type: 'range', min: 10, max: 300, step: 1,    value: 80  },
+  ],
+  fonts: ['Space Mono','Roboto Mono','Source Code Pro','JetBrains Mono','IBM Plex Mono','Fira Code',
+          'Inconsolata','Courier Prime','Share Tech Mono','Cutive Mono','DM Mono','Fragment Mono',
+          'Azeret Mono','Spline Sans Mono','Geist Mono','Syne','Unbounded','Bricolage Grotesque',
+          'Epilogue','DM Sans','Oswald','Montserrat'],
+  customAfterBuild: function (body) {
+    var cosinePresets = {
+      'Rainbow':   { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.0,  0.33, 0.67]  },
+      'Cool Blue': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.263,0.416,0.557] },
+      'Neon Heat': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.3,  0.2,  0.2 ]  },
+      'Cyberpunk': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[2.0,1.0,0.0], d:[0.5,  0.2,  0.25]  },
+      'Golden':    { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,0.5], d:[0.8,  0.9,  0.3 ]  },
+    };
+    var fourStopPresets = {
+      'Neon':   { c0:[1.0,0.2,0.4],     c1:[1.0,0.8,0.0],     c2:[0.0,0.8,1.0],     c3:[0.667,0.0,1.0]   },
+      'Retro':  { c0:[0.91,0.286,0.114], c1:[0.788,0.627,0.188],c2:[0.176,0.541,0.369],c3:[0.102,0.153,0.267] },
+      'Sunset': { c0:[1.0,0.318,0.184],  c1:[0.867,0.141,0.463],c2:[0.541,0.169,0.886],c3:[0.098,0.098,0.439] },
+      'Aurora': { c0:[0.0,1.0,0.533],    c1:[0.0,0.898,1.0],    c2:[0.486,0.302,1.0],  c3:[0.878,0.251,0.984] },
+      'Dusk':   { c0:[1.0,0.6,0.4],      c1:[1.0,0.369,0.384],  c2:[0.8,0.169,0.369],  c3:[0.459,0.227,0.533] },
+    };
+
+    function setColor(key, val) {
+      window._shaderState.values[key] = val;
+      var inp = document.querySelector('[data-param-key="' + key + '"]');
+      if (inp) inp.value = toHex(val);
+    }
+
+    // Apply default cosine preset on load so shader matches pickers.
+    var rainbow = cosinePresets['Rainbow'];
+    setColor('u_a', rainbow.a); setColor('u_b', rainbow.b);
+    setColor('u_c', rainbow.c); setColor('u_d', rainbow.d);
+
+    var presetSel = document.querySelector('[data-param-key="_palette_preset"]');
+    if (presetSel) {
+      presetSel.addEventListener('change', function () {
+        var p = cosinePresets[this.value]; if (!p) return;
+        setColor('u_a', p.a); setColor('u_b', p.b);
+        setColor('u_c', p.c); setColor('u_d', p.d);
+      });
+    }
+
+    var fourSel = document.querySelector('[data-param-key="_fc_4color_preset"]');
+    if (fourSel) {
+      fourSel.addEventListener('change', function () {
+        var p = fourStopPresets[this.value]; if (!p) return;
+        setColor('u_color0', p.c0); setColor('u_color1', p.c1);
+        setColor('u_color2', p.c2); setColor('u_color3', p.c3);
       });
     }
   },
