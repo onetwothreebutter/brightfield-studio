@@ -1269,7 +1269,7 @@ h6 {
 .shader-gui {
     display: none;
     overflow-y: auto;
-    max-height: 70vh;
+    max-height: var(--gui-max-h, 70vh);
 }
 
 .shader-gui__header {
@@ -1691,6 +1691,7 @@ h6 {
 
 .shader-demo__canvas-wrap {
     box-shadow: 0 0 51px var(--color-primary-dim);
+    outline: 1px solid rgb(0 255 255 / 19%);
     border-radius: 30px;
 }
 
@@ -1704,6 +1705,13 @@ h6 {
 .shader-demo__controls {
     display: flex;
     flex-direction: column;
+}
+
+@media (min-width: 801px) {
+    .shader-demo__controls {
+        overflow-y: auto;
+        padding-right: 0.25rem;
+    }
 }
 
 .shader-demo__cycle-indicator {
@@ -1938,6 +1946,26 @@ h6 {
     text-align: center;
     margin-top: 0.5rem;
     letter-spacing: 0.04em;
+}
+
+.shader-demo__desktop-only-note,
+.shader-gui__desktop-only-note {
+    display: none;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    text-align: center;
+    padding: 0.5rem 0.75rem;
+    letter-spacing: 0.03em;
+}
+@media (max-width: 800px) {
+    .shader-demo__desktop-only-note {
+        display: block;
+    }
+}
+@media (max-width: 900px) {
+    .shader-gui__desktop-only-note {
+        display: block;
+    }
 }
 
 /* ── Control tips ───────────────────────────────────────────── */

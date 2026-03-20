@@ -16,6 +16,8 @@
 
     <div class="shader-demo__controls">
 
+      <p class="shader-demo__desktop-only-note">This is for desktop only.</p>
+
       <!-- Randomize -->
       <button type="button" class="shader-control__randomize-btn" id="demo-randomize">Randomize</button>
 
@@ -1077,6 +1079,18 @@
   // ── Boot ───────────────────────────────────────────────────────────────────
   applyColorModeVisibility();
   startCycle();
+}());
+
+// ── Desktop: lock controls height to canvas height ────────────────────────────
+(function () {
+  if (!window.ResizeObserver) return;
+  if (window.innerWidth <= 800) return;
+  var canvasWrap = document.querySelector('.shader-demo__canvas-wrap');
+  var controls   = document.querySelector('.shader-demo__controls');
+  if (!canvasWrap || !controls) return;
+  new ResizeObserver(function (entries) {
+    controls.style.maxHeight = entries[0].contentRect.height + 'px';
+  }).observe(canvasWrap);
 }());
 
 // ── Mobile: fade controls as they scroll past the canvas bottom ───────────────

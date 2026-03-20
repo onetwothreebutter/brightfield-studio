@@ -222,6 +222,7 @@
           <div class="shader-gui__mobile-bar">
             <button class="shader-gui__toggle" id="shader-gui-popout">Popout</button>
           </div>
+          <p class="shader-gui__desktop-only-note">This is for desktop only.</p>
 <div class="shader-gui__body" id="shader-gui-body"></div>
         </div>
         <div class="shader-gui__preview">
@@ -1217,6 +1218,23 @@ if (window.location.hash === '#shader') {
       });
     });
   }
+}());
+
+// ── Desktop: lock shader-gui height to canvas height ──────────────────────────
+(function () {
+  if (!window.ResizeObserver) return;
+  if (window.innerWidth <= 900) return;
+  var canvas = document.getElementById('shader-canvas');
+  var gui    = document.getElementById('shader-gui');
+  if (!canvas || !gui) return;
+  var isSquare = canvas.classList.contains('product-shader__canvas--square');
+  var ratio    = isSquare ? 1 : 4 / 3;
+  var media    = document.querySelector('.product-media');
+  if (!media) return;
+  new ResizeObserver(function (entries) {
+    var w = entries[0].contentRect.width;
+    gui.style.setProperty('--gui-max-h', (w * ratio) + 'px');
+  }).observe(media);
 }());
 </script>
 
