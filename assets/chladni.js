@@ -18,8 +18,22 @@
     'uniform vec3  u_color1;',
     'uniform vec3  u_color2;',
     'uniform float u_transparent_bg;',
+    'uniform float u_opacity;',
+    'uniform float u_distress;',
+    'uniform float u_distress_scale;',
     '',
     'out vec4 fragColor;',
+    '',
+    'float hash21(vec2 p) {',
+    '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);',
+    '}',
+    'float distressNoise(vec2 uv, float scale) {',
+    '  vec2 p = uv * scale; vec2 i = floor(p); vec2 f = fract(p);',
+    '  float a = hash21(i), b = hash21(i + vec2(1,0)),',
+    '        c = hash21(i + vec2(0,1)), d = hash21(i + vec2(1,1));',
+    '  vec2 u = f * f * (3.0 - 2.0 * f);',
+    '  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);',
+    '}',
     '',
     'const float PI = 3.14159265359;',
     '',
@@ -70,6 +84,10 @@
     '  // For print export: make background transparent based on luminance',
     '  float luma  = dot(col, vec3(0.299, 0.587, 0.114));',
     '  float alpha = mix(1.0, smoothstep(0.01, 0.05, luma), u_transparent_bg);',
+    '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
+    '  float dn = distressNoise(dUV, u_distress_scale) * 0.67',
+    '           + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
+    '  alpha = alpha * step(u_distress, dn) * u_opacity;',
     '  fragColor = vec4(col, alpha);',
     '}'
   ].join('\n');
@@ -92,6 +110,9 @@
         color1:       gl.getUniformLocation(program, 'u_color1'),
         color2:       gl.getUniformLocation(program, 'u_color2'),
         transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
+        opacity:       gl.getUniformLocation(program, 'u_opacity'),
+        distress:      gl.getUniformLocation(program, 'u_distress'),
+        distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
       };
     },
 
@@ -109,6 +130,9 @@
       gl.uniform3fv(u.color1,    v.u_color1 || [0.0, 0.722, 1.0]);
       gl.uniform3fv(u.color2,    v.u_color2 || [1.0, 0.690, 0.0]);
       gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);
+      gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
+      gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
+      gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
     },
   });
 }());

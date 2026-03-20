@@ -2,10 +2,13 @@
   'use strict';
 
   function create(opts) {
-    var canvas = document.getElementById('shader-canvas');
+    var canvasId  = opts.canvasId  || 'shader-canvas';
+    var stateKey  = opts.stateKey  || '_shaderState';
+    var exportKey = opts.exportKey || '_shaderExport';
+    var canvas = document.getElementById(canvasId);
     if (!canvas) return;
 
-    var glOpts = { preserveDrawingBuffer: true, alpha: true, antialias: true };
+    var glOpts = { preserveDrawingBuffer: true, alpha: true, antialias: true, premultipliedAlpha: false };
     var gl = canvas.getContext('webgl2', glOpts);
     if (!gl) { canvas.style.display = 'none'; return; }
 
@@ -99,7 +102,7 @@
 
     function render() {
       var t = (performance.now() - start) / 1000.0;
-      var v = (window._shaderState && window._shaderState.values) || {};
+      var v = (window[stateKey] && window[stateKey].values) || {};
       var w = canvas.width;
       var h = canvas.height;
 
@@ -107,14 +110,14 @@
         if (opts.drawText) {
           var getKey  = opts.textKey || defaultTextKey;
           var textKey = getKey(v);
-          var dirty   = window._shaderState && window._shaderState.textDirty;
+          var dirty   = window[stateKey] && window[stateKey].textDirty;
           if (dirty || textKey !== lastTextKey || w !== lastTexW || h !== lastTexH) {
             opts.drawText(textCtx, 1024, v, w, h);
             uploadTexture();
             lastTextKey = textKey;
             lastTexW    = w;
             lastTexH    = h;
-            if (window._shaderState) window._shaderState.textDirty = false;
+            if (window[stateKey]) window[stateKey].textDirty = false;
           }
         }
 
@@ -128,7 +131,7 @@
     render();
 
     // Export the shader at print resolution and return base64 PNG via callback
-    window._shaderExport = function (targetW, targetH, callback) {
+    window[exportKey] = function (targetW, targetH, callback) {
       var prevW = canvas.width;
       var prevH = canvas.height;
 
@@ -136,7 +139,7 @@
       canvas.height = targetH;
       gl.viewport(0, 0, targetW, targetH);
 
-      if (window._shaderState) window._shaderState.values.u_transparent_bg = 1.0;
+      if (window[stateKey]) window[stateKey].values.u_transparent_bg = 1.0;
 
       render();
 
@@ -145,9 +148,9 @@
       canvas.width  = prevW;
       canvas.height = prevH;
       gl.viewport(0, 0, prevW, prevH);
-      if (window._shaderState) {
-        window._shaderState.values.u_transparent_bg = 0.0;
-        window._shaderState.textDirty = true;
+      if (window[stateKey]) {
+        window[stateKey].values.u_transparent_bg = 0.0;
+        window[stateKey].textDirty = true;
       }
 
       callback(dataUrl.split(',')[1]); // base64 only

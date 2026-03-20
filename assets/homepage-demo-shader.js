@@ -1,8 +1,6 @@
 (function () {
   'use strict';
 
-  var TEX_SIZE = 512;
-
   // LineCircle GLSL — with text overlay
   var fragSrc = [
     '#version 300 es',
@@ -109,132 +107,7 @@
     '  float finalAlpha = mix(mask, 1.0, textAlpha);',
     '  fragColor = vec4(finalColor, finalAlpha);',
     '}'
-  ].join('\n');
-
-  var canvas = document.getElementById('demo-shader-canvas');
-  if (!canvas) return;
-
-  var glOpts = { preserveDrawingBuffer: true, alpha: true, antialias: true };
-  var gl = canvas.getContext('webgl2', glOpts);
-  if (!gl) { canvas.style.display = 'none'; return; }
-
-  function compileShader(src, type) {
-    var s = gl.createShader(type);
-    gl.shaderSource(s, src);
-    gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-      console.error('[demo-shader]', gl.getShaderInfoLog(s));
-      gl.deleteShader(s);
-      return null;
-    }
-    return s;
-  }
-
-  var vertSrc = [
-    '#version 300 es',
-    'in vec2 a_position;',
-    'void main() { gl_Position = vec4(a_position, 0.0, 1.0); }'
-  ].join('\n');
-
-  var vert = compileShader(vertSrc, gl.VERTEX_SHADER);
-  var frag = compileShader(fragSrc, gl.FRAGMENT_SHADER);
-  if (!vert || !frag) return;
-
-  var program = gl.createProgram();
-  gl.attachShader(program, vert);
-  gl.attachShader(program, frag);
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.error('[demo-shader] link error:', gl.getProgramInfoLog(program));
-    return;
-  }
-  gl.useProgram(program);
-
-  var buf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
-  var posLoc = gl.getAttribLocation(program, 'a_position');
-  gl.enableVertexAttribArray(posLoc);
-  gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-
-  function loc(name) { return gl.getUniformLocation(program, name); }
-  var u = {
-    res:                 loc('u_resolution'),
-    aspect:              loc('u_aspect'),
-    radius:              loc('u_radius'),
-    lineCount:           loc('u_line_count'),
-    power:               loc('u_power'),
-    widthTop:            loc('u_width_top'),
-    widthBot:            loc('u_width_bot'),
-    paletteA:            loc('u_palette_a'),
-    paletteB:            loc('u_palette_b'),
-    paletteC:            loc('u_palette_c'),
-    paletteD:            loc('u_palette_d'),
-    colorMode:           loc('u_color_mode'),
-    color0:              loc('u_color0'),
-    color1:              loc('u_color1'),
-    color2:              loc('u_color2'),
-    color3:              loc('u_color3'),
-    triEnabled:          loc('u_tri_enabled'),
-    triRotation:         loc('u_tri_rotation'),
-    triSize:             loc('u_tri_size'),
-    triWidth:            loc('u_tri_width'),
-    centerCircleEnabled: loc('u_center_circle_enabled'),
-    centerCircleRadius:  loc('u_center_circle_radius'),
-    textColor:           loc('u_text_color'),
-    useTextColor:        loc('u_use_text_color'),
-    outlineColor:        loc('u_outline_color'),
-    textX:               loc('u_text_x'),
-    textY:               loc('u_text_y'),
-    textTex:             loc('u_text_texture'),
-  };
-
-  // ── Text texture ──────────────────────────────────────────────────────────
-  var texCanvas = document.createElement('canvas');
-  texCanvas.width = texCanvas.height = TEX_SIZE;
-  var texCtx = texCanvas.getContext('2d');
-
-  var glTextTex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, glTextTex);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0,0,0,0]));
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-  var drawnTextKey = null;
-
-  function drawText(v) {
-    texCtx.fillStyle = '#000000';
-    texCtx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-    var txt = v.text || '';
-    if (!txt) return;
-    var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"Montserrat"';
-    var fontSize   = v.textFontSize || 120;
-    var cx = (v.textX != null ? v.textX : 0.5) * TEX_SIZE;
-    var cy = (1 - (v.textY != null ? v.textY : 0.5)) * TEX_SIZE;
-    texCtx.font         = fontSize + 'px ' + fontFamily + ', monospace';
-    texCtx.textAlign    = 'center';
-    texCtx.textBaseline = 'middle';
-    if (v.outlineEnabled && v.outlineWidth > 0) {
-      texCtx.strokeStyle = 'rgb(0,255,0)';
-      texCtx.lineWidth   = (v.outlineWidth || 8) * 2;
-      texCtx.lineJoin    = 'round';
-      texCtx.strokeText(txt, cx, cy);
-    }
-    texCtx.fillStyle = 'rgb(255,0,0)';
-    texCtx.fillText(txt, cx, cy);
-  }
-
-  function uploadTextTex() {
-    gl.bindTexture(gl.TEXTURE_2D, glTextTex);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texCanvas);
-  }
-
-  function textKey(v) {
-    return JSON.stringify([v.text, v.textFont, v.textFontSize, v.textX, v.textY, v.outlineEnabled, v.outlineWidth]);
-  }
+  ];
 
   // Preload fonts
   ['Oswald', 'Unbounded', 'Bricolage Grotesque', 'DM Mono',
@@ -242,93 +115,104 @@
     document.fonts.load('500 48px "' + f + '"');
   });
 
-  function resize() {
-    var dpr = window.devicePixelRatio || 1;
-    var w = canvas.offsetWidth;
-    var h = canvas.offsetHeight;
-    if (!w || !h) return;
-    canvas.width  = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    if (window._demoState) window._demoState.dirty = true;
-  }
-  window.addEventListener('resize', resize);
-  resize();
+  window.ShaderBase.create({
+    canvasId:  'demo-shader-canvas',
+    stateKey:  '_demoState',
+    exportKey: '_demoExport',
+    fragSrc:   fragSrc,
 
-  function render() {
-    var state = window._demoState;
-    if (!state || !state.dirty) return;
-    state.dirty = false;
+    setup: function (gl, program) {
+      function loc(name) { return gl.getUniformLocation(program, name); }
+      return {
+        res:                 loc('u_resolution'),
+        aspect:              loc('u_aspect'),
+        radius:              loc('u_radius'),
+        lineCount:           loc('u_line_count'),
+        power:               loc('u_power'),
+        widthTop:            loc('u_width_top'),
+        widthBot:            loc('u_width_bot'),
+        paletteA:            loc('u_palette_a'),
+        paletteB:            loc('u_palette_b'),
+        paletteC:            loc('u_palette_c'),
+        paletteD:            loc('u_palette_d'),
+        colorMode:           loc('u_color_mode'),
+        color0:              loc('u_color0'),
+        color1:              loc('u_color1'),
+        color2:              loc('u_color2'),
+        color3:              loc('u_color3'),
+        triEnabled:          loc('u_tri_enabled'),
+        triRotation:         loc('u_tri_rotation'),
+        triSize:             loc('u_tri_size'),
+        triWidth:            loc('u_tri_width'),
+        centerCircleEnabled: loc('u_center_circle_enabled'),
+        centerCircleRadius:  loc('u_center_circle_radius'),
+        textColor:           loc('u_text_color'),
+        useTextColor:        loc('u_use_text_color'),
+        outlineColor:        loc('u_outline_color'),
+        textX:               loc('u_text_x'),
+        textY:               loc('u_text_y'),
+        textTex:             loc('u_text_texture'),
+      };
+    },
 
-    var v = state.values;
-    var w = canvas.width;
-    var h = canvas.height;
-    if (!w || !h) return;
+    render: function (gl, u, v, w, h, t, textTex) {
+      var aspect = w / h;
+      gl.uniform2f(u.res,       w, h);
+      gl.uniform1f(u.aspect,    aspect);
+      gl.uniform1f(u.radius,    v.u_radius     != null ? v.u_radius     : 0.4);
+      gl.uniform1f(u.lineCount, v.u_line_count != null ? v.u_line_count : 20);
+      gl.uniform1f(u.power,     v.u_power      != null ? v.u_power      : 2.5);
+      gl.uniform1f(u.widthTop,  v.u_width_top  != null ? v.u_width_top  : 0.05);
+      gl.uniform1f(u.widthBot,  v.u_width_bot  != null ? v.u_width_bot  : 0.75);
+      gl.uniform3fv(u.paletteA, v.u_palette_a || [0.5, 0.5, 0.5]);
+      gl.uniform3fv(u.paletteB, v.u_palette_b || [0.5, 0.5, 0.5]);
+      gl.uniform3fv(u.paletteC, v.u_palette_c || [1.0, 1.0, 1.0]);
+      gl.uniform3fv(u.paletteD, v.u_palette_d || [0.0, 0.33, 0.67]);
+      gl.uniform1f(u.colorMode, v.u_color_mode != null ? v.u_color_mode : 0.0);
+      gl.uniform3fv(u.color0,   v.u_color0 || [1.0, 0.2,  0.4]);
+      gl.uniform3fv(u.color1,   v.u_color1 || [1.0, 0.8,  0.0]);
+      gl.uniform3fv(u.color2,   v.u_color2 || [0.0, 0.8,  1.0]);
+      gl.uniform3fv(u.color3,   v.u_color3 || [0.667, 0.0, 1.0]);
+      gl.uniform1f(u.triEnabled,          v.u_tri_enabled           != null ? v.u_tri_enabled           : 1.0);
+      gl.uniform1f(u.triRotation,         v.u_tri_rotation          != null ? v.u_tri_rotation * Math.PI / 180 : 0.0);
+      gl.uniform1f(u.triSize,             v.u_tri_size              != null ? v.u_tri_size              : 1.0);
+      gl.uniform1f(u.triWidth,            v.u_tri_width             != null ? v.u_tri_width * Math.PI / 180 : (45 * Math.PI) / 180);
+      gl.uniform1f(u.centerCircleEnabled, v.u_center_circle_enabled != null ? v.u_center_circle_enabled : 1.0);
+      gl.uniform1f(u.centerCircleRadius,  v.u_center_circle_radius  != null ? v.u_center_circle_radius  : 0.04);
+      gl.uniform3fv(u.textColor,   v.u_text_color    || [1.0, 1.0, 1.0]);
+      gl.uniform1f(u.useTextColor, v.u_use_text_color != null ? v.u_use_text_color : 0.0);
+      gl.uniform3fv(u.outlineColor, v.u_outline_color || [0.0, 0.0, 0.0]);
+      gl.uniform1f(u.textX,        v.textX != null ? v.textX : 0.5);
+      gl.uniform1f(u.textY,        v.textY != null ? v.textY : 0.5);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, textTex);
+      gl.uniform1i(u.textTex, 0);
+    },
 
-    // Redraw text texture if content changed
-    var tk = textKey(v);
-    if (tk !== drawnTextKey) {
-      drawText(v);
-      uploadTextTex();
-      drawnTextKey = tk;
-    }
+    drawText: function (ctx, size, v) {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, size, size);
+      var txt = v.text || '';
+      if (!txt) return;
+      var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"Montserrat"';
+      var fontSize   = v.textFontSize || 120;
+      var cx = (v.textX != null ? v.textX : 0.5) * size;
+      var cy = (1 - (v.textY != null ? v.textY : 0.5)) * size;
+      ctx.font         = fontSize + 'px ' + fontFamily + ', monospace';
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      if (v.outlineEnabled && v.outlineWidth > 0) {
+        ctx.strokeStyle = 'rgb(0,255,0)';
+        ctx.lineWidth   = (v.outlineWidth || 8) * 2;
+        ctx.lineJoin    = 'round';
+        ctx.strokeText(txt, cx, cy);
+      }
+      ctx.fillStyle = 'rgb(255,0,0)';
+      ctx.fillText(txt, cx, cy);
+    },
 
-    var aspect = w / h;
-
-    gl.uniform2f(u.res,       w, h);
-    gl.uniform1f(u.aspect,    aspect);
-    gl.uniform1f(u.radius,    v.u_radius     != null ? v.u_radius     : 0.4);
-    gl.uniform1f(u.lineCount, v.u_line_count != null ? v.u_line_count : 20);
-    gl.uniform1f(u.power,     v.u_power      != null ? v.u_power      : 2.5);
-    gl.uniform1f(u.widthTop,  v.u_width_top  != null ? v.u_width_top  : 0.05);
-    gl.uniform1f(u.widthBot,  v.u_width_bot  != null ? v.u_width_bot  : 0.75);
-    gl.uniform3fv(u.paletteA, v.u_palette_a || [0.5, 0.5, 0.5]);
-    gl.uniform3fv(u.paletteB, v.u_palette_b || [0.5, 0.5, 0.5]);
-    gl.uniform3fv(u.paletteC, v.u_palette_c || [1.0, 1.0, 1.0]);
-    gl.uniform3fv(u.paletteD, v.u_palette_d || [0.0, 0.33, 0.67]);
-    gl.uniform1f(u.colorMode, v.u_color_mode != null ? v.u_color_mode : 0.0);
-    gl.uniform3fv(u.color0,   v.u_color0 || [1.0, 0.2,  0.4]);
-    gl.uniform3fv(u.color1,   v.u_color1 || [1.0, 0.8,  0.0]);
-    gl.uniform3fv(u.color2,   v.u_color2 || [0.0, 0.8,  1.0]);
-    gl.uniform3fv(u.color3,   v.u_color3 || [0.667, 0.0, 1.0]);
-    gl.uniform1f(u.triEnabled,   v.u_tri_enabled  != null ? v.u_tri_enabled  : 1.0);
-    gl.uniform1f(u.triRotation,  v.u_tri_rotation != null ? v.u_tri_rotation * Math.PI / 180 : 0.0);
-    gl.uniform1f(u.triSize,      v.u_tri_size     != null ? v.u_tri_size     : 1.0);
-    gl.uniform1f(u.triWidth,     v.u_tri_width    != null ? v.u_tri_width * Math.PI / 180 : (45 * Math.PI) / 180);
-    gl.uniform1f(u.centerCircleEnabled, v.u_center_circle_enabled != null ? v.u_center_circle_enabled : 1.0);
-    gl.uniform1f(u.centerCircleRadius,  v.u_center_circle_radius  != null ? v.u_center_circle_radius  : 0.04);
-    gl.uniform3fv(u.textColor,   v.u_text_color    || [1.0, 1.0, 1.0]);
-    gl.uniform1f(u.useTextColor, v.u_use_text_color != null ? v.u_use_text_color : 0.0);
-    gl.uniform3fv(u.outlineColor, v.u_outline_color || [0.0, 0.0, 0.0]);
-    gl.uniform1f(u.textX,        v.textX != null ? v.textX : 0.5);
-    gl.uniform1f(u.textY,        v.textY != null ? v.textY : 0.5);
-
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, glTextTex);
-    gl.uniform1i(u.textTex, 0);
-
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-  }
-
-  function loop() {
-    render();
-    requestAnimationFrame(loop);
-  }
-  loop();
-
-  window._demoExport = function (targetW, targetH, callback) {
-    var prevW = canvas.width;
-    var prevH = canvas.height;
-    canvas.width  = targetW;
-    canvas.height = targetH;
-    gl.viewport(0, 0, targetW, targetH);
-    if (window._demoState) window._demoState.dirty = true;
-    render();
-    var dataUrl = canvas.toDataURL('image/png');
-    canvas.width  = prevW;
-    canvas.height = prevH;
-    gl.viewport(0, 0, prevW, prevH);
-    if (window._demoState) window._demoState.dirty = true;
-    callback(dataUrl.split(',')[1]);
-  };
+    textKey: function (v) {
+      return JSON.stringify([v.text, v.textFont, v.textFontSize, v.textX, v.textY, v.outlineEnabled, v.outlineWidth]);
+    },
+  });
 }());

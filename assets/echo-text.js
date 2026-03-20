@@ -42,6 +42,20 @@
     'uniform float     u_blur_length;',
     'uniform float     u_blur_falloff;',
     'uniform float     u_blur_enabled;',
+    'uniform float     u_opacity;',
+    'uniform float     u_distress;',
+    'uniform float     u_distress_scale;',
+    '',
+    'float hash21(vec2 p) {',
+    '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);',
+    '}',
+    'float distressNoise(vec2 uv, float scale) {',
+    '  vec2 p = uv * scale; vec2 i = floor(p); vec2 f = fract(p);',
+    '  float a = hash21(i), b = hash21(i + vec2(1,0)),',
+    '        c = hash21(i + vec2(0,1)), d = hash21(i + vec2(1,1));',
+    '  vec2 u = f * f * (3.0 - 2.0 * f);',
+    '  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);',
+    '}',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
     '  return a + b * cos(6.28318 * (c * t + d));',
@@ -115,6 +129,10 @@
     '',
     '  float inkAlpha = max(fillAlpha, outlineAlpha);',
     '  float alpha    = mix(1.0, inkAlpha, u_transparent_bg);',
+    '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
+    '  float dn = distressNoise(dUV, u_distress_scale) * 0.67',
+    '           + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
+    '  alpha = alpha * step(u_distress, dn) * u_opacity;',
     '  fragColor   = vec4(color, alpha);',
     '}'
   ].join('\n');
@@ -151,6 +169,9 @@ textColor:     gl.getUniformLocation(program, 'u_text_color'),
         blurLength:    gl.getUniformLocation(program, 'u_blur_length'),
         blurFalloff:   gl.getUniformLocation(program, 'u_blur_falloff'),
         blurEnabled:   gl.getUniformLocation(program, 'u_blur_enabled'),
+        opacity:       gl.getUniformLocation(program, 'u_opacity'),
+        distress:      gl.getUniformLocation(program, 'u_distress'),
+        distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
       };
     },
 
@@ -196,7 +217,10 @@ gl.uniform3fv(u.textColor,    v.u_text_color     || [1.0, 1.0, 1.0]);
       gl.uniform1f(u.blurAngle,   blurAngle);
       gl.uniform1f(u.blurLength,  blurLength);
       gl.uniform1f(u.blurFalloff, blurFalloff);
-      gl.uniform1f(u.blurEnabled, blurEnabled);
+      gl.uniform1f(u.blurEnabled,   blurEnabled);
+      gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
+      gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
+      gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);
