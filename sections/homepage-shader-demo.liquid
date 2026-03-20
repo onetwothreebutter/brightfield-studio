@@ -301,6 +301,35 @@
             <input type="color" class="shader-control__color" id="demo-outline-color" value="#000000">
           </div>
 
+          <p class="shader-demo__panel-label">Finish</p>
+
+          <!-- Opacity -->
+          <div class="shader-control">
+            <label class="shader-control__label">Opacity</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-opacity" min="0" max="1" step="0.01" value="1">
+              <span class="shader-control__value" id="demo-opacity-display">1</span>
+            </div>
+          </div>
+
+          <!-- Distress -->
+          <div class="shader-control">
+            <label class="shader-control__label">Distress</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-distress" min="0" max="0.85" step="0.01" value="0">
+              <span class="shader-control__value" id="demo-distress-display">0</span>
+            </div>
+          </div>
+
+          <!-- Grain -->
+          <div class="shader-control">
+            <label class="shader-control__label">Grain</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-distress-scale" min="10" max="300" step="1" value="80">
+              <span class="shader-control__value" id="demo-distress-scale-display">80</span>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -879,6 +908,33 @@
 
   outlineColorInput.addEventListener('input', function () {
     window._demoState.values.u_outline_color = hexToRgb(this.value);
+    window._demoState.dirty = true;
+  });
+
+  // ── Finish controls ────────────────────────────────────────────────────────
+  var opacityInput        = document.getElementById('demo-opacity');
+  var opacityDisp         = document.getElementById('demo-opacity-display');
+  var distressInput       = document.getElementById('demo-distress');
+  var distressDisp        = document.getElementById('demo-distress-display');
+  var distressScaleInput  = document.getElementById('demo-distress-scale');
+  var distressScaleDisp   = document.getElementById('demo-distress-scale-display');
+
+  opacityInput.addEventListener('input', function () {
+    var n = parseFloat(this.value);
+    window._demoState.values.u_opacity = n;
+    opacityDisp.textContent = n.toFixed(2);
+    window._demoState.dirty = true;
+  });
+  distressInput.addEventListener('input', function () {
+    var n = parseFloat(this.value);
+    window._demoState.values.u_distress = n;
+    distressDisp.textContent = n.toFixed(2);
+    window._demoState.dirty = true;
+  });
+  distressScaleInput.addEventListener('input', function () {
+    var n = parseInt(this.value, 10);
+    window._demoState.values.u_distress_scale = n;
+    distressScaleDisp.textContent = n;
     window._demoState.dirty = true;
   });
 
