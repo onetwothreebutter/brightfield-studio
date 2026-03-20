@@ -1968,6 +1968,30 @@ h6 {
     }
 }
 
+/* ── Custom scrollbar (controls panels) ─────────────────────── */
+.shader-demo__controls,
+.shader-gui {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 255, 255, 0.25) transparent;
+}
+.shader-demo__controls::-webkit-scrollbar,
+.shader-gui::-webkit-scrollbar {
+    width: 6px;
+}
+.shader-demo__controls::-webkit-scrollbar-track,
+.shader-gui::-webkit-scrollbar-track {
+    background: transparent;
+}
+.shader-demo__controls::-webkit-scrollbar-thumb,
+.shader-gui::-webkit-scrollbar-thumb {
+    background: rgba(0, 255, 255, 0.25);
+    border-radius: 9999px;
+}
+.shader-demo__controls::-webkit-scrollbar-thumb:hover,
+.shader-gui::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 255, 255, 0.5);
+}
+
 /* ── Scroll shadows ─────────────────────────────────────────── */
 .scroll-shadow {
     position: sticky;
