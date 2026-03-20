@@ -1353,6 +1353,15 @@ h6 {
     padding: 0 1rem;
     margin-top: 1rem;
 }
+
+@media (max-width: 900px) {
+    .shader-gui__preview {
+        display: none;
+    }
+    .product-layout.shader-mode .shader-gui__preview {
+        display: block;
+    }
+}
 .shader-gui__body {
     padding: 0.25rem 0;
 }
