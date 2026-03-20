@@ -42,5 +42,5 @@ jobs:
           shopify theme push \
             --store brightfield-2.myshopify.com \
             --theme ${{ secrets.SHOPIFY_THEME_ID }} \
-            --live \
+            --allow-live \
             --force
