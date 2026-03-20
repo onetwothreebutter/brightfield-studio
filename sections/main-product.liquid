@@ -222,8 +222,10 @@
           <div class="shader-gui__mobile-bar">
             <button class="shader-gui__toggle" id="shader-gui-popout">Popout</button>
           </div>
+          <div class="scroll-shadow scroll-shadow--top" aria-hidden="true"></div>
           <p class="shader-gui__desktop-only-note">This is for desktop only.</p>
 <div class="shader-gui__body" id="shader-gui-body"></div>
+          <div class="scroll-shadow scroll-shadow--bottom" aria-hidden="true"></div>
         </div>
         <div class="shader-gui__preview">
           <button
@@ -1218,6 +1220,19 @@ if (window.location.hash === '#shader') {
       });
     });
   }
+}());
+
+// ── Desktop: scroll shadows on shader-gui ─────────────────────────────────────
+(function () {
+  var el = document.getElementById('shader-gui');
+  if (!el) return;
+  function update() {
+    el.classList.toggle('is-scrollable-top',    el.scrollTop > 4);
+    el.classList.toggle('is-scrollable-bottom', el.scrollTop + el.clientHeight < el.scrollHeight - 4);
+  }
+  el.addEventListener('scroll', update, { passive: true });
+  if (window.ResizeObserver) { new ResizeObserver(update).observe(el); }
+  update();
 }());
 
 // ── Desktop: lock shader-gui height to canvas height ──────────────────────────

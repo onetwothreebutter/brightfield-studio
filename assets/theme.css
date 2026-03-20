@@ -1968,6 +1968,37 @@ h6 {
     }
 }
 
+/* ── Scroll shadows ─────────────────────────────────────────── */
+.scroll-shadow {
+    position: sticky;
+    height: 48px;
+    flex-shrink: 0;
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.scroll-shadow--top {
+    top: 0;
+    background: linear-gradient(to bottom, var(--color-bg), transparent);
+    margin-bottom: -48px;
+}
+.scroll-shadow--bottom {
+    bottom: 0;
+    background: linear-gradient(to top, var(--color-bg), transparent);
+    margin-top: -48px;
+}
+.is-scrollable-top > .scroll-shadow--top,
+.is-scrollable-bottom > .scroll-shadow--bottom {
+    opacity: 1;
+}
+@media (max-width: 800px) {
+    .shader-demo__controls .scroll-shadow { display: none; }
+}
+@media (max-width: 900px) {
+    .shader-gui .scroll-shadow { display: none; }
+}
+
 /* ── Control tips ───────────────────────────────────────────── */
 .shader-tip-btn {
     display: inline-flex;
