@@ -1105,6 +1105,10 @@
     el.classList.toggle('is-scrollable-top',    el.scrollTop > 4);
     el.classList.toggle('is-scrollable-bottom', el.scrollTop + el.clientHeight < el.scrollHeight - 4);
   }
+  el.addEventListener('scroll', function onFirstScroll() {
+    el.classList.add('has-scrolled');
+    el.removeEventListener('scroll', onFirstScroll);
+  }, { passive: true });
   el.addEventListener('scroll', update, { passive: true });
   if (window.ResizeObserver) { new ResizeObserver(update).observe(el); }
   update();
