@@ -830,6 +830,7 @@
 
   if (enableTextBtn) {
     enableTextBtn.addEventListener('click', function () {
+      onUserInteract();
       var wasOn = this.dataset.on === '1';
       this.dataset.on  = wasOn ? '0' : '1';
       this.textContent = wasOn ? 'Off' : 'On';
@@ -840,17 +841,20 @@
   }
 
   textInput.addEventListener('input', function () {
+    onUserInteract();
     if (!isTextEnabled()) return;
     window._demoState.values.text = this.value;
     window._demoState.dirty = true;
   });
 
   textFontSel.addEventListener('change', function () {
+    onUserInteract();
     window._demoState.values.textFont = this.value;
     window._demoState.dirty = true;
   });
 
   textSizeInput.addEventListener('input', function () {
+    onUserInteract();
     var n = parseInt(this.value, 10);
     window._demoState.values.textFontSize = n;
     textSizeDisp.textContent = n;
@@ -858,6 +862,7 @@
   });
 
   textXInput.addEventListener('input', function () {
+    onUserInteract();
     var n = parseFloat(this.value);
     window._demoState.values.textX = n;
     textXDisp.textContent = n;
@@ -865,6 +870,7 @@
   });
 
   textYInput.addEventListener('input', function () {
+    onUserInteract();
     var n = parseFloat(this.value);
     window._demoState.values.textY = n;
     textYDisp.textContent = n;
@@ -872,6 +878,7 @@
   });
 
   useTextColorBtn.addEventListener('click', function () {
+    onUserInteract();
     var isOn = this.dataset.on === '1';
     var next = isOn ? 0 : 1;
     window._demoState.values.u_use_text_color = next;
@@ -883,11 +890,13 @@
   });
 
   textColorInput.addEventListener('input', function () {
+    onUserInteract();
     window._demoState.values.u_text_color = hexToRgb(this.value);
     window._demoState.dirty = true;
   });
 
   outlineBtn.addEventListener('click', function () {
+    onUserInteract();
     var isOn = this.dataset.on === '1';
     var next = isOn ? 0 : 1;
     window._demoState.values.outlineEnabled = !!next;
@@ -900,6 +909,7 @@
   });
 
   outlineWidthInput.addEventListener('input', function () {
+    onUserInteract();
     var n = parseInt(this.value, 10);
     window._demoState.values.outlineWidth = n;
     outlineWidthDisp.textContent = n;
@@ -907,6 +917,7 @@
   });
 
   outlineColorInput.addEventListener('input', function () {
+    onUserInteract();
     window._demoState.values.u_outline_color = hexToRgb(this.value);
     window._demoState.dirty = true;
   });
@@ -920,18 +931,21 @@
   var distressScaleDisp   = document.getElementById('demo-distress-scale-display');
 
   opacityInput.addEventListener('input', function () {
+    onUserInteract();
     var n = parseFloat(this.value);
     window._demoState.values.u_opacity = n;
     opacityDisp.textContent = n.toFixed(2);
     window._demoState.dirty = true;
   });
   distressInput.addEventListener('input', function () {
+    onUserInteract();
     var n = parseFloat(this.value);
     window._demoState.values.u_distress = n;
     distressDisp.textContent = n.toFixed(2);
     window._demoState.dirty = true;
   });
   distressScaleInput.addEventListener('input', function () {
+    onUserInteract();
     var n = parseInt(this.value, 10);
     window._demoState.values.u_distress_scale = n;
     distressScaleDisp.textContent = n;
