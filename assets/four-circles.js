@@ -284,7 +284,7 @@
       var circleSize   = v.u_circle_size   != null ? v.u_circle_size   : 0.42;
       var triSize      = v.u_tri_size      != null ? v.u_tri_size      : 0.22;
       var triAngle     = (v.u_tri_angle    != null ? v.u_tri_angle    : 0)    * DEG;
-      var triApex      = (v.u_tri_apex     != null ? v.u_tri_apex     : 60)   * DEG;
+      var triApex      = (v.u_tri_apex     != null ? v.u_tri_apex     : 90)   * DEG;
       var offsetX      = v.u_offset_x      != null ? v.u_offset_x      : 0.0;
       var offsetY      = v.u_offset_y      != null ? v.u_offset_y      : 0.0;
       var rot1         = (v.u_rot1         != null ? v.u_rot1         : 0)    * DEG;
