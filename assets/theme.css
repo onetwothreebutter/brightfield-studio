@@ -1070,6 +1070,9 @@ h6 {
     .product-layout.shader-mode {
         gap: 0;
     }
+    .product-layout.shader-mode .product-info {
+        margin-top: 20px;
+    }
     /* Restore the visual gap between the title and the tab row.
        gap:0 is needed between media→controls, not between title→media. */
     .product-layout.shader-mode .product-title-mobile {
@@ -1352,6 +1355,15 @@ h6 {
 .shader-gui__preview {
     padding: 0 1rem;
     margin-top: 1rem;
+}
+
+@media (max-width: 900px) {
+    .shader-gui__preview {
+        display: none;
+    }
+    .product-layout.shader-mode .shader-gui__preview {
+        display: block;
+    }
 }
 .shader-gui__body {
     padding: 0.25rem 0;

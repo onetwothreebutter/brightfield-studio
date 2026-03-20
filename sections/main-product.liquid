@@ -223,15 +223,15 @@
             <button class="shader-gui__toggle" id="shader-gui-popout">Popout</button>
           </div>
 <div class="shader-gui__body" id="shader-gui-body"></div>
-          <div class="shader-gui__preview">
-            <button
-              id="shader-preview-btn"
-              class="btn btn--primary btn--lg btn--full"
-              data-variant-id="4017"
-              data-worker-url="https://brightfield-mockup-worker.eric-d-johnson.workers.dev"
-            >Preview on Shirt</button>
-            <p class="product-customize-actions__note">You'll select your size when you order.</p>
-          </div>
+        </div>
+        <div class="shader-gui__preview">
+          <button
+            id="shader-preview-btn"
+            class="btn btn--primary btn--lg btn--full"
+            data-variant-id="4017"
+            data-worker-url="https://brightfield-mockup-worker.eric-d-johnson.workers.dev"
+          >Preview on Shirt</button>
+          <p class="product-customize-actions__note">You'll select your size when you order.</p>
         </div>
         {%- endif -%}
 
@@ -943,8 +943,21 @@ if (window.location.hash === '#shader') {
 
   var FADE_ZONE = 60;
 
+  function resetRows() {
+    var rows = guiBody.children;
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].style.opacity       = '';
+      rows[i].style.pointerEvents = '';
+    }
+  }
+
   function fadeRow(el, canvasBottom) {
-    if (el.style.display === 'none') return;
+    // Reset hidden rows so they show correctly when revealed
+    if (el.style.display === 'none') {
+      el.style.opacity       = '';
+      el.style.pointerEvents = '';
+      return;
+    }
     var rect    = el.getBoundingClientRect();
     var rowMid  = (rect.top + rect.bottom) / 2;
     var dist    = rowMid - canvasBottom;
@@ -954,9 +967,9 @@ if (window.location.hash === '#shader') {
   }
 
   function applyFade() {
-    if (window.innerWidth > 900) return;
+    if (window.innerWidth > 900) { resetRows(); return; }
     var productLayout = document.querySelector('.product-layout');
-    if (!productLayout || !productLayout.classList.contains('shader-mode')) return;
+    if (!productLayout || !productLayout.classList.contains('shader-mode')) { resetRows(); return; }
     var mediaEl = document.querySelector('.product-media');
     if (!mediaEl) return;
     var canvasBottom = mediaEl.getBoundingClientRect().bottom;
@@ -966,9 +979,20 @@ if (window.location.hash === '#shader') {
     }
   }
 
-  document.addEventListener('scroll', applyFade, { passive: true });
+  // Re-check after scroll settles to catch iOS momentum scroll finishing
+  var settleTimer;
+  function onScroll() {
+    applyFade();
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(applyFade, 150);
+  }
+
+  document.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', applyFade);
-  window.addEventListener('product-shader-mode', applyFade);
+  // Wait for DOM reflow before evaluating positions after tab switch
+  window.addEventListener('product-shader-mode', function () {
+    requestAnimationFrame(applyFade);
+  });
 }());
 
 // ── Fade media-tabs when sticky canvas is stuck ───────────────────────────────
