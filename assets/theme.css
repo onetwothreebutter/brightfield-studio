@@ -1269,7 +1269,7 @@ h6 {
 .shader-gui {
     display: none;
     overflow-y: auto;
-    max-height: 70vh;
+    max-height: var(--gui-max-h, 70vh);
 }
 
 .shader-gui__header {
@@ -1691,6 +1691,7 @@ h6 {
 
 .shader-demo__canvas-wrap {
     box-shadow: 0 0 51px var(--color-primary-dim);
+    outline: 1px solid rgb(0 255 255 / 8%);
     border-radius: 30px;
 }
 
@@ -1704,6 +1705,13 @@ h6 {
 .shader-demo__controls {
     display: flex;
     flex-direction: column;
+}
+
+@media (min-width: 801px) {
+    .shader-demo__controls {
+        overflow-y: auto;
+        padding-right: 0.25rem;
+    }
 }
 
 .shader-demo__cycle-indicator {
@@ -1938,6 +1946,100 @@ h6 {
     text-align: center;
     margin-top: 0.5rem;
     letter-spacing: 0.04em;
+}
+
+.shader-demo__desktop-only-note,
+.shader-gui__desktop-only-note {
+    display: none;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    text-align: center;
+    padding: 0.5rem 0.75rem;
+    letter-spacing: 0.03em;
+}
+@media (max-width: 800px) {
+    .shader-demo__desktop-only-note {
+        display: block;
+    }
+}
+@media (max-width: 900px) {
+    .shader-gui__desktop-only-note {
+        display: block;
+    }
+}
+
+/* ── Custom scrollbar (controls panels) ─────────────────────── */
+.shader-demo__controls,
+.shader-gui {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 255, 255, 0.25) transparent;
+}
+.shader-demo__controls::-webkit-scrollbar,
+.shader-gui::-webkit-scrollbar {
+    width: 6px;
+}
+.shader-demo__controls::-webkit-scrollbar-track,
+.shader-gui::-webkit-scrollbar-track {
+    background: transparent;
+}
+.shader-demo__controls::-webkit-scrollbar-thumb,
+.shader-gui::-webkit-scrollbar-thumb {
+    background: rgba(0, 255, 255, 0.25);
+    border-radius: 9999px;
+}
+.shader-demo__controls::-webkit-scrollbar-thumb:hover,
+.shader-gui::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 255, 255, 0.5);
+}
+
+/* ── Scroll shadows ─────────────────────────────────────────── */
+.scroll-shadow {
+    position: sticky;
+    height: 100px;
+    flex-shrink: 0;
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.scroll-shadow--top {
+    top: 0;
+    background: linear-gradient(to bottom, var(--color-bg), transparent);
+    margin-bottom: -100px;
+}
+.scroll-shadow--bottom {
+    bottom: 0;
+    background: linear-gradient(to top, var(--color-bg), transparent);
+    margin-top: -100px;
+}
+.is-scrollable-top > .scroll-shadow--top,
+.is-scrollable-bottom > .scroll-shadow--bottom {
+    opacity: 1;
+}
+.scroll-shadow--bottom::after {
+    content: '↓';
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(0, 255, 255, 0.65);
+    font-size: 1.4rem;
+    opacity: 0;
+    transition: opacity 0.3s;
+    animation: scroll-hint-bounce 1.4s ease-in-out infinite;
+}
+.is-scrollable-bottom:not(.has-scrolled) > .scroll-shadow--bottom::after {
+    opacity: 1;
+}
+@keyframes scroll-hint-bounce {
+    0%, 100% { transform: translateX(-50%) translateY(0);   }
+    50%       { transform: translateX(-50%) translateY(5px); }
+}
+@media (max-width: 800px) {
+    .shader-demo__controls .scroll-shadow { display: none; }
+}
+@media (max-width: 900px) {
+    .shader-gui .scroll-shadow { display: none; }
 }
 
 /* ── Control tips ───────────────────────────────────────────── */

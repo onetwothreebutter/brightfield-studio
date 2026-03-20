@@ -16,6 +16,10 @@
 
     <div class="shader-demo__controls">
 
+      <div class="scroll-shadow scroll-shadow--top" aria-hidden="true"></div>
+
+      <p class="shader-demo__desktop-only-note">This is for desktop only.</p>
+
       <!-- Randomize -->
       <button type="button" class="shader-control__randomize-btn" id="demo-randomize">Randomize</button>
 
@@ -332,6 +336,8 @@
 
         </div>
       </div>
+
+      <div class="scroll-shadow scroll-shadow--bottom" aria-hidden="true"></div>
 
     </div>
 
@@ -1077,6 +1083,35 @@
   // ── Boot ───────────────────────────────────────────────────────────────────
   applyColorModeVisibility();
   startCycle();
+}());
+
+// ── Desktop: lock controls height to canvas height ────────────────────────────
+(function () {
+  if (!window.ResizeObserver) return;
+  if (window.innerWidth <= 800) return;
+  var canvasWrap = document.querySelector('.shader-demo__canvas-wrap');
+  var controls   = document.querySelector('.shader-demo__controls');
+  if (!canvasWrap || !controls) return;
+  new ResizeObserver(function (entries) {
+    controls.style.maxHeight = entries[0].contentRect.height + 'px';
+  }).observe(canvasWrap);
+}());
+
+// ── Desktop: scroll shadows on controls ───────────────────────────────────────
+(function () {
+  var el = document.querySelector('.shader-demo__controls');
+  if (!el) return;
+  function update() {
+    el.classList.toggle('is-scrollable-top',    el.scrollTop > 4);
+    el.classList.toggle('is-scrollable-bottom', el.scrollTop + el.clientHeight < el.scrollHeight - 4);
+  }
+  el.addEventListener('scroll', function onFirstScroll() {
+    el.classList.add('has-scrolled');
+    el.removeEventListener('scroll', onFirstScroll);
+  }, { passive: true });
+  el.addEventListener('scroll', update, { passive: true });
+  if (window.ResizeObserver) { new ResizeObserver(update).observe(el); }
+  update();
 }());
 
 // ── Mobile: fade controls as they scroll past the canvas bottom ───────────────
