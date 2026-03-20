@@ -5,7 +5,7 @@
     var canvas = document.getElementById('shader-canvas');
     if (!canvas) return;
 
-    var glOpts = { preserveDrawingBuffer: true, alpha: true, antialias: true };
+    var glOpts = { preserveDrawingBuffer: true, alpha: true, antialias: true, premultipliedAlpha: false };
     var gl = canvas.getContext('webgl2', glOpts);
     if (!gl) { canvas.style.display = 'none'; return; }
 
