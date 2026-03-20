@@ -1691,7 +1691,7 @@ h6 {
 
 .shader-demo__canvas-wrap {
     box-shadow: 0 0 51px var(--color-primary-dim);
-    outline: 1px solid rgb(0 255 255 / 19%);
+    outline: 1px solid rgb(0 255 255 / 8%);
     border-radius: 30px;
 }
 
