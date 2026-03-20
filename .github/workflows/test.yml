@@ -31,10 +31,11 @@ jobs:
         run: npm install -g @shopify/cli@latest
       - name: Get Shopify token
         run: |
-          TOKEN=$(curl -s -X POST \
+          RESPONSE=$(curl -s -X POST \
             "https://brightfield-2.myshopify.com/admin/oauth/access_token" \
-            -d "grant_type=client_credentials&client_id=${{ secrets.SHOPIFY_CLIENT_ID }}&client_secret=${{ secrets.SHOPIFY_CLIENT_SECRET }}" \
-            | jq -r '.access_token')
+            -d "grant_type=client_credentials&client_id=${{ secrets.SHOPIFY_CLIENT_ID }}&client_secret=${{ secrets.SHOPIFY_CLIENT_SECRET }}")
+          echo "Response: $RESPONSE"
+          TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
           echo "SHOPIFY_CLI_THEME_TOKEN=$TOKEN" >> $GITHUB_ENV
       - name: Push theme
         run: |
