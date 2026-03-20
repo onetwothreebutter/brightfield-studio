@@ -42,4 +42,5 @@ jobs:
         run: |
           shopify theme push \
             --store brightfield-2.myshopify.com \
-            --theme ${{ secrets.SHOPIFY_THEME_ID }}
+            --theme ${{ secrets.SHOPIFY_THEME_ID }} \
+            --force
