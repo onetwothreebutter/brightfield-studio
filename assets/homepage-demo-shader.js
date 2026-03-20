@@ -33,11 +33,25 @@
     'uniform float u_text_x;',
     'uniform float u_text_y;',
     'uniform sampler2D u_text_texture;',
+    'uniform float u_opacity;',
+    'uniform float u_distress;',
+    'uniform float u_distress_scale;',
     '',
     'out vec4 fragColor;',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
     '  return a + b * cos(6.28318 * (c * t + d));',
+    '}',
+    '',
+    'float hash21(vec2 p) {',
+    '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);',
+    '}',
+    'float distressNoise(vec2 uv, float scale) {',
+    '  vec2 p = uv * scale; vec2 i = floor(p); vec2 f = fract(p);',
+    '  float a = hash21(i), b = hash21(i + vec2(1,0)),',
+    '        c = hash21(i + vec2(0,1)), d = hash21(i + vec2(1,1));',
+    '  vec2 u = f * f * (3.0 - 2.0 * f);',
+    '  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);',
     '}',
     '',
     'void main() {',
@@ -105,7 +119,12 @@
     '',
     '  float textAlpha  = clamp(fillSample + outlineSample, 0.0, 1.0);',
     '  float finalAlpha = mix(mask, 1.0, textAlpha);',
-    '  fragColor = vec4(finalColor, finalAlpha);',
+    '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
+    '  float dn = distressNoise(dUV, u_distress_scale) * 0.67',
+    '           + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
+    '  float alpha = finalAlpha * step(u_distress, dn) * u_opacity;',
+    '  vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
+    '  fragColor = vec4(encoded, alpha);',
     '}'
   ];
 
@@ -152,6 +171,9 @@
         textX:               loc('u_text_x'),
         textY:               loc('u_text_y'),
         textTex:             loc('u_text_texture'),
+        opacity:             loc('u_opacity'),
+        distress:            loc('u_distress'),
+        distressScale:       loc('u_distress_scale'),
       };
     },
 
@@ -184,6 +206,9 @@
       gl.uniform3fv(u.outlineColor, v.u_outline_color || [0.0, 0.0, 0.0]);
       gl.uniform1f(u.textX,        v.textX != null ? v.textX : 0.5);
       gl.uniform1f(u.textY,        v.textY != null ? v.textY : 0.5);
+      gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
+      gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
+      gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);
       gl.uniform1i(u.textTex, 0);
