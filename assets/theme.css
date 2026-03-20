@@ -1971,7 +1971,7 @@ h6 {
 /* ── Scroll shadows ─────────────────────────────────────────── */
 .scroll-shadow {
     position: sticky;
-    height: 70px;
+    height: 100px;
     flex-shrink: 0;
     pointer-events: none;
     z-index: 5;
@@ -1981,12 +1981,12 @@ h6 {
 .scroll-shadow--top {
     top: 0;
     background: linear-gradient(to bottom, var(--color-bg), transparent);
-    margin-bottom: -70px;
+    margin-bottom: -100px;
 }
 .scroll-shadow--bottom {
     bottom: 0;
     background: linear-gradient(to top, var(--color-bg), transparent);
-    margin-top: -70px;
+    margin-top: -100px;
 }
 .is-scrollable-top > .scroll-shadow--top,
 .is-scrollable-bottom > .scroll-shadow--bottom {
