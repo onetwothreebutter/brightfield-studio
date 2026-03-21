@@ -14,7 +14,8 @@
     'uniform vec3  u_c;',
     'uniform vec3  u_d;',
     'uniform sampler2D u_text_texture;',
-    'uniform float u_vignette;',
+    'uniform float u_vignette_x;',
+    'uniform float u_vignette_y;',
     'out vec4 fragColor;',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
@@ -41,8 +42,10 @@
     '  // Cosine palette along X axis',
     '  vec3 col = cosinePalette(uv.x, u_a, u_b, u_c, u_d);',
     '',
-    '  // Vignette: fade edges based on radial distance from center',
-    '  float vignette = clamp(1.0 - dot(uv - 0.5, uv - 0.5) * u_vignette, 0.0, 1.0);',
+    '  // Vignette: independent falloff per axis',
+    '  vec2 vigCoord = uv - 0.5;',
+    '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
+    '  float vignette = clamp(1.0 - vigVal, 0.0, 1.0);',
     '',
     '  vec3 encoded = pow(max(col, 0.0), vec3(1.0 / 2.2));',
     '  fragColor = vec4(encoded, lineMask * vignette);',
@@ -63,7 +66,8 @@
         palC:          gl.getUniformLocation(program, 'u_c'),
         palD:          gl.getUniformLocation(program, 'u_d'),
         textTex:       gl.getUniformLocation(program, 'u_text_texture'),
-        vignette:      gl.getUniformLocation(program, 'u_vignette'),
+        vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
+        vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
       };
     },
 
@@ -76,7 +80,8 @@
       gl.uniform3fv(u.palB,         v.u_b || [0.5, 0.5, 0.5]);
       gl.uniform3fv(u.palC,         v.u_c || [1.0, 1.0, 1.0]);
       gl.uniform3fv(u.palD,         v.u_d || [0.0, 0.33, 0.67]);
-      gl.uniform1f(u.vignette,      v.u_vignette != null ? v.u_vignette : 2.0);
+      gl.uniform1f(u.vignetteX,     v.u_vignette_x != null ? v.u_vignette_x : 2.0);
+      gl.uniform1f(u.vignetteY,     v.u_vignette_y != null ? v.u_vignette_y : 2.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);
