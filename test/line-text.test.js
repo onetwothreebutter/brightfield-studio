@@ -77,7 +77,7 @@ describe('line-text.js', () => {
   it('fragSrc declares all expected uniforms', () => {
     const frag = Array.isArray(opts.fragSrc) ? opts.fragSrc.join('\n') : opts.fragSrc;
     ['u_resolution', 'u_rows', 'u_base_thickness', 'u_text_thickness',
-     'u_a', 'u_b', 'u_c', 'u_d', 'u_text_texture'].forEach((name) => {
+     'u_vignette', 'u_a', 'u_b', 'u_c', 'u_d', 'u_text_texture'].forEach((name) => {
       expect(frag, `missing uniform ${name}`).toContain(name);
     });
   });
@@ -97,7 +97,7 @@ describe('line-text.js', () => {
   it('setup() returns an object with all required uniform keys', () => {
     const gl = makeSetupGl();
     const uniforms = opts.setup(gl, {});
-    ['res', 'rows', 'baseThickness', 'textThickness',
+    ['res', 'rows', 'baseThickness', 'textThickness', 'vignette',
      'palA', 'palB', 'palC', 'palD', 'textTex'].forEach((key) => {
       expect(uniforms, `setup() is missing key "${key}"`).toHaveProperty(key);
     });
@@ -144,6 +144,7 @@ describe('line-text.js', () => {
     expect(find1f(uniforms.rows)).toBe(80.0);
     expect(find1f(uniforms.baseThickness)).toBeCloseTo(0.02);
     expect(find1f(uniforms.textThickness)).toBeCloseTo(0.4);
+    expect(find1f(uniforms.vignette)).toBeCloseTo(2.0);
   });
 
   it('render() passes supplied values to uniforms', () => {
