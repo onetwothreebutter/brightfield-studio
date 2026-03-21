@@ -68,6 +68,16 @@
     'uniform vec3      u_color1;',
     'uniform vec3      u_color2;',
     'uniform vec3      u_color3;',
+    'uniform vec3      u_quad0;',
+    'uniform vec3      u_quad1;',
+    'uniform vec3      u_quad2;',
+    'uniform vec3      u_quad3;',
+    'uniform sampler2D u_word_texture;',
+    'uniform float     u_word_x;',
+    'uniform float     u_word_y;',
+    'uniform vec3      u_word_color;',
+    'uniform float     u_use_word_color;',
+    'uniform vec3      u_word_outline_color;',
     'uniform sampler2D u_tex1;',
     'uniform sampler2D u_tex2;',
     'uniform sampler2D u_tex3;',
@@ -200,16 +210,33 @@
     '  vec3  seg23  = mix(u_color2, u_color3, t23);',
     '  vec3  gradCol = mix(mix(seg01, seg12, step(1.0 / 3.0, palT)), seg23, step(2.0 / 3.0, palT));',
     '',
-    '  vec3 col        = mix(cosineCol, gradCol, u_color_mode);',
+    '  vec3 perQuadCol = mix(mix(u_quad2, u_quad3, isRight), mix(u_quad0, u_quad1, isRight), isTop);',
+    '  vec3 col = mix(',
+    '    mix(cosineCol, gradCol, step(0.5, u_color_mode)),',
+    '    perQuadCol,',
+    '    step(1.5, u_color_mode)',
+    '  );',
     '  vec3 layerColor = mix(col, u_outline_color, outlineSample);',
+    '',
+    '  // ── Word overlay ─────────────────────────────────────────────────────────',
+    '  vec2 wordAnchor  = vec2(u_word_x, u_word_y);',
+    '  vec2 wordDelta   = uv - wordAnchor;',
+    '  vec2 wordUV      = vec2(wordDelta.x * u_aspect, wordDelta.y) + wordAnchor;',
+    '  vec4 wordSample  = texture(u_word_texture, wordUV);',
+    '  float wordFill   = smoothstep(0.05, 0.6, wordSample.r);',
+    '  float wordStroke = smoothstep(0.05, 0.6, wordSample.g);',
+    '  vec3 wordFillCol = mix(col, u_word_color, u_use_word_color);',
+    '  vec3 finalColor  = mix(mix(layerColor, u_word_outline_color, wordStroke), wordFillCol, wordFill);',
     '',
     '  // ── Distress + output ───────────────────────────────────────────────────',
     '  vec2  dUV = gl_FragCoord.xy / u_resolution;',
     '  float dn  = distressNoise(dUV, u_distress_scale) * 0.67',
     '            + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
     '',
-    '  float alpha   = shapeMask * step(u_distress, dn) * u_opacity;',
-    '  vec3  encoded = pow(max(layerColor, 0.0), vec3(1.0 / 2.2));',
+    '  float baseAlpha  = shapeMask * step(u_distress, dn) * u_opacity;',
+    '  float wordAlpha  = clamp(wordFill + wordStroke, 0.0, 1.0) * step(u_distress, dn) * u_opacity;',
+    '  float alpha      = max(baseAlpha, wordAlpha);',
+    '  vec3  encoded    = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
     '  fragColor = vec4(encoded, alpha);',
     '}',
   ].join('\n');
@@ -263,6 +290,16 @@
         color1:       gl.getUniformLocation(program, 'u_color1'),
         color2:       gl.getUniformLocation(program, 'u_color2'),
         color3:       gl.getUniformLocation(program, 'u_color3'),
+        quad0:        gl.getUniformLocation(program, 'u_quad0'),
+        quad1:        gl.getUniformLocation(program, 'u_quad1'),
+        quad2:        gl.getUniformLocation(program, 'u_quad2'),
+        quad3:        gl.getUniformLocation(program, 'u_quad3'),
+        wordTex:      gl.getUniformLocation(program, 'u_word_texture'),
+        wordX:        gl.getUniformLocation(program, 'u_word_x'),
+        wordY:        gl.getUniformLocation(program, 'u_word_y'),
+        wordColor:    gl.getUniformLocation(program, 'u_word_color'),
+        useWordColor: gl.getUniformLocation(program, 'u_use_word_color'),
+        wordOutlineColor: gl.getUniformLocation(program, 'u_word_outline_color'),
         tex1:         gl.getUniformLocation(program, 'u_tex1'),
         tex2:         gl.getUniformLocation(program, 'u_tex2'),
         tex3:         gl.getUniformLocation(program, 'u_tex3'),
@@ -278,7 +315,7 @@
       };
     },
 
-    render: function (gl, u, v, w, h) {
+    render: function (gl, u, v, w, h, t, textTex) {
       var DEG = Math.PI / 180;
 
       var circleSize   = v.u_circle_size   != null ? v.u_circle_size   : 0.42;
@@ -298,11 +335,15 @@
       var palB         = v.u_b             || [0.5, 0.5, 0.5];
       var palC         = v.u_c             || [1.0, 1.0, 1.0];
       var palD         = v.u_d             || [0.0, 0.33, 0.67];
-      var colorMode    = v.u_color_mode    != null ? v.u_color_mode    : 0.0;
+      var colorMode    = parseFloat(v.u_color_mode != null ? v.u_color_mode : 0);
       var color0       = v.u_color0        || [1.0, 0.2,   0.4];
       var color1       = v.u_color1        || [1.0, 0.8,   0.0];
       var color2       = v.u_color2        || [0.0, 0.8,   1.0];
       var color3       = v.u_color3        || [0.667, 0.0, 1.0];
+      var quad0        = v.u_quad0         || [1.0,  0.08, 0.58];
+      var quad1        = v.u_quad1         || [0.0,  0.45, 1.0 ];
+      var quad2        = v.u_quad2         || [0.0,  0.90, 0.40];
+      var quad3        = v.u_quad3         || [1.0,  0.55, 0.0 ];
       var fontFamily   = v.u_font_family   || 'Montserrat';
       var fontSize     = v.u_font_size     != null ? v.u_font_size     : 300;
       var outlineEnabled = v.outlineEnabled ? true : false;
@@ -356,9 +397,49 @@
       gl.uniform3fv(u.color1,      color1);
       gl.uniform3fv(u.color2,      color2);
       gl.uniform3fv(u.color3,      color3);
+      gl.uniform3fv(u.quad0,       quad0);
+      gl.uniform3fv(u.quad1,       quad1);
+      gl.uniform3fv(u.quad2,       quad2);
+      gl.uniform3fv(u.quad3,       quad3);
+      gl.uniform1f(u.wordX,        v.textX          != null ? v.textX          : 0.5);
+      gl.uniform1f(u.wordY,        v.textY          != null ? v.textY          : 0.5);
+      gl.uniform3fv(u.wordColor,   v.u_word_color   || [1.0, 1.0, 1.0]);
+      gl.uniform1f(u.useWordColor, v.u_use_word_color != null ? v.u_use_word_color : 0.0);
+      gl.uniform3fv(u.wordOutlineColor, v.u_word_outline_color || [0.0, 0.0, 0.0]);
+      gl.activeTexture(gl.TEXTURE4);
+      gl.bindTexture(gl.TEXTURE_2D, textTex);
+      gl.uniform1i(u.wordTex, 4);
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
+    },
+
+    drawText: function (ctx, size, v) {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, size, size);
+      var txt = (v.wordEnabled && v.text) ? v.text : '';
+      if (txt) {
+        var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"Montserrat"';
+        var fontSize   = v.textFontSize || 200;
+        var cx         = (v.textX != null ? v.textX : 0.5) * size;
+        var cy         = (1 - (v.textY != null ? v.textY : 0.5)) * size;
+        ctx.font         = 'bold ' + fontSize + 'px ' + fontFamily + ', monospace';
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'middle';
+        if (v.wordOutline && v.wordOutlineWidth > 0) {
+          ctx.strokeStyle = 'rgb(0,255,0)';
+          ctx.lineWidth   = (v.wordOutlineWidth || 8) * 2;
+          ctx.lineJoin    = 'round';
+          ctx.strokeText(txt, cx, cy);
+        }
+        ctx.fillStyle = 'rgb(255,0,0)';
+        ctx.fillText(txt, cx, cy);
+      }
+    },
+
+    textKey: function (v) {
+      return JSON.stringify([v.wordEnabled, v.text, v.textX, v.textY, v.textFontSize, v.textFont,
+                             v.wordOutline, v.wordOutlineWidth, v.u_word_outline_color]);
     },
   });
 }());
