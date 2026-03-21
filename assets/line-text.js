@@ -63,7 +63,7 @@
     '  float vignette = clamp(1.0 - vigVal, 0.0, 1.0);',
     '',
     '  vec3 encoded = pow(max(col, 0.0), vec3(1.0 / 2.2));',
-    '  fragColor = vec4(encoded, lineMask * vignette);',
+    '  fragColor = vec4(encoded * vignette, lineMask);',
     '}',
   ].join('\n');
 
