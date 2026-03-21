@@ -14,7 +14,7 @@ function corsHeaders(origin) {
   const allowed = ALLOWED_ORIGINS.has(origin);
   return {
     'Access-Control-Allow-Origin':  allowed ? origin : 'https://brightfield.studio',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
 }
@@ -38,6 +38,10 @@ export default {
 
     if (method === 'GET' && pathname === '/list-designs') {
       return handleListDesigns(request, env, origin);
+    }
+
+    if (method === 'POST' && pathname === '/delete-design') {
+      return handleDeleteDesign(request, env, origin);
     }
 
     if (method === 'POST' && pathname === '/community/submit')  return handleCommunitySubmit(request, env, origin);
@@ -178,6 +182,35 @@ async function handleListDesigns(request, env, origin) {
   } catch {
     return new Response(JSON.stringify([]), { status: 200, headers });
   }
+}
+
+async function handleDeleteDesign(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
+  }
+
+  const { id, deviceId } = body;
+  if (!id || !deviceId) {
+    return new Response(JSON.stringify({ error: 'Missing id or deviceId' }), { status: 400, headers });
+  }
+
+  const key = `device-designs/${deviceId}.json`;
+  let designs = [];
+  try {
+    const obj = await env.MOCKUP_STAGING.get(key);
+    if (obj) designs = JSON.parse(await obj.text());
+  } catch { designs = []; }
+
+  const filtered = designs.filter(function (d) { return d.id !== id; });
+  await env.MOCKUP_STAGING.put(key, JSON.stringify(filtered), {
+    httpMetadata: { contentType: 'application/json' },
+  });
+
+  return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
 }
 
 // ── Community helpers ────────────────────────────────────────────────────────

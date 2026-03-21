@@ -317,3 +317,51 @@ describe('CORS', () => {
     expect(res.headers.get('Access-Control-Allow-Headers')).toContain('Authorization');
   });
 });
+
+// ── /delete-design ────────────────────────────────────────────────────────────
+
+async function seedDesigns(env, deviceId, designs) {
+  await env.MOCKUP_STAGING.put(
+    `device-designs/${deviceId}.json`,
+    JSON.stringify(designs),
+  );
+}
+
+describe('POST /delete-design', () => {
+  let env;
+  beforeEach(() => { env = makeEnv(); });
+
+  it('removes the design with the matching id', async () => {
+    await seedDesigns(env, 'dev-1', [
+      { id: 'aaa', shader: 'rise-shirt' },
+      { id: 'bbb', shader: 'line-circle' },
+    ]);
+
+    const res = await worker.fetch(post('/delete-design', { id: 'aaa', deviceId: 'dev-1' }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+
+    const obj = await env.MOCKUP_STAGING.get('device-designs/dev-1.json');
+    const remaining = JSON.parse(await obj.text());
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].id).toBe('bbb');
+  });
+
+  it('returns ok when id is not found (idempotent)', async () => {
+    await seedDesigns(env, 'dev-2', [{ id: 'aaa', shader: 'rise-shirt' }]);
+
+    const res = await worker.fetch(post('/delete-design', { id: 'no-such', deviceId: 'dev-2' }), env);
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
+
+    const obj = await env.MOCKUP_STAGING.get('device-designs/dev-2.json');
+    const remaining = JSON.parse(await obj.text());
+    expect(remaining).toHaveLength(1);
+  });
+
+  it('returns 400 when id or deviceId is missing', async () => {
+    const res = await worker.fetch(post('/delete-design', { id: 'aaa' }), env);
+    expect(res.status).toBe(400);
+  });
+});
