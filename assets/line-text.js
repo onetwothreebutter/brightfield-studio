@@ -121,7 +121,7 @@
       if (!txt) return;
 
       var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"Montserrat"';
-      var fontSize   = v.textFontSize != null ? v.textFontSize : 600;
+      var fontSize   = v.textFontSize != null ? v.textFontSize : 202;
       var capRadius  = v.textCapRadius != null ? v.textCapRadius : 20;
 
       // Draw white text on offscreen canvas so blur compositing is clean
