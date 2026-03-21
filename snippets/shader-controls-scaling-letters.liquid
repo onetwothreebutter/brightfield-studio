@@ -1,0 +1,68 @@
+var controls = [
+  // ── Text ──────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Text' },
+  { key: 'u_word',         label: 'Word',          type: 'text',   value: 'ABCDE', textDirty: true,
+    tip: 'Up to 6 characters. Word length determines the grid layout.' },
+  { key: 'u_font_family',  label: 'Font',          type: 'select', value: 'Montserrat',
+    options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; }) },
+  { key: 'u_font_size',    label: 'Font Size',     type: 'range',  min: 50, max: 500, step: 10, value: 300 },
+  { key: 'u_text_enabled', label: 'Show Text',     type: 'toggle', value: 1 },
+  { key: 'outlineEnabled', label: 'Outline',       type: 'toggle', value: 0 },
+  { key: 'outlineWidth',   label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 12 },
+  { key: 'u_outline_color', label: 'Outline Color', type: 'color', value: '#000000' },
+  // ── Border ────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Border' },
+  { key: 'u_border_width', label: 'Border Width', type: 'range',  min: 0.002, max: 0.05, step: 0.001, value: 0.01,
+    tip: 'Thickness of the dividing lines between letter cells.' },
+  { key: 'u_border_color', label: 'Border Color', type: 'color',  value: '#ffffff' },
+  { key: 'u_outer_border', label: 'Outer Border', type: 'toggle', value: 0,
+    tip: 'Adds a border around the entire canvas edge.' },
+  // ── Palette ───────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Palette' },
+  { key: '_sl_palette_preset', label: 'Preset', type: 'select', value: 'Rainbow',
+    options: [
+      { label: 'Rainbow',   value: 'Rainbow'   },
+      { label: 'Cool Blue', value: 'Cool Blue' },
+      { label: 'Neon Heat', value: 'Neon Heat' },
+      { label: 'Cyberpunk', value: 'Cyberpunk' },
+      { label: 'Golden',    value: 'Golden'    },
+    ]
+  },
+  { key: 'u_a', label: 'Palette A', type: 'color', value: '#808080',
+    tip: 'Offset — base brightness per channel.' },
+  { key: 'u_b', label: 'Palette B', type: 'color', value: '#808080',
+    tip: 'Amplitude — colour swing range per channel.' },
+  { key: 'u_c', label: 'Palette C', type: 'color', value: '#ffffff',
+    tip: 'Frequency — how many times the palette cycles per channel.' },
+  { key: 'u_d', label: 'Palette D', type: 'color', value: '#0054ab',
+    tip: 'Phase — shifts the starting hue of the colour cycle.' },
+  // ── Finish ────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Finish' },
+  { key: 'u_opacity',        label: 'Opacity',  type: 'range', min: 0, max: 1,    step: 0.01, value: 1.0, noRandomize: true,
+    tip: 'Fades the entire design from fully visible to invisible.' },
+  { key: 'u_distress',       label: 'Distress', type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0,
+    tip: 'Adds a worn, aged look by knocking out random ink spots.' },
+  { key: 'u_distress_scale', label: 'Grain',    type: 'range', min: 10, max: 300, step: 1,    value: 80,
+    tip: 'Size of the distress grain — lower = finer, higher = coarser.' },
+];
+
+var customAfterBuild = function () {
+  var cosineKeys = ['u_a', 'u_b', 'u_c', 'u_d'];
+
+  function applyCosinePreset(p) {
+    applyColors(cosineKeys.map(function (k, i) {
+      return [k, [p.a, p.b, p.c, p.d][i]];
+    }));
+  }
+
+  // Apply default on load so shader matches pickers.
+  applyCosinePreset(COSINE_PRESETS['Rainbow']);
+
+  var presetSel = document.querySelector('[data-param-key="_sl_palette_preset"]');
+  if (presetSel) {
+    presetSel.addEventListener('change', function () {
+      var p = COSINE_PRESETS[this.value];
+      if (p) applyCosinePreset(p);
+    });
+  }
+};
