@@ -1213,17 +1213,30 @@ SHADERS['line-text'] = {
     { key: 'textCapRadius', label: 'Cap Radius', type: 'range', textDirty: true, noRandomize: true, min: 0,  max: 100, step: 1, value: 20,
       tip: 'Blur radius applied to line ends — higher values give softer, more rounded caps.' },
     { type: 'header', label: 'Color Palette' },
-    { key: '_lt_palette_preset', label: 'Preset', type: 'select', noRandomize: true, value: 'Rainbow',
+    { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
+      tip: 'Off = cosine palette. On = 4-stop linear gradient from left to right.' },
+    { key: '_lt_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, noRandomize: true, value: 'Rainbow',
       options: [
         { label: 'Rainbow',   value: 'Rainbow'   }, { label: 'Cool Blue', value: 'Cool Blue' },
         { label: 'Neon Heat', value: 'Neon Heat' }, { label: 'Cyberpunk', value: 'Cyberpunk' },
         { label: 'Golden',    value: 'Golden'    },
       ]
     },
-    { key: 'u_a', label: 'Palette A', type: 'color', value: '#808080', tip: 'Offset.' },
-    { key: 'u_b', label: 'Palette B', type: 'color', value: '#808080', tip: 'Amplitude.' },
-    { key: 'u_c', label: 'Palette C', type: 'color', value: '#ffffff', tip: 'Frequency.' },
-    { key: 'u_d', label: 'Palette D', type: 'color', value: '#0054ab', tip: 'Phase.' },
+    { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080', tip: 'Offset.' },
+    { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080', tip: 'Amplitude.' },
+    { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff', tip: 'Frequency.' },
+    { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab', tip: 'Phase.' },
+    { key: '_lt_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
+      options: [
+        { label: 'Neon',   value: 'Neon'   }, { label: 'Retro',  value: 'Retro'  },
+        { label: 'Sunset', value: 'Sunset' }, { label: 'Aurora', value: 'Aurora' },
+        { label: 'Dusk',   value: 'Dusk'   },
+      ]
+    },
+    { key: 'u_color0', label: 'Color 1 (Left)',  type: 'color', stopDependent: true, value: '#ff3366' },
+    { key: 'u_color1', label: 'Color 2',         type: 'color', stopDependent: true, value: '#ffcc00' },
+    { key: 'u_color2', label: 'Color 3',         type: 'color', stopDependent: true, value: '#00ccff' },
+    { key: 'u_color3', label: 'Color 4 (Right)', type: 'color', stopDependent: true, value: '#aa00ff' },
   ],
   fonts: ['Montserrat','Oswald','Unbounded','Syne','Bricolage Grotesque','Epilogue','DM Sans',
           'IBM Plex Mono','Space Mono','Roboto Mono','Fira Code','Inconsolata','Courier Prime',
@@ -1252,6 +1265,26 @@ SHADERS['line-text'] = {
         var pr = presets[this.value]; if (!pr) return;
         ['u_a','u_b','u_c','u_d'].forEach(function (key, i) {
           var val = [pr.a, pr.b, pr.c, pr.d][i];
+          window._shaderState.values[key] = val;
+          var inp = document.querySelector('[data-param-key="' + key + '"]');
+          if (inp) inp.value = toHex(val);
+        });
+      });
+    }
+
+    var fourStopPresets = {
+      'Neon':   { c0:[1.0,0.2,0.4],   c1:[1.0,0.8,0.0],   c2:[0.0,0.8,1.0],   c3:[0.667,0.0,1.0] },
+      'Retro':  { c0:[0.957,0.263,0.212], c1:[1.0,0.757,0.027], c2:[0.129,0.588,0.953], c3:[0.612,0.153,0.69] },
+      'Sunset': { c0:[1.0,0.341,0.133], c1:[1.0,0.647,0.0], c2:[0.941,0.502,0.502], c3:[0.294,0.0,0.51] },
+      'Aurora': { c0:[0.0,0.858,0.682], c1:[0.0,0.647,0.459], c2:[0.298,0.0,0.933], c3:[0.576,0.0,0.933] },
+      'Dusk':   { c0:[0.925,0.345,0.345], c1:[0.957,0.643,0.376], c2:[0.376,0.239,0.722], c3:[0.137,0.122,0.408] },
+    };
+    var fourStopSel = document.querySelector('[data-param-key="_lt_4color_preset"]');
+    if (fourStopSel) {
+      fourStopSel.addEventListener('change', function () {
+        var fp = fourStopPresets[this.value]; if (!fp) return;
+        ['u_color0','u_color1','u_color2','u_color3'].forEach(function (key, i) {
+          var val = [fp.c0, fp.c1, fp.c2, fp.c3][i];
           window._shaderState.values[key] = val;
           var inp = document.querySelector('[data-param-key="' + key + '"]');
           if (inp) inp.value = toHex(val);

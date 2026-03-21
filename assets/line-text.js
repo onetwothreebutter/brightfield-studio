@@ -13,6 +13,11 @@
     'uniform vec3  u_b;',
     'uniform vec3  u_c;',
     'uniform vec3  u_d;',
+    'uniform float u_color_mode;',
+    'uniform vec3  u_color0;',
+    'uniform vec3  u_color1;',
+    'uniform vec3  u_color2;',
+    'uniform vec3  u_color3;',
     'uniform sampler2D u_text_texture;',
     'uniform float u_vignette_x;',
     'uniform float u_vignette_y;',
@@ -40,7 +45,17 @@
     '  float lineMask = 1.0 - smoothstep(-aa, aa, d);',
     '',
     '  // Cosine palette along X axis',
-    '  vec3 col = cosinePalette(uv.x, u_a, u_b, u_c, u_d);',
+    '  vec3 palColor = cosinePalette(uv.x, u_a, u_b, u_c, u_d);',
+    '',
+    '  // 4-stop linear gradient along X axis',
+    '  float t01 = clamp(uv.x * 3.0, 0.0, 1.0);',
+    '  float t12 = clamp((uv.x - 1.0 / 3.0) * 3.0, 0.0, 1.0);',
+    '  float t23 = clamp((uv.x - 2.0 / 3.0) * 3.0, 0.0, 1.0);',
+    '  vec3 seg01 = mix(u_color0, u_color1, t01);',
+    '  vec3 seg12 = mix(u_color1, u_color2, t12);',
+    '  vec3 seg23 = mix(u_color2, u_color3, t23);',
+    '  vec3 gradColor = mix(mix(seg01, seg12, step(1.0 / 3.0, uv.x)), seg23, step(2.0 / 3.0, uv.x));',
+    '  vec3 col = mix(palColor, gradColor, u_color_mode);',
     '',
     '  // Vignette: independent falloff per axis',
     '  vec2 vigCoord = uv - 0.5;',
@@ -65,6 +80,11 @@
         palB:          gl.getUniformLocation(program, 'u_b'),
         palC:          gl.getUniformLocation(program, 'u_c'),
         palD:          gl.getUniformLocation(program, 'u_d'),
+        colorMode:     gl.getUniformLocation(program, 'u_color_mode'),
+        color0:        gl.getUniformLocation(program, 'u_color0'),
+        color1:        gl.getUniformLocation(program, 'u_color1'),
+        color2:        gl.getUniformLocation(program, 'u_color2'),
+        color3:        gl.getUniformLocation(program, 'u_color3'),
         textTex:       gl.getUniformLocation(program, 'u_text_texture'),
         vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
         vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
@@ -80,6 +100,11 @@
       gl.uniform3fv(u.palB,         v.u_b || [0.5, 0.5, 0.5]);
       gl.uniform3fv(u.palC,         v.u_c || [1.0, 1.0, 1.0]);
       gl.uniform3fv(u.palD,         v.u_d || [0.0, 0.33, 0.67]);
+      gl.uniform1f(u.colorMode,     v.u_color_mode != null ? v.u_color_mode : 0.0);
+      gl.uniform3fv(u.color0,       v.u_color0 || [1.0, 0.2,  0.4]);
+      gl.uniform3fv(u.color1,       v.u_color1 || [1.0, 0.8,  0.0]);
+      gl.uniform3fv(u.color2,       v.u_color2 || [0.0, 0.8,  1.0]);
+      gl.uniform3fv(u.color3,       v.u_color3 || [0.667, 0.0, 1.0]);
       gl.uniform1f(u.vignetteX,     v.u_vignette_x != null ? v.u_vignette_x : 2.0);
       gl.uniform1f(u.vignetteY,     v.u_vignette_y != null ? v.u_vignette_y : 2.0);
 

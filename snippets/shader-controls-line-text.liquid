@@ -17,7 +17,9 @@ var controls = [
     tip: 'Blur radius applied to line ends — higher values give softer, more rounded caps.' },
   // ── Color Palette ──────────────────────────────────────────────────────────
   { type: 'header', label: 'Color Palette' },
-  { key: '_lt_palette_preset', label: 'Preset', type: 'select', noRandomize: true, value: 'Rainbow',
+  { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
+    tip: 'Off = cosine palette. On = 4-stop linear gradient from left to right.' },
+  { key: '_lt_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, noRandomize: true, value: 'Rainbow',
     options: [
       { label: 'Rainbow',   value: 'Rainbow'   },
       { label: 'Cool Blue', value: 'Cool Blue' },
@@ -26,14 +28,27 @@ var controls = [
       { label: 'Golden',    value: 'Golden'    },
     ]
   },
-  { key: 'u_a', label: 'Palette A', type: 'color', value: '#808080',
+  { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
     tip: 'Offset — base brightness per channel. Sets the center point colors oscillate around.' },
-  { key: 'u_b', label: 'Palette B', type: 'color', value: '#808080',
+  { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080',
     tip: 'Amplitude — color swing range per channel. Higher = more vivid, saturated output.' },
-  { key: 'u_c', label: 'Palette C', type: 'color', value: '#ffffff',
+  { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff',
     tip: 'Frequency — how many times the palette cycles per channel.' },
-  { key: 'u_d', label: 'Palette D', type: 'color', value: '#0054ab',
+  { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab',
     tip: 'Phase — shifts the starting hue of the color cycle.' },
+  { key: '_lt_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
+    options: [
+      { label: 'Neon',   value: 'Neon'   },
+      { label: 'Retro',  value: 'Retro'  },
+      { label: 'Sunset', value: 'Sunset' },
+      { label: 'Aurora', value: 'Aurora' },
+      { label: 'Dusk',   value: 'Dusk'   },
+    ]
+  },
+  { key: 'u_color0', label: 'Color 1 (Left)',  type: 'color', stopDependent: true, value: '#ff3366' },
+  { key: 'u_color1', label: 'Color 2',         type: 'color', stopDependent: true, value: '#ffcc00' },
+  { key: 'u_color2', label: 'Color 3',         type: 'color', stopDependent: true, value: '#00ccff' },
+  { key: 'u_color3', label: 'Color 4 (Right)', type: 'color', stopDependent: true, value: '#aa00ff' },
 ];
 
 var customAfterBuild = function () {
@@ -53,6 +68,23 @@ var customAfterBuild = function () {
     cosinePresetSel.addEventListener('change', function () {
       var p = COSINE_PRESETS[this.value];
       if (p) applyCosinePreset(p);
+    });
+  }
+
+  function apply4ColorPreset(p) {
+    applyColors([
+      ['u_color0', p.c0],
+      ['u_color1', p.c1],
+      ['u_color2', p.c2],
+      ['u_color3', p.c3],
+    ]);
+  }
+
+  var fourColorPresetSel = document.querySelector('[data-param-key="_lt_4color_preset"]');
+  if (fourColorPresetSel) {
+    fourColorPresetSel.addEventListener('change', function () {
+      var p = FOUR_STOP_PRESETS[this.value];
+      if (p) apply4ColorPreset(p);
     });
   }
 };

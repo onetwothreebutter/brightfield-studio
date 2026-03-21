@@ -77,7 +77,10 @@ describe('line-text.js', () => {
   it('fragSrc declares all expected uniforms', () => {
     const frag = Array.isArray(opts.fragSrc) ? opts.fragSrc.join('\n') : opts.fragSrc;
     ['u_resolution', 'u_rows', 'u_base_thickness', 'u_text_thickness',
-     'u_vignette_x', 'u_vignette_y', 'u_a', 'u_b', 'u_c', 'u_d', 'u_text_texture'].forEach((name) => {
+     'u_vignette_x', 'u_vignette_y',
+     'u_a', 'u_b', 'u_c', 'u_d',
+     'u_color_mode', 'u_color0', 'u_color1', 'u_color2', 'u_color3',
+     'u_text_texture'].forEach((name) => {
       expect(frag, `missing uniform ${name}`).toContain(name);
     });
   });
@@ -98,7 +101,9 @@ describe('line-text.js', () => {
     const gl = makeSetupGl();
     const uniforms = opts.setup(gl, {});
     ['res', 'rows', 'baseThickness', 'textThickness', 'vignetteX', 'vignetteY',
-     'palA', 'palB', 'palC', 'palD', 'textTex'].forEach((key) => {
+     'palA', 'palB', 'palC', 'palD',
+     'colorMode', 'color0', 'color1', 'color2', 'color3',
+     'textTex'].forEach((key) => {
       expect(uniforms, `setup() is missing key "${key}"`).toHaveProperty(key);
     });
   });
@@ -146,6 +151,7 @@ describe('line-text.js', () => {
     expect(find1f(uniforms.textThickness)).toBeCloseTo(0.4);
     expect(find1f(uniforms.vignetteX)).toBeCloseTo(2.0);
     expect(find1f(uniforms.vignetteY)).toBeCloseTo(2.0);
+    expect(find1f(uniforms.colorMode)).toBe(0.0);
   });
 
   it('render() passes supplied values to uniforms', () => {
