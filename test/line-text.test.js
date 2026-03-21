@@ -253,8 +253,14 @@ describe('line-text.js', () => {
     expect(k1).not.toBe(k2);
   });
 
+  it('textKey() changes when textY changes', () => {
+    const k1 = opts.textKey({ text: 'HI', textY: 0.5 });
+    const k2 = opts.textKey({ text: 'HI', textY: 0.8 });
+    expect(k1).not.toBe(k2);
+  });
+
   it('textKey() is stable for the same inputs', () => {
-    const v = { text: 'TEST', textFont: 'Montserrat', textFontSize: 600, textCapRadius: 20 };
+    const v = { text: 'TEST', textFont: 'Montserrat', textFontSize: 600, textCapRadius: 20, textY: 0.5 };
     expect(opts.textKey(v)).toBe(opts.textKey(v));
   });
 });

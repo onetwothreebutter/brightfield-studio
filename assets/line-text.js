@@ -134,8 +134,10 @@
       octx.textBaseline = 'middle';
       octx.fillStyle    = 'white';
       // Canvas Y=0 is top; UNPACK_FLIP_Y maps canvas top → UV bottom.
-      // Center in shader (UV 0.5,0.5) = canvas (size/2, size/2).
-      octx.fillText(txt, size / 2, size / 2);
+      // textY=0.5 (center) → canvas y = (1-0.5)*size = size/2.
+      var ty = v.textY != null ? v.textY : 0.5;
+      var cy = (1 - ty) * size;
+      octx.fillText(txt, size / 2, cy);
 
       // Blurred pass first — creates smooth falloff at glyph edges (rounded line caps)
       if (capRadius > 0) {
@@ -149,7 +151,7 @@
     },
 
     textKey: function (v) {
-      return JSON.stringify([v.text, v.textFont, v.textFontSize, v.textCapRadius]);
+      return JSON.stringify([v.text, v.textFont, v.textFontSize, v.textCapRadius, v.textY]);
     },
   });
 }());
