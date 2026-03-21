@@ -77,7 +77,7 @@ describe('line-text.js', () => {
   it('fragSrc declares all expected uniforms', () => {
     const frag = Array.isArray(opts.fragSrc) ? opts.fragSrc.join('\n') : opts.fragSrc;
     ['u_resolution', 'u_rows', 'u_base_thickness', 'u_text_thickness',
-     'u_vignette_x', 'u_vignette_y',
+     'u_text_y', 'u_vignette_x', 'u_vignette_y',
      'u_a', 'u_b', 'u_c', 'u_d',
      'u_color_mode', 'u_color0', 'u_color1', 'u_color2', 'u_color3',
      'u_text_texture'].forEach((name) => {
@@ -100,7 +100,7 @@ describe('line-text.js', () => {
   it('setup() returns an object with all required uniform keys', () => {
     const gl = makeSetupGl();
     const uniforms = opts.setup(gl, {});
-    ['res', 'rows', 'baseThickness', 'textThickness', 'vignetteX', 'vignetteY',
+    ['res', 'rows', 'baseThickness', 'textThickness', 'textY', 'vignetteX', 'vignetteY',
      'palA', 'palB', 'palC', 'palD',
      'colorMode', 'color0', 'color1', 'color2', 'color3',
      'textTex'].forEach((key) => {
