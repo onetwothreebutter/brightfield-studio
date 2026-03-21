@@ -218,7 +218,7 @@
     '  float edgeX    = min(uvCoord.x, 1.0 - uvCoord.x);',
     '  float edgeY    = min(uvCoord.y, 1.0 - uvCoord.y) / u_aspect;',
     '  float edgeDist = min(edgeX, edgeY);',
-    '  float outerB   = u_outer_border * (1.0 - smoothstep(bw-aa, bw+aa, edgeDist));',
+    '  float outerB   = u_outer_border * (1.0 - smoothstep(bw*0.5-aa, bw*0.5+aa, edgeDist));',
     '',
     '  // ── Composite ─────────────────────────────────────────────────────────────',
     '  vec3  finalColor = mix(mix(vec3(0.0), letterColor, letterAlpha), u_border_color, isBorder);',
