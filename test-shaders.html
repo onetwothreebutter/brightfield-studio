@@ -193,6 +193,7 @@
     <option value="stacked-gradient">Stacked Gradient</option>
     <option value="echo-text">Echo Text</option>
     <option value="four-circles">Four Circles</option>
+    <option value="line-text">Line Text</option>
   </select>
   <button id="export-btn">Export PNG</button>
 </div>
@@ -1176,6 +1177,87 @@ function buildGUI(shader) {
   // Font preload
   (shader.fonts||[]).forEach(function(f){ document.fonts.load('700 48px "'+f+'"'); });
 }
+
+// ── Line Text ─────────────────────────────────────────────────────────────────
+SHADERS['line-text'] = {
+  controls: [
+    { type: 'header', label: 'Lines' },
+    { key: 'u_rows',           label: 'Row Count',      type: 'range', min: 5,     max: 500,  step: 1,     value: 80   },
+    { key: 'u_base_thickness', label: 'Base Thickness', type: 'range', min: 0.001, max: 0.1,  step: 0.001, value: 0.02 },
+    { key: 'u_text_thickness', label: 'Text Thickness', type: 'range', min: 0,     max: 0.5,  step: 0.01,  value: 0.4  },
+    { type: 'header', label: 'Text' },
+    { key: 'text',          label: 'Text',       type: 'text',   textDirty: true, value: 'HELLO' },
+    { key: 'textFont',      label: 'Font',       type: 'select', textDirty: true, value: 'Montserrat',
+      options: [
+        { label: 'Montserrat',          value: 'Montserrat'          },
+        { label: 'Oswald',              value: 'Oswald'              },
+        { label: 'Unbounded',           value: 'Unbounded'           },
+        { label: 'Syne',                value: 'Syne'                },
+        { label: 'Bricolage Grotesque', value: 'Bricolage Grotesque' },
+        { label: 'Epilogue',            value: 'Epilogue'            },
+        { label: 'DM Sans',             value: 'DM Sans'             },
+        { label: 'IBM Plex Mono',       value: 'IBM Plex Mono'       },
+        { label: 'Space Mono',          value: 'Space Mono'          },
+        { label: 'Roboto Mono',         value: 'Roboto Mono'         },
+        { label: 'Fira Code',           value: 'Fira Code'           },
+        { label: 'Inconsolata',         value: 'Inconsolata'         },
+        { label: 'Courier Prime',       value: 'Courier Prime'       },
+        { label: 'Fragment Mono',       value: 'Fragment Mono'       },
+        { label: 'Azeret Mono',         value: 'Azeret Mono'         },
+        { label: 'Geist Mono',          value: 'Geist Mono'          },
+      ]
+    },
+    { key: 'textFontSize',  label: 'Font Size',  type: 'range', textDirty: true, noRandomize: true, min: 50, max: 950, step: 1, value: 600 },
+    { key: 'textCapRadius', label: 'Cap Radius', type: 'range', textDirty: true, noRandomize: true, min: 0,  max: 100, step: 1, value: 20,
+      tip: 'Blur radius applied to line ends — higher values give softer, more rounded caps.' },
+    { type: 'header', label: 'Color Palette' },
+    { key: '_lt_palette_preset', label: 'Preset', type: 'select', noRandomize: true, value: 'Rainbow',
+      options: [
+        { label: 'Rainbow',   value: 'Rainbow'   }, { label: 'Cool Blue', value: 'Cool Blue' },
+        { label: 'Neon Heat', value: 'Neon Heat' }, { label: 'Cyberpunk', value: 'Cyberpunk' },
+        { label: 'Golden',    value: 'Golden'    },
+      ]
+    },
+    { key: 'u_a', label: 'Palette A', type: 'color', value: '#808080', tip: 'Offset.' },
+    { key: 'u_b', label: 'Palette B', type: 'color', value: '#808080', tip: 'Amplitude.' },
+    { key: 'u_c', label: 'Palette C', type: 'color', value: '#ffffff', tip: 'Frequency.' },
+    { key: 'u_d', label: 'Palette D', type: 'color', value: '#0054ab', tip: 'Phase.' },
+  ],
+  fonts: ['Montserrat','Oswald','Unbounded','Syne','Bricolage Grotesque','Epilogue','DM Sans',
+          'IBM Plex Mono','Space Mono','Roboto Mono','Fira Code','Inconsolata','Courier Prime',
+          'Fragment Mono','Azeret Mono','Geist Mono'],
+  customAfterBuild: function () {
+    var presets = {
+      'Rainbow':   { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.0,  0.33, 0.67]  },
+      'Cool Blue': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.263,0.416,0.557] },
+      'Neon Heat': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.3,  0.2,  0.2 ]  },
+      'Cyberpunk': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[2.0,1.0,0.0], d:[0.5,  0.2,  0.25]  },
+      'Golden':    { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,0.5], d:[0.8,  0.9,  0.3 ]  },
+    };
+
+    // Sync pickers to Rainbow on load
+    var p = presets['Rainbow'];
+    ['u_a','u_b','u_c','u_d'].forEach(function (key, i) {
+      var val = [p.a, p.b, p.c, p.d][i];
+      window._shaderState.values[key] = val;
+      var inp = document.querySelector('[data-param-key="' + key + '"]');
+      if (inp) inp.value = toHex(val);
+    });
+
+    var presetSel = document.querySelector('[data-param-key="_lt_palette_preset"]');
+    if (presetSel) {
+      presetSel.addEventListener('change', function () {
+        var pr = presets[this.value]; if (!pr) return;
+        ['u_a','u_b','u_c','u_d'].forEach(function (key, i) {
+          var val = [pr.a, pr.b, pr.c, pr.d][i];
+          window._shaderState.values[key] = val;
+          var inp = document.querySelector('[data-param-key="' + key + '"]');
+          if (inp) inp.value = toHex(val);
+        });
+      });
+    }
+  },
+};
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 var params     = new URLSearchParams(window.location.search);
