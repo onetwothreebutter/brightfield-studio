@@ -17,6 +17,8 @@ var controls = [
   { key: 'u_border_color', label: 'Border Color', type: 'color',  value: '#ffffff' },
   { key: 'u_outer_border', label: 'Outer Border', type: 'toggle', value: 0,
     tip: 'Adds a border around the entire canvas edge.' },
+  { key: 'u_grid_aspect',  label: 'Grid Ratio',   type: 'range',  min: 0.4, max: 2.0, step: 0.01, value: 0.8,
+    tip: 'Width-to-height ratio of the letter grid (e.g. 0.8 = 4:5 portrait, 1.0 = square).' },
   // ── Palette ───────────────────────────────────────────────────────────────
   { type: 'header', label: 'Palette' },
   { key: '_sl_palette_preset', label: 'Preset', type: 'select', value: 'Rainbow',

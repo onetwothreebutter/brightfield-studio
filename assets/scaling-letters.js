@@ -77,6 +77,7 @@
     'uniform sampler2D u_tex4;',
     'uniform sampler2D u_tex5;',
     'uniform sampler2D u_tex6;',
+    'uniform float     u_grid_aspect;',
     'uniform float     u_opacity;',
     'uniform float     u_distress;',
     'uniform float     u_distress_scale;',
@@ -104,7 +105,7 @@
     '  float aa         = 0.0008;',
     '',
     '  // ── Grid crop: constrain to 4:5 aspect, centred in canvas ─────────────────',
-    '  const float GRID_ASPECT = 0.8;',
+    '  float GRID_ASPECT = u_grid_aspect;',
     '  float scaleX  = min(1.0, GRID_ASPECT / u_aspect);',
     '  float scaleY  = min(1.0, u_aspect / GRID_ASPECT);',
     '  float marginX = (1.0 - scaleX) * 0.5;',
@@ -282,6 +283,7 @@
         outlineColor: gl.getUniformLocation(program, 'u_outline_color'),
         textEnabled:  gl.getUniformLocation(program, 'u_text_enabled'),
         outerBorder:  gl.getUniformLocation(program, 'u_outer_border'),
+        gridAspect:   gl.getUniformLocation(program, 'u_grid_aspect'),
         palA:         gl.getUniformLocation(program, 'u_a'),
         palB:         gl.getUniformLocation(program, 'u_b'),
         palC:         gl.getUniformLocation(program, 'u_c'),
@@ -319,7 +321,7 @@
       var palC           = v.u_c             || [1.0, 1.0, 1.0];
       var palD           = v.u_d             || [0.0, 0.33, 0.67];
       var aspect         = h > 0 ? w / h : 1.0;
-      var GRID_ASPECT    = 4 / 5;
+      var GRID_ASPECT    = v.u_grid_aspect != null ? v.u_grid_aspect : 0.8;
 
       var letters     = word.slice(0, 6).split('').filter(Boolean);
       var letterCount = Math.max(1, letters.length);
@@ -347,6 +349,7 @@
       gl.uniform1f(u.borderWidth,  borderWidth);
       gl.uniform3fv(u.borderColor, borderColor);
       gl.uniform1f(u.outerBorder,  outerBorder);
+      gl.uniform1f(u.gridAspect,   GRID_ASPECT);
       gl.uniform3fv(u.outlineColor, outlineColor);
       gl.uniform1f(u.textEnabled,  textEnabled);
       gl.uniform3fv(u.palA,        palA);
