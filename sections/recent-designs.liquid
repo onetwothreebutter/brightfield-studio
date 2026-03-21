@@ -8,14 +8,6 @@
 <style>
 .recent-designs__heading { margin-bottom: 16px; font-size: 1.25rem; }
 .recent-designs__strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
-.recent-designs__card { flex: 0 0 160px; cursor: pointer; }
-.recent-designs__card-img-wrap { position: relative; width: 160px; height: 240px; }
-.recent-designs__card-img { width: 160px; height: 240px; object-fit: cover; display: block; border-radius: 4px; }
-.recent-designs__card-delete { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%; border: none; background: rgba(0,0,0,0.55); color: #fff; font-size: 1rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.15s; }
-.recent-designs__card:hover .recent-designs__card-delete { opacity: 1; }
-.recent-designs__card-label { padding: 6px 0; }
-.recent-designs__card-name { display: block; font-size: 0.8rem; text-transform: capitalize; }
-.recent-designs__card-time { display: block; font-size: 0.75rem; opacity: 0.6; }
 </style>
 
 <script src="{{ 'recent-designs.js' | asset_url }}" defer></script>
