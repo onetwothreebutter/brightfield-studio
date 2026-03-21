@@ -85,3 +85,11 @@ Always use bold: `ctx.font = 'bold ' + fontSize + 'px ' + fontFamily`
 2. Create `assets/[name].js` — call `window.ShaderBase.create({ fragSrc, setup, render, textKey })`
 3. Add `{% when '[name]' %} {% render 'shader-controls-[name]' %}` to the case block in `sections/main-product.liquid`
 4. Tag the product `shader-[name]` in Shopify
+
+## Memory
+Project memory files live in `.claude/memory/` — read these for patterns, architecture decisions, and accumulated learnings:
+- `feedback_new_shader_checklist.md` — checklist when adding a new shader
+- `project_four_circles_shader.md` — four-circles color modes, texture slots, word overlay
+- `project_gui_dependency_tracking.md` — show/hide row dependencies in GUI builder
+- `project_shader_test_pattern.md` — Vitest test pattern; mocking canvas in jsdom
+- `project_word_overlay_pattern.md` — ShaderBase drawText/textKey recipe
