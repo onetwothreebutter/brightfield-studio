@@ -19,6 +19,7 @@
     'uniform vec3  u_color2;',
     'uniform vec3  u_color3;',
     'uniform sampler2D u_text_texture;',
+    'uniform float u_text_y;',
     'uniform float u_vignette_x;',
     'uniform float u_vignette_y;',
     'out vec4 fragColor;',
@@ -57,8 +58,8 @@
     '  vec3 gradColor = mix(mix(seg01, seg12, step(1.0 / 3.0, uv.x)), seg23, step(2.0 / 3.0, uv.x));',
     '  vec3 col = mix(palColor, gradColor, u_color_mode);',
     '',
-    '  // Vignette: independent falloff per axis',
-    '  vec2 vigCoord = uv - 0.5;',
+    '  // Vignette: centered on text Y position',
+    '  vec2 vigCoord = uv - vec2(0.5, u_text_y);',
     '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
     '  float vignette = clamp(1.0 - vigVal, 0.0, 1.0);',
     '',
@@ -86,6 +87,7 @@
         color2:        gl.getUniformLocation(program, 'u_color2'),
         color3:        gl.getUniformLocation(program, 'u_color3'),
         textTex:       gl.getUniformLocation(program, 'u_text_texture'),
+        textY:         gl.getUniformLocation(program, 'u_text_y'),
         vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
         vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
       };
@@ -105,6 +107,7 @@
       gl.uniform3fv(u.color1,       v.u_color1 || [1.0, 0.8,  0.0]);
       gl.uniform3fv(u.color2,       v.u_color2 || [0.0, 0.8,  1.0]);
       gl.uniform3fv(u.color3,       v.u_color3 || [0.667, 0.0, 1.0]);
+      gl.uniform1f(u.textY,         v.textY != null ? v.textY : 0.5);
       gl.uniform1f(u.vignetteX,     v.u_vignette_x != null ? v.u_vignette_x : 2.0);
       gl.uniform1f(u.vignetteY,     v.u_vignette_y != null ? v.u_vignette_y : 2.0);
 
