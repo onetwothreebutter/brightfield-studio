@@ -329,12 +329,23 @@
       var texUnits    = [gl.TEXTURE0, gl.TEXTURE1, gl.TEXTURE2, gl.TEXTURE3, gl.TEXTURE4, gl.TEXTURE5];
       var texUniforms = [u.tex1, u.tex2, u.tex3, u.tex4, u.tex5, u.tex6];
 
+      var perLetterSize = v.perLetterSizeEnabled ? true : false;
+      var perLetterSizes = [
+        perLetterSize && v.u_font_size_1 != null ? v.u_font_size_1 : fontSize,
+        perLetterSize && v.u_font_size_2 != null ? v.u_font_size_2 : fontSize,
+        perLetterSize && v.u_font_size_3 != null ? v.u_font_size_3 : fontSize,
+        perLetterSize && v.u_font_size_4 != null ? v.u_font_size_4 : fontSize,
+        perLetterSize && v.u_font_size_5 != null ? v.u_font_size_5 : fontSize,
+        perLetterSize && v.u_font_size_6 != null ? v.u_font_size_6 : fontSize,
+      ];
+
       for (var i = 0; i < 6; i++) {
-        var letter = textEnabled ? (letters[i] || '') : '';
-        var ca     = getCellCa(i + 1, letterCount, GRID_ASPECT);
-        var key    = letter + '|' + fontFamily + '|' + fontSize + '|' + outlineEnabled + '|' + outlineWidth + '|' + letterCount + '|' + ca;
+        var letter    = textEnabled ? (letters[i] || '') : '';
+        var letterSz  = perLetterSizes[i];
+        var ca        = getCellCa(i + 1, letterCount, GRID_ASPECT);
+        var key       = letter + '|' + fontFamily + '|' + letterSz + '|' + outlineEnabled + '|' + outlineWidth + '|' + letterCount + '|' + ca;
         if (key !== u._lastLetterKeys[i]) {
-          drawLetter(u._texCtxs[i], letter, fontFamily, fontSize, outlineEnabled, outlineWidth, ca);
+          drawLetter(u._texCtxs[i], letter, fontFamily, letterSz, outlineEnabled, outlineWidth, ca);
           uploadTex(gl, u._glTextures[i], u._texCanvases[i]);
           u._lastLetterKeys[i] = key;
         }

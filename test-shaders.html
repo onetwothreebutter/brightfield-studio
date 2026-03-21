@@ -961,6 +961,13 @@ SHADERS['scaling-letters'] = {
       ]
     },
     { key: 'u_font_size',    label: 'Font Size',     type: 'range',  min: 50, max: 500, step: 10, value: 300 },
+    { key: 'perLetterSizeEnabled', label: 'Per-Letter Size', type: 'toggle', value: 0 },
+    { key: 'u_font_size_1', label: 'Size 1', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_font_size_2', label: 'Size 2', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_font_size_3', label: 'Size 3', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_font_size_4', label: 'Size 4', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_font_size_5', label: 'Size 5', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_font_size_6', label: 'Size 6', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
     { key: 'u_text_enabled', label: 'Show Text',     type: 'toggle', value: 1 },
     { key: 'outlineEnabled', label: 'Outline',       type: 'toggle', value: 0 },
     { key: 'outlineWidth',   label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 12 },
@@ -1068,12 +1075,14 @@ function buildGUI(shader) {
   var quadDependentRows      = [];
   var textColorDependentRows = [];
   var outlineDependentRows   = [];
-  var wordDependentRows      = [];
+  var wordDependentRows          = [];
+  var perLetterSizeDependentRows = [];
   var colorModeBtn    = null;
   var colorModeSel    = null;
   var useTextColorBtn = null;
-  var outlineToggleBtn= null;
-  var wordToggleBtn   = null;
+  var outlineToggleBtn       = null;
+  var wordToggleBtn          = null;
+  var perLetterSizeToggleBtn = null;
   var controlEls = [];
 
   controls.forEach(function(ctrl) {
@@ -1138,7 +1147,8 @@ function buildGUI(shader) {
       if (ctrl.key==='u_color_mode')    colorModeBtn     = btn;
       if (ctrl.key==='u_use_text_color') useTextColorBtn = btn;
       if (ctrl.key==='outlineEnabled')  outlineToggleBtn = btn;
-      if (ctrl.key==='wordEnabled')     wordToggleBtn    = btn;
+      if (ctrl.key==='wordEnabled')           wordToggleBtn          = btn;
+      if (ctrl.key==='perLetterSizeEnabled')  perLetterSizeToggleBtn = btn;
       row.appendChild(btn); controlEls.push({ctrl:ctrl,el:btn});
 
     } else if (ctrl.type === 'color') {
@@ -1182,7 +1192,8 @@ function buildGUI(shader) {
     if (ctrl.quadDependent)      quadDependentRows.push(row);
     if (ctrl.textColorDependent) textColorDependentRows.push(row);
     if (ctrl.outlineDependent)   outlineDependentRows.push(row);
-    if (ctrl.wordDependent)      wordDependentRows.push(row);
+    if (ctrl.wordDependent)           wordDependentRows.push(row);
+    if (ctrl.perLetterSizeDependent)  perLetterSizeDependentRows.push(row);
 
     body.appendChild(row);
   });
@@ -1217,6 +1228,11 @@ function buildGUI(shader) {
   applyTextColorVisibility();
   applyOutlineVisibility();
   applyWordVisibility();
+  function applyPerLetterSizeVisibility() {
+    var on = perLetterSizeToggleBtn && perLetterSizeToggleBtn.dataset.on==='1';
+    perLetterSizeDependentRows.forEach(function(r){ r.style.display=on?'':'none'; });
+  }
+  applyPerLetterSizeVisibility();
 
   // customAfterBuild
   if (typeof shader.customAfterBuild === 'function') shader.customAfterBuild(body);

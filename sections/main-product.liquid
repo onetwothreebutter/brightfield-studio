@@ -396,12 +396,14 @@ if (window.location.hash === '#shader') {
   var quadDependentRows       = [];
   var textColorDependentRows  = [];
   var outlineDependentRows    = [];
-  var wordDependentRows       = [];
+  var wordDependentRows           = [];
+  var perLetterSizeDependentRows  = [];
   var colorModeBtn     = null;
   var colorModeSel     = null;
   var useTextColorBtn  = null;
-  var outlineToggleBtn = null;
-  var wordToggleBtn    = null;
+  var outlineToggleBtn        = null;
+  var wordToggleBtn           = null;
+  var perLetterSizeToggleBtn  = null;
   var controlEls = []; // [{ctrl, el}] for randomisation
 
   controls.forEach(function (ctrl) {
@@ -480,7 +482,8 @@ if (window.location.hash === '#shader') {
       if (ctrl.key === 'u_color_mode')    colorModeBtn     = btn;
       if (ctrl.key === 'u_use_text_color') useTextColorBtn  = btn;
       if (ctrl.key === 'outlineEnabled')   outlineToggleBtn = btn;
-      if (ctrl.key === 'wordEnabled')      wordToggleBtn    = btn;
+      if (ctrl.key === 'wordEnabled')           wordToggleBtn           = btn;
+      if (ctrl.key === 'perLetterSizeEnabled')  perLetterSizeToggleBtn  = btn;
 
       row.appendChild(btn);
       controlEls.push({ ctrl: ctrl, el: btn });
@@ -546,7 +549,8 @@ if (window.location.hash === '#shader') {
     if (ctrl.quadDependent)      quadDependentRows.push(row);
     if (ctrl.textColorDependent) textColorDependentRows.push(row);
     if (ctrl.outlineDependent)   outlineDependentRows.push(row);
-    if (ctrl.wordDependent)      wordDependentRows.push(row);
+    if (ctrl.wordDependent)           wordDependentRows.push(row);
+    if (ctrl.perLetterSizeDependent)  perLetterSizeDependentRows.push(row);
 
     body.appendChild(row);
   });
@@ -599,6 +603,12 @@ if (window.location.hash === '#shader') {
   }
   if (wordToggleBtn) wordToggleBtn.addEventListener('click', applyWordVisibility);
   applyWordVisibility();
+  function applyPerLetterSizeVisibility() {
+    var on = perLetterSizeToggleBtn && perLetterSizeToggleBtn.dataset.on === '1';
+    perLetterSizeDependentRows.forEach(function (r) { r.style.display = on ? '' : 'none'; });
+  }
+  if (perLetterSizeToggleBtn) perLetterSizeToggleBtn.addEventListener('click', applyPerLetterSizeVisibility);
+  applyPerLetterSizeVisibility();
   if (typeof customAfterBuild === 'function') customAfterBuild();
 
   // Animation settings (exposed for browser debugging)
