@@ -1,21 +1,21 @@
 var controls = [
   // ── Circles ───────────────────────────────────────────────────────────────
   { type: 'header', label: 'Circles' },
-  { key: 'u_circle_size', label: 'Circle Size',      type: 'range', min: 0.05, max: 0.49,  step: 0.01, value: 0.42,
+  { key: 'u_circle_size', label: 'Circle Size',      type: 'range', min: 0.05, max: 0.49,  step: 0.01, value: 0.33,
     tip: 'Radius of each circle in local quadrant space.' },
-  { key: 'u_tri_size',    label: 'Triangle Size',    type: 'range', min: 0.01, max: 1.0,   step: 0.01, value: 0.22,
+  { key: 'u_tri_size',    label: 'Triangle Size',    type: 'range', min: 0.01, max: 1.0,   step: 0.01, value: 0.46,
     tip: 'Height of the triangular cutout.' },
-  { key: 'u_tri_angle',   label: 'Triangle Angle',   type: 'range', min: -180, max: 180,   step: 1,    value: 0,
+  { key: 'u_tri_angle',   label: 'Triangle Angle',   type: 'range', min: -180, max: 180,   step: 1,    value: 45,
     tip: 'Extra rotation applied to all triangles (degrees).' },
   { key: 'u_tri_apex',    label: 'Triangle Width',   type: 'range', min: 5,    max: 175,   step: 1,    value: 90,
     tip: 'Apex angle of the triangle — wider angle = wider cutout (degrees).' },
-  { key: 'u_offset_x',    label: 'X Spacing',        type: 'range', min: -1.0, max: 0.4,   step: 0.01, value: 0.0,
+  { key: 'u_offset_x',    label: 'X Spacing',        type: 'range', min: -1.0, max: 0.4,   step: 0.01, value: 0.04,
     tip: 'Horizontal shift of each circle away from the image centre.' },
-  { key: 'u_offset_y',    label: 'Y Spacing',        type: 'range', min: -1.0, max: 0.4,   step: 0.01, value: 0.0,
+  { key: 'u_offset_y',    label: 'Y Spacing',        type: 'range', min: -1.0, max: 0.4,   step: 0.01, value: -0.14,
     tip: 'Vertical shift of each circle away from the image centre.' },
   // ── Rotation ──────────────────────────────────────────────────────────────
   { type: 'header', label: 'Rotation' },
-  { key: 'u_rot1', label: 'Top Left',     type: 'range', min: -180, max: 180, step: 1, value: 0,
+  { key: 'u_rot1', label: 'Top Left',     type: 'range', min: -180, max: 180, step: 1, value: -180,
     tip: 'Individual rotation for the top-left circle (degrees).' },
   { key: 'u_rot2', label: 'Top Right',    type: 'range', min: -180, max: 180, step: 1, value: 0,
     tip: 'Individual rotation for the top-right circle (degrees).' },
@@ -25,8 +25,13 @@ var controls = [
     tip: 'Individual rotation for the bottom-right circle (degrees).' },
   // ── Palette ───────────────────────────────────────────────────────────────
   { type: 'header', label: 'Palette' },
-  { key: 'u_color_mode',  label: '4-Stop Mode',     type: 'toggle', value: 0,
-    tip: 'Off = cosine palette. On = 4-stop linear gradient.' },
+  { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '2',
+    options: [
+      { label: 'Cosine',       value: '0' },
+      { label: '4-Stop',       value: '1' },
+      { label: 'Per-Quadrant', value: '2' },
+    ]
+  },
   { key: 'u_global_grad', label: 'Global Gradient', type: 'toggle', value: 0,
     tip: 'Off = each quadrant has its own gradient. On = gradient spans the full image.' },
   // Cosine palette controls (hidden when 4-Stop mode is on)
@@ -61,8 +66,28 @@ var controls = [
   { key: 'u_color1', label: 'Color 2', type: 'color', stopDependent: true, value: '#ffcc00' },
   { key: 'u_color2', label: 'Color 3', type: 'color', stopDependent: true, value: '#00ccff' },
   { key: 'u_color3', label: 'Color 4', type: 'color', stopDependent: true, value: '#aa00ff' },
+  // Per-quadrant colour controls (hidden unless Per-Quadrant mode is active)
+  { key: 'u_quad0', label: 'Top Left',     type: 'color', quadDependent: true, value: '#d10000' },
+  { key: 'u_quad1', label: 'Top Right',    type: 'color', quadDependent: true, value: '#003087' },
+  { key: 'u_quad2', label: 'Bottom Left',  type: 'color', quadDependent: true, value: '#ffd700' },
+  { key: 'u_quad3', label: 'Bottom Right', type: 'color', quadDependent: true, value: '#f5f5f5' },
+  // ── Word Overlay ──────────────────────────────────────────────────────────
+  { type: 'header', label: 'Word Overlay' },
+  { key: 'wordEnabled',  label: 'Enabled',   type: 'toggle', value: 0, textDirty: true, noRandomize: true },
+  { key: 'text',         label: 'Word',      type: 'text',   value: 'GLOW',        textDirty: true, wordDependent: true },
+  { key: 'textFont',     label: 'Font',      type: 'select', value: 'Montserrat',  textDirty: true, wordDependent: true,
+    options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
+  },
+  { key: 'textFontSize', label: 'Size',      type: 'range', min: 8, max: 400, step: 1, value: 200, textDirty: true, wordDependent: true },
+  { key: 'textX',        label: 'X',         type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.5, textDirty: true, noRandomize: true, wordDependent: true },
+  { key: 'textY',        label: 'Y',         type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.5, textDirty: true, noRandomize: true, wordDependent: true },
+  { key: 'u_use_word_color',   label: 'Custom Color',   type: 'toggle', value: 0, wordDependent: true },
+  { key: 'u_word_color',       label: 'Word Color',     type: 'color',  value: '#ffffff', wordDependent: true },
+  { key: 'wordOutline',        label: 'Outline',        type: 'toggle', value: 0, textDirty: true, noRandomize: true, wordDependent: true },
+  { key: 'wordOutlineWidth',   label: 'Outline Width',  type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true, noRandomize: true, wordDependent: true },
+  { key: 'u_word_outline_color', label: 'Outline Color', type: 'color', value: '#000000', noRandomize: true, wordDependent: true },
   // ── Text ──────────────────────────────────────────────────────────────────
-  { type: 'header', label: 'Text' },
+  { type: 'header', label: 'Letters' },
   { key: 'u_text_enabled', label: 'Show Text',    type: 'toggle', value: 1 },
   { key: 'u_letter1',      label: 'Top Left',     type: 'text',   value: 'A' },
   { key: 'u_letter2',      label: 'Top Right',    type: 'text',   value: 'B' },
@@ -122,4 +147,5 @@ var customAfterBuild = function () {
       if (p) apply4ColorPreset(p);
     });
   }
+
 };

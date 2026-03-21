@@ -392,12 +392,15 @@ if (window.location.hash === '#shader') {
   var paletteDependentRows    = [];
   var stopDependentRows       = [];
   var oklchDependentRows      = [];
+  var quadDependentRows       = [];
   var textColorDependentRows  = [];
   var outlineDependentRows    = [];
+  var wordDependentRows       = [];
   var colorModeBtn     = null;
   var colorModeSel     = null;
   var useTextColorBtn  = null;
   var outlineToggleBtn = null;
+  var wordToggleBtn    = null;
   var controlEls = []; // [{ctrl, el}] for randomisation
 
   controls.forEach(function (ctrl) {
@@ -476,6 +479,7 @@ if (window.location.hash === '#shader') {
       if (ctrl.key === 'u_color_mode')    colorModeBtn     = btn;
       if (ctrl.key === 'u_use_text_color') useTextColorBtn  = btn;
       if (ctrl.key === 'outlineEnabled')   outlineToggleBtn = btn;
+      if (ctrl.key === 'wordEnabled')      wordToggleBtn    = btn;
 
       row.appendChild(btn);
       controlEls.push({ ctrl: ctrl, el: btn });
@@ -538,8 +542,10 @@ if (window.location.hash === '#shader') {
     if (ctrl.paletteDependent)   paletteDependentRows.push(row);
     if (ctrl.stopDependent)      stopDependentRows.push(row);
     if (ctrl.oklchDependent)     oklchDependentRows.push(row);
+    if (ctrl.quadDependent)      quadDependentRows.push(row);
     if (ctrl.textColorDependent) textColorDependentRows.push(row);
     if (ctrl.outlineDependent)   outlineDependentRows.push(row);
+    if (ctrl.wordDependent)      wordDependentRows.push(row);
 
     body.appendChild(row);
   });
@@ -559,6 +565,9 @@ if (window.location.hash === '#shader') {
       r.style.display = mode === '1' ? '' : 'none';
     });
     oklchDependentRows.forEach(function (r) {
+      r.style.display = mode === '2' ? '' : 'none';
+    });
+    quadDependentRows.forEach(function (r) {
       r.style.display = mode === '2' ? '' : 'none';
     });
   }
@@ -581,6 +590,14 @@ if (window.location.hash === '#shader') {
   }
   if (outlineToggleBtn) outlineToggleBtn.addEventListener('click', applyOutlineVisibility);
   applyOutlineVisibility();
+
+  // Show/hide word overlay rows based on Word Enabled toggle
+  function applyWordVisibility() {
+    var on = wordToggleBtn && wordToggleBtn.dataset.on === '1';
+    wordDependentRows.forEach(function (r) { r.style.display = on ? '' : 'none'; });
+  }
+  if (wordToggleBtn) wordToggleBtn.addEventListener('click', applyWordVisibility);
+  applyWordVisibility();
   if (typeof customAfterBuild === 'function') customAfterBuild();
 
   // Animation settings (exposed for browser debugging)
