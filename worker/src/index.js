@@ -51,6 +51,8 @@ export default {
     if (method === 'POST' && pathname === '/community/approve') return handleCommunityModerate(request, env, origin, 'approved');
     if (method === 'POST' && pathname === '/community/reject')  return handleCommunityModerate(request, env, origin, 'rejected');
 
+    if (method === 'GET'  && pathname === '/admin-ui') return handleAdminUI(request, env);
+
     return new Response('Not found', { status: 404 });
   }
 };
@@ -215,9 +217,46 @@ async function handleDeleteDesign(request, env, origin) {
 
 // ── Community helpers ────────────────────────────────────────────────────────
 
-function requireAdmin(request, env) {
+async function verifyShopifySessionToken(token, clientSecret) {
+  if (!token || !clientSecret) return false;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const [headerB64, payloadB64, sigB64] = parts;
+
+    function b64urlToBytes(s) {
+      const b64 = s.replace(/-/g, '+').replace(/_/g, '/');
+      return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    }
+
+    const header = JSON.parse(new TextDecoder().decode(b64urlToBytes(headerB64)));
+    if (header.alg !== 'HS256') return false;
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(clientSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+    const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
+    const valid = await crypto.subtle.verify('HMAC', key, b64urlToBytes(sigB64), data);
+    if (!valid) return false;
+
+    const payload = JSON.parse(new TextDecoder().decode(b64urlToBytes(payloadB64)));
+    if (payload.exp < Date.now() / 1000) return false;
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function requireAdmin(request, env) {
   const auth = request.headers.get('Authorization') || '';
-  return auth === `Bearer ${env.ADMIN_TOKEN}`;
+  if (auth === `Bearer ${env.ADMIN_TOKEN}`) return true;
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  return verifyShopifySessionToken(token, env.SHOPIFY_APP_CLIENT_SECRET);
 }
 
 async function readJson(env, key) {
@@ -328,7 +367,7 @@ async function handleCommunityLike(request, env, origin) {
 
 async function handleCommunityPending(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
-  if (!requireAdmin(request, env)) {
+  if (!await requireAdmin(request, env)) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
   }
 
@@ -342,7 +381,7 @@ async function handleCommunityPending(request, env, origin) {
 
 async function handleCommunityModerate(request, env, origin, newStatus) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
-  if (!requireAdmin(request, env)) {
+  if (!await requireAdmin(request, env)) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
   }
 
@@ -364,6 +403,152 @@ async function handleCommunityModerate(request, env, origin, newStatus) {
   submission.status = newStatus;
   await writeJson(env, `community/submissions/${id}.json`, submission);
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+}
+
+// ── Shopify Admin App UI ──────────────────────────────────────────────────────
+
+function handleAdminUI(request, env) {
+  const clientId = env.SHOPIFY_APP_CLIENT_ID || '';
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Community Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="shopify-api-key" content="${clientId}" />
+  <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"><\/script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; color: #202223; background: #f6f6f7; }
+    .admin { max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem; }
+    h1 { font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; }
+    .tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 1px solid #e1e3e5; }
+    .tab { background: none; border: none; padding: 0.5rem 1rem; font-size: 0.875rem; color: #6d7175; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tab.active { color: #202223; border-bottom-color: #008060; font-weight: 500; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
+    .card { background: #fff; border: 1px solid #e1e3e5; border-radius: 8px; overflow: hidden; }
+    .card-img { width: 100%; aspect-ratio: 3/4; object-fit: cover; display: block; }
+    .card-info { padding: 0.5rem; font-size: 0.75rem; color: #6d7175; line-height: 1.4; }
+    .card-info strong { display: block; font-size: 0.8125rem; color: #202223; margin-bottom: 0.15rem; font-weight: 500; }
+    .card-actions { display: flex; gap: 0.5rem; padding: 0 0.5rem 0.5rem; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; border-radius: 6px; cursor: pointer; border: 1px solid; flex: 1; }
+    .btn-primary { background: #008060; color: #fff; border-color: #008060; }
+    .btn-outline { background: #fff; color: #202223; border-color: #c9cccf; }
+    .status { color: #6d7175; font-size: 0.875rem; padding: 1.5rem 0; }
+    .error { color: #d72c0d; }
+  </style>
+</head>
+<body>
+  <div class="admin">
+    <h1>Community Designs</h1>
+    <div class="tabs">
+      <button class="tab active" data-tab="pending">Pending</button>
+      <button class="tab" data-tab="approved">Approved</button>
+      <button class="tab" data-tab="rejected">Rejected</button>
+    </div>
+    <div id="content"><p class="status">Loading…</p></div>
+  </div>
+  <script>
+    var content = document.getElementById('content');
+    var tabs = document.querySelectorAll('.tab');
+
+    async function authHeaders() {
+      var token = await window.shopify.idToken();
+      return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+    }
+
+    function timeAgo(ts) {
+      var diff = Math.floor((Date.now() - ts * 1000) / 1000);
+      if (diff < 60) return diff + 's ago';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      return Math.floor(diff / 86400) + 'd ago';
+    }
+
+    function esc(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    async function loadTab(tab) {
+      content.innerHTML = '<p class="status">Loading\u2026</p>';
+      try {
+        var endpoint = tab === 'pending' ? '/community/pending' : '/community/list?status=' + tab;
+        var r = await fetch(endpoint, { headers: await authHeaders() });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        renderCards(await r.json(), tab);
+      } catch (err) {
+        content.innerHTML = '<p class="status error">Error: ' + esc(err.message) + '</p>';
+      }
+    }
+
+    function renderCards(designs, tab) {
+      if (!designs || !designs.length) {
+        content.innerHTML = '<p class="status">No ' + tab + ' designs.</p>';
+        return;
+      }
+      var grid = document.createElement('div');
+      grid.className = 'cards';
+      designs.forEach(function(d) {
+        var card = document.createElement('div');
+        card.className = 'card';
+        var img = document.createElement('img');
+        img.src = d.mockupUrl; img.alt = ''; img.className = 'card-img'; img.loading = 'lazy';
+        var info = document.createElement('div');
+        info.className = 'card-info';
+        info.innerHTML = '<strong>' + esc(d.creatorName || 'Anonymous') + '</strong>' +
+          esc(d.creatorEmail || '') + '<br>' +
+          esc((d.shader || '').replace(/-/g, ' ')) + ' \u00b7 ' + timeAgo(d.timestamp);
+        card.appendChild(img);
+        card.appendChild(info);
+        if (tab === 'pending') {
+          var actions = document.createElement('div');
+          actions.className = 'card-actions';
+          var aBtn = document.createElement('button');
+          aBtn.className = 'btn btn-primary'; aBtn.textContent = 'Approve';
+          var rBtn = document.createElement('button');
+          rBtn.className = 'btn btn-outline'; rBtn.textContent = 'Reject';
+          (function(id, a, r, c) {
+            a.addEventListener('click', function() { moderate(id, 'approve', c); });
+            r.addEventListener('click', function() { moderate(id, 'reject', c); });
+          }(d.id, aBtn, rBtn, card));
+          actions.appendChild(aBtn); actions.appendChild(rBtn);
+          card.appendChild(actions);
+        }
+        grid.appendChild(card);
+      });
+      content.innerHTML = '';
+      content.appendChild(grid);
+    }
+
+    async function moderate(id, action, cardEl) {
+      try {
+        var r = await fetch('/community/' + action, {
+          method: 'POST',
+          headers: await authHeaders(),
+          body: JSON.stringify({ id: id })
+        });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        cardEl.style.opacity = '0.3';
+        cardEl.style.pointerEvents = 'none';
+      } catch (err) { alert('Action failed: ' + err.message); }
+    }
+
+    tabs.forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        tabs.forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        loadTab(tab.dataset.tab);
+      });
+    });
+
+    loadTab('pending');
+  <\/script>
+</body>
+</html>`;
+  return new Response(html, {
+    status: 200,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  });
 }
 
 // ── Device design gallery ────────────────────────────────────────────────────
