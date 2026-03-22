@@ -113,6 +113,7 @@
     'uniform sampler2D u_tex10;',
     'uniform sampler2D u_tex11;',
     'uniform float     u_invert;',
+    'uniform float     u_corner_radius;',
     'uniform float     u_grid_aspect;',
     'uniform float     u_opacity;',
     'uniform float     u_distress;',
@@ -497,6 +498,11 @@
     '  finalColor = mix(finalColor, u_border_color, activeOuterB);',
     '  float alpha = max(max(activeBorder, activeOuterB), activeLetterAlpha);',
     '',
+    '  // ── Corner rounding ───────────────────────────────────────────────────────',
+    '  vec2  _q = abs(localUV - 0.5) - (0.5 - u_corner_radius);',
+    '  float _d = length(max(_q, 0.0)) + min(max(_q.x, _q.y), 0.0) - u_corner_radius;',
+    '  alpha *= 1.0 - smoothstep(-0.005, 0.005, _d);',
+    '',
     '  // ── Distress + finish ─────────────────────────────────────────────────────',
     '  float dn = distressNoise(gridUV, u_distress_scale) * 0.67',
     '           + distressNoise(gridUV, u_distress_scale * 2.73) * 0.33;',
@@ -563,6 +569,7 @@
         tex10:        gl.getUniformLocation(program, 'u_tex10'),
         tex11:        gl.getUniformLocation(program, 'u_tex11'),
         invert:        gl.getUniformLocation(program, 'u_invert'),
+        cornerRadius:  gl.getUniformLocation(program, 'u_corner_radius'),
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
@@ -652,6 +659,7 @@
       gl.uniform3fv(u.color2,    v.u_color2     || [0.0, 0.8, 1.0]);
       gl.uniform3fv(u.color3,    v.u_color3     || [0.67, 0.0, 1.0]);
       gl.uniform1f(u.invert,        v.u_invert ? 1.0 : 0.0);
+      gl.uniform1f(u.cornerRadius,  v.u_corner_radius != null ? v.u_corner_radius : 0.0);
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
