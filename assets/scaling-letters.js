@@ -339,7 +339,7 @@
 
     render: function (gl, u, v, w, h) {
       var word           = v.u_word         != null ? v.u_word         : 'ABCDE';
-      var fontFamily     = v.u_font_family  || 'Montserrat';
+      var fontFamily     = v.u_font_family  || 'Barlow Condensed';
       var fontSize       = v.u_font_size    != null ? v.u_font_size    : 300;
       var textEnabled    = v.u_text_enabled != null ? v.u_text_enabled : 1.0;
       var outlineEnabled = v.outlineEnabled ? true : false;
