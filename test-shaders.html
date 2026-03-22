@@ -969,15 +969,23 @@ SHADERS['scaling-letters'] = {
     { key: 'u_font_size_5', label: 'Size 5', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
     { key: 'u_font_size_6', label: 'Size 6', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
     { key: 'u_text_enabled', label: 'Show Text',     type: 'toggle', value: 1 },
+    { key: 'u_text_color',   label: 'Text Color',    type: 'color',  value: '#ffffff' },
     { key: 'outlineEnabled', label: 'Outline',       type: 'toggle', value: 0 },
     { key: 'outlineWidth',   label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 12 },
     { key: 'u_outline_color', label: 'Outline Color', type: 'color', value: '#000000' },
     { type: 'header', label: 'Border' },
-    { key: 'u_border_width', label: 'Border Width', type: 'range',  min: 0.002, max: 0.05, step: 0.001, value: 0.01 },
+    { key: 'u_border_width', label: 'Border Width', type: 'range',  min: 2, max: 50, step: 1, value: 4 },
     { key: 'u_border_color', label: 'Border Color', type: 'color',  value: '#ffffff' },
     { key: 'u_outer_border', label: 'Outer Border', type: 'toggle', value: 1 },
     { key: 'u_grid_aspect',  label: 'Grid Ratio',   type: 'range',  min: 0.4, max: 2.0, step: 0.01, value: 0.8 },
     { type: 'header', label: 'Palette' },
+    { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '0',
+      options: [
+        { label: 'Flat',   value: '0' },
+        { label: '4-Stop', value: '1' },
+        { label: 'Cosine', value: '2' },
+      ]
+    },
     { key: '_sl_palette_preset', label: 'Preset', type: 'select', value: 'Rainbow',
       options: [
         { label: 'Rainbow',   value: 'Rainbow'   }, { label: 'Cool Blue', value: 'Cool Blue' },
@@ -989,6 +997,10 @@ SHADERS['scaling-letters'] = {
     { key: 'u_b', label: 'Palette B', type: 'color', value: '#808080' },
     { key: 'u_c', label: 'Palette C', type: 'color', value: '#ffffff' },
     { key: 'u_d', label: 'Palette D', type: 'color', value: '#0054ab' },
+    { key: 'u_color0', label: 'Color 1 (Left)',  type: 'color', value: '#ff3366' },
+    { key: 'u_color1', label: 'Color 2',         type: 'color', value: '#ffcc00' },
+    { key: 'u_color2', label: 'Color 3',         type: 'color', value: '#00ccff' },
+    { key: 'u_color3', label: 'Color 4 (Right)', type: 'color', value: '#aa00ff' },
     { type: 'header', label: 'Finish' },
     { key: 'u_opacity',        label: 'Opacity',  type: 'range', min: 0, max: 1,    step: 0.01, value: 1.0, noRandomize: true },
     { key: 'u_distress',       label: 'Distress', type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0 },
@@ -1013,9 +1025,28 @@ SHADERS['scaling-letters'] = {
       if (inp) inp.value = toHex(val);
     }
 
-    var rainbow = cosinePresets['Rainbow'];
-    setColor('u_a', rainbow.a); setColor('u_b', rainbow.b);
-    setColor('u_c', rainbow.c); setColor('u_d', rainbow.d);
+    function rowFor(key) {
+      var el = document.querySelector('[data-param-key="' + key + '"]');
+      return el ? el.closest('.shader-control') : null;
+    }
+
+    var cosineKeys = ['_sl_palette_preset', 'u_a', 'u_b', 'u_c', 'u_d'];
+    var stopKeys   = ['u_color0', 'u_color1', 'u_color2', 'u_color3'];
+
+    function applyVisibility() {
+      var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
+      var mode   = modeEl ? modeEl.value : '0';
+      cosineKeys.forEach(function (key) {
+        var row = rowFor(key); if (row) row.style.display = mode === '2' ? '' : 'none';
+      });
+      stopKeys.forEach(function (key) {
+        var row = rowFor(key); if (row) row.style.display = mode === '1' ? '' : 'none';
+      });
+    }
+
+    var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
+    if (modeEl) modeEl.addEventListener('change', applyVisibility);
+    applyVisibility();
 
     var presetSel = document.querySelector('[data-param-key="_sl_palette_preset"]');
     if (presetSel) {

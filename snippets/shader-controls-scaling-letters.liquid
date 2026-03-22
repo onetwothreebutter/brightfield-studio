@@ -15,12 +15,13 @@ var controls = [
   { key: 'u_font_size_5', label: 'Size 5', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
   { key: 'u_font_size_6', label: 'Size 6', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
   { key: 'u_text_enabled', label: 'Show Text',     type: 'toggle', value: 1 },
+  { key: 'u_text_color',   label: 'Text Color',    type: 'color',  value: '#ffffff' },
   { key: 'outlineEnabled', label: 'Outline',       type: 'toggle', value: 0 },
   { key: 'outlineWidth',   label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 12 },
   { key: 'u_outline_color', label: 'Outline Color', type: 'color', value: '#000000' },
   // ── Border ────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Border' },
-  { key: 'u_border_width', label: 'Border Width', type: 'range',  min: 0.002, max: 0.05, step: 0.001, value: 0.01,
+  { key: 'u_border_width', label: 'Border Width', type: 'range',  min: 2, max: 50, step: 1, value: 4,
     tip: 'Thickness of the dividing lines between letter cells.' },
   { key: 'u_border_color', label: 'Border Color', type: 'color',  value: '#ffffff' },
   { key: 'u_outer_border', label: 'Outer Border', type: 'toggle', value: 1,
@@ -29,6 +30,14 @@ var controls = [
     tip: 'Width-to-height ratio of the letter grid (e.g. 0.8 = 4:5 portrait, 1.0 = square).' },
   // ── Palette ───────────────────────────────────────────────────────────────
   { type: 'header', label: 'Palette' },
+  { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '0',
+    options: [
+      { label: 'Flat',   value: '0' },
+      { label: '4-Stop', value: '1' },
+      { label: 'Cosine', value: '2' },
+    ]
+  },
+  // Cosine palette (shown/hidden by customAfterBuild)
   { key: '_sl_palette_preset', label: 'Preset', type: 'select', value: 'Rainbow',
     options: [
       { label: 'Rainbow',   value: 'Rainbow'   },
@@ -46,6 +55,11 @@ var controls = [
     tip: 'Frequency — how many times the palette cycles per channel.' },
   { key: 'u_d', label: 'Palette D', type: 'color', value: '#0054ab',
     tip: 'Phase — shifts the starting hue of the colour cycle.' },
+  // 4-stop colors (shown/hidden by customAfterBuild)
+  { key: 'u_color0', label: 'Color 1 (Left)',  type: 'color', value: '#ff3366' },
+  { key: 'u_color1', label: 'Color 2',         type: 'color', value: '#ffcc00' },
+  { key: 'u_color2', label: 'Color 3',         type: 'color', value: '#00ccff' },
+  { key: 'u_color3', label: 'Color 4 (Right)', type: 'color', value: '#aa00ff' },
   // ── Finish ────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Finish' },
   { key: 'u_opacity',        label: 'Opacity',  type: 'range', min: 0, max: 1,    step: 0.01, value: 1.0, noRandomize: true,
@@ -57,22 +71,38 @@ var controls = [
 ];
 
 var customAfterBuild = function () {
-  var cosineKeys = ['u_a', 'u_b', 'u_c', 'u_d'];
+  var cosineKeys = ['_sl_palette_preset', 'u_a', 'u_b', 'u_c', 'u_d'];
+  var stopKeys   = ['u_color0', 'u_color1', 'u_color2', 'u_color3'];
 
-  function applyCosinePreset(p) {
-    applyColors(cosineKeys.map(function (k, i) {
-      return [k, [p.a, p.b, p.c, p.d][i]];
-    }));
+  function rowFor(key) {
+    var el = document.querySelector('[data-param-key="' + key + '"]');
+    return el ? el.closest('.shader-control') : null;
   }
 
-  // Apply default on load so shader matches pickers.
-  applyCosinePreset(COSINE_PRESETS['Rainbow']);
+  function applyVisibility() {
+    var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
+    var mode   = modeEl ? modeEl.value : '0';
+    cosineKeys.forEach(function (key) {
+      var row = rowFor(key); if (row) row.style.display = mode === '2' ? '' : 'none';
+    });
+    stopKeys.forEach(function (key) {
+      var row = rowFor(key); if (row) row.style.display = mode === '1' ? '' : 'none';
+    });
+  }
 
+  var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
+  if (modeEl) modeEl.addEventListener('change', applyVisibility);
+  applyVisibility();
+
+  // Cosine preset handler — uses COSINE_PRESETS + applyColors globals
+  var cosineAbcdKeys = ['u_a', 'u_b', 'u_c', 'u_d'];
   var presetSel = document.querySelector('[data-param-key="_sl_palette_preset"]');
   if (presetSel) {
     presetSel.addEventListener('change', function () {
       var p = COSINE_PRESETS[this.value];
-      if (p) applyCosinePreset(p);
+      if (p) applyColors(cosineAbcdKeys.map(function (k, i) {
+        return [k, [p.a, p.b, p.c, p.d][i]];
+      }));
     });
   }
 };
