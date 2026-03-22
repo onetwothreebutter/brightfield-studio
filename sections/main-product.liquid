@@ -269,6 +269,7 @@
   var price         = document.querySelector('.product-price');
   var orderForm     = document.getElementById('product-order-form');
   var shaderGui     = document.getElementById('shader-gui');
+  var shaderPreview = document.querySelector('.shader-gui__preview');
   var defaultDesc   = document.querySelector('.product-description');
   var productLayout = document.querySelector('.product-layout');
   if (!tabs.length) return;
@@ -287,6 +288,7 @@
       if (price)         price.style.display         = isCustomize ? 'none'  : '';
       if (orderForm)     orderForm.style.display     = isCustomize ? 'none'  : '';
       if (shaderGui)     shaderGui.style.display     = isCustomize ? 'block' : 'none';
+      if (shaderPreview) shaderPreview.style.display = isCustomize ? 'block' : 'none';
       if (defaultDesc)   defaultDesc.style.display   = isCustomize ? 'none'  : '';
       if (productLayout) productLayout.classList.toggle('shader-mode', isCustomize);
 

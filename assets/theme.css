@@ -1353,6 +1353,7 @@ h6 {
 }
 
 .shader-gui__preview {
+    display: none;
     padding: 0 1rem;
     margin-top: 1rem;
 }
