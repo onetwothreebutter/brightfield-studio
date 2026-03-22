@@ -2196,6 +2196,15 @@ h6 {
     }
 }
 
+@media (max-width: 800px) {
+    /* On mobile the page scrolls (no inner overflow), so let the range
+       handle all touch directions — pan-y from the 900px block above
+       blocks horizontal drag on some browsers (e.g. Chrome/Android). */
+    .shader-control__range {
+        touch-action: none;
+    }
+}
+
 /* ─── Recent Designs (homepage + product page) ───────────── */
 .product-recent-designs {
     margin-top: 24px;

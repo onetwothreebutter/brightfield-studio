@@ -1157,6 +1157,13 @@
   }
 
   window.addEventListener('scroll', updateFade, { passive: true });
+  // Re-run after All Settings opens so newly visible rows get correct fade state
+  var allSettingsToggleEl = allSettingsEl && allSettingsEl.querySelector('.shader-demo__all-settings-toggle');
+  if (allSettingsToggleEl) {
+    allSettingsToggleEl.addEventListener('click', function () {
+      setTimeout(updateFade, 0);
+    });
+  }
   updateFade();
 }());
 </script>
