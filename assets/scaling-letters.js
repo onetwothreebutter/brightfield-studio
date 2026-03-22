@@ -2,33 +2,49 @@
   'use strict';
 
   // ScalingLetters port — asymmetric letter-grid shader.
-  // Left cell is always 2/3 width; right side is divided into 1–5 smaller cells
-  // depending on word length (1–6 chars). Each cell shows one letter texture,
-  // colored with a cosine palette along the local X axis.
+  // Left cell is always 2/3 width; right side is divided into 1–10 smaller cells
+  // depending on word length (1–11 chars). Each row adds one more cell than the row
+  // above: row1=1, row2=2, row3=3, row4=4 (triangle layout).
 
   var CANVAS_SIZE = 512;
 
   // Returns the width/height aspect ratio for each letter's canvas texture.
   // texIndex is 1-based; letterCount is the number of letters in the word.
-  // aspect is the canvas width/height ratio.
+  // gridAspect is the canvas width/height ratio.
   function getCellCa(texIndex, letterCount, gridAspect) {
-    var H1  = 0.4;   // N=3,4: letter 2 height (top 40%)
-    var T1  = 0.6;   // N=3,4: letter 2 bottom boundary
-    var H1B = 0.45;  // N=5,6: letter 2 height (top 45%)
-    var H2B = 0.35;  // N=5,6: middle row height
-    var H3B = 0.20;  // N=5,6: bottom row height
+    var H1   = 0.4;   // N=3,4: row1 height
+    var T1   = 0.6;   // N=3,4: row1 bottom boundary
+    var H1B  = 0.45;  // N=5,6,7: row1 height
+    var H2B  = 0.35;  // N=5,6,7: row2 height
+    var H3B  = 0.20;  // N=5,6,7: row3 height
+    var H4_1 = 0.30;  // N=8-11: row1 height
+    var H4_2 = 0.27;  // N=8-11: row2 height
+    var H4_3 = 0.23;  // N=8-11: row3 height
+    var H4_4 = 0.20;  // N=8-11: row4 height
+
     if (texIndex === 1) return letterCount === 1 ? gridAspect : (2 / 3) * gridAspect;
     if (letterCount === 2) return (1 / 3) * gridAspect;
     if (letterCount <= 4) {
       if (texIndex === 2) return (1 / 3 / H1) * gridAspect;
       if (letterCount === 3) return (1 / 3 / T1) * gridAspect;
-      return (1 / 6 / T1) * gridAspect; // N=4
+      return (1 / 6 / T1) * gridAspect; // N=4 row2 (2 cells)
     }
-    // N=5 or N=6
-    if (texIndex === 2) return (1 / 3 / H1B) * gridAspect;
-    if (texIndex === 3 || texIndex === 4) return (1 / 6 / H2B) * gridAspect;
-    if (letterCount === 5) return (1 / 3 / H3B) * gridAspect;
-    return (1 / 6 / H3B) * gridAspect; // N=6 bottom cells
+    if (letterCount <= 7) {
+      // N=5,6,7: 3-row layout
+      if (texIndex === 2) return (1 / 3 / H1B) * gridAspect;
+      if (texIndex <= 4)  return (1 / 6 / H2B) * gridAspect;
+      // row3: 1 cell (N=5), 2 cells (N=6), 3 cells (N=7)
+      if (letterCount === 5) return (1 / 3 / H3B) * gridAspect;
+      if (letterCount === 6) return (1 / 6 / H3B) * gridAspect;
+      return (1 / 9 / H3B) * gridAspect; // N=7, 3 cells
+    }
+    // N=8-11: 4-row layout
+    if (texIndex === 2) return (1 / 3 / H4_1) * gridAspect;
+    if (texIndex <= 4)  return (1 / 6 / H4_2) * gridAspect;
+    if (texIndex <= 7)  return (1 / 9 / H4_3) * gridAspect;
+    // row4: 1 cell (N=8), 2 cells (N=9), 3 cells (N=10), 4 cells (N=11)
+    var row4Count = letterCount - 7;
+    return (1 / (3 * row4Count) / H4_4) * gridAspect;
   }
 
   function drawLetter(ctx, letter, font, size, outlineEnabled, outlineWidth, ca) {
@@ -91,6 +107,11 @@
     'uniform sampler2D u_tex4;',
     'uniform sampler2D u_tex5;',
     'uniform sampler2D u_tex6;',
+    'uniform sampler2D u_tex7;',
+    'uniform sampler2D u_tex8;',
+    'uniform sampler2D u_tex9;',
+    'uniform sampler2D u_tex10;',
+    'uniform sampler2D u_tex11;',
     'uniform float     u_grid_aspect;',
     'uniform float     u_opacity;',
     'uniform float     u_distress;',
@@ -118,11 +139,14 @@
     '  float bw         = u_border_width;',
     '  float aa         = 0.0008;',
     '',
-    '  // ── Grid crop: constrain to 4:5 aspect, centred in canvas ─────────────────',
+    '  // ── Grid crop: constrain to target aspect, centred in canvas ────────────────',
     '  float GRID_ASPECT = u_grid_aspect;',
     '  const float ROW_T1  = 0.6;',
     '  const float ROW_T1B = 0.55;',
     '  const float ROW_T2  = 0.20;',
+    '  const float ROW_4A  = 0.70;',
+    '  const float ROW_4B  = 0.43;',
+    '  const float ROW_4C  = 0.20;',
     '  float scaleX  = min(1.0, GRID_ASPECT / u_aspect);',
     '  float scaleY  = min(1.0, u_aspect / GRID_ASPECT);',
     '  float marginX = (1.0 - scaleX) * 0.5;',
@@ -209,8 +233,7 @@
     '    float midB      = isMidRow * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 5.0/6.0)));',
     '    isBorder = max(max(vertB, horizTopB), max(horizBotB, midB));',
     '',
-    '  } else {',
-    '    // N=6',
+    '  } else if (u_letter_count == 6) {',
     '    float isRight       = step(2.0/3.0, gridUV.x);',
     '    float isTop         = step(ROW_T1B, gridUV.y);',
     '    float isMidRight    = step(5.0/6.0, gridUV.x);',
@@ -237,6 +260,208 @@
     '    float midB    = isBottomRight * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 5.0/6.0)));',
     '    float midBotB = isBottomRight * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.y - ROW_T2)  / GRID_ASPECT));',
     '    isBorder = max(max(vertB, horizB), max(midB, midBotB));',
+    '',
+    '  } else if (u_letter_count == 7) {',
+    '    // 3 rows: row1=1, row2=2, row3=3',
+    '    float isRight    = step(2.0/3.0, gridUV.x);',
+    '    float isRow1     = step(ROW_T1B, gridUV.y);',
+    '    float isAboveBt  = step(ROW_T2, gridUV.y);',
+    '    float isMidRight = step(5.0/6.0, gridUV.x);',
+    '    float isR3Ge2    = step(7.0/9.0, gridUV.x);',
+    '    float isR3Ge3    = step(8.0/9.0, gridUV.x);',
+    '    float isMidRow   = isRight * isAboveBt  * (1.0 - isRow1);',
+    '    float isBotRow   = isRight * (1.0 - isAboveBt);',
+    '    vec2 luv1 = vec2(gridUV.x * 1.5, gridUV.y);',
+    '    vec2 luv2 = vec2((gridUV.x - 2.0/3.0) * 3.0, (gridUV.y - ROW_T1B) / (1.0 - ROW_T1B));',
+    '    vec2 luv3 = vec2((gridUV.x - 2.0/3.0) * 6.0, (gridUV.y - ROW_T2) / (ROW_T1B - ROW_T2));',
+    '    vec2 luv4 = vec2((gridUV.x - 5.0/6.0) * 6.0, (gridUV.y - ROW_T2) / (ROW_T1B - ROW_T2));',
+    '    vec2 luv5 = vec2((gridUV.x - 2.0/3.0) * 9.0, gridUV.y / ROW_T2);',
+    '    vec2 luv6 = vec2((gridUV.x - 7.0/9.0) * 9.0, gridUV.y / ROW_T2);',
+    '    vec2 luv7 = vec2((gridUV.x - 8.0/9.0) * 9.0, gridUV.y / ROW_T2);',
+    '    vec2 row3UV = mix(mix(luv5, luv6, isR3Ge2), luv7, isR3Ge3);',
+    '    vec4 row3S  = mix(mix(texture(u_tex5, luv5), texture(u_tex6, luv6), isR3Ge2), texture(u_tex7, luv7), isR3Ge3);',
+    '    vec2 row2UV = mix(luv3, luv4, isMidRight);',
+    '    vec4 row2S  = mix(texture(u_tex3, luv3), texture(u_tex4, luv4), isMidRight);',
+    '    vec2 rightUV    = mix(mix(row3UV, row2UV, isAboveBt), luv2, isRow1);',
+    '    vec4 rightSample = mix(mix(row3S, row2S, isAboveBt), texture(u_tex2, luv2), isRow1);',
+    '    localUV      = mix(luv1, rightUV, isRight);',
+    '    activeSample = mix(texture(u_tex1, luv1), rightSample, isRight);',
+    '    float vertB  = 1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 2.0/3.0));',
+    '    float horizT = isRight  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.y - ROW_T1B) / GRID_ASPECT));',
+    '    float horizB = isRight  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.y - ROW_T2)  / GRID_ASPECT));',
+    '    float midV   = isMidRow * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 5.0/6.0)));',
+    '    float bot1V  = isBotRow * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 7.0/9.0)));',
+    '    float bot2V  = isBotRow * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 8.0/9.0)));',
+    '    isBorder = max(max(max(vertB, horizT), max(horizB, midV)), max(bot1V, bot2V));',
+    '',
+    '  } else if (u_letter_count == 8) {',
+    '    // 4 rows: row1=1, row2=2, row3=3, row4=1',
+    '    float isRight     = step(2.0/3.0, gridUV.x);',
+    '    float isRow1      = step(ROW_4A, gridUV.y);',
+    '    float isAboveR4   = step(ROW_4C, gridUV.y);',
+    '    float isAboveR3   = step(ROW_4B, gridUV.y);',
+    '    float isMidRight  = step(5.0/6.0, gridUV.x);',
+    '    float isR3Ge2     = step(7.0/9.0, gridUV.x);',
+    '    float isR3Ge3     = step(8.0/9.0, gridUV.x);',
+    '    float isRow2Reg   = isRight * isAboveR3 * (1.0 - isRow1);',
+    '    float isRow3Reg   = isRight * isAboveR4 * (1.0 - isAboveR3);',
+    '    float isRow4Reg   = isRight * (1.0 - isAboveR4);',
+    '    vec2 luv1 = vec2(gridUV.x * 1.5, gridUV.y);',
+    '    vec2 luv2 = vec2((gridUV.x - 2.0/3.0) * 3.0,  (gridUV.y - ROW_4A) / (1.0 - ROW_4A));',
+    '    vec2 luv3 = vec2((gridUV.x - 2.0/3.0) * 6.0,  (gridUV.y - ROW_4B) / (ROW_4A - ROW_4B));',
+    '    vec2 luv4 = vec2((gridUV.x - 5.0/6.0) * 6.0,  (gridUV.y - ROW_4B) / (ROW_4A - ROW_4B));',
+    '    vec2 luv5 = vec2((gridUV.x - 2.0/3.0) * 9.0,  (gridUV.y - ROW_4C) / (ROW_4B - ROW_4C));',
+    '    vec2 luv6 = vec2((gridUV.x - 7.0/9.0) * 9.0,  (gridUV.y - ROW_4C) / (ROW_4B - ROW_4C));',
+    '    vec2 luv7 = vec2((gridUV.x - 8.0/9.0) * 9.0,  (gridUV.y - ROW_4C) / (ROW_4B - ROW_4C));',
+    '    vec2 luv8 = vec2((gridUV.x - 2.0/3.0) * 3.0,  gridUV.y / ROW_4C);',
+    '    vec2 row3UV = mix(mix(luv5, luv6, isR3Ge2), luv7, isR3Ge3);',
+    '    vec4 row3S  = mix(mix(texture(u_tex5, luv5), texture(u_tex6, luv6), isR3Ge2), texture(u_tex7, luv7), isR3Ge3);',
+    '    vec2 row2UV = mix(luv3, luv4, isMidRight);',
+    '    vec4 row2S  = mix(texture(u_tex3, luv3), texture(u_tex4, luv4), isMidRight);',
+    '    vec2 rightUV    = mix(mix(mix(luv8, row3UV, isAboveR4), row2UV, isAboveR3), luv2, isRow1);',
+    '    vec4 rightSample = mix(mix(mix(texture(u_tex8, luv8), row3S, isAboveR4), row2S, isAboveR3), texture(u_tex2, luv2), isRow1);',
+    '    localUV      = mix(luv1, rightUV, isRight);',
+    '    activeSample = mix(texture(u_tex1, luv1), rightSample, isRight);',
+    '    float vertB  = 1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 2.0/3.0));',
+    '    float horiz1 = isRight    * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.y - ROW_4A) / GRID_ASPECT));',
+    '    float horiz2 = isRight    * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.y - ROW_4B) / GRID_ASPECT));',
+    '    float horiz3 = isRight    * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.y - ROW_4C) / GRID_ASPECT));',
+    '    float r2V    = isRow2Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 5.0/6.0)));',
+    '    float r3V1   = isRow3Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 7.0/9.0)));',
+    '    float r3V2   = isRow3Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 8.0/9.0)));',
+    '    isBorder = max(max(max(vertB, horiz1), max(horiz2, horiz3)), max(max(r2V, r3V1), r3V2));',
+    '',
+    '  } else if (u_letter_count == 9) {',
+    '    // 4 rows: row1=1, row2=2, row3=3, row4=2',
+    '    float isRight     = step(2.0/3.0, gridUV.x);',
+    '    float isRow1      = step(ROW_4A, gridUV.y);',
+    '    float isAboveR4   = step(ROW_4C, gridUV.y);',
+    '    float isAboveR3   = step(ROW_4B, gridUV.y);',
+    '    float isMidRight  = step(5.0/6.0, gridUV.x);',
+    '    float isR3Ge2     = step(7.0/9.0, gridUV.x);',
+    '    float isR3Ge3     = step(8.0/9.0, gridUV.x);',
+    '    float isRow2Reg   = isRight * isAboveR3 * (1.0 - isRow1);',
+    '    float isRow3Reg   = isRight * isAboveR4 * (1.0 - isAboveR3);',
+    '    float isRow4Reg   = isRight * (1.0 - isAboveR4);',
+    '    vec2 luv1 = vec2(gridUV.x * 1.5, gridUV.y);',
+    '    vec2 luv2 = vec2((gridUV.x - 2.0/3.0) * 3.0,  (gridUV.y - ROW_4A) / (1.0 - ROW_4A));',
+    '    vec2 luv3 = vec2((gridUV.x - 2.0/3.0) * 6.0,  (gridUV.y - ROW_4B) / (ROW_4A - ROW_4B));',
+    '    vec2 luv4 = vec2((gridUV.x - 5.0/6.0) * 6.0,  (gridUV.y - ROW_4B) / (ROW_4A - ROW_4B));',
+    '    vec2 luv5 = vec2((gridUV.x - 2.0/3.0) * 9.0,  (gridUV.y - ROW_4C) / (ROW_4B - ROW_4C));',
+    '    vec2 luv6 = vec2((gridUV.x - 7.0/9.0) * 9.0,  (gridUV.y - ROW_4C) / (ROW_4B - ROW_4C));',
+    '    vec2 luv7 = vec2((gridUV.x - 8.0/9.0) * 9.0,  (gridUV.y - ROW_4C) / (ROW_4B - ROW_4C));',
+    '    vec2 luv8 = vec2((gridUV.x - 2.0/3.0) * 6.0,  gridUV.y / ROW_4C);',
+    '    vec2 luv9 = vec2((gridUV.x - 5.0/6.0) * 6.0,  gridUV.y / ROW_4C);',
+    '    vec2 row3UV = mix(mix(luv5, luv6, isR3Ge2), luv7, isR3Ge3);',
+    '    vec4 row3S  = mix(mix(texture(u_tex5, luv5), texture(u_tex6, luv6), isR3Ge2), texture(u_tex7, luv7), isR3Ge3);',
+    '    vec2 row2UV = mix(luv3, luv4, isMidRight);',
+    '    vec4 row2S  = mix(texture(u_tex3, luv3), texture(u_tex4, luv4), isMidRight);',
+    '    vec2 row4UV  = mix(luv8, luv9, isMidRight);',
+    '    vec4 row4S   = mix(texture(u_tex8, luv8), texture(u_tex9, luv9), isMidRight);',
+    '    vec2 rightUV    = mix(mix(mix(row4UV, row3UV, isAboveR4), row2UV, isAboveR3), luv2, isRow1);',
+    '    vec4 rightSample = mix(mix(mix(row4S, row3S, isAboveR4), row2S, isAboveR3), texture(u_tex2, luv2), isRow1);',
+    '    localUV      = mix(luv1, rightUV, isRight);',
+    '    activeSample = mix(texture(u_tex1, luv1), rightSample, isRight);',
+    '    float vertB  = 1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 2.0/3.0));',
+    '    float horiz1 = isRight    * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.y - ROW_4A) / GRID_ASPECT));',
+    '    float horiz2 = isRight    * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.y - ROW_4B) / GRID_ASPECT));',
+    '    float horiz3 = isRight    * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.y - ROW_4C) / GRID_ASPECT));',
+    '    float r2V    = isRow2Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 5.0/6.0)));',
+    '    float r3V1   = isRow3Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 7.0/9.0)));',
+    '    float r3V2   = isRow3Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 8.0/9.0)));',
+    '    float r4V    = isRow4Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 5.0/6.0)));',
+    '    isBorder = max(max(max(vertB, horiz1), max(horiz2, horiz3)), max(max(r2V, r3V1), max(r3V2, r4V)));',
+    '',
+    '  } else if (u_letter_count == 10) {',
+    '    // 4 rows: row1=1, row2=2, row3=3, row4=3',
+    '    float isRight     = step(2.0/3.0, gridUV.x);',
+    '    float isRow1      = step(ROW_4A, gridUV.y);',
+    '    float isAboveR4   = step(ROW_4C, gridUV.y);',
+    '    float isAboveR3   = step(ROW_4B, gridUV.y);',
+    '    float isMidRight  = step(5.0/6.0, gridUV.x);',
+    '    float isR3Ge2     = step(7.0/9.0, gridUV.x);',
+    '    float isR3Ge3     = step(8.0/9.0, gridUV.x);',
+    '    float isRow2Reg   = isRight * isAboveR3 * (1.0 - isRow1);',
+    '    float isRow3Reg   = isRight * isAboveR4 * (1.0 - isAboveR3);',
+    '    float isRow4Reg   = isRight * (1.0 - isAboveR4);',
+    '    vec2 luv1  = vec2(gridUV.x * 1.5, gridUV.y);',
+    '    vec2 luv2  = vec2((gridUV.x - 2.0/3.0) * 3.0,  (gridUV.y - ROW_4A) / (1.0 - ROW_4A));',
+    '    vec2 luv3  = vec2((gridUV.x - 2.0/3.0) * 6.0,  (gridUV.y - ROW_4B) / (ROW_4A - ROW_4B));',
+    '    vec2 luv4  = vec2((gridUV.x - 5.0/6.0) * 6.0,  (gridUV.y - ROW_4B) / (ROW_4A - ROW_4B));',
+    '    vec2 luv5  = vec2((gridUV.x - 2.0/3.0) * 9.0,  (gridUV.y - ROW_4C) / (ROW_4B - ROW_4C));',
+    '    vec2 luv6  = vec2((gridUV.x - 7.0/9.0) * 9.0,  (gridUV.y - ROW_4C) / (ROW_4B - ROW_4C));',
+    '    vec2 luv7  = vec2((gridUV.x - 8.0/9.0) * 9.0,  (gridUV.y - ROW_4C) / (ROW_4B - ROW_4C));',
+    '    vec2 luv8  = vec2((gridUV.x - 2.0/3.0) * 9.0,  gridUV.y / ROW_4C);',
+    '    vec2 luv9  = vec2((gridUV.x - 7.0/9.0) * 9.0,  gridUV.y / ROW_4C);',
+    '    vec2 luv10 = vec2((gridUV.x - 8.0/9.0) * 9.0,  gridUV.y / ROW_4C);',
+    '    vec2 row3UV = mix(mix(luv5, luv6, isR3Ge2), luv7, isR3Ge3);',
+    '    vec4 row3S  = mix(mix(texture(u_tex5, luv5), texture(u_tex6, luv6), isR3Ge2), texture(u_tex7, luv7), isR3Ge3);',
+    '    vec2 row2UV = mix(luv3, luv4, isMidRight);',
+    '    vec4 row2S  = mix(texture(u_tex3, luv3), texture(u_tex4, luv4), isMidRight);',
+    '    vec2 row4UV  = mix(mix(luv8, luv9, isR3Ge2), luv10, isR3Ge3);',
+    '    vec4 row4S   = mix(mix(texture(u_tex8, luv8), texture(u_tex9, luv9), isR3Ge2), texture(u_tex10, luv10), isR3Ge3);',
+    '    vec2 rightUV    = mix(mix(mix(row4UV, row3UV, isAboveR4), row2UV, isAboveR3), luv2, isRow1);',
+    '    vec4 rightSample = mix(mix(mix(row4S, row3S, isAboveR4), row2S, isAboveR3), texture(u_tex2, luv2), isRow1);',
+    '    localUV      = mix(luv1, rightUV, isRight);',
+    '    activeSample = mix(texture(u_tex1, luv1), rightSample, isRight);',
+    '    float vertB  = 1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 2.0/3.0));',
+    '    float horiz1 = isRight    * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.y - ROW_4A) / GRID_ASPECT));',
+    '    float horiz2 = isRight    * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.y - ROW_4B) / GRID_ASPECT));',
+    '    float horiz3 = isRight    * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.y - ROW_4C) / GRID_ASPECT));',
+    '    float r2V    = isRow2Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 5.0/6.0)));',
+    '    float r3V1   = isRow3Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 7.0/9.0)));',
+    '    float r3V2   = isRow3Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 8.0/9.0)));',
+    '    float r4V1   = isRow4Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 7.0/9.0)));',
+    '    float r4V2   = isRow4Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 8.0/9.0)));',
+    '    isBorder = max(max(max(vertB, horiz1), max(horiz2, horiz3)), max(max(r2V, r3V1), max(r3V2, max(r4V1, r4V2))));',
+    '',
+    '  } else {',
+    '    // N=11: 4 rows: row1=1, row2=2, row3=3, row4=4',
+    '    float isRight     = step(2.0/3.0, gridUV.x);',
+    '    float isRow1      = step(ROW_4A, gridUV.y);',
+    '    float isAboveR4   = step(ROW_4C, gridUV.y);',
+    '    float isAboveR3   = step(ROW_4B, gridUV.y);',
+    '    float isMidRight  = step(5.0/6.0, gridUV.x);',
+    '    float isR3Ge2     = step(7.0/9.0,   gridUV.x);',
+    '    float isR3Ge3     = step(8.0/9.0,   gridUV.x);',
+    '    float isR4Ge2     = step(3.0/4.0,   gridUV.x);',
+    '    float isR4Ge3     = step(5.0/6.0,   gridUV.x);',
+    '    float isR4Ge4     = step(11.0/12.0, gridUV.x);',
+    '    float isRow2Reg   = isRight * isAboveR3 * (1.0 - isRow1);',
+    '    float isRow3Reg   = isRight * isAboveR4 * (1.0 - isAboveR3);',
+    '    float isRow4Reg   = isRight * (1.0 - isAboveR4);',
+    '    vec2 luv1  = vec2(gridUV.x * 1.5, gridUV.y);',
+    '    vec2 luv2  = vec2((gridUV.x - 2.0/3.0)   * 3.0,  (gridUV.y - ROW_4A) / (1.0 - ROW_4A));',
+    '    vec2 luv3  = vec2((gridUV.x - 2.0/3.0)   * 6.0,  (gridUV.y - ROW_4B) / (ROW_4A - ROW_4B));',
+    '    vec2 luv4  = vec2((gridUV.x - 5.0/6.0)   * 6.0,  (gridUV.y - ROW_4B) / (ROW_4A - ROW_4B));',
+    '    vec2 luv5  = vec2((gridUV.x - 2.0/3.0)   * 9.0,  (gridUV.y - ROW_4C) / (ROW_4B - ROW_4C));',
+    '    vec2 luv6  = vec2((gridUV.x - 7.0/9.0)   * 9.0,  (gridUV.y - ROW_4C) / (ROW_4B - ROW_4C));',
+    '    vec2 luv7  = vec2((gridUV.x - 8.0/9.0)   * 9.0,  (gridUV.y - ROW_4C) / (ROW_4B - ROW_4C));',
+    '    vec2 luv8  = vec2((gridUV.x - 2.0/3.0)   * 12.0, gridUV.y / ROW_4C);',
+    '    vec2 luv9  = vec2((gridUV.x - 3.0/4.0)   * 12.0, gridUV.y / ROW_4C);',
+    '    vec2 luv10 = vec2((gridUV.x - 5.0/6.0)   * 12.0, gridUV.y / ROW_4C);',
+    '    vec2 luv11 = vec2((gridUV.x - 11.0/12.0) * 12.0, gridUV.y / ROW_4C);',
+    '    vec2 row3UV = mix(mix(luv5, luv6, isR3Ge2), luv7, isR3Ge3);',
+    '    vec4 row3S  = mix(mix(texture(u_tex5, luv5), texture(u_tex6, luv6), isR3Ge2), texture(u_tex7, luv7), isR3Ge3);',
+    '    vec2 row2UV = mix(luv3, luv4, isMidRight);',
+    '    vec4 row2S  = mix(texture(u_tex3, luv3), texture(u_tex4, luv4), isMidRight);',
+    '    vec2 row4UV  = mix(mix(mix(luv8, luv9, isR4Ge2), luv10, isR4Ge3), luv11, isR4Ge4);',
+    '    vec4 row4S   = mix(mix(mix(texture(u_tex8, luv8), texture(u_tex9, luv9), isR4Ge2), texture(u_tex10, luv10), isR4Ge3), texture(u_tex11, luv11), isR4Ge4);',
+    '    vec2 rightUV    = mix(mix(mix(row4UV, row3UV, isAboveR4), row2UV, isAboveR3), luv2, isRow1);',
+    '    vec4 rightSample = mix(mix(mix(row4S, row3S, isAboveR4), row2S, isAboveR3), texture(u_tex2, luv2), isRow1);',
+    '    localUV      = mix(luv1, rightUV, isRight);',
+    '    activeSample = mix(texture(u_tex1, luv1), rightSample, isRight);',
+    '    float vertB  = 1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 2.0/3.0));',
+    '    float horiz1 = isRight    * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.y - ROW_4A) / GRID_ASPECT));',
+    '    float horiz2 = isRight    * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.y - ROW_4B) / GRID_ASPECT));',
+    '    float horiz3 = isRight    * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.y - ROW_4C) / GRID_ASPECT));',
+    '    float r2V    = isRow2Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 5.0/6.0)));',
+    '    float r3V1   = isRow3Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 7.0/9.0)));',
+    '    float r3V2   = isRow3Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 8.0/9.0)));',
+    '    float r4V1   = isRow4Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 3.0/4.0)));',
+    '    float r4V2   = isRow4Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 5.0/6.0)));',
+    '    float r4V3   = isRow4Reg  * (1.0 - smoothstep(bw-aa, bw+aa, abs(gridUV.x - 11.0/12.0)));',
+    '    isBorder = max(max(max(vertB, horiz1), max(horiz2, horiz3)), max(max(r2V, r3V1), max(r3V2, max(max(r4V1, r4V2), r4V3))));',
     '  }',
     '',
     '  // ── Colour ────────────────────────────────────────────────────────────────',
@@ -285,7 +510,7 @@
       var glTextures     = [];
       var lastLetterKeys = [];
 
-      for (var i = 0; i < 6; i++) {
+      for (var i = 0; i < 11; i++) {
         var c = document.createElement('canvas');
         c.width  = CANVAS_SIZE;
         c.height = CANVAS_SIZE;
@@ -326,6 +551,11 @@
         tex4:         gl.getUniformLocation(program, 'u_tex4'),
         tex5:         gl.getUniformLocation(program, 'u_tex5'),
         tex6:         gl.getUniformLocation(program, 'u_tex6'),
+        tex7:         gl.getUniformLocation(program, 'u_tex7'),
+        tex8:         gl.getUniformLocation(program, 'u_tex8'),
+        tex9:         gl.getUniformLocation(program, 'u_tex9'),
+        tex10:        gl.getUniformLocation(program, 'u_tex10'),
+        tex11:        gl.getUniformLocation(program, 'u_tex11'),
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
@@ -355,23 +585,31 @@
       var aspect         = h > 0 ? w / h : 1.0;
       var GRID_ASPECT    = v.u_grid_aspect != null ? v.u_grid_aspect : 0.8;
 
-      var letters     = word.slice(0, 6).split('').filter(Boolean);
+      var letters     = word.slice(0, 11).split('').filter(Boolean);
       var letterCount = Math.max(1, letters.length);
 
-      var texUnits    = [gl.TEXTURE0, gl.TEXTURE1, gl.TEXTURE2, gl.TEXTURE3, gl.TEXTURE4, gl.TEXTURE5];
-      var texUniforms = [u.tex1, u.tex2, u.tex3, u.tex4, u.tex5, u.tex6];
+      var texUnits    = [
+        gl.TEXTURE0, gl.TEXTURE1, gl.TEXTURE2, gl.TEXTURE3, gl.TEXTURE4,
+        gl.TEXTURE5, gl.TEXTURE6, gl.TEXTURE7, gl.TEXTURE8, gl.TEXTURE9, gl.TEXTURE10,
+      ];
+      var texUniforms = [u.tex1, u.tex2, u.tex3, u.tex4, u.tex5, u.tex6, u.tex7, u.tex8, u.tex9, u.tex10, u.tex11];
 
       var perLetterSize = v.perLetterSizeEnabled ? true : false;
       var perLetterSizes = [
-        perLetterSize && v.u_font_size_1 != null ? v.u_font_size_1 : fontSize,
-        perLetterSize && v.u_font_size_2 != null ? v.u_font_size_2 : fontSize,
-        perLetterSize && v.u_font_size_3 != null ? v.u_font_size_3 : fontSize,
-        perLetterSize && v.u_font_size_4 != null ? v.u_font_size_4 : fontSize,
-        perLetterSize && v.u_font_size_5 != null ? v.u_font_size_5 : fontSize,
-        perLetterSize && v.u_font_size_6 != null ? v.u_font_size_6 : fontSize,
+        perLetterSize && v.u_font_size_1  != null ? v.u_font_size_1  : fontSize,
+        perLetterSize && v.u_font_size_2  != null ? v.u_font_size_2  : fontSize,
+        perLetterSize && v.u_font_size_3  != null ? v.u_font_size_3  : fontSize,
+        perLetterSize && v.u_font_size_4  != null ? v.u_font_size_4  : fontSize,
+        perLetterSize && v.u_font_size_5  != null ? v.u_font_size_5  : fontSize,
+        perLetterSize && v.u_font_size_6  != null ? v.u_font_size_6  : fontSize,
+        perLetterSize && v.u_font_size_7  != null ? v.u_font_size_7  : fontSize,
+        perLetterSize && v.u_font_size_8  != null ? v.u_font_size_8  : fontSize,
+        perLetterSize && v.u_font_size_9  != null ? v.u_font_size_9  : fontSize,
+        perLetterSize && v.u_font_size_10 != null ? v.u_font_size_10 : fontSize,
+        perLetterSize && v.u_font_size_11 != null ? v.u_font_size_11 : fontSize,
       ];
 
-      for (var i = 0; i < 6; i++) {
+      for (var i = 0; i < 11; i++) {
         var letter    = textEnabled ? (letters[i] || '') : '';
         var letterSz  = perLetterSizes[i];
         var ca        = getCellCa(i + 1, letterCount, GRID_ASPECT);
