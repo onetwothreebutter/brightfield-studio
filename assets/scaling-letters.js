@@ -39,7 +39,7 @@
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvasW, CANVAS_SIZE);
     if (letter) {
-      ctx.font         = 'bold ' + size + 'px ' + font + ', monospace';
+      ctx.font         = '600 ' + size + 'px ' + font + ', monospace';
       ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
       if (outlineEnabled && outlineWidth > 0) {
