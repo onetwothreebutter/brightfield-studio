@@ -100,7 +100,8 @@
       (function (d, c) {
         deleteBtn.addEventListener('click', function (e) {
           e.stopPropagation();
-          deleteDesign(d.id).then(function () {
+          deleteDesign(d.id).then(function (result) {
+            if (!result || !result.ok) return;
             c.remove();
             if (!strip.querySelector('.recent-designs__card')) {
               var section = container.closest('.recent-designs-section');
