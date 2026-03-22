@@ -112,6 +112,7 @@
     'uniform sampler2D u_tex9;',
     'uniform sampler2D u_tex10;',
     'uniform sampler2D u_tex11;',
+    'uniform float     u_invert;',
     'uniform float     u_grid_aspect;',
     'uniform float     u_opacity;',
     'uniform float     u_distress;',
@@ -467,6 +468,8 @@
     '  // ── Colour ────────────────────────────────────────────────────────────────',
     '  float fillMask    = smoothstep(0.3, 0.7, activeSample.r) * u_text_enabled;',
     '  float outlineMask = smoothstep(0.3, 0.7, activeSample.g) * u_text_enabled;',
+    '  float effectiveFill = mix(fillMask, 1.0 - fillMask, u_invert);',
+    '  float letterAlpha = max(effectiveFill, outlineMask);',
     '  vec3  cosCol  = cosinePalette(localUV.x, u_a, u_b, u_c, u_d);',
     '  float t01     = clamp(localUV.x * 3.0, 0.0, 1.0);',
     '  float t12     = clamp((localUV.x - 1.0/3.0) * 3.0, 0.0, 1.0);',
@@ -478,7 +481,6 @@
     '  // u_color_mode: 0=flat, 1=4-stop, 2=cosine',
     '  vec3  fillCol = mix(mix(u_text_color, gradCol, step(0.5, u_color_mode)), cosCol, step(1.5, u_color_mode));',
     '  vec3  letterColor = mix(fillCol, u_outline_color, outlineMask);',
-    '  float letterAlpha = max(fillMask, outlineMask);',
     '',
     '  // ── Outer border ──────────────────────────────────────────────────────────',
     '  float edgeX    = min(gridUV.x, 1.0 - gridUV.x);',
@@ -556,6 +558,7 @@
         tex9:         gl.getUniformLocation(program, 'u_tex9'),
         tex10:        gl.getUniformLocation(program, 'u_tex10'),
         tex11:        gl.getUniformLocation(program, 'u_tex11'),
+        invert:        gl.getUniformLocation(program, 'u_invert'),
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
@@ -644,6 +647,7 @@
       gl.uniform3fv(u.color1,    v.u_color1     || [1.0, 0.8, 0.0]);
       gl.uniform3fv(u.color2,    v.u_color2     || [0.0, 0.8, 1.0]);
       gl.uniform3fv(u.color3,    v.u_color3     || [0.67, 0.0, 1.0]);
+      gl.uniform1f(u.invert,        v.u_invert ? 1.0 : 0.0);
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
