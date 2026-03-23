@@ -521,6 +521,7 @@ if (window.location.hash === '#shader') {
       });
 
       row.appendChild(textInput);
+      controlEls.push({ ctrl: ctrl, el: textInput });
 
     } else if (ctrl.type === 'select') {
       var sel = document.createElement('select');
