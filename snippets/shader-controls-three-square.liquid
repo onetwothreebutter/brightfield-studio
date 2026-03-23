@@ -63,9 +63,9 @@ var controls = [
   { key: 'u_font_size',      label: 'Font Size',             type: 'range',  min: 50, max: 500, step: 10, value: 300 },
   { key: 'u_col_width_wide', label: 'Column Width (Letter)', type: 'range',  min: 0.05, max: 0.49, step: 0.01, value: 0.45,
     tip: 'Column half-width inside letter-filled areas.' },
-  { key: 'outlineEnabled', label: 'Outline',       type: 'toggle', value: 0 },
-  { key: 'outlineWidth',   label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 12 },
-  { key: 'u_outline_color', label: 'Outline Color', type: 'color',  value: '#000000' },
+  { key: 'outlineEnabled', label: 'Outline',       type: 'toggle', value: 0, noRandomize: true },
+  { key: 'outlineWidth',   label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 12, noRandomize: true },
+  { key: 'u_outline_color', label: 'Outline Color', type: 'color',  value: '#000000', noRandomize: true },
   // ── Finish ────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Finish' },
   { key: 'u_opacity',        label: 'Opacity',  type: 'range', min: 0, max: 1,    step: 0.01, value: 1.0, noRandomize: true,

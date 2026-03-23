@@ -88,8 +88,8 @@ var controls = [
   // ── Outline ───────────────────────────────────────────────────────────────
   { type: 'header', label: 'Outline' },
   { key: 'u_outline_enabled', label: 'Outline',       type: 'toggle', textDirty: true, value: 0, noRandomize: true },
-  { key: 'u_outline_width',   label: 'Outline Width', type: 'range',  textDirty: true, min: 1, max: 60, step: 1, value: 8 },
-  { key: 'u_outline_color',   label: 'Outline Color', type: 'color',  value: '#000000' },
+  { key: 'u_outline_width',   label: 'Outline Width', type: 'range',  textDirty: true, min: 1, max: 60, step: 1, value: 8, noRandomize: true },
+  { key: 'u_outline_color',   label: 'Outline Color', type: 'color',  value: '#000000', noRandomize: true },
   // ── Finish ────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Finish' },
   { key: 'u_opacity',        label: 'Opacity',  type: 'range', min: 0, max: 1,    step: 0.01, value: 1.0, noRandomize: true,
