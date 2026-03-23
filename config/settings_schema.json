@@ -94,5 +94,16 @@
         "info": "1 = slowest, 10 = fastest"
       }
     ]
+  },
+  {
+    "name": "Admin",
+    "settings": [
+      {
+        "type": "text",
+        "id": "community_admin_token",
+        "label": "Community Admin Token",
+        "info": "Must match the ADMIN_TOKEN Cloudflare Worker secret."
+      }
+    ]
   }
 ]

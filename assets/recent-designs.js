@@ -38,6 +38,17 @@
     return Math.floor(diff / 86400) + 'd ago';
   }
 
+  function deleteDesign(id) {
+    var deviceId = getDeviceId();
+    return fetch(WORKER_URL + '/delete-design', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id, deviceId: deviceId }),
+    })
+      .then(function (r) { return r.json(); })
+      .catch(function () { return { ok: false }; });
+  }
+
   function renderFilmstrip(container, designs, onCardClick) {
     container.innerHTML = '';
     if (!designs || !designs.length) {
@@ -53,11 +64,22 @@
       var card = document.createElement('div');
       card.className = 'recent-designs__card';
 
+      var imgWrap = document.createElement('div');
+      imgWrap.className = 'recent-designs__card-img-wrap';
+
       var img = document.createElement('img');
       img.src = design.mockupUrl;
       img.alt = design.shader + ' design';
       img.className = 'recent-designs__card-img';
       img.loading = 'lazy';
+
+      var deleteBtn = document.createElement('button');
+      deleteBtn.className = 'recent-designs__card-delete';
+      deleteBtn.setAttribute('aria-label', 'Delete design');
+      deleteBtn.textContent = '×';
+
+      imgWrap.appendChild(img);
+      imgWrap.appendChild(deleteBtn);
 
       var label = document.createElement('div');
       label.className = 'recent-designs__card-label';
@@ -72,13 +94,25 @@
 
       label.appendChild(name);
       label.appendChild(time);
-      card.appendChild(img);
+      card.appendChild(imgWrap);
       card.appendChild(label);
 
-      (function (d) {
+      (function (d, c) {
+        deleteBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          deleteDesign(d.id).then(function (result) {
+            if (!result || !result.ok) return;
+            c.remove();
+            if (!strip.querySelector('.recent-designs__card')) {
+              var section = container.closest('.recent-designs-section');
+              if (section) section.style.display = 'none';
+            }
+          });
+        });
+
         card.addEventListener('click', function () {
           if (onCardClick) {
-            onCardClick(d, card);
+            onCardClick(d, c);
           } else {
             localStorage.setItem(RESTORE_KEY, JSON.stringify({
               values: d.values,
@@ -87,7 +121,7 @@
             window.location.href = '/products/' + d.productHandle + '#shader';
           }
         });
-      }(design));
+      }(design, card));
 
       strip.appendChild(card);
     });
@@ -98,6 +132,7 @@
   window.RecentDesigns = {
     getDeviceId: getDeviceId,
     fetchDesigns: fetchDesigns,
+    deleteDesign: deleteDesign,
     renderFilmstrip: renderFilmstrip
   };
 }());

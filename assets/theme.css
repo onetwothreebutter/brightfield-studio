@@ -1353,6 +1353,7 @@ h6 {
 }
 
 .shader-gui__preview {
+    display: none;
     padding: 0 1rem;
     margin-top: 1rem;
 }
@@ -2224,6 +2225,11 @@ h6 {
 .recent-designs__card:hover {
     opacity: 0.8;
 }
+.recent-designs__card-img-wrap {
+    position: relative;
+    width: 120px;
+    height: 180px;
+}
 .recent-designs__card-img {
     width: 120px;
     height: 180px;
@@ -2231,6 +2237,28 @@ h6 {
     display: block;
     border-radius: var(--radius);
     border: 1px solid var(--color-border);
+}
+.recent-designs__card-delete {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.recent-designs__card:hover .recent-designs__card-delete {
+    opacity: 1;
 }
 .recent-designs__card-label {
     padding: 5px 0;

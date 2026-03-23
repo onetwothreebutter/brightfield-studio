@@ -148,6 +148,86 @@ describe('renderFilmstrip()', () => {
   });
 });
 
+// ── deleteDesign() ────────────────────────────────────────────────────────────
+
+describe('deleteDesign()', () => {
+  it('POSTs to /delete-design with id and deviceId', async () => {
+    localStorage.setItem('brightfield_device_id', 'test-device-del');
+    const mockFetch = vi.fn(async () => ({ json: async () => ({ ok: true }) }));
+    vi.stubGlobal('fetch', mockFetch);
+
+    await window.RecentDesigns.deleteDesign('design-123');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/delete-design'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ id: 'design-123', deviceId: 'test-device-del' }),
+      })
+    );
+  });
+
+  it('returns { ok: false } on network error', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network down'); }));
+    const result = await window.RecentDesigns.deleteDesign('design-123');
+    expect(result).toEqual({ ok: false });
+  });
+});
+
+// ── delete button ─────────────────────────────────────────────────────────────
+
+describe('delete button', () => {
+  it('renders a delete button on each card', () => {
+    const container = document.createElement('div');
+    window.RecentDesigns.renderFilmstrip(container, [makeDesign(), makeDesign()]);
+    expect(container.querySelectorAll('.recent-designs__card-delete')).toHaveLength(2);
+  });
+
+  it('clicking delete removes the card', async () => {
+    localStorage.setItem('brightfield_device_id', 'test-device-del');
+    vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => ({ ok: true }) })));
+
+    const container = document.createElement('div');
+    window.RecentDesigns.renderFilmstrip(container, [makeDesign({ id: 'abc' }), makeDesign({ id: 'def' })]);
+
+    container.querySelectorAll('.recent-designs__card-delete')[0].click();
+    await new Promise(r => setTimeout(r, 0)); // flush microtasks
+
+    expect(container.querySelectorAll('.recent-designs__card')).toHaveLength(1);
+  });
+
+  it('hides the section when deleting the last card', async () => {
+    localStorage.setItem('brightfield_device_id', 'test-device-del');
+    vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => ({ ok: true }) })));
+
+    const section = document.createElement('div');
+    section.className = 'recent-designs-section';
+    const container = document.createElement('div');
+    section.appendChild(container);
+    document.body.appendChild(section);
+
+    window.RecentDesigns.renderFilmstrip(container, [makeDesign({ id: 'only' })]);
+    container.querySelector('.recent-designs__card-delete').click();
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(section.style.display).toBe('none');
+    section.remove();
+  });
+
+  it('clicking delete does not trigger card navigation', async () => {
+    vi.stubGlobal('location', { href: '' });
+    vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => ({ ok: true }) })));
+
+    const container = document.createElement('div');
+    window.RecentDesigns.renderFilmstrip(container, [makeDesign({ id: 'xyz', productHandle: 'my-shirt' })]);
+
+    container.querySelector('.recent-designs__card-delete').click();
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(window.location.href).toBe('');
+  });
+});
+
 // ── card click ────────────────────────────────────────────────────────────────
 
 describe('card click', () => {
