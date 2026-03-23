@@ -882,6 +882,12 @@ if (window.location.hash === '#shader') {
         el.value = chosen.value;
         window._shaderState.values[ctrl.key] = chosen.value;
         if (ctrl.textDirty) window._shaderState.textDirty = true;
+
+      } else if (ctrl.type === 'text' && ctrl.randomOptions) {
+        var picked = ctrl.randomOptions[Math.floor(Math.random() * ctrl.randomOptions.length)];
+        el.value = picked;
+        window._shaderState.values[ctrl.key] = picked;
+        if (ctrl.textDirty) window._shaderState.textDirty = true;
       }
     });
     applyPaletteVisibility();
