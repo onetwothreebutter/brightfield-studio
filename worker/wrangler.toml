@@ -7,3 +7,10 @@ workers_dev = true
 binding = "MOCKUP_STAGING"
 preview_bucket_name = "mockup-staging"
 bucket_name = "mockup-staging"
+
+# Required secrets (set via: npx wrangler secret put SECRET_NAME)
+#   ADMIN_TOKEN                - static fallback token for tests / CLI use
+#   PRINTFUL_API_KEY           - Printful API key
+#   R2_PUBLIC_DOMAIN           - public R2 bucket domain
+#   SHOPIFY_APP_CLIENT_ID      - from Shopify custom app (Settings → Apps → Develop apps)
+#   SHOPIFY_APP_CLIENT_SECRET  - from Shopify custom app (used to verify App Bridge JWTs)
