@@ -886,8 +886,7 @@ if (window.location.hash === '#shader') {
       } else if (ctrl.type === 'text' && ctrl.randomOptions) {
         var picked = ctrl.randomOptions[Math.floor(Math.random() * ctrl.randomOptions.length)];
         el.value = picked;
-        window._shaderState.values[ctrl.key] = picked;
-        if (ctrl.textDirty) window._shaderState.textDirty = true;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
       }
     });
     applyPaletteVisibility();
