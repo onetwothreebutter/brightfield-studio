@@ -22,9 +22,9 @@ var controls = [
   { key: 'u_text_color',   label: 'Text Color',    type: 'color',  value: '#ffffff' },
   { key: 'u_invert',       label: 'Invert',        type: 'toggle', value: 0,
     tip: 'Colors the cell background instead of the letter (text becomes a cutout).' },
-  { key: 'outlineEnabled', label: 'Outline',       type: 'toggle', value: 0 },
-  { key: 'outlineWidth',   label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 12 },
-  { key: 'u_outline_color', label: 'Outline Color', type: 'color', value: '#000000' },
+  { key: 'outlineEnabled', label: 'Outline',       type: 'toggle', value: 0, noRandomize: true },
+  { key: 'outlineWidth',   label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 12, noRandomize: true },
+  { key: 'u_outline_color', label: 'Outline Color', type: 'color', value: '#000000', noRandomize: true },
   // ── Border ────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Border' },
   { key: 'u_border_width', label: 'Border Width', type: 'range',  min: 2, max: 50, step: 1, value: 4,
