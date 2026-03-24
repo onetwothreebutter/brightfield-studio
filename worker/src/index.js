@@ -371,10 +371,13 @@ async function handleCommunityPending(request, env, origin) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
   }
 
+  const url = new URL(request.url);
+  const statusFilter = url.searchParams.get('status') || 'pending';
+
   const list = (await readJson(env, 'community/list.json')) || [];
   const submissions = (
     await Promise.all(list.map(id => readJson(env, `community/submissions/${id}.json`)))
-  ).filter(s => s && s.status === 'pending');
+  ).filter(s => s && s.status === statusFilter);
 
   return new Response(JSON.stringify(submissions), { status: 200, headers });
 }
@@ -488,7 +491,7 @@ function handleAdminUI(request, env) {
       var headers = authHeaders();
       if (!headers) return;
       try {
-        var endpoint = tab === 'pending' ? '/community/pending' : '/community/list?status=' + tab;
+        var endpoint = '/community/pending?status=' + tab;
         var r = await fetch(endpoint, { headers: headers });
         if (r.status === 401) { refreshApp(); return; }
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -517,20 +520,25 @@ function handleAdminUI(request, env) {
           esc((d.shader || '').replace(/-/g, ' ')) + ' \u00b7 ' + timeAgo(d.timestamp);
         card.appendChild(img);
         card.appendChild(info);
-        if (tab === 'pending') {
-          var actions = document.createElement('div');
-          actions.className = 'card-actions';
+        var actions = document.createElement('div');
+        actions.className = 'card-actions';
+        if (tab === 'pending' || tab === 'rejected') {
           var aBtn = document.createElement('button');
           aBtn.className = 'btn btn-primary'; aBtn.textContent = 'Approve';
+          (function(id, a, c) {
+            a.addEventListener('click', function() { moderate(id, 'approve', c); });
+          }(d.id, aBtn, card));
+          actions.appendChild(aBtn);
+        }
+        if (tab === 'pending' || tab === 'approved') {
           var rBtn = document.createElement('button');
           rBtn.className = 'btn btn-outline'; rBtn.textContent = 'Reject';
-          (function(id, a, r, c) {
-            a.addEventListener('click', function() { moderate(id, 'approve', c); });
+          (function(id, r, c) {
             r.addEventListener('click', function() { moderate(id, 'reject', c); });
-          }(d.id, aBtn, rBtn, card));
-          actions.appendChild(aBtn); actions.appendChild(rBtn);
-          card.appendChild(actions);
+          }(d.id, rBtn, card));
+          actions.appendChild(rBtn);
         }
+        card.appendChild(actions);
         grid.appendChild(card);
       });
       content.innerHTML = '';
