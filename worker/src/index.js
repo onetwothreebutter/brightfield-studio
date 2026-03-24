@@ -452,9 +452,23 @@ function handleAdminUI(request, env) {
     var content = document.getElementById('content');
     var tabs = document.querySelectorAll('.tab');
 
-    async function authHeaders() {
-      var token = await window.shopify.idToken();
-      return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+    // Shopify passes a fresh id_token in the URL on every load (valid ~60s).
+    // window.shopify.idToken() hangs in some environments, so we read from URL.
+    // On 401, redirect to the Shopify admin app entry point so Shopify issues a fresh token.
+    var _token = new URLSearchParams(location.search).get('id_token') || '';
+    var _shop  = new URLSearchParams(location.search).get('shop') || '';
+    var _shopSlug = _shop.replace('.myshopify.com', '');
+
+    function authHeaders() {
+      if (!_token) return null;
+      return { 'Authorization': 'Bearer ' + _token, 'Content-Type': 'application/json' };
+    }
+
+    function refreshApp() {
+      var base = _shopSlug
+        ? 'https://admin.shopify.com/store/' + _shopSlug + '/apps/community-admin'
+        : location.href;
+      location.replace(base);
     }
 
     function timeAgo(ts) {
@@ -471,9 +485,12 @@ function handleAdminUI(request, env) {
 
     async function loadTab(tab) {
       content.innerHTML = '<p class="status">Loading\u2026</p>';
+      var headers = authHeaders();
+      if (!headers) return;
       try {
         var endpoint = tab === 'pending' ? '/community/pending' : '/community/list?status=' + tab;
-        var r = await fetch(endpoint, { headers: await authHeaders() });
+        var r = await fetch(endpoint, { headers: headers });
+        if (r.status === 401) { refreshApp(); return; }
         if (!r.ok) throw new Error('HTTP ' + r.status);
         renderCards(await r.json(), tab);
       } catch (err) {
@@ -521,12 +538,15 @@ function handleAdminUI(request, env) {
     }
 
     async function moderate(id, action, cardEl) {
+      var headers = authHeaders();
+      if (!headers) return;
       try {
         var r = await fetch('/community/' + action, {
           method: 'POST',
-          headers: await authHeaders(),
+          headers: headers,
           body: JSON.stringify({ id: id })
         });
+        if (r.status === 401) { refreshApp(); return; }
         if (!r.ok) throw new Error('HTTP ' + r.status);
         cardEl.style.opacity = '0.3';
         cardEl.style.pointerEvents = 'none';
