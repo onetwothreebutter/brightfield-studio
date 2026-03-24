@@ -42,27 +42,8 @@ var controls = [
     options: [
       { label: 'Flat',   value: '0' },
       { label: '4-Stop', value: '1' },
-      { label: 'Cosine', value: '2' },
     ]
   },
-  // Cosine palette (shown/hidden by customAfterBuild)
-  { key: '_sl_palette_preset', label: 'Preset', type: 'select', value: 'Rainbow',
-    options: [
-      { label: 'Rainbow',   value: 'Rainbow'   },
-      { label: 'Cool Blue', value: 'Cool Blue' },
-      { label: 'Neon Heat', value: 'Neon Heat' },
-      { label: 'Cyberpunk', value: 'Cyberpunk' },
-      { label: 'Golden',    value: 'Golden'    },
-    ]
-  },
-  { key: 'u_a', label: 'Palette A', type: 'color', value: '#808080',
-    tip: 'Offset — base brightness per channel.' },
-  { key: 'u_b', label: 'Palette B', type: 'color', value: '#808080',
-    tip: 'Amplitude — colour swing range per channel.' },
-  { key: 'u_c', label: 'Palette C', type: 'color', value: '#ffffff',
-    tip: 'Frequency — how many times the palette cycles per channel.' },
-  { key: 'u_d', label: 'Palette D', type: 'color', value: '#0054ab',
-    tip: 'Phase — shifts the starting hue of the colour cycle.' },
   // 4-stop colors (shown/hidden by customAfterBuild)
   { key: 'u_color0', label: 'Color 1 (Left)',  type: 'color', value: '#ff3366' },
   { key: 'u_color1', label: 'Color 2',         type: 'color', value: '#ffcc00' },
@@ -79,8 +60,7 @@ var controls = [
 ];
 
 var customAfterBuild = function () {
-  var cosineKeys = ['_sl_palette_preset', 'u_a', 'u_b', 'u_c', 'u_d'];
-  var stopKeys   = ['u_color0', 'u_color1', 'u_color2', 'u_color3'];
+  var stopKeys = ['u_color0', 'u_color1', 'u_color2', 'u_color3'];
 
   function rowFor(key) {
     var el = document.querySelector('[data-param-key="' + key + '"]');
@@ -90,9 +70,6 @@ var customAfterBuild = function () {
   function applyVisibility() {
     var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
     var mode   = modeEl ? modeEl.value : '0';
-    cosineKeys.forEach(function (key) {
-      var row = rowFor(key); if (row) row.style.display = mode === '2' ? '' : 'none';
-    });
     stopKeys.forEach(function (key) {
       var row = rowFor(key); if (row) row.style.display = mode === '1' ? '' : 'none';
     });
@@ -101,16 +78,4 @@ var customAfterBuild = function () {
   var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
   if (modeEl) modeEl.addEventListener('change', applyVisibility);
   applyVisibility();
-
-  // Cosine preset handler — uses COSINE_PRESETS + applyColors globals
-  var cosineAbcdKeys = ['u_a', 'u_b', 'u_c', 'u_d'];
-  var presetSel = document.querySelector('[data-param-key="_sl_palette_preset"]');
-  if (presetSel) {
-    presetSel.addEventListener('change', function () {
-      var p = COSINE_PRESETS[this.value];
-      if (p) applyColors(cosineAbcdKeys.map(function (k, i) {
-        return [k, [p.a, p.b, p.c, p.d][i]];
-      }));
-    });
-  }
 };
