@@ -2273,7 +2273,7 @@ h6 {
 
 /* ─── Community Designs ──────────────────────────────────── */
 .community-designs-section {
-    padding: 2rem var(--container-padding);
+    padding: 2rem 0;
 }
 .community-designs__header {
     margin-bottom: 1rem;
