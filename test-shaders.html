@@ -6,7 +6,7 @@
   <title>Shader Test</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Azeret+Mono:wght@900&family=Bebas+Neue&family=Big+Shoulders+Display:wght@700&family=Bricolage+Grotesque:wght@800&family=Courier+Prime:wght@700&family=Cutive+Mono&family=DM+Mono:wght@500&family=DM+Sans:wght@900&family=Epilogue:wght@900&family=Fira+Code:wght@700&family=Fragment+Mono&family=Geist+Mono:wght@900&family=IBM+Plex+Mono:wght@700&family=Inconsolata:wght@900&family=JetBrains+Mono:wght@800&family=Montserrat:wght@900&family=Orbitron:wght@700&family=Oswald:wght@700&family=Playfair+Display:wght@700&family=Righteous&family=Roboto+Mono:wght@700&family=Russo+One&family=Share+Tech+Mono&family=Source+Code+Pro:wght@900&family=Space+Mono:wght@700&family=Spline+Sans+Mono:wght@700&family=Syne:wght@800&family=Teko:wght@500&family=Unbounded:wght@900" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Azeret+Mono:wght@900&family=Barlow+Condensed:wght@700&family=Bebas+Neue&family=Fjalla+One&family=Big+Shoulders+Display:wght@700&family=Bricolage+Grotesque:wght@800&family=Courier+Prime:wght@700&family=Cutive+Mono&family=DM+Mono:wght@500&family=DM+Sans:wght@900&family=Epilogue:wght@900&family=Fira+Code:wght@700&family=Fragment+Mono&family=Geist+Mono:wght@900&family=IBM+Plex+Mono:wght@700&family=Inconsolata:wght@900&family=JetBrains+Mono:wght@800&family=Montserrat:wght@900&family=Orbitron:wght@700&family=Oswald:wght@700&family=Playfair+Display:wght@700&family=Righteous&family=Roboto+Mono:wght@700&family=Russo+One&family=Share+Tech+Mono&family=Source+Code+Pro:wght@900&family=Space+Mono:wght@700&family=Spline+Sans+Mono:wght@700&family=Syne:wght@800&family=Teko:wght@500&family=Unbounded:wght@900" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -194,6 +194,7 @@
     <option value="echo-text">Echo Text</option>
     <option value="four-circles">Four Circles</option>
     <option value="line-text">Line Text</option>
+    <option value="scaling-letters">Scaling Letters</option>
   </select>
   <button id="export-btn">Export PNG</button>
 </div>
@@ -929,6 +930,147 @@ SHADERS['four-circles'] = {
   },
 };
 
+// ── Scaling Letters ───────────────────────────────────────────────────────────
+SHADERS['scaling-letters'] = {
+  controls: [
+    { type: 'header', label: 'Text' },
+    { key: 'u_word',         label: 'Word',          type: 'text',   value: 'ABCDE' },
+    { key: 'u_font_family',  label: 'Font',          type: 'select', value: 'Barlow Condensed',
+      options: [
+        { label: 'Space Mono',          value: 'Space Mono'          },
+        { label: 'Roboto Mono',         value: 'Roboto Mono'         },
+        { label: 'Source Code Pro',     value: 'Source Code Pro'     },
+        { label: 'JetBrains Mono',      value: 'JetBrains Mono'      },
+        { label: 'IBM Plex Mono',       value: 'IBM Plex Mono'       },
+        { label: 'Fira Code',           value: 'Fira Code'           },
+        { label: 'Inconsolata',         value: 'Inconsolata'         },
+        { label: 'Courier Prime',       value: 'Courier Prime'       },
+        { label: 'Share Tech Mono',     value: 'Share Tech Mono'     },
+        { label: 'Cutive Mono',         value: 'Cutive Mono'         },
+        { label: 'DM Mono',             value: 'DM Mono'             },
+        { label: 'Fragment Mono',       value: 'Fragment Mono'       },
+        { label: 'Azeret Mono',         value: 'Azeret Mono'         },
+        { label: 'Spline Sans Mono',    value: 'Spline Sans Mono'    },
+        { label: 'Geist Mono',          value: 'Geist Mono'          },
+        { label: 'Syne',                value: 'Syne'                },
+        { label: 'Unbounded',           value: 'Unbounded'           },
+        { label: 'Bricolage Grotesque', value: 'Bricolage Grotesque' },
+        { label: 'Epilogue',            value: 'Epilogue'            },
+        { label: 'DM Sans',             value: 'DM Sans'             },
+        { label: 'Oswald',              value: 'Oswald'              },
+        { label: 'Montserrat',          value: 'Montserrat'          },
+        { label: 'Bebas Neue',          value: 'Bebas Neue'          },
+        { label: 'Barlow Condensed',    value: 'Barlow Condensed'    },
+        { label: 'Anton',               value: 'Anton'               },
+        { label: 'Fjalla One',          value: 'Fjalla One'          },
+      ]
+    },
+    { key: 'u_font_size',    label: 'Font Size',     type: 'range',  min: 50, max: 500, step: 10, value: 300 },
+    { key: 'perLetterSizeEnabled', label: 'Per-Letter Size', type: 'toggle', value: 0 },
+    { key: 'u_font_size_1', label: 'Size 1', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_font_size_2', label: 'Size 2', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_font_size_3', label: 'Size 3', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_font_size_4', label: 'Size 4', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_font_size_5', label: 'Size 5', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_font_size_6',  label: 'Size 6',  type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_font_size_7',  label: 'Size 7',  type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_font_size_8',  label: 'Size 8',  type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_font_size_9',  label: 'Size 9',  type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_font_size_10', label: 'Size 10', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_font_size_11', label: 'Size 11', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+    { key: 'u_text_color',   label: 'Text Color',    type: 'color',  value: '#ffffff' },
+    { key: 'u_invert',       label: 'Invert',        type: 'toggle', value: 0 },
+    { key: 'outlineEnabled', label: 'Outline',       type: 'toggle', value: 0 },
+    { key: 'outlineWidth',   label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 12 },
+    { key: 'u_outline_color', label: 'Outline Color', type: 'color', value: '#000000' },
+    { type: 'header', label: 'Border' },
+    { key: 'u_border_width', label: 'Border Width', type: 'range',  min: 2, max: 50, step: 1, value: 4 },
+    { key: 'u_border_color',   label: 'Border Color',  type: 'color',  value: '#ffffff' },
+    { key: 'u_corner_radius', label: 'Corner Radius', type: 'range',  min: 0, max: 0.5, step: 0.01, value: 0 },
+    { key: 'u_outer_border', label: 'Outer Border', type: 'toggle', value: 1 },
+    { key: 'u_grid_aspect',  label: 'Grid Ratio',   type: 'range',  min: 0.4, max: 2.0, step: 0.01, value: 0.8 },
+    { type: 'header', label: 'Palette' },
+    { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '0',
+      options: [
+        { label: 'Flat',   value: '0' },
+        { label: '4-Stop', value: '1' },
+        { label: 'Cosine', value: '2' },
+      ]
+    },
+    { key: '_sl_palette_preset', label: 'Preset', type: 'select', value: 'Rainbow',
+      options: [
+        { label: 'Rainbow',   value: 'Rainbow'   }, { label: 'Cool Blue', value: 'Cool Blue' },
+        { label: 'Neon Heat', value: 'Neon Heat' }, { label: 'Cyberpunk', value: 'Cyberpunk' },
+        { label: 'Golden',    value: 'Golden'    },
+      ]
+    },
+    { key: 'u_a', label: 'Palette A', type: 'color', value: '#808080' },
+    { key: 'u_b', label: 'Palette B', type: 'color', value: '#808080' },
+    { key: 'u_c', label: 'Palette C', type: 'color', value: '#ffffff' },
+    { key: 'u_d', label: 'Palette D', type: 'color', value: '#0054ab' },
+    { key: 'u_color0', label: 'Color 1 (Left)',  type: 'color', value: '#ff3366' },
+    { key: 'u_color1', label: 'Color 2',         type: 'color', value: '#ffcc00' },
+    { key: 'u_color2', label: 'Color 3',         type: 'color', value: '#00ccff' },
+    { key: 'u_color3', label: 'Color 4 (Right)', type: 'color', value: '#aa00ff' },
+    { type: 'header', label: 'Finish' },
+    { key: 'u_opacity',        label: 'Opacity',  type: 'range', min: 0, max: 1,    step: 0.01, value: 1.0, noRandomize: true },
+    { key: 'u_distress',       label: 'Distress', type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0 },
+    { key: 'u_distress_scale', label: 'Grain',    type: 'range', min: 10, max: 300, step: 1,    value: 80  },
+  ],
+  fonts: ['Space Mono','Roboto Mono','Source Code Pro','JetBrains Mono','IBM Plex Mono','Fira Code',
+          'Inconsolata','Courier Prime','Share Tech Mono','Cutive Mono','DM Mono','Fragment Mono',
+          'Azeret Mono','Spline Sans Mono','Geist Mono','Syne','Unbounded','Bricolage Grotesque',
+          'Epilogue','DM Sans','Oswald','Montserrat',
+          'Bebas Neue','Barlow Condensed','Anton','Fjalla One'],
+  customAfterBuild: function (body) {
+    var cosinePresets = {
+      'Rainbow':   { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.0,  0.33, 0.67]  },
+      'Cool Blue': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.263,0.416,0.557] },
+      'Neon Heat': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.3,  0.2,  0.2 ]  },
+      'Cyberpunk': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[2.0,1.0,0.0], d:[0.5,  0.2,  0.25]  },
+      'Golden':    { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,0.5], d:[0.8,  0.9,  0.3 ]  },
+    };
+
+    function setColor(key, val) {
+      window._shaderState.values[key] = val;
+      var inp = document.querySelector('[data-param-key="' + key + '"]');
+      if (inp) inp.value = toHex(val);
+    }
+
+    function rowFor(key) {
+      var el = document.querySelector('[data-param-key="' + key + '"]');
+      return el ? el.closest('.shader-control') : null;
+    }
+
+    var cosineKeys = ['_sl_palette_preset', 'u_a', 'u_b', 'u_c', 'u_d'];
+    var stopKeys   = ['u_color0', 'u_color1', 'u_color2', 'u_color3'];
+
+    function applyVisibility() {
+      var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
+      var mode   = modeEl ? modeEl.value : '0';
+      cosineKeys.forEach(function (key) {
+        var row = rowFor(key); if (row) row.style.display = mode === '2' ? '' : 'none';
+      });
+      stopKeys.forEach(function (key) {
+        var row = rowFor(key); if (row) row.style.display = mode === '1' ? '' : 'none';
+      });
+    }
+
+    var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
+    if (modeEl) modeEl.addEventListener('change', applyVisibility);
+    applyVisibility();
+
+    var presetSel = document.querySelector('[data-param-key="_sl_palette_preset"]');
+    if (presetSel) {
+      presetSel.addEventListener('change', function () {
+        var p = cosinePresets[this.value]; if (!p) return;
+        setColor('u_a', p.a); setColor('u_b', p.b);
+        setColor('u_c', p.c); setColor('u_d', p.d);
+      });
+    }
+  },
+};
+
 // ── Shared helpers ────────────────────────────────────────────────────────────
 function hexToRgb(hex) {
   return [
@@ -976,12 +1118,14 @@ function buildGUI(shader) {
   var quadDependentRows      = [];
   var textColorDependentRows = [];
   var outlineDependentRows   = [];
-  var wordDependentRows      = [];
+  var wordDependentRows          = [];
+  var perLetterSizeDependentRows = [];
   var colorModeBtn    = null;
   var colorModeSel    = null;
   var useTextColorBtn = null;
-  var outlineToggleBtn= null;
-  var wordToggleBtn   = null;
+  var outlineToggleBtn       = null;
+  var wordToggleBtn          = null;
+  var perLetterSizeToggleBtn = null;
   var controlEls = [];
 
   controls.forEach(function(ctrl) {
@@ -1042,11 +1186,13 @@ function buildGUI(shader) {
         applyTextColorVisibility();
         applyOutlineVisibility();
         applyWordVisibility();
+        applyPerLetterSizeVisibility();
       }; })(ctrl));
       if (ctrl.key==='u_color_mode')    colorModeBtn     = btn;
       if (ctrl.key==='u_use_text_color') useTextColorBtn = btn;
       if (ctrl.key==='outlineEnabled')  outlineToggleBtn = btn;
-      if (ctrl.key==='wordEnabled')     wordToggleBtn    = btn;
+      if (ctrl.key==='wordEnabled')           wordToggleBtn          = btn;
+      if (ctrl.key==='perLetterSizeEnabled')  perLetterSizeToggleBtn = btn;
       row.appendChild(btn); controlEls.push({ctrl:ctrl,el:btn});
 
     } else if (ctrl.type === 'color') {
@@ -1090,7 +1236,8 @@ function buildGUI(shader) {
     if (ctrl.quadDependent)      quadDependentRows.push(row);
     if (ctrl.textColorDependent) textColorDependentRows.push(row);
     if (ctrl.outlineDependent)   outlineDependentRows.push(row);
-    if (ctrl.wordDependent)      wordDependentRows.push(row);
+    if (ctrl.wordDependent)           wordDependentRows.push(row);
+    if (ctrl.perLetterSizeDependent)  perLetterSizeDependentRows.push(row);
 
     body.appendChild(row);
   });
@@ -1125,6 +1272,11 @@ function buildGUI(shader) {
   applyTextColorVisibility();
   applyOutlineVisibility();
   applyWordVisibility();
+  function applyPerLetterSizeVisibility() {
+    var on = perLetterSizeToggleBtn && perLetterSizeToggleBtn.dataset.on==='1';
+    perLetterSizeDependentRows.forEach(function(r){ r.style.display=on?'':'none'; });
+  }
+  applyPerLetterSizeVisibility();
 
   // customAfterBuild
   if (typeof shader.customAfterBuild === 'function') shader.customAfterBuild(body);

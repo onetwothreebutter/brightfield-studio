@@ -1,0 +1,81 @@
+var controls = [
+  // ── Text ──────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Text' },
+  { key: 'u_word',         label: 'Word',          type: 'text',   value: 'PIZZA', textDirty: true,
+    randomOptions: ['PIZZA','NACHOS','WAFFLES','MEATBALL','DOUGHNUTS','QUESADILLA','CHEESESTEAK'],
+    tip: 'Up to 11 characters. Word length determines the grid layout.' },
+  { key: 'u_font_family',  label: 'Font',          type: 'select', value: 'Barlow Condensed',
+    options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; }) },
+  { key: 'u_font_size',    label: 'Font Size',     type: 'range',  min: 50, max: 500, step: 10, value: 300 },
+  { key: 'perLetterSizeEnabled', label: 'Per-Letter Size', type: 'toggle', value: 0,
+    tip: 'Override font size individually for each letter.' },
+  { key: 'u_font_size_1', label: 'Size 1', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+  { key: 'u_font_size_2', label: 'Size 2', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+  { key: 'u_font_size_3', label: 'Size 3', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+  { key: 'u_font_size_4', label: 'Size 4', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+  { key: 'u_font_size_5', label: 'Size 5', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+  { key: 'u_font_size_6',  label: 'Size 6',  type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+  { key: 'u_font_size_7',  label: 'Size 7',  type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+  { key: 'u_font_size_8',  label: 'Size 8',  type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+  { key: 'u_font_size_9',  label: 'Size 9',  type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+  { key: 'u_font_size_10', label: 'Size 10', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+  { key: 'u_font_size_11', label: 'Size 11', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
+  { key: 'u_text_color',   label: 'Text Color',    type: 'color',  value: '#ffffff' },
+  { key: 'u_invert',       label: 'Invert',        type: 'toggle', value: 0,
+    tip: 'Colors the cell background instead of the letter (text becomes a cutout).' },
+  { key: 'outlineEnabled', label: 'Outline',       type: 'toggle', value: 0, noRandomize: true },
+  { key: 'outlineWidth',   label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 12, noRandomize: true },
+  { key: 'u_outline_color', label: 'Outline Color', type: 'color', value: '#000000', noRandomize: true },
+  // ── Border ────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Border' },
+  { key: 'u_border_width', label: 'Border Width', type: 'range',  min: 2, max: 50, step: 1, value: 4, noRandomize: true,
+    tip: 'Thickness of the dividing lines between letter cells.' },
+  { key: 'u_border_color',   label: 'Border Color',   type: 'color',  value: '#ffffff', noRandomize: true },
+  { key: 'u_corner_radius', label: 'Corner Radius',  type: 'range',  min: 0, max: 0.5, step: 0.01, value: 0, noRandomize: true },
+  { key: 'u_outer_border', label: 'Outer Border', type: 'toggle', value: 1,
+    tip: 'Adds a border around the entire canvas edge.' },
+  { key: 'u_grid_aspect',  label: 'Grid Ratio',   type: 'range',  min: 0.4, max: 2.0, step: 0.01, value: 0.8,
+    tip: 'Width-to-height ratio of the letter grid (e.g. 0.8 = 4:5 portrait, 1.0 = square).' },
+  // ── Palette ───────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Palette' },
+  { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '0',
+    options: [
+      { label: 'Flat',   value: '0' },
+      { label: '4-Stop', value: '1' },
+    ]
+  },
+  // 4-stop colors (shown/hidden by customAfterBuild)
+  { key: 'u_color0', label: 'Color 1 (Left)',  type: 'color', value: '#ff3366' },
+  { key: 'u_color1', label: 'Color 2',         type: 'color', value: '#ffcc00' },
+  { key: 'u_color2', label: 'Color 3',         type: 'color', value: '#00ccff' },
+  { key: 'u_color3', label: 'Color 4 (Right)', type: 'color', value: '#aa00ff' },
+  // ── Finish ────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Finish' },
+  { key: 'u_opacity',        label: 'Opacity',  type: 'range', min: 0, max: 1,    step: 0.01, value: 1.0, noRandomize: true,
+    tip: 'Fades the entire design from fully visible to invisible.' },
+  { key: 'u_distress',       label: 'Distress', type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0, noRandomize: true,
+    tip: 'Adds a worn, aged look by knocking out random ink spots.' },
+  { key: 'u_distress_scale', label: 'Grain',    type: 'range', min: 10, max: 300, step: 1,    value: 80, noRandomize: true,
+    tip: 'Size of the distress grain — lower = finer, higher = coarser.' },
+];
+
+var customAfterBuild = function () {
+  var stopKeys = ['u_color0', 'u_color1', 'u_color2', 'u_color3'];
+
+  function rowFor(key) {
+    var el = document.querySelector('[data-param-key="' + key + '"]');
+    return el ? el.closest('.shader-control') : null;
+  }
+
+  function applyVisibility() {
+    var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
+    var mode   = modeEl ? modeEl.value : '0';
+    stopKeys.forEach(function (key) {
+      var row = rowFor(key); if (row) row.style.display = mode === '1' ? '' : 'none';
+    });
+  }
+
+  var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
+  if (modeEl) modeEl.addEventListener('change', applyVisibility);
+  applyVisibility();
+};

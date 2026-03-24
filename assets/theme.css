@@ -1941,13 +1941,6 @@ h6 {
 .shader-demo__cta-row .btn {
     flex: 1;
 }
-.shader-demo__note {
-    font-size: 0.7rem;
-    color: var(--color-text-muted);
-    text-align: center;
-    margin-top: 0.5rem;
-    letter-spacing: 0.04em;
-}
 
 .shader-demo__desktop-only-note,
 .shader-gui__desktop-only-note {
