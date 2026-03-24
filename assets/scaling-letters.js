@@ -91,10 +91,6 @@
     'uniform vec3      u_outline_color;',
     'uniform float     u_text_enabled;',
     'uniform float     u_outer_border;',
-    'uniform vec3      u_a;',
-    'uniform vec3      u_b;',
-    'uniform vec3      u_c;',
-    'uniform vec3      u_d;',
     'uniform vec3      u_text_color;',
     'uniform float     u_color_mode;',
     'uniform vec3      u_color0;',
@@ -120,10 +116,6 @@
     'uniform float     u_distress_scale;',
     '',
     'out vec4 fragColor;',
-    '',
-    'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
-    '  return a + b * cos(6.28318 * (c * t + d));',
-    '}',
     '',
     'float hash21(vec2 p) {',
     '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);',
@@ -483,14 +475,13 @@
     '  float outlineMask = smoothstep(0.3, 0.7, activeSample.g) * u_text_enabled;',
     '  float effectiveFill = mix(fillMask, 1.0 - fillMask, u_invert);',
     '  float letterAlpha = max(effectiveFill, outlineMask);',
-    '  vec3  cosCol  = cosinePalette(localUV.x, u_a, u_b, u_c, u_d);',
     '  float isFirst  = 1.0 - step(0.5, letterIdx);',
     '  float ci       = mod(max(letterIdx - 1.0, 0.0), 3.0);',
     '  vec3  c12      = mix(u_color1, u_color2, step(1.0, ci));',
     '  vec3  cycleCol = mix(c12, u_color3, step(2.0, ci));',
     '  vec3  gradCol  = mix(cycleCol, u_color0, isFirst);',
-    '  // u_color_mode: 0=flat, 1=4-stop, 2=cosine',
-    '  vec3  fillCol = mix(mix(u_text_color, gradCol, step(0.5, u_color_mode)), cosCol, step(1.5, u_color_mode));',
+    '  // u_color_mode: 0=flat, 1=4-stop',
+    '  vec3  fillCol = mix(u_text_color, gradCol, step(0.5, u_color_mode));',
     '  vec3  letterColor = mix(fillCol, u_outline_color, outlineMask);',
     '',
     '  // ── Outer border ──────────────────────────────────────────────────────────',
@@ -563,10 +554,6 @@
         textEnabled:  gl.getUniformLocation(program, 'u_text_enabled'),
         outerBorder:  gl.getUniformLocation(program, 'u_outer_border'),
         gridAspect:   gl.getUniformLocation(program, 'u_grid_aspect'),
-        palA:         gl.getUniformLocation(program, 'u_a'),
-        palB:         gl.getUniformLocation(program, 'u_b'),
-        palC:         gl.getUniformLocation(program, 'u_c'),
-        palD:         gl.getUniformLocation(program, 'u_d'),
         textColor:    gl.getUniformLocation(program, 'u_text_color'),
         colorMode:    gl.getUniformLocation(program, 'u_color_mode'),
         color0:       gl.getUniformLocation(program, 'u_color0'),
@@ -608,10 +595,6 @@
       var borderColor    = v.u_border_color || [1.0, 1.0, 1.0];
       var outerBorder    = v.u_outer_border != null ? v.u_outer_border : 0.0;
       var outlineColor   = v.u_outline_color || [0.0, 0.0, 0.0];
-      var palA           = v.u_a             || [0.5, 0.5, 0.5];
-      var palB           = v.u_b             || [0.5, 0.5, 0.5];
-      var palC           = v.u_c             || [1.0, 1.0, 1.0];
-      var palD           = v.u_d             || [0.0, 0.33, 0.67];
       var aspect         = h > 0 ? w / h : 1.0;
       var GRID_ASPECT    = v.u_grid_aspect != null ? v.u_grid_aspect : 0.8;
 
@@ -663,10 +646,6 @@
       gl.uniform1f(u.gridAspect,   GRID_ASPECT);
       gl.uniform3fv(u.outlineColor, outlineColor);
       gl.uniform1f(u.textEnabled,  textEnabled);
-      gl.uniform3fv(u.palA,        palA);
-      gl.uniform3fv(u.palB,        palB);
-      gl.uniform3fv(u.palC,        palC);
-      gl.uniform3fv(u.palD,        palD);
       var colorMode = v.u_color_mode != null ? parseFloat(v.u_color_mode) : 0.0;
       gl.uniform1f(u.colorMode,  colorMode);
       gl.uniform3fv(u.textColor, v.u_text_color || [1.0, 1.0, 1.0]);
