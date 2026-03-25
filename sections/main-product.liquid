@@ -363,16 +363,12 @@ if (window.location.hash === '#shader') {
       });
       window._shaderState.textDirty = true;
       if (saved.creatorName) {
-        var remixEl = document.createElement('p');
-        remixEl.className = 'product-remixed-by';
-        remixEl.textContent = 'Remixed by ' + saved.creatorName;
-        var descEl = document.querySelector('.product-description');
-        if (descEl) {
-          descEl.parentNode.insertBefore(remixEl, descEl.nextSibling);
-        } else {
-          var infoEl = document.querySelector('.product-info__details');
-          if (infoEl) infoEl.appendChild(remixEl);
-        }
+        document.querySelectorAll('.product-title').forEach(function (titleEl) {
+          var remixEl = document.createElement('p');
+          remixEl.className = 'product-remixed-by';
+          remixEl.textContent = 'Remixed by ' + saved.creatorName;
+          titleEl.parentNode.insertBefore(remixEl, titleEl.nextSibling);
+        });
       }
     } catch (e) {
       localStorage.removeItem('brightfield_restore');
