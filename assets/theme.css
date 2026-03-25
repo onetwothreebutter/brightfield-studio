@@ -701,6 +701,12 @@ h6 {
     font-size: 0.9375rem;
 }
 
+.product-remixed-by {
+    margin-top: 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+}
+
 .product-customize-desc {
     display: none;
     border-top: 1px solid var(--color-border);
