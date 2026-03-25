@@ -152,7 +152,8 @@
             var RESTORE_KEY = 'brightfield_restore';
             localStorage.setItem(RESTORE_KEY, JSON.stringify({
               values: d.values,
-              shader: d.shader
+              shader: d.shader,
+              creatorName: d.creatorName || null
             }));
             window.location.href = '/products/' + d.productHandle + '#shader';
           }
