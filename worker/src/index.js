@@ -141,8 +141,19 @@ async function handleGenerateMockup(request, env, origin) {
       throw new Error('Mockup generation timed out');
     }
 
-    // 4. Keep the design file in R2 — merchant needs the URL to submit to Printful when fulfilling
-    // 5. Save design entry for the device gallery (best-effort)
+    // 4. Re-host the Printful mockup in R2 so the URL doesn't expire
+    const mockupKey = `mockups/${crypto.randomUUID()}.jpg`;
+    const mockupImageRes = await fetch(mockupUrl);
+    if (mockupImageRes.ok) {
+      const mockupImageData = await mockupImageRes.arrayBuffer();
+      await env.MOCKUP_STAGING.put(mockupKey, mockupImageData, {
+        httpMetadata: { contentType: 'image/jpeg' }
+      });
+      mockupUrl = `https://${env.R2_PUBLIC_DOMAIN}/${mockupKey}`;
+    }
+
+    // 5. Keep the design file in R2 — merchant needs the URL to submit to Printful when fulfilling
+    // 6. Save design entry for the device gallery (best-effort)
     if (deviceId) {
       const entry = {
         id: crypto.randomUUID(),
