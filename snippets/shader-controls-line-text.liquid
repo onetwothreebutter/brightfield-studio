@@ -14,7 +14,7 @@ var controls = [
   { key: 'textFont',     label: 'Font',       type: 'select', value: 'Montserrat',  textDirty: true,
     options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
   },
-  { key: 'textFontSize', label: 'Font Size',  type: 'range', min: 50,  max: 950, step: 1,    value: 202, textDirty: true },
+  { key: 'textFontSize', label: 'Font Size',  type: 'range', min: 50,  max: 950, step: 1,    value: 202, textDirty: true, noRandomize: true },
   { key: 'textY',        label: 'Text Y',     type: 'range', min: 0,   max: 1,   step: 0.01, value: 0.5, textDirty: true, noRandomize: true },
   // ── Color Palette ──────────────────────────────────────────────────────────
   { type: 'header', label: 'Color Palette' },
