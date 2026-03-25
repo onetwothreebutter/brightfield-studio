@@ -1,44 +1,8 @@
 (function () {
   'use strict';
 
-  // FourCircles port — 2×2 grid of circles with triangular cutouts (pinwheel),
-  // per-quadrant letter textures, cosine/4-stop palette, and per-quadrant rotation.
-
-  var CANVAS_SIZE = 512;
-
-  function drawLetter(ctx, letter, font, size, outlineEnabled, outlineWidth) {
-    var canvas   = ctx.canvas;
-    canvas.width  = CANVAS_SIZE;
-    canvas.height = CANVAS_SIZE;
-    ctx.fillStyle = 'black';
-    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    if (letter) {
-      ctx.font         = 'bold ' + size + 'px ' + font + ', monospace';
-      ctx.textAlign    = 'center';
-      ctx.textBaseline = 'alphabetic';
-      var metrics = ctx.measureText(letter);
-      var y = CANVAS_SIZE / 2 +
-        (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2;
-      if (outlineEnabled && outlineWidth > 0) {
-        ctx.strokeStyle = 'rgb(0,255,0)';
-        ctx.lineWidth   = outlineWidth * 2;
-        ctx.lineJoin    = 'round';
-        ctx.strokeText(letter, CANVAS_SIZE / 2, y);
-      }
-      ctx.fillStyle = 'rgb(255,0,0)';
-      ctx.fillText(letter, CANVAS_SIZE / 2, y);
-    }
-  }
-
-  function uploadTex(gl, tex, canvas) {
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  }
+  // FourCircles — 2×2 grid of circles with triangular cutouts (pinwheel),
+  // cosine/4-stop/per-quadrant palette, word overlay, and per-quadrant rotation.
 
   var fragSrc = [
     '#version 300 es',
@@ -57,8 +21,6 @@
     'uniform float     u_rot3;',
     'uniform float     u_rot4;',
     'uniform float     u_global_grad;',
-    'uniform float     u_text_enabled;',
-    'uniform vec3      u_outline_color;',
     'uniform vec3      u_a;',
     'uniform vec3      u_b;',
     'uniform vec3      u_c;',
@@ -78,10 +40,6 @@
     'uniform vec3      u_word_color;',
     'uniform float     u_use_word_color;',
     'uniform vec3      u_word_outline_color;',
-    'uniform sampler2D u_tex1;',
-    'uniform sampler2D u_tex2;',
-    'uniform sampler2D u_tex3;',
-    'uniform sampler2D u_tex4;',
     'uniform float     u_opacity;',
     'uniform float     u_distress;',
     'uniform float     u_distress_scale;',
@@ -187,17 +145,6 @@
     '',
     '  float shapeMask = circleMask * (1.0 - triCutout);',
     '',
-    '  // ── Letter textures ─────────────────────────────────────────────────────',
-    '  // tex1 = top-left, tex2 = top-right, tex3 = bot-left, tex4 = bot-right',
-    '  vec4 t1 = texture(u_tex1, localUV);',
-    '  vec4 t2 = texture(u_tex2, localUV);',
-    '  vec4 t3 = texture(u_tex3, localUV);',
-    '  vec4 t4 = texture(u_tex4, localUV);',
-    '  vec4 activeTex = mix(mix(t3, t4, isRight), mix(t1, t2, isRight), isTop);',
-    '',
-    '  // Green channel = outline stroke; red channel = letter fill (unused in color path)',
-    '  float outlineSample = smoothstep(0.3, 0.7, activeTex.g) * u_text_enabled;',
-    '',
     '  // ── Colour ──────────────────────────────────────────────────────────────',
     '  float palT      = mix(localUV.x, uv.x, u_global_grad);',
     '  vec3  cosineCol = cosinePalette(palT, u_a, u_b, u_c, u_d);',
@@ -216,7 +163,7 @@
     '    perQuadCol,',
     '    step(1.5, u_color_mode)',
     '  );',
-    '  vec3 layerColor = mix(col, u_outline_color, outlineSample);',
+    '  vec3 layerColor = col;',
     '',
     '  // ── Word overlay ─────────────────────────────────────────────────────────',
     '  vec2 wordAnchor  = vec2(u_word_x, u_word_y);',
@@ -245,26 +192,6 @@
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
-      var texCanvases    = [];
-      var texCtxs        = [];
-      var glTextures     = [];
-      var lastLetterKeys = [];
-
-      for (var i = 0; i < 4; i++) {
-        var c = document.createElement('canvas');
-        c.width  = CANVAS_SIZE;
-        c.height = CANVAS_SIZE;
-        texCanvases.push(c);
-        var ctx = c.getContext('2d');
-        texCtxs.push(ctx);
-        ctx.fillStyle = 'black';
-        ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-        var t = gl.createTexture();
-        glTextures.push(t);
-        uploadTex(gl, t, c);
-        lastLetterKeys.push(null);
-      }
-
       return {
         res:          gl.getUniformLocation(program, 'u_resolution'),
         aspect:       gl.getUniformLocation(program, 'u_aspect'),
@@ -279,8 +206,6 @@
         rot3:         gl.getUniformLocation(program, 'u_rot3'),
         rot4:         gl.getUniformLocation(program, 'u_rot4'),
         globalGrad:   gl.getUniformLocation(program, 'u_global_grad'),
-        textEnabled:  gl.getUniformLocation(program, 'u_text_enabled'),
-        outlineColor: gl.getUniformLocation(program, 'u_outline_color'),
         palA:         gl.getUniformLocation(program, 'u_a'),
         palB:         gl.getUniformLocation(program, 'u_b'),
         palC:         gl.getUniformLocation(program, 'u_c'),
@@ -300,18 +225,9 @@
         wordColor:    gl.getUniformLocation(program, 'u_word_color'),
         useWordColor: gl.getUniformLocation(program, 'u_use_word_color'),
         wordOutlineColor: gl.getUniformLocation(program, 'u_word_outline_color'),
-        tex1:         gl.getUniformLocation(program, 'u_tex1'),
-        tex2:         gl.getUniformLocation(program, 'u_tex2'),
-        tex3:         gl.getUniformLocation(program, 'u_tex3'),
-        tex4:         gl.getUniformLocation(program, 'u_tex4'),
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
-        // Internal letter-texture state (not uniform locations).
-        _texCanvases:    texCanvases,
-        _texCtxs:        texCtxs,
-        _glTextures:     glTextures,
-        _lastLetterKeys: lastLetterKeys,
       };
     },
 
@@ -329,8 +245,6 @@
       var rot3         = (v.u_rot3         != null ? v.u_rot3         : 0)    * DEG;
       var rot4         = (v.u_rot4         != null ? v.u_rot4         : 0)    * DEG;
       var globalGrad   = v.u_global_grad   != null ? v.u_global_grad   : 0.0;
-      var textEnabled  = v.u_text_enabled  != null ? v.u_text_enabled  : 1.0;
-      var outlineColor = v.u_outline_color || [0.0, 0.0, 0.0];
       var palA         = v.u_a             || [0.5, 0.5, 0.5];
       var palB         = v.u_b             || [0.5, 0.5, 0.5];
       var palC         = v.u_c             || [1.0, 1.0, 1.0];
@@ -344,34 +258,7 @@
       var quad1        = v.u_quad1         || [0.0,  0.45, 1.0 ];
       var quad2        = v.u_quad2         || [0.0,  0.90, 0.40];
       var quad3        = v.u_quad3         || [1.0,  0.55, 0.0 ];
-      var fontFamily   = v.u_font_family   || 'Montserrat';
-      var fontSize     = v.u_font_size     != null ? v.u_font_size     : 300;
-      var outlineEnabled = v.outlineEnabled ? true : false;
-      var outlineWidth   = v.outlineWidth  != null ? v.outlineWidth    : 12;
-      var aspect         = h > 0 ? w / h : 1.0;
-
-      // When text is disabled pass '' so the canvas is blank (black — no green channel).
-      var letters = [
-        textEnabled ? (v.u_letter1 != null ? v.u_letter1 : 'A') : '',
-        textEnabled ? (v.u_letter2 != null ? v.u_letter2 : 'B') : '',
-        textEnabled ? (v.u_letter3 != null ? v.u_letter3 : 'C') : '',
-        textEnabled ? (v.u_letter4 != null ? v.u_letter4 : 'D') : '',
-      ];
-
-      // Redraw and re-upload any letter texture whose key changed.
-      var texUnits    = [gl.TEXTURE0, gl.TEXTURE1, gl.TEXTURE2, gl.TEXTURE3];
-      var texUniforms = [u.tex1, u.tex2, u.tex3, u.tex4];
-      for (var i = 0; i < 4; i++) {
-        var key = letters[i] + '|' + fontFamily + '|' + fontSize + '|' + outlineEnabled + '|' + outlineWidth;
-        if (key !== u._lastLetterKeys[i]) {
-          drawLetter(u._texCtxs[i], letters[i], fontFamily, fontSize, outlineEnabled, outlineWidth);
-          uploadTex(gl, u._glTextures[i], u._texCanvases[i]);
-          u._lastLetterKeys[i] = key;
-        }
-        gl.activeTexture(texUnits[i]);
-        gl.bindTexture(gl.TEXTURE_2D, u._glTextures[i]);
-        gl.uniform1i(texUniforms[i], i);
-      }
+      var aspect       = h > 0 ? w / h : 1.0;
 
       gl.uniform2f(u.res,          w, h);
       gl.uniform1f(u.aspect,       aspect);
@@ -386,8 +273,6 @@
       gl.uniform1f(u.rot3,         rot3);
       gl.uniform1f(u.rot4,         rot4);
       gl.uniform1f(u.globalGrad,   globalGrad);
-      gl.uniform1f(u.textEnabled,  textEnabled);
-      gl.uniform3fv(u.outlineColor, outlineColor);
       gl.uniform3fv(u.palA,        palA);
       gl.uniform3fv(u.palB,        palB);
       gl.uniform3fv(u.palC,        palC);
@@ -406,9 +291,9 @@
       gl.uniform3fv(u.wordColor,   v.u_word_color   || [1.0, 1.0, 1.0]);
       gl.uniform1f(u.useWordColor, v.u_use_word_color != null ? v.u_use_word_color : 0.0);
       gl.uniform3fv(u.wordOutlineColor, v.u_word_outline_color || [0.0, 0.0, 0.0]);
-      gl.activeTexture(gl.TEXTURE4);
+      gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);
-      gl.uniform1i(u.wordTex, 4);
+      gl.uniform1i(u.wordTex, 0);
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
