@@ -2373,6 +2373,19 @@ h6 {
     padding-top: 16px;
 }
 
+/* ─── Designs Row (two-column on desktop) ──────────────── */
+.designs-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+}
+@media (min-width: 768px) {
+    .designs-row {
+        grid-template-columns: 1fr 1fr;
+        align-items: start;
+    }
+}
+
 /* ─── Mockup modal community form ────────────────────────── */
 .mockup-modal__community {
     margin-top: 1rem;
