@@ -1,13 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <filter id="g1" x="-100%" y="-100%" width="300%" height="300%">
-      <feGaussianBlur stdDeviation="7"/>
-    </filter>
-    <filter id="g2" x="-100%" y="-100%" width="300%" height="300%">
-      <feGaussianBlur stdDeviation="3"/>
-    </filter>
+    <radialGradient id="g" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#2df0de" stop-opacity="1"/>
+      <stop offset="58%" stop-color="#2df0de" stop-opacity="1"/>
+      <stop offset="78%" stop-color="#2df0de" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#2df0de" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <circle cx="32" cy="32" r="14" fill="rgba(44,233,214,0.35)" filter="url(#g1)"/>
-  <circle cx="32" cy="32" r="8" fill="rgba(44,233,214,0.62)" filter="url(#g2)"/>
-  <circle cx="32" cy="32" r="5" fill="#2ce9d6"/>
+  <circle cx="32" cy="32" r="25" fill="url(#g)"/>
 </svg>
