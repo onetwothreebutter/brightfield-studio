@@ -130,9 +130,10 @@
     '  float inkAlpha = max(fillAlpha, outlineAlpha);',
     '  float alpha    = mix(1.0, inkAlpha, u_transparent_bg);',
     '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
+    '  float dist = clamp(length(dUV - 0.5) * 2.0, 0.0, 1.0);',
     '  float dn = distressNoise(dUV, u_distress_scale) * 0.67',
     '           + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
-    '  alpha = alpha * step(u_distress, dn) * u_opacity;',
+    '  alpha = alpha * step(u_distress * dist, dn) * u_opacity;',
     '  fragColor   = vec4(color, alpha);',
     '}'
   ].join('\n');
