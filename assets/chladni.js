@@ -21,6 +21,8 @@
     'uniform float u_opacity;',
     'uniform float u_distress;',
     'uniform float u_distress_scale;',
+    'uniform float u_vignette_x;',
+    'uniform float u_vignette_y;',
     '',
     'out vec4 fragColor;',
     '',
@@ -88,6 +90,9 @@
     '  float dn = distressNoise(dUV, u_distress_scale) * 0.67',
     '           + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
     '  alpha = alpha * step(u_distress, dn) * u_opacity;',
+    '  vec2 vigCoord = dUV - 0.5;',
+    '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
+    '  col = col * clamp(1.0 - vigVal, 0.0, 1.0);',
     '  fragColor = vec4(col, alpha);',
     '}'
   ].join('\n');
@@ -113,6 +118,8 @@
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
+        vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
+        vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
       };
     },
 
@@ -133,6 +140,8 @@
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
+      gl.uniform1f(u.vignetteX,     v.u_vignette_x     != null ? v.u_vignette_x     : 0.0);
+      gl.uniform1f(u.vignetteY,     v.u_vignette_y     != null ? v.u_vignette_y     : 0.0);
     },
   });
 }());
