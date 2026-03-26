@@ -234,7 +234,7 @@
     '  vec3 seg12 = mix_oklch(lch1, lch2, t12);',
     '  vec3 seg23 = mix_oklch(lch2, lch3, t23);',
     '  vec3 blendedLch = mix(mix(seg01, seg12, step(0.33333, palT)), seg23, step(0.66667, palT));',
-    '  vec3 gradCol = oklab_to_linear_rgb(oklch_to_oklab(blendedLch));',
+    '  vec3 gradCol = clamp(oklab_to_linear_rgb(oklch_to_oklab(blendedLch)), 0.0, 1.0);',
     '',
     '  vec3 oklchCol = oklchPalette(palT);',
     '  float isStop  = step(0.5, u_color_mode) * (1.0 - step(1.5, u_color_mode));',
