@@ -701,6 +701,12 @@ h6 {
     font-size: 0.9375rem;
 }
 
+.product-remixed-by {
+    margin-top: 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+}
+
 .product-customize-desc {
     display: none;
     border-top: 1px solid var(--color-border);
@@ -2273,7 +2279,7 @@ h6 {
 
 /* ─── Community Designs ──────────────────────────────────── */
 .community-designs-section {
-    padding: 2rem var(--page-gutter);
+    padding: 2rem 0;
 }
 .community-designs__header {
     margin-bottom: 1rem;

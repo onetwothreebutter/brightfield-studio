@@ -7,9 +7,10 @@
       {%- if page_title == blank -%}{{ shop.name }}{%- else -%}{{ page_title }} &ndash; {{ shop.name }}{%- endif -%}
     </title>
     <meta name="description" content="{{ page_description | escape }}">
-    {%- if settings.favicon != blank -%}
-      <link rel="icon" type="image/png" href="{{ settings.favicon | image_url: width: 32 }}">
-    {%- endif -%}
+    <link rel="icon" href="{{ 'favicon.ico' | asset_url }}" sizes="any">
+    <link rel="icon" href="{{ 'favicon.svg' | asset_url }}" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{{ 'apple-touch-icon.png' | asset_url }}">
+    <meta name="theme-color" content="#0a0b11">
 
     {{ content_for_header }}
 

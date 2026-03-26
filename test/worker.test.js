@@ -303,6 +303,71 @@ describe('POST /community/reject', () => {
   });
 });
 
+// ── /community/pending?status= ────────────────────────────────────────────────
+
+describe('GET /community/pending?status=', () => {
+  let env;
+  beforeEach(() => { env = makeEnv(); });
+
+  it('returns only approved submissions when status=approved', async () => {
+    const { id: pending } = await submitDesign(env, { creatorName: 'Alice' });
+    const { id: approved } = await submitDesign(env, { creatorName: 'Bob' });
+    await worker.fetch(post('/community/approve', { id: approved }, adminHeaders()), env);
+
+    const res = await worker.fetch(get('/community/pending?status=approved', adminHeaders()), env);
+    expect(res.status).toBe(200);
+    const results = await res.json();
+    expect(results).toHaveLength(1);
+    expect(results[0].id).toBe(approved);
+    void pending;
+  });
+
+  it('returns only rejected submissions when status=rejected', async () => {
+    const { id: pending } = await submitDesign(env, { creatorName: 'Alice' });
+    const { id: rejected } = await submitDesign(env, { creatorName: 'Carol' });
+    await worker.fetch(post('/community/reject', { id: rejected }, adminHeaders()), env);
+
+    const res = await worker.fetch(get('/community/pending?status=rejected', adminHeaders()), env);
+    expect(res.status).toBe(200);
+    const results = await res.json();
+    expect(results).toHaveLength(1);
+    expect(results[0].id).toBe(rejected);
+    void pending;
+  });
+
+  it('returns 401 without auth', async () => {
+    const res = await worker.fetch(get('/community/pending?status=approved'), env);
+    expect(res.status).toBe(401);
+  });
+});
+
+// ── re-moderate (approve rejected / reject approved) ─────────────────────────
+
+describe('re-moderation', () => {
+  let env;
+  beforeEach(() => { env = makeEnv(); });
+
+  it('can reject an already-approved design', async () => {
+    const { id } = await submitDesign(env);
+    await worker.fetch(post('/community/approve', { id }, adminHeaders()), env);
+
+    const res = await worker.fetch(post('/community/reject', { id }, adminHeaders()), env);
+    expect(res.status).toBe(200);
+    const obj = await env.MOCKUP_STAGING.get(`community/submissions/${id}.json`);
+    expect(JSON.parse(await obj.text()).status).toBe('rejected');
+  });
+
+  it('can approve an already-rejected design', async () => {
+    const { id } = await submitDesign(env);
+    await worker.fetch(post('/community/reject', { id }, adminHeaders()), env);
+
+    const res = await worker.fetch(post('/community/approve', { id }, adminHeaders()), env);
+    expect(res.status).toBe(200);
+    const obj = await env.MOCKUP_STAGING.get(`community/submissions/${id}.json`);
+    expect(JSON.parse(await obj.text()).status).toBe('approved');
+  });
+});
+
 // ── CORS ──────────────────────────────────────────────────────────────────────
 
 describe('CORS', () => {

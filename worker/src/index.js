@@ -141,8 +141,19 @@ async function handleGenerateMockup(request, env, origin) {
       throw new Error('Mockup generation timed out');
     }
 
-    // 4. Keep the design file in R2 — merchant needs the URL to submit to Printful when fulfilling
-    // 5. Save design entry for the device gallery (best-effort)
+    // 4. Re-host the Printful mockup in R2 so the URL doesn't expire
+    const mockupKey = `mockups/${crypto.randomUUID()}.jpg`;
+    const mockupImageRes = await fetch(mockupUrl);
+    if (mockupImageRes.ok) {
+      const mockupImageData = await mockupImageRes.arrayBuffer();
+      await env.MOCKUP_STAGING.put(mockupKey, mockupImageData, {
+        httpMetadata: { contentType: 'image/jpeg' }
+      });
+      mockupUrl = `https://${env.R2_PUBLIC_DOMAIN}/${mockupKey}`;
+    }
+
+    // 5. Keep the design file in R2 — merchant needs the URL to submit to Printful when fulfilling
+    // 6. Save design entry for the device gallery (best-effort)
     if (deviceId) {
       const entry = {
         id: crypto.randomUUID(),
@@ -371,10 +382,13 @@ async function handleCommunityPending(request, env, origin) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
   }
 
+  const url = new URL(request.url);
+  const statusFilter = url.searchParams.get('status') || 'pending';
+
   const list = (await readJson(env, 'community/list.json')) || [];
   const submissions = (
     await Promise.all(list.map(id => readJson(env, `community/submissions/${id}.json`)))
-  ).filter(s => s && s.status === 'pending');
+  ).filter(s => s && s.status === statusFilter);
 
   return new Response(JSON.stringify(submissions), { status: 200, headers });
 }
@@ -452,9 +466,23 @@ function handleAdminUI(request, env) {
     var content = document.getElementById('content');
     var tabs = document.querySelectorAll('.tab');
 
-    async function authHeaders() {
-      var token = await window.shopify.idToken();
-      return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+    // Shopify passes a fresh id_token in the URL on every load (valid ~60s).
+    // window.shopify.idToken() hangs in some environments, so we read from URL.
+    // On 401, redirect to the Shopify admin app entry point so Shopify issues a fresh token.
+    var _token = new URLSearchParams(location.search).get('id_token') || '';
+    var _shop  = new URLSearchParams(location.search).get('shop') || '';
+    var _shopSlug = _shop.replace('.myshopify.com', '');
+
+    function authHeaders() {
+      if (!_token) return null;
+      return { 'Authorization': 'Bearer ' + _token, 'Content-Type': 'application/json' };
+    }
+
+    function refreshApp() {
+      var base = _shopSlug
+        ? 'https://admin.shopify.com/store/' + _shopSlug + '/apps/community-admin'
+        : location.href;
+      location.replace(base);
     }
 
     function timeAgo(ts) {
@@ -471,9 +499,12 @@ function handleAdminUI(request, env) {
 
     async function loadTab(tab) {
       content.innerHTML = '<p class="status">Loading\u2026</p>';
+      var headers = authHeaders();
+      if (!headers) return;
       try {
-        var endpoint = tab === 'pending' ? '/community/pending' : '/community/list?status=' + tab;
-        var r = await fetch(endpoint, { headers: await authHeaders() });
+        var endpoint = '/community/pending?status=' + tab;
+        var r = await fetch(endpoint, { headers: headers });
+        if (r.status === 401) { refreshApp(); return; }
         if (!r.ok) throw new Error('HTTP ' + r.status);
         renderCards(await r.json(), tab);
       } catch (err) {
@@ -500,20 +531,25 @@ function handleAdminUI(request, env) {
           esc((d.shader || '').replace(/-/g, ' ')) + ' \u00b7 ' + timeAgo(d.timestamp);
         card.appendChild(img);
         card.appendChild(info);
-        if (tab === 'pending') {
-          var actions = document.createElement('div');
-          actions.className = 'card-actions';
+        var actions = document.createElement('div');
+        actions.className = 'card-actions';
+        if (tab === 'pending' || tab === 'rejected') {
           var aBtn = document.createElement('button');
           aBtn.className = 'btn btn-primary'; aBtn.textContent = 'Approve';
+          (function(id, a, c) {
+            a.addEventListener('click', function() { moderate(id, 'approve', c); });
+          }(d.id, aBtn, card));
+          actions.appendChild(aBtn);
+        }
+        if (tab === 'pending' || tab === 'approved') {
           var rBtn = document.createElement('button');
           rBtn.className = 'btn btn-outline'; rBtn.textContent = 'Reject';
-          (function(id, a, r, c) {
-            a.addEventListener('click', function() { moderate(id, 'approve', c); });
+          (function(id, r, c) {
             r.addEventListener('click', function() { moderate(id, 'reject', c); });
-          }(d.id, aBtn, rBtn, card));
-          actions.appendChild(aBtn); actions.appendChild(rBtn);
-          card.appendChild(actions);
+          }(d.id, rBtn, card));
+          actions.appendChild(rBtn);
         }
+        card.appendChild(actions);
         grid.appendChild(card);
       });
       content.innerHTML = '';
@@ -521,12 +557,15 @@ function handleAdminUI(request, env) {
     }
 
     async function moderate(id, action, cardEl) {
+      var headers = authHeaders();
+      if (!headers) return;
       try {
         var r = await fetch('/community/' + action, {
           method: 'POST',
-          headers: await authHeaders(),
+          headers: headers,
           body: JSON.stringify({ id: id })
         });
+        if (r.status === 401) { refreshApp(); return; }
         if (!r.ok) throw new Error('HTTP ' + r.status);
         cardEl.style.opacity = '0.3';
         cardEl.style.pointerEvents = 'none';
