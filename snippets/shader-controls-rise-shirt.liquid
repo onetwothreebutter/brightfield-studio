@@ -1,10 +1,23 @@
 var controls = [
   // ── Palette ───────────────────────────────────────────────────────────────
   { type: 'header', label: 'Color Palette' },
-  { key: 'u_color_mode',  label: 'Solid Color Mode', type: 'toggle', value: 0,
-    tip: 'Off = cosine palette. On = solid color.' },
-  { key: 'u_dot_color',   label: 'Dot Color',        type: 'color',  stopDependent: true,    value: '#ffffff' },
-  { key: 'u_text_color',  label: 'Text Color',       type: 'color',  stopDependent: true,    value: '#ffffff' },
+  { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '0',
+    options: [
+      { label: 'Cosine', value: '0' },
+      { label: '4-Stop', value: '1' },
+      { label: 'OKLCH',  value: '2' },
+    ]
+  },
+  // Cosine palette controls
+  { key: '_rs_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, noRandomize: true, value: 'Rainbow',
+    options: [
+      { label: 'Rainbow',   value: 'Rainbow'   },
+      { label: 'Cool Blue', value: 'Cool Blue' },
+      { label: 'Neon Heat', value: 'Neon Heat' },
+      { label: 'Cyberpunk', value: 'Cyberpunk' },
+      { label: 'Golden',    value: 'Golden'    },
+    ]
+  },
   { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
     tip: 'Offset — base brightness per channel. Sets the center point colors oscillate around.' },
   { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080',
@@ -13,6 +26,39 @@ var controls = [
     tip: 'Frequency — how many times the palette cycles across the gradient per channel.' },
   { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#436a8e',
     tip: 'Phase — shifts the starting hue of the color cycle. Rotates the overall color mood.' },
+  // 4-stop color controls
+  { key: 'u_color0', label: 'Color 1', type: 'color', stopDependent: true, value: '#ff3366' },
+  { key: 'u_color1', label: 'Color 2', type: 'color', stopDependent: true, value: '#ffcc00' },
+  { key: 'u_color2', label: 'Color 3', type: 'color', stopDependent: true, value: '#00ccff' },
+  { key: 'u_color3', label: 'Color 4', type: 'color', stopDependent: true, value: '#aa00ff' },
+  // OKLCH palette controls
+  { key: '_rs_oklch_preset', label: 'Preset', type: 'select', oklchDependent: true, noRandomize: true, value: 'Vivid Rainbow',
+    options: [
+      { label: 'Vivid Rainbow', value: 'Vivid Rainbow' },
+      { label: 'Pastel',        value: 'Pastel'        },
+      { label: 'Neon',          value: 'Neon'          },
+      { label: 'Warm',          value: 'Warm'          },
+      { label: 'Monochrome',    value: 'Monochrome'    },
+    ]
+  },
+  { key: 'u_oklch_aL', label: 'L Center',    type: 'range', min: 0,    max: 1,    step: 0.01, value: 0.70, oklchDependent: true,
+    tip: 'Base lightness (0 = black, 1 = white). OKLCH L is perceptually uniform.' },
+  { key: 'u_oklch_bL', label: 'L Amplitude', type: 'range', min: 0,    max: 0.5,  step: 0.01, value: 0.00, oklchDependent: true,
+    tip: 'How much lightness oscillates around the center.' },
+  { key: 'u_oklch_cL', label: 'L Frequency', type: 'range', min: 0,    max: 5,    step: 0.1,  value: 0.5,  oklchDependent: true },
+  { key: 'u_oklch_dL', label: 'L Phase',      type: 'range', min: 0,    max: 1,    step: 0.01, value: 0.0,  oklchDependent: true },
+  { key: 'u_oklch_aC', label: 'C Center',     type: 'range', min: 0,    max: 0.37, step: 0.01, value: 0.25, oklchDependent: true,
+    tip: 'Base chroma — higher values are more vibrant. 0.37 is the sRGB gamut boundary.' },
+  { key: 'u_oklch_bC', label: 'C Amplitude',  type: 'range', min: 0,    max: 0.2,  step: 0.01, value: 0.00, oklchDependent: true,
+    tip: 'How much chroma oscillates (vivid ↔ muted).' },
+  { key: 'u_oklch_cC', label: 'C Frequency',  type: 'range', min: 0,    max: 5,    step: 0.1,  value: 0.5,  oklchDependent: true },
+  { key: 'u_oklch_dC', label: 'C Phase',       type: 'range', min: 0,    max: 1,    step: 0.01, value: 0.0,  oklchDependent: true },
+  { key: 'u_oklch_aH', label: 'H Center (°)',  type: 'range', min: 0,    max: 360,  step: 1,    value: 180,  oklchDependent: true,
+    tip: 'Center hue in degrees. OKLCH: 0°=red, 120°=green, 240°=blue.' },
+  { key: 'u_oklch_bH', label: 'H Range (°)',   type: 'range', min: 0,    max: 360,  step: 1,    value: 180,  oklchDependent: true,
+    tip: 'How far the hue swings in either direction. 180° covers the full color wheel.' },
+  { key: 'u_oklch_cH', label: 'H Frequency',   type: 'range', min: 0,    max: 5,    step: 0.1,  value: 0.5,  oklchDependent: true },
+  { key: 'u_oklch_dH', label: 'H Phase',        type: 'range', min: 0,    max: 1,    step: 0.01, value: 0.0,  oklchDependent: true },
   { key: 'u_transparent_bg', label: 'Transparent BG', type: 'toggle', value: 0 },
   // ── Text overlay ──────────────────────────────────────────────────────────
   { type: 'header', label: 'Text Overlay' },
@@ -20,13 +66,13 @@ var controls = [
   { key: 'textFont',         label: 'Font',          type: 'select', textDirty: true, value: 'IBM Plex Mono',
     options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
   },
-  { key: 'textFontSize',     label: 'Font Size',     type: 'range',  min: 50,   max: 800,  step: 10,   value: 320,  textDirty: true },
+  { key: 'textFontSize',     label: 'Font Size',     type: 'range',  min: 50,   max: 800,  step: 10,   value: 320,  textDirty: true, noRandomize: true },
   { key: 'u_text_rotation',  label: 'Rotation (°)',  type: 'range',  min: -180, max: 180,  step: 1,    value: 0,    textDirty: true,
-    tip: '90° = vertical text. 0° = horizontal.' },
+    tip: '90° = vertical text. 0° = horizontal.', noRandomize: true },
   { key: 'u_text_grid_cols', label: 'Text Cols',     type: 'range',  min: 1,    max: 50,   step: 1,    value: 28   },
   { key: 'u_text_grid_rows', label: 'Text Rows',     type: 'range',  min: 1,    max: 100,  step: 1,    value: 39   },
-  { key: 'textX',            label: 'Text X',        type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 0.5,  textDirty: true },
-  { key: 'textY',            label: 'Text Y',        type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 0.79, textDirty: true },
+  { key: 'textX',            label: 'Text X',        type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 0.5,  textDirty: true, noRandomize: true },
+  { key: 'textY',            label: 'Text Y',        type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 0.79, textDirty: true, noRandomize: true },
   { key: 'u_invert_text',    label: 'Invert Color',  type: 'toggle', value: 0,
     tip: 'On = text shows inverted palette color. Off = text matches the palette.' },
   { key: 'u_text_radius',    label: 'Text Dot Size', type: 'range',  min: 0.01, max: 1.5,  step: 0.01, value: 0.33 },
@@ -37,7 +83,7 @@ var controls = [
   { key: 'u_cols',           label: 'Cols',          type: 'range',  min: 1,    max: 50,   step: 1,    value: 27   },
   { key: 'u_min_radius',     label: 'Min Radius',    type: 'range',  min: 0,    max: 0.5,  step: 0.01, value: 0.02 },
   { key: 'u_max_radius',     label: 'Max Radius',    type: 'range',  min: 0.1,  max: 1.5,  step: 0.01, value: 0.55 },
-  { key: 'u_invert',         label: 'Invert',        type: 'toggle',                                   value: 1    },
+  { key: 'u_invert',         label: 'Invert',        type: 'toggle',                                   value: 1,   noRandomize: true },
   { key: 'u_top_margin',     label: 'Top Margin',    type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 0.31 },
   // ── Finish ────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Finish' },
@@ -49,3 +95,55 @@ var controls = [
     tip: 'Size of the distress grain — lower = finer, higher = coarser.' },
 ];
 
+var customAfterBuild = function () {
+  // Cosine preset wiring
+  var cosineKeys = ['u_a', 'u_b', 'u_c', 'u_d'];
+  function applyCosinePreset(p) {
+    applyColors(cosineKeys.map(function (k, i) {
+      return [k, [p.a, p.b, p.c, p.d][i]];
+    }));
+  }
+  applyCosinePreset(COSINE_PRESETS['Rainbow']);
+  var presetSel = document.querySelector('[data-param-key="_rs_palette_preset"]');
+  if (presetSel) {
+    presetSel.addEventListener('change', function () {
+      var p = COSINE_PRESETS[this.value];
+      if (p) applyCosinePreset(p);
+    });
+  }
+
+  // OKLCH preset wiring
+  var oklchPresets = {
+    'Vivid Rainbow': { aL:0.70, bL:0.00, cL:0.5, dL:0.0, aC:0.25, bC:0.00, cC:0.5, dC:0.0, aH:180, bH:180, cH:0.5, dH:0.0 },
+    'Pastel':        { aL:0.88, bL:0.06, cL:0.5, dL:0.0, aC:0.12, bC:0.04, cC:0.5, dC:0.0, aH:180, bH:180, cH:0.5, dH:0.0 },
+    'Neon':          { aL:0.65, bL:0.15, cL:0.5, dL:0.0, aC:0.30, bC:0.08, cC:0.5, dC:0.0, aH:200, bH:120, cH:0.5, dH:0.0 },
+    'Warm':          { aL:0.72, bL:0.10, cL:0.5, dL:0.0, aC:0.22, bC:0.06, cC:0.5, dC:0.0, aH: 60, bH: 60, cH:0.5, dH:0.0 },
+    'Monochrome':    { aL:0.70, bL:0.25, cL:1.0, dL:0.0, aC:0.05, bC:0.00, cC:1.0, dC:0.0, aH:230, bH:  0, cH:1.0, dH:0.0 },
+  };
+  var oklchKeys = [
+    'u_oklch_aL', 'u_oklch_bL', 'u_oklch_cL', 'u_oklch_dL',
+    'u_oklch_aC', 'u_oklch_bC', 'u_oklch_cC', 'u_oklch_dC',
+    'u_oklch_aH', 'u_oklch_bH', 'u_oklch_cH', 'u_oklch_dH',
+  ];
+  function applyOklchPreset(p) {
+    var vals = [p.aL, p.bL, p.cL, p.dL, p.aC, p.bC, p.cC, p.dC, p.aH, p.bH, p.cH, p.dH];
+    oklchKeys.forEach(function (k, i) {
+      var val = vals[i];
+      window._shaderState.values[k] = val;
+      var inp = document.querySelector('[data-param-key="' + k + '"]');
+      if (inp) {
+        inp.value = val;
+        var disp = inp.nextElementSibling;
+        if (disp && disp.classList.contains('shader-control__value')) disp.textContent = val;
+      }
+    });
+  }
+  applyOklchPreset(oklchPresets['Vivid Rainbow']);
+  var oklchPresetSel = document.querySelector('[data-param-key="_rs_oklch_preset"]');
+  if (oklchPresetSel) {
+    oklchPresetSel.addEventListener('change', function () {
+      var p = oklchPresets[this.value];
+      if (p) applyOklchPreset(p);
+    });
+  }
+};
