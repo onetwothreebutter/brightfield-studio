@@ -56,13 +56,7 @@ var controls = [
     tip: 'Phase — shifts the starting hue of the color cycle.' },
   // 4-stop color controls (hidden when not in 4-Stop mode)
   { key: '_sg_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
-    options: [
-      { label: 'Neon',   value: 'Neon'   },
-      { label: 'Retro',  value: 'Retro'  },
-      { label: 'Sunset', value: 'Sunset' },
-      { label: 'Aurora', value: 'Aurora' },
-      { label: 'Dusk',   value: 'Dusk'   },
-    ]
+    options: Object.keys(FOUR_STOP_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
   { key: 'u_color0', label: 'Color 1', type: 'color', stopDependent: true, value: '#ff3366', noRandomize: true },
   { key: 'u_color1', label: 'Color 2', type: 'color', stopDependent: true, value: '#ffcc00', noRandomize: true },
@@ -187,21 +181,13 @@ var customAfterBuild = function () {
   applyNoiseSeedVis();
 
   function apply4ColorPreset(p) {
-    applyColors([
-      ['u_color0', p.c0],
-      ['u_color1', p.c1],
-      ['u_color2', p.c2],
-      ['u_color3', p.c3],
-    ]);
+    applyColors([['u_color0',p.c0],['u_color1',p.c1],['u_color2',p.c2],['u_color3',p.c3]]);
   }
 
   var fourColorPresetSel = document.querySelector('[data-param-key="_sg_4color_preset"]');
-  if (fourColorPresetSel) {
-    fourColorPresetSel.addEventListener('change', function () {
-      var p = FOUR_STOP_PRESETS[this.value];
-      if (p) apply4ColorPreset(p);
-    });
-  }
+  if (fourColorPresetSel) fourColorPresetSel.addEventListener('change', function () {
+    var p = FOUR_STOP_PRESETS[this.value]; if (p) apply4ColorPreset(p);
+  });
 
   // Apply default on load so shader matches pickers.
   applyCosinePreset(COSINE_PRESETS['Rainbow']);

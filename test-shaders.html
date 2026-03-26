@@ -372,9 +372,11 @@ SHADERS['line-circle'] = {
     { key: 'u_palette_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab', tip: 'Phase.' },
     { key: '_lc_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
       options: [
-        { label: 'Neon',   value: 'Neon'   }, { label: 'Retro',  value: 'Retro'  },
-        { label: 'Sunset', value: 'Sunset' }, { label: 'Aurora', value: 'Aurora' },
-        { label: 'Dusk',   value: 'Dusk'   },
+        { label: 'Neon',     value: 'Neon'     }, { label: 'Retro',    value: 'Retro'    },
+        { label: 'Sunset',   value: 'Sunset'   }, { label: 'Aurora',   value: 'Aurora'   },
+        { label: 'Dusk',     value: 'Dusk'     }, { label: 'Midnight', value: 'Midnight' },
+        { label: 'Ember',    value: 'Ember'    }, { label: 'Obsidian', value: 'Obsidian' },
+        { label: 'Velvet',   value: 'Velvet'   },
       ]
     },
     { key: 'u_color0', label: 'Color 1 (Top)',    type: 'color', stopDependent: true, value: '#ff3366' },
@@ -422,11 +424,15 @@ SHADERS['line-circle'] = {
       'Golden':    { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,0.5], d:[0.8,  0.9,  0.3 ]  },
     };
     var fourColorPresets = {
-      'Neon':   { c0:[1.0, 0.2, 0.4  ], c1:[1.0, 0.8, 0.0  ], c2:[0.0, 0.8, 1.0  ], c3:[0.667,0.0,  1.0  ] },
-      'Retro':  { c0:[0.91,0.286,0.114], c1:[0.788,0.627,0.188], c2:[0.176,0.541,0.369], c3:[0.102,0.153,0.267] },
-      'Sunset': { c0:[1.0, 0.318,0.184], c1:[0.867,0.141,0.463], c2:[0.541,0.169,0.886], c3:[0.098,0.098,0.439] },
-      'Aurora': { c0:[0.0, 1.0, 0.533], c1:[0.0, 0.898,1.0  ], c2:[0.486,0.302,1.0  ], c3:[0.878,0.251,0.984] },
-      'Dusk':   { c0:[1.0, 0.6, 0.4  ], c1:[1.0, 0.369,0.384], c2:[0.8, 0.169,0.369], c3:[0.459,0.227,0.533] },
+      'Neon':     { c0:[1.0, 0.2, 0.4  ], c1:[1.0, 0.8, 0.0  ], c2:[0.0, 0.8, 1.0  ], c3:[0.667,0.0,  1.0  ] },
+      'Retro':    { c0:[0.91,0.286,0.114], c1:[0.788,0.627,0.188], c2:[0.176,0.541,0.369], c3:[0.102,0.153,0.267] },
+      'Sunset':   { c0:[1.0, 0.318,0.184], c1:[0.867,0.141,0.463], c2:[0.541,0.169,0.886], c3:[0.098,0.098,0.439] },
+      'Aurora':   { c0:[0.0, 1.0, 0.533], c1:[0.0, 0.898,1.0  ], c2:[0.486,0.302,1.0  ], c3:[0.878,0.251,0.984] },
+      'Dusk':     { c0:[1.0, 0.6, 0.4  ], c1:[1.0, 0.369,0.384], c2:[0.8, 0.169,0.369], c3:[0.459,0.227,0.533] },
+      'Midnight': { c0:[0.04,0.12,0.30 ], c1:[0.02,0.22, 0.32 ], c2:[0.14,0.06, 0.32 ], c3:[0.06, 0.04, 0.16 ] },
+      'Ember':    { c0:[0.58,0.14,0.02 ], c1:[0.35,0.06, 0.04 ], c2:[0.16,0.04, 0.06 ], c3:[0.05, 0.03, 0.02 ] },
+      'Obsidian': { c0:[0.06,0.04,0.04 ], c1:[0.22,0.04, 0.28 ], c2:[0.04,0.16, 0.22 ], c3:[0.08, 0.04, 0.14 ] },
+      'Velvet':   { c0:[0.30,0.04,0.08 ], c1:[0.45,0.06, 0.14 ], c2:[0.22,0.04, 0.22 ], c3:[0.08, 0.04, 0.08 ] },
     };
     var cosineKeys = ['u_palette_a','u_palette_b','u_palette_c','u_palette_d'];
     function applyColors(pairs) {
@@ -475,6 +481,15 @@ SHADERS['three-square'] = {
     { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080', tip: 'Amplitude.' },
     { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff', tip: 'Frequency.' },
     { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab', tip: 'Phase.' },
+    { key: '_ts_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
+      options: [
+        { label: 'Neon',     value: 'Neon'     }, { label: 'Retro',    value: 'Retro'    },
+        { label: 'Sunset',   value: 'Sunset'   }, { label: 'Aurora',   value: 'Aurora'   },
+        { label: 'Dusk',     value: 'Dusk'     }, { label: 'Midnight', value: 'Midnight' },
+        { label: 'Ember',    value: 'Ember'    }, { label: 'Obsidian', value: 'Obsidian' },
+        { label: 'Velvet',   value: 'Velvet'   },
+      ]
+    },
     { key: 'u_color0', label: 'Color 1', type: 'color', stopDependent: true, value: '#ff3366' },
     { key: 'u_color1', label: 'Color 2', type: 'color', stopDependent: true, value: '#ffcc00' },
     { key: 'u_color2', label: 'Color 3', type: 'color', stopDependent: true, value: '#00ccff' },
@@ -522,6 +537,17 @@ SHADERS['three-square'] = {
       'Cyberpunk': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[2.0,1.0,0.0], d:[0.5,  0.2,  0.25]  },
       'Golden':    { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,0.5], d:[0.8,  0.9,  0.3 ]  },
     };
+    var fourColorPresets = {
+      'Neon':     { c0:[1.0, 0.2, 0.4  ], c1:[1.0, 0.8, 0.0  ], c2:[0.0, 0.8, 1.0  ], c3:[0.667,0.0,  1.0  ] },
+      'Retro':    { c0:[0.91,0.286,0.114], c1:[0.788,0.627,0.188], c2:[0.176,0.541,0.369], c3:[0.102,0.153,0.267] },
+      'Sunset':   { c0:[1.0, 0.318,0.184], c1:[0.867,0.141,0.463], c2:[0.541,0.169,0.886], c3:[0.098,0.098,0.439] },
+      'Aurora':   { c0:[0.0, 1.0, 0.533], c1:[0.0, 0.898,1.0  ], c2:[0.486,0.302,1.0  ], c3:[0.878,0.251,0.984] },
+      'Dusk':     { c0:[1.0, 0.6, 0.4  ], c1:[1.0, 0.369,0.384], c2:[0.8, 0.169,0.369], c3:[0.459,0.227,0.533] },
+      'Midnight': { c0:[0.04,0.12,0.30 ], c1:[0.02,0.22, 0.32 ], c2:[0.14,0.06, 0.32 ], c3:[0.06, 0.04, 0.16 ] },
+      'Ember':    { c0:[0.58,0.14,0.02 ], c1:[0.35,0.06, 0.04 ], c2:[0.16,0.04, 0.06 ], c3:[0.05, 0.03, 0.02 ] },
+      'Obsidian': { c0:[0.06,0.04,0.04 ], c1:[0.22,0.04, 0.28 ], c2:[0.04,0.16, 0.22 ], c3:[0.08, 0.04, 0.14 ] },
+      'Velvet':   { c0:[0.30,0.04,0.08 ], c1:[0.45,0.06, 0.14 ], c2:[0.22,0.04, 0.22 ], c3:[0.08, 0.04, 0.08 ] },
+    };
     var presetSel = document.querySelector('[data-param-key="_palette_preset"]');
     if (presetSel) {
       presetSel.addEventListener('change', function () {
@@ -534,6 +560,15 @@ SHADERS['three-square'] = {
         });
       });
     }
+    var fourSel = document.querySelector('[data-param-key="_ts_4color_preset"]');
+    if (fourSel) fourSel.addEventListener('change', function () {
+      var p = fourColorPresets[this.value]; if (!p) return;
+      [['u_color0',p.c0],['u_color1',p.c1],['u_color2',p.c2],['u_color3',p.c3]].forEach(function(pair){
+        window._shaderState.values[pair[0]] = pair[1];
+        var inp = document.querySelector('[data-param-key="'+pair[0]+'"]');
+        if (inp) inp.value = toHex(pair[1]);
+      });
+    });
   },
 };
 
@@ -571,6 +606,15 @@ SHADERS['stacked-gradient'] = {
     { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080' },
     { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff' },
     { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab' },
+    { key: '_sg_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
+      options: [
+        { label: 'Neon',     value: 'Neon'     }, { label: 'Retro',    value: 'Retro'    },
+        { label: 'Sunset',   value: 'Sunset'   }, { label: 'Aurora',   value: 'Aurora'   },
+        { label: 'Dusk',     value: 'Dusk'     }, { label: 'Midnight', value: 'Midnight' },
+        { label: 'Ember',    value: 'Ember'    }, { label: 'Obsidian', value: 'Obsidian' },
+        { label: 'Velvet',   value: 'Velvet'   },
+      ]
+    },
     { key: 'u_color0', label: 'Color 1', type: 'color', stopDependent: true, value: '#ff3366' },
     { key: 'u_color1', label: 'Color 2', type: 'color', stopDependent: true, value: '#ffcc00' },
     { key: 'u_color2', label: 'Color 3', type: 'color', stopDependent: true, value: '#00ccff' },
@@ -623,6 +667,22 @@ SHADERS['stacked-gradient'] = {
     applyCosinePreset(cosinePresets['Rainbow']);
     var presetSel = document.querySelector('[data-param-key="_sg_palette_preset"]');
     if (presetSel) presetSel.addEventListener('change', function(){ var p=cosinePresets[this.value]; if(p) applyCosinePreset(p); });
+    var fourColorPresets = {
+      'Neon':     { c0:[1.0, 0.2, 0.4  ], c1:[1.0, 0.8, 0.0  ], c2:[0.0, 0.8, 1.0  ], c3:[0.667,0.0,  1.0  ] },
+      'Retro':    { c0:[0.91,0.286,0.114], c1:[0.788,0.627,0.188], c2:[0.176,0.541,0.369], c3:[0.102,0.153,0.267] },
+      'Sunset':   { c0:[1.0, 0.318,0.184], c1:[0.867,0.141,0.463], c2:[0.541,0.169,0.886], c3:[0.098,0.098,0.439] },
+      'Aurora':   { c0:[0.0, 1.0, 0.533], c1:[0.0, 0.898,1.0  ], c2:[0.486,0.302,1.0  ], c3:[0.878,0.251,0.984] },
+      'Dusk':     { c0:[1.0, 0.6, 0.4  ], c1:[1.0, 0.369,0.384], c2:[0.8, 0.169,0.369], c3:[0.459,0.227,0.533] },
+      'Midnight': { c0:[0.04,0.12,0.30 ], c1:[0.02,0.22, 0.32 ], c2:[0.14,0.06, 0.32 ], c3:[0.06, 0.04, 0.16 ] },
+      'Ember':    { c0:[0.58,0.14,0.02 ], c1:[0.35,0.06, 0.04 ], c2:[0.16,0.04, 0.06 ], c3:[0.05, 0.03, 0.02 ] },
+      'Obsidian': { c0:[0.06,0.04,0.04 ], c1:[0.22,0.04, 0.28 ], c2:[0.04,0.16, 0.22 ], c3:[0.08, 0.04, 0.14 ] },
+      'Velvet':   { c0:[0.30,0.04,0.08 ], c1:[0.45,0.06, 0.14 ], c2:[0.22,0.04, 0.22 ], c3:[0.08, 0.04, 0.08 ] },
+    };
+    var fourSel = document.querySelector('[data-param-key="_sg_4color_preset"]');
+    if (fourSel) fourSel.addEventListener('change', function () {
+      var p = fourColorPresets[this.value]; if (!p) return;
+      applyColors([['u_color0',p.c0],['u_color1',p.c1],['u_color2',p.c2],['u_color3',p.c3]]);
+    });
   },
 };
 
@@ -648,6 +708,15 @@ SHADERS['echo-text'] = {
     { key: 'u_b', label: 'Palette B', type: 'color', value: '#808080', tip: 'Amplitude.' },
     { key: 'u_c', label: 'Palette C', type: 'color', value: '#ffffff', tip: 'Frequency.' },
     { key: 'u_d', label: 'Palette D', type: 'color', value: '#0054ab', tip: 'Phase.' },
+    { key: '_et_4color_preset', label: 'Preset', type: 'select', value: 'Neon',
+      options: [
+        { label: 'Neon',     value: 'Neon'     }, { label: 'Retro',    value: 'Retro'    },
+        { label: 'Sunset',   value: 'Sunset'   }, { label: 'Aurora',   value: 'Aurora'   },
+        { label: 'Dusk',     value: 'Dusk'     }, { label: 'Midnight', value: 'Midnight' },
+        { label: 'Ember',    value: 'Ember'    }, { label: 'Obsidian', value: 'Obsidian' },
+        { label: 'Velvet',   value: 'Velvet'   },
+      ]
+    },
     { key: 'u_color0', label: 'Color 1 (Top)',    type: 'color', value: '#ff3366' },
     { key: 'u_color1', label: 'Color 2',          type: 'color', value: '#ffcc00' },
     { key: 'u_color2', label: 'Color 3',          type: 'color', value: '#00ccff' },
@@ -717,7 +786,7 @@ SHADERS['echo-text'] = {
       'Golden':    { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,0.5], d:[0.8,  0.9,  0.3 ]  },
     };
     var cosineKeys = ['_et_palette_preset', 'u_a', 'u_b', 'u_c', 'u_d'];
-    var stopKeys   = ['u_color0', 'u_color1', 'u_color2', 'u_color3'];
+    var stopKeys   = ['_et_4color_preset', 'u_color0', 'u_color1', 'u_color2', 'u_color3'];
 
     function rowFor(key) {
       var el = document.querySelector('[data-param-key="' + key + '"]');
@@ -747,6 +816,26 @@ SHADERS['echo-text'] = {
         });
       });
     }
+    var fourColorPresets = {
+      'Neon':     { c0:[1.0, 0.2, 0.4  ], c1:[1.0, 0.8, 0.0  ], c2:[0.0, 0.8, 1.0  ], c3:[0.667,0.0,  1.0  ] },
+      'Retro':    { c0:[0.91,0.286,0.114], c1:[0.788,0.627,0.188], c2:[0.176,0.541,0.369], c3:[0.102,0.153,0.267] },
+      'Sunset':   { c0:[1.0, 0.318,0.184], c1:[0.867,0.141,0.463], c2:[0.541,0.169,0.886], c3:[0.098,0.098,0.439] },
+      'Aurora':   { c0:[0.0, 1.0, 0.533], c1:[0.0, 0.898,1.0  ], c2:[0.486,0.302,1.0  ], c3:[0.878,0.251,0.984] },
+      'Dusk':     { c0:[1.0, 0.6, 0.4  ], c1:[1.0, 0.369,0.384], c2:[0.8, 0.169,0.369], c3:[0.459,0.227,0.533] },
+      'Midnight': { c0:[0.04,0.12,0.30 ], c1:[0.02,0.22, 0.32 ], c2:[0.14,0.06, 0.32 ], c3:[0.06, 0.04, 0.16 ] },
+      'Ember':    { c0:[0.58,0.14,0.02 ], c1:[0.35,0.06, 0.04 ], c2:[0.16,0.04, 0.06 ], c3:[0.05, 0.03, 0.02 ] },
+      'Obsidian': { c0:[0.06,0.04,0.04 ], c1:[0.22,0.04, 0.28 ], c2:[0.04,0.16, 0.22 ], c3:[0.08, 0.04, 0.14 ] },
+      'Velvet':   { c0:[0.30,0.04,0.08 ], c1:[0.45,0.06, 0.14 ], c2:[0.22,0.04, 0.22 ], c3:[0.08, 0.04, 0.08 ] },
+    };
+    var fourSel = document.querySelector('[data-param-key="_et_4color_preset"]');
+    if (fourSel) fourSel.addEventListener('change', function () {
+      var p = fourColorPresets[this.value]; if (!p) return;
+      [['u_color0',p.c0],['u_color1',p.c1],['u_color2',p.c2],['u_color3',p.c3]].forEach(function(pair){
+        window._shaderState.values[pair[0]] = pair[1];
+        var inp = document.querySelector('[data-param-key="'+pair[0]+'"]');
+        if (inp) inp.value = toHex(pair[1]);
+      });
+    });
   },
 };
 
@@ -787,9 +876,11 @@ SHADERS['four-circles'] = {
     { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab' },
     { key: '_fc_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
       options: [
-        { label: 'Neon',   value: 'Neon'   }, { label: 'Retro',  value: 'Retro'  },
-        { label: 'Sunset', value: 'Sunset' }, { label: 'Aurora', value: 'Aurora' },
-        { label: 'Dusk',   value: 'Dusk'   },
+        { label: 'Neon',     value: 'Neon'     }, { label: 'Retro',    value: 'Retro'    },
+        { label: 'Sunset',   value: 'Sunset'   }, { label: 'Aurora',   value: 'Aurora'   },
+        { label: 'Dusk',     value: 'Dusk'     }, { label: 'Midnight', value: 'Midnight' },
+        { label: 'Ember',    value: 'Ember'    }, { label: 'Obsidian', value: 'Obsidian' },
+        { label: 'Velvet',   value: 'Velvet'   },
       ]
     },
     { key: 'u_color0', label: 'Color 1', type: 'color', stopDependent: true, value: '#ff3366' },
@@ -891,11 +982,15 @@ SHADERS['four-circles'] = {
       'Golden':    { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,0.5], d:[0.8,  0.9,  0.3 ]  },
     };
     var fourStopPresets = {
-      'Neon':   { c0:[1.0,0.2,0.4],     c1:[1.0,0.8,0.0],     c2:[0.0,0.8,1.0],     c3:[0.667,0.0,1.0]   },
-      'Retro':  { c0:[0.91,0.286,0.114], c1:[0.788,0.627,0.188],c2:[0.176,0.541,0.369],c3:[0.102,0.153,0.267] },
-      'Sunset': { c0:[1.0,0.318,0.184],  c1:[0.867,0.141,0.463],c2:[0.541,0.169,0.886],c3:[0.098,0.098,0.439] },
-      'Aurora': { c0:[0.0,1.0,0.533],    c1:[0.0,0.898,1.0],    c2:[0.486,0.302,1.0],  c3:[0.878,0.251,0.984] },
-      'Dusk':   { c0:[1.0,0.6,0.4],      c1:[1.0,0.369,0.384],  c2:[0.8,0.169,0.369],  c3:[0.459,0.227,0.533] },
+      'Neon':     { c0:[1.0, 0.2, 0.4  ], c1:[1.0, 0.8, 0.0  ], c2:[0.0, 0.8, 1.0  ], c3:[0.667,0.0,  1.0  ] },
+      'Retro':    { c0:[0.91,0.286,0.114], c1:[0.788,0.627,0.188], c2:[0.176,0.541,0.369], c3:[0.102,0.153,0.267] },
+      'Sunset':   { c0:[1.0, 0.318,0.184], c1:[0.867,0.141,0.463], c2:[0.541,0.169,0.886], c3:[0.098,0.098,0.439] },
+      'Aurora':   { c0:[0.0, 1.0, 0.533], c1:[0.0, 0.898,1.0  ], c2:[0.486,0.302,1.0  ], c3:[0.878,0.251,0.984] },
+      'Dusk':     { c0:[1.0, 0.6, 0.4  ], c1:[1.0, 0.369,0.384], c2:[0.8, 0.169,0.369], c3:[0.459,0.227,0.533] },
+      'Midnight': { c0:[0.04,0.12,0.30 ], c1:[0.02,0.22, 0.32 ], c2:[0.14,0.06, 0.32 ], c3:[0.06, 0.04, 0.16 ] },
+      'Ember':    { c0:[0.58,0.14,0.02 ], c1:[0.35,0.06, 0.04 ], c2:[0.16,0.04, 0.06 ], c3:[0.05, 0.03, 0.02 ] },
+      'Obsidian': { c0:[0.06,0.04,0.04 ], c1:[0.22,0.04, 0.28 ], c2:[0.04,0.16, 0.22 ], c3:[0.08, 0.04, 0.14 ] },
+      'Velvet':   { c0:[0.30,0.04,0.08 ], c1:[0.45,0.06, 0.14 ], c2:[0.22,0.04, 0.22 ], c3:[0.08, 0.04, 0.08 ] },
     };
 
     function setColor(key, val) {
@@ -1008,6 +1103,15 @@ SHADERS['scaling-letters'] = {
     { key: 'u_b', label: 'Palette B', type: 'color', value: '#808080' },
     { key: 'u_c', label: 'Palette C', type: 'color', value: '#ffffff' },
     { key: 'u_d', label: 'Palette D', type: 'color', value: '#0054ab' },
+    { key: '_sl_4color_preset', label: 'Preset', type: 'select', value: 'Neon',
+      options: [
+        { label: 'Neon',     value: 'Neon'     }, { label: 'Retro',    value: 'Retro'    },
+        { label: 'Sunset',   value: 'Sunset'   }, { label: 'Aurora',   value: 'Aurora'   },
+        { label: 'Dusk',     value: 'Dusk'     }, { label: 'Midnight', value: 'Midnight' },
+        { label: 'Ember',    value: 'Ember'    }, { label: 'Obsidian', value: 'Obsidian' },
+        { label: 'Velvet',   value: 'Velvet'   },
+      ]
+    },
     { key: 'u_color0', label: 'Color 1 (Left)',  type: 'color', value: '#ff3366' },
     { key: 'u_color1', label: 'Color 2',         type: 'color', value: '#ffcc00' },
     { key: 'u_color2', label: 'Color 3',         type: 'color', value: '#00ccff' },
@@ -1043,7 +1147,7 @@ SHADERS['scaling-letters'] = {
     }
 
     var cosineKeys = ['_sl_palette_preset', 'u_a', 'u_b', 'u_c', 'u_d'];
-    var stopKeys   = ['u_color0', 'u_color1', 'u_color2', 'u_color3'];
+    var stopKeys   = ['_sl_4color_preset', 'u_color0', 'u_color1', 'u_color2', 'u_color3'];
 
     function applyVisibility() {
       var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
@@ -1068,6 +1172,23 @@ SHADERS['scaling-letters'] = {
         setColor('u_c', p.c); setColor('u_d', p.d);
       });
     }
+    var fourColorPresets = {
+      'Neon':     { c0:[1.0, 0.2, 0.4  ], c1:[1.0, 0.8, 0.0  ], c2:[0.0, 0.8, 1.0  ], c3:[0.667,0.0,  1.0  ] },
+      'Retro':    { c0:[0.91,0.286,0.114], c1:[0.788,0.627,0.188], c2:[0.176,0.541,0.369], c3:[0.102,0.153,0.267] },
+      'Sunset':   { c0:[1.0, 0.318,0.184], c1:[0.867,0.141,0.463], c2:[0.541,0.169,0.886], c3:[0.098,0.098,0.439] },
+      'Aurora':   { c0:[0.0, 1.0, 0.533], c1:[0.0, 0.898,1.0  ], c2:[0.486,0.302,1.0  ], c3:[0.878,0.251,0.984] },
+      'Dusk':     { c0:[1.0, 0.6, 0.4  ], c1:[1.0, 0.369,0.384], c2:[0.8, 0.169,0.369], c3:[0.459,0.227,0.533] },
+      'Midnight': { c0:[0.04,0.12,0.30 ], c1:[0.02,0.22, 0.32 ], c2:[0.14,0.06, 0.32 ], c3:[0.06, 0.04, 0.16 ] },
+      'Ember':    { c0:[0.58,0.14,0.02 ], c1:[0.35,0.06, 0.04 ], c2:[0.16,0.04, 0.06 ], c3:[0.05, 0.03, 0.02 ] },
+      'Obsidian': { c0:[0.06,0.04,0.04 ], c1:[0.22,0.04, 0.28 ], c2:[0.04,0.16, 0.22 ], c3:[0.08, 0.04, 0.14 ] },
+      'Velvet':   { c0:[0.30,0.04,0.08 ], c1:[0.45,0.06, 0.14 ], c2:[0.22,0.04, 0.22 ], c3:[0.08, 0.04, 0.08 ] },
+    };
+    var fourSel = document.querySelector('[data-param-key="_sl_4color_preset"]');
+    if (fourSel) fourSel.addEventListener('change', function () {
+      var p = fourColorPresets[this.value]; if (!p) return;
+      setColor('u_color0', p.c0); setColor('u_color1', p.c1);
+      setColor('u_color2', p.c2); setColor('u_color3', p.c3);
+    });
   },
 };
 
@@ -1381,9 +1502,11 @@ SHADERS['line-text'] = {
     { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab', tip: 'Phase.' },
     { key: '_lt_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
       options: [
-        { label: 'Neon',   value: 'Neon'   }, { label: 'Retro',  value: 'Retro'  },
-        { label: 'Sunset', value: 'Sunset' }, { label: 'Aurora', value: 'Aurora' },
-        { label: 'Dusk',   value: 'Dusk'   },
+        { label: 'Neon',     value: 'Neon'     }, { label: 'Retro',    value: 'Retro'    },
+        { label: 'Sunset',   value: 'Sunset'   }, { label: 'Aurora',   value: 'Aurora'   },
+        { label: 'Dusk',     value: 'Dusk'     }, { label: 'Midnight', value: 'Midnight' },
+        { label: 'Ember',    value: 'Ember'    }, { label: 'Obsidian', value: 'Obsidian' },
+        { label: 'Velvet',   value: 'Velvet'   },
       ]
     },
     { key: 'u_color0', label: 'Color 1 (Left)',  type: 'color', stopDependent: true, value: '#ff3366' },
@@ -1426,11 +1549,15 @@ SHADERS['line-text'] = {
     }
 
     var fourStopPresets = {
-      'Neon':   { c0:[1.0,0.2,0.4],   c1:[1.0,0.8,0.0],   c2:[0.0,0.8,1.0],   c3:[0.667,0.0,1.0] },
-      'Retro':  { c0:[0.957,0.263,0.212], c1:[1.0,0.757,0.027], c2:[0.129,0.588,0.953], c3:[0.612,0.153,0.69] },
-      'Sunset': { c0:[1.0,0.341,0.133], c1:[1.0,0.647,0.0], c2:[0.941,0.502,0.502], c3:[0.294,0.0,0.51] },
-      'Aurora': { c0:[0.0,0.858,0.682], c1:[0.0,0.647,0.459], c2:[0.298,0.0,0.933], c3:[0.576,0.0,0.933] },
-      'Dusk':   { c0:[0.925,0.345,0.345], c1:[0.957,0.643,0.376], c2:[0.376,0.239,0.722], c3:[0.137,0.122,0.408] },
+      'Neon':     { c0:[1.0, 0.2, 0.4  ], c1:[1.0, 0.8, 0.0  ], c2:[0.0, 0.8, 1.0  ], c3:[0.667,0.0,  1.0  ] },
+      'Retro':    { c0:[0.91,0.286,0.114], c1:[0.788,0.627,0.188], c2:[0.176,0.541,0.369], c3:[0.102,0.153,0.267] },
+      'Sunset':   { c0:[1.0, 0.318,0.184], c1:[0.867,0.141,0.463], c2:[0.541,0.169,0.886], c3:[0.098,0.098,0.439] },
+      'Aurora':   { c0:[0.0, 1.0, 0.533], c1:[0.0, 0.898,1.0  ], c2:[0.486,0.302,1.0  ], c3:[0.878,0.251,0.984] },
+      'Dusk':     { c0:[1.0, 0.6, 0.4  ], c1:[1.0, 0.369,0.384], c2:[0.8, 0.169,0.369], c3:[0.459,0.227,0.533] },
+      'Midnight': { c0:[0.04,0.12,0.30 ], c1:[0.02,0.22, 0.32 ], c2:[0.14,0.06, 0.32 ], c3:[0.06, 0.04, 0.16 ] },
+      'Ember':    { c0:[0.58,0.14,0.02 ], c1:[0.35,0.06, 0.04 ], c2:[0.16,0.04, 0.06 ], c3:[0.05, 0.03, 0.02 ] },
+      'Obsidian': { c0:[0.06,0.04,0.04 ], c1:[0.22,0.04, 0.28 ], c2:[0.04,0.16, 0.22 ], c3:[0.08, 0.04, 0.14 ] },
+      'Velvet':   { c0:[0.30,0.04,0.08 ], c1:[0.45,0.06, 0.14 ], c2:[0.22,0.04, 0.22 ], c3:[0.08, 0.04, 0.08 ] },
     };
     var fourStopSel = document.querySelector('[data-param-key="_lt_4color_preset"]');
     if (fourStopSel) {

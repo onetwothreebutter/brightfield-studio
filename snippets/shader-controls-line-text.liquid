@@ -39,13 +39,7 @@ var controls = [
   { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab',
     tip: 'Phase — shifts the starting hue of the color cycle.' },
   { key: '_lt_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
-    options: [
-      { label: 'Neon',   value: 'Neon'   },
-      { label: 'Retro',  value: 'Retro'  },
-      { label: 'Sunset', value: 'Sunset' },
-      { label: 'Aurora', value: 'Aurora' },
-      { label: 'Dusk',   value: 'Dusk'   },
-    ]
+    options: Object.keys(FOUR_STOP_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
   { key: 'u_color0', label: 'Color 1 (Left)',  type: 'color', stopDependent: true, value: '#ff3366' },
   { key: 'u_color1', label: 'Color 2',         type: 'color', stopDependent: true, value: '#ffcc00' },

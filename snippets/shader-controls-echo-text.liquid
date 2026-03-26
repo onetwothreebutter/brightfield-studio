@@ -54,6 +54,9 @@ var controls = [
   { key: 'u_d', label: 'Palette D', type: 'color', value: '#0054ab',
     tip: 'Phase — shifts the starting hue of the color cycle.' },
   // 4-stop colors (shown/hidden by customAfterBuild)
+  { key: '_et_4color_preset', label: 'Preset', type: 'select', value: 'Neon',
+    options: Object.keys(FOUR_STOP_PRESETS).map(function (k) { return { label: k, value: k }; })
+  },
   { key: 'u_color0', label: 'Color 1 (Top)',    type: 'color', value: '#ff3366' },
   { key: 'u_color1', label: 'Color 2',          type: 'color', value: '#ffcc00' },
   { key: 'u_color2', label: 'Color 3',          type: 'color', value: '#00ccff' },
@@ -119,7 +122,7 @@ var customAfterBuild = function () {
 
   // Keys for each visibility group
   var cosineKeys = ['_et_palette_preset', 'u_a', 'u_b', 'u_c', 'u_d'];
-  var stopKeys   = ['u_color0', 'u_color1', 'u_color2', 'u_color3'];
+  var stopKeys   = ['_et_4color_preset', 'u_color0', 'u_color1', 'u_color2', 'u_color3'];
 
   function rowFor(key) {
     var el = document.querySelector('[data-param-key="' + key + '"]');
@@ -145,6 +148,16 @@ var customAfterBuild = function () {
   var modeEl = document.querySelector('[data-param-key="u_color_mode"]');
   if (modeEl) modeEl.addEventListener('change', applyVisibility);
   applyVisibility();
+
+  // 4-stop preset handler
+  function apply4ColorPreset(p) {
+    applyColors([['u_color0',p.c0],['u_color1',p.c1],['u_color2',p.c2],['u_color3',p.c3]]);
+  }
+
+  var fourColorPresetSel = document.querySelector('[data-param-key="_et_4color_preset"]');
+  if (fourColorPresetSel) fourColorPresetSel.addEventListener('change', function () {
+    var p = FOUR_STOP_PRESETS[this.value]; if (p) apply4ColorPreset(p);
+  });
 
   // Cosine palette preset handler
   var presetSel = document.querySelector('[data-param-key="_et_palette_preset"]');

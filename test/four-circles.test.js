@@ -7,43 +7,10 @@ import { make2DContextMock } from './helpers/webgl-mock.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const src = readFileSync(join(__dirname, '../assets/four-circles.js'), 'utf8');
 
-// 2D context mock with canvas back-reference and measureText support
-function makeCanvasCtxMock() {
-  const ctx = make2DContextMock();
-  ctx.measureText = vi.fn(() => ({ actualBoundingBoxAscent: 10, actualBoundingBoxDescent: 2 }));
-  const canvas = { width: 0, height: 0, getContext: () => ctx };
-  ctx.canvas = canvas;
-  return ctx;
-}
-
-// Spy on document.createElement so canvas elements get a working 2D context
-function mockDocumentCreateCanvas() {
-  const origCreateElement = document.createElement.bind(document);
-  vi.spyOn(document, 'createElement').mockImplementation((tag) => {
-    if (tag === 'canvas') return makeCanvasCtxMock().canvas;
-    return origCreateElement(tag);
-  });
-}
-
-// GL mock for setup() — needs texture creation methods
+// GL mock for setup() — only needs getUniformLocation
 function makeSetupGl() {
   return {
-    TEXTURE_2D:          3553,
-    UNPACK_FLIP_Y_WEBGL: 37440,
-    TEXTURE_MIN_FILTER:  10241,
-    TEXTURE_MAG_FILTER:  10240,
-    TEXTURE_WRAP_S:      10242,
-    TEXTURE_WRAP_T:      10243,
-    LINEAR:              9729,
-    CLAMP_TO_EDGE:       33071,
-    RGBA:                6408,
-    UNSIGNED_BYTE:       5121,
-    createTexture:       vi.fn(() => ({})),
-    bindTexture:         vi.fn(),
-    pixelStorei:         vi.fn(),
-    texImage2D:          vi.fn(),
-    texParameteri:       vi.fn(),
-    getUniformLocation:  vi.fn((_p, name) => ({ _loc: name })),
+    getUniformLocation: vi.fn((_p, name) => ({ _loc: name })),
   };
 }
 
@@ -51,29 +18,13 @@ function makeSetupGl() {
 function makeRenderGl() {
   return {
     TEXTURE0: 33984,
-    TEXTURE1: 33985,
-    TEXTURE2: 33986,
-    TEXTURE3: 33987,
-    TEXTURE4: 33988,
-    TEXTURE_2D:          3553,
-    UNPACK_FLIP_Y_WEBGL: 37440,
-    TEXTURE_MIN_FILTER:  10241,
-    TEXTURE_MAG_FILTER:  10240,
-    TEXTURE_WRAP_S:      10242,
-    TEXTURE_WRAP_T:      10243,
-    LINEAR:              9729,
-    CLAMP_TO_EDGE:       33071,
-    RGBA:                6408,
-    UNSIGNED_BYTE:       5121,
+    TEXTURE_2D:    3553,
     uniform1f:    vi.fn(),
     uniform2f:    vi.fn(),
     uniform1i:    vi.fn(),
     uniform3fv:   vi.fn(),
     activeTexture: vi.fn(),
     bindTexture:   vi.fn(),
-    pixelStorei:   vi.fn(),
-    texImage2D:    vi.fn(),
-    texParameteri: vi.fn(),
   };
 }
 
@@ -82,7 +33,6 @@ describe('four-circles.js', () => {
 
   beforeEach(() => {
     opts = null;
-    mockDocumentCreateCanvas();
     window.ShaderBase = { create: vi.fn((o) => { opts = o; }) };
     new Function(src)(); // eslint-disable-line no-new-func
   });
@@ -111,13 +61,12 @@ describe('four-circles.js', () => {
       'u_circle_size', 'u_tri_size', 'u_tri_angle', 'u_tri_apex',
       'u_offset_x', 'u_offset_y',
       'u_rot1', 'u_rot2', 'u_rot3', 'u_rot4',
-      'u_global_grad', 'u_text_enabled', 'u_outline_color',
+      'u_global_grad',
       'u_a', 'u_b', 'u_c', 'u_d',
       'u_color_mode', 'u_color0', 'u_color1', 'u_color2', 'u_color3',
       'u_quad0', 'u_quad1', 'u_quad2', 'u_quad3',
       'u_word_texture', 'u_word_x', 'u_word_y',
       'u_word_color', 'u_use_word_color', 'u_word_outline_color',
-      'u_tex1', 'u_tex2', 'u_tex3', 'u_tex4',
       'u_opacity', 'u_distress', 'u_distress_scale',
     ].forEach((name) => {
       expect(frag, `missing uniform ${name}`).toContain(name);
@@ -152,25 +101,15 @@ describe('four-circles.js', () => {
       'res', 'aspect',
       'circleSize', 'triSize', 'triAngle', 'triApex',
       'offsetX', 'offsetY', 'rot1', 'rot2', 'rot3', 'rot4',
-      'globalGrad', 'textEnabled', 'outlineColor',
+      'globalGrad',
       'palA', 'palB', 'palC', 'palD',
       'colorMode', 'color0', 'color1', 'color2', 'color3',
       'quad0', 'quad1', 'quad2', 'quad3',
       'wordTex', 'wordX', 'wordY', 'wordColor', 'useWordColor', 'wordOutlineColor',
-      'tex1', 'tex2', 'tex3', 'tex4',
       'opacity', 'distress', 'distressScale',
     ].forEach((key) => {
       expect(uniforms, `setup() is missing key "${key}"`).toHaveProperty(key);
     });
-  });
-
-  it('setup() initialises four letter-texture canvases', () => {
-    const gl = makeSetupGl();
-    const uniforms = opts.setup(gl, {});
-    expect(uniforms._texCanvases).toHaveLength(4);
-    expect(uniforms._texCtxs).toHaveLength(4);
-    expect(uniforms._glTextures).toHaveLength(4);
-    expect(uniforms._lastLetterKeys).toHaveLength(4);
   });
 
   it('every uniform key accessed by render() exists in the setup() return value', () => {
@@ -212,22 +151,18 @@ describe('four-circles.js', () => {
     expect(call[1]).toBe(2.0);
   });
 
-  it('render() binds letter textures to TEXTURE0–3 and word texture to TEXTURE4', () => {
+  it('render() binds word texture to TEXTURE0', () => {
     const uniforms = opts.setup(makeSetupGl(), {});
     const renderGl = makeRenderGl();
     opts.render(renderGl, uniforms, {}, 500, 500, 0, {});
 
     const activeSlots = renderGl.activeTexture.mock.calls.map(([slot]) => slot);
     expect(activeSlots).toContain(renderGl.TEXTURE0);
-    expect(activeSlots).toContain(renderGl.TEXTURE1);
-    expect(activeSlots).toContain(renderGl.TEXTURE2);
-    expect(activeSlots).toContain(renderGl.TEXTURE3);
-    expect(activeSlots).toContain(renderGl.TEXTURE4);
 
-    // Word texture sampler must be assigned to unit 4
+    // Word texture sampler must be assigned to unit 0
     const wordTexCall = renderGl.uniform1i.mock.calls.find(([loc]) => loc === uniforms.wordTex);
     expect(wordTexCall).toBeDefined();
-    expect(wordTexCall[1]).toBe(4);
+    expect(wordTexCall[1]).toBe(0);
   });
 
   it('render() defaults: colorMode=0, opacity=1, distress=0, distressScale=80', () => {
