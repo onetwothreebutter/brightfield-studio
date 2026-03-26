@@ -1,0 +1,53 @@
+<section class="designs-row-section section-padding">
+  <div class="container">
+    <div class="designs-row">
+
+      <div class="designs-row__col" id="designs-row__recent">
+        <h2 class="recent-designs__heading">Your Recent Designs</h2>
+        <div id="recent-designs-container"></div>
+      </div>
+
+      <div class="designs-row__col" id="designs-row__community">
+        <div class="community-designs__header">
+          <h2 class="community-designs__heading">Community Designs</h2>
+        </div>
+        <div id="community-designs-container"></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<script src="{{ 'recent-designs.js' | asset_url }}" defer></script>
+<script src="{{ 'community-designs.js' | asset_url }}" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var recentContainer = document.getElementById('recent-designs-container');
+  if (recentContainer && window.RecentDesigns) {
+    RecentDesigns.fetchDesigns().then(function (designs) {
+      RecentDesigns.renderFilmstrip(recentContainer, designs);
+    });
+  }
+
+  var communityContainer = document.getElementById('community-designs-container');
+  if (communityContainer && window.CommunityDesigns) {
+    CommunityDesigns.fetchCommunityDesigns().then(function (designs) {
+      if (!designs || !designs.length) {
+        document.getElementById('designs-row__community').style.display = 'none';
+        return;
+      }
+      CommunityDesigns.renderStrip(communityContainer, designs, {
+        getDeviceId: window.RecentDesigns && window.RecentDesigns.getDeviceId
+      });
+    });
+  }
+});
+</script>
+
+{% schema %}
+{
+  "name": "Designs Row",
+  "settings": [],
+  "presets": [{ "name": "Designs Row" }]
+}
+{% endschema %}
