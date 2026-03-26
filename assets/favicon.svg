@@ -1,23 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="orb" x1="35%" y1="30%" x2="80%" y2="75%">
-      <stop offset="0%" stop-color="#b4d0ff"/>
-      <stop offset="45%" stop-color="#ec67c4"/>
-      <stop offset="100%" stop-color="#f7a55c"/>
-    </linearGradient>
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="8" result="b"/>
-      <feMerge>
-        <feMergeNode in="b"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
+    <filter id="g1" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+    <filter id="g2" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="3"/>
     </filter>
   </defs>
-  <rect x="0" y="0" width="512" height="512" rx="112" fill="#0a0b11"/>
-  <g filter="url(#glow)" opacity="0.92">
-    <line x1="214.4" y1="221.6" x2="121.9" y2="145.1" stroke="#7388ff" stroke-width="5.7" stroke-linecap="round"/><line x1="219.4" y1="212.4" x2="145.7" y2="124.6" stroke="#7a72ff" stroke-width="5.8" stroke-linecap="round"/><line x1="226.7" y1="204.5" x2="174.5" y2="112.6" stroke="#8864f8" stroke-width="5.9" stroke-linecap="round"/><line x1="236.0" y1="198.5" x2="204.7" y2="108.7" stroke="#9e60eb" stroke-width="6.0" stroke-linecap="round"/><line x1="246.5" y1="194.9" x2="233.5" y2="110.5" stroke="#b35dde" stroke-width="6.1" stroke-linecap="round"/><line x1="257.7" y1="194.1" x2="259.9" y2="115.0" stroke="#c959d1" stroke-width="6.2" stroke-linecap="round"/><line x1="268.7" y1="196.2" x2="285.0" y2="119.8" stroke="#de56c4" stroke-width="6.3" stroke-linecap="round"/><line x1="278.7" y1="200.9" x2="310.2" y2="124.4" stroke="#f452b7" stroke-width="6.4" stroke-linecap="round"/><line x1="287.1" y1="207.8" x2="336.9" y2="130.5" stroke="#ff55a7" stroke-width="6.5" stroke-linecap="round"/><line x1="293.4" y1="216.2" x2="364.4" y2="140.5" stroke="#ff5f96" stroke-width="6.6" stroke-linecap="round"/><line x1="297.3" y1="225.6" x2="390.4" y2="156.9" stroke="#ff6984" stroke-width="6.7" stroke-linecap="round"/><line x1="298.9" y1="235.1" x2="411.2" y2="180.3" stroke="#ff7372" stroke-width="6.8" stroke-linecap="round"/><line x1="298.5" y1="244.1" x2="423.4" y2="209.3" stroke="#ff7d61" stroke-width="6.9" stroke-linecap="round"/><line x1="296.5" y1="252.3" x2="425.5" y2="240.6" stroke="#ff874f" stroke-width="7.0" stroke-linecap="round"/><line x1="293.4" y1="259.4" x2="418.1" y2="270.7" stroke="#ff9347" stroke-width="7.0" stroke-linecap="round"/><line x1="289.6" y1="265.4" x2="403.9" y2="297.3" stroke="#ffa048" stroke-width="6.9" stroke-linecap="round"/><line x1="285.5" y1="270.4" x2="386.6" y2="319.7" stroke="#ffad4a" stroke-width="6.8" stroke-linecap="round"/><line x1="281.4" y1="274.7" x2="368.8" y2="339.1" stroke="#ffbb4c" stroke-width="6.7" stroke-linecap="round"/><line x1="277.2" y1="278.6" x2="351.5" y2="357.7" stroke="#ffc84e" stroke-width="6.6" stroke-linecap="round"/><line x1="273.0" y1="282.3" x2="333.9" y2="376.9" stroke="#ffd54f" stroke-width="6.5" stroke-linecap="round"/><line x1="268.4" y1="286.0" x2="313.8" y2="396.2" stroke="#f1de5f" stroke-width="6.4" stroke-linecap="round"/><line x1="263.2" y1="289.6" x2="289.4" y2="413.3" stroke="#d4e17c" stroke-width="6.3" stroke-linecap="round"/><line x1="257.0" y1="292.9" x2="260.7" y2="424.8" stroke="#b8e499" stroke-width="6.2" stroke-linecap="round"/><line x1="249.9" y1="295.6" x2="229.5" y2="427.4" stroke="#9be8b6" stroke-width="6.1" stroke-linecap="round"/><line x1="241.7" y1="297.0" x2="199.0" y2="419.7" stroke="#7febd3" stroke-width="6.0" stroke-linecap="round"/><line x1="232.8" y1="296.9" x2="172.8" y2="402.5" stroke="#62eef0" stroke-width="5.9" stroke-linecap="round"/><line x1="223.5" y1="294.8" x2="152.9" y2="378.9" stroke="#57e5ff" stroke-width="5.8" stroke-linecap="round"/><line x1="214.4" y1="290.4" x2="139.5" y2="352.4" stroke="#5ecdff" stroke-width="5.7" stroke-linecap="round"/>
-  </g>
-  <circle cx="256" cy="256" r="74" fill="none" stroke="#d7f2ff" stroke-opacity="0.92" stroke-width="7"/>
-  <circle cx="256" cy="256" r="54" fill="url(#orb)"/>
-  <line x1="256" y1="170" x2="256" y2="142" stroke="#ffd95a" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="32" cy="32" r="14" fill="rgba(44,233,214,0.35)" filter="url(#g1)"/>
+  <circle cx="32" cy="32" r="8" fill="rgba(44,233,214,0.62)" filter="url(#g2)"/>
+  <circle cx="32" cy="32" r="5" fill="#2ce9d6"/>
 </svg>
