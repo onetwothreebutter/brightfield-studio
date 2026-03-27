@@ -187,7 +187,7 @@ describe('card click — default navigation', () => {
     window.CommunityDesigns.renderStrip(container, [design]);
     container.querySelector('.community-designs__card').click();
     const stored = JSON.parse(localStorage.getItem('brightfield_restore'));
-    expect(stored).toEqual({ values: design.values, shader: 'echo-text' });
+    expect(stored).toEqual({ values: design.values, shader: 'echo-text', creatorName: 'Jane' });
   });
 
   it('navigates to /products/{productHandle}#shader', () => {
