@@ -35,6 +35,9 @@ function makePrintfulFetch(mockupUrl = 'https://printful.com/mockup.jpg') {
     if (url.includes('task?task_key')) {
       return { json: async () => ({ result: { status: 'completed', mockups: [{ mockup_url: mockupUrl }] } }) };
     }
+    if (url === mockupUrl) {
+      return { ok: true, arrayBuffer: async () => new ArrayBuffer(0) };
+    }
     throw new Error('Unexpected fetch: ' + url);
   });
 }
@@ -109,7 +112,7 @@ describe('POST /generate-mockup — design saving', () => {
     expect(saved[0]).toMatchObject({
       shader: 'echo-text',
       productHandle: 'echo-text-shirt',
-      mockupUrl: MOCKUP_URL,
+      mockupUrl: expect.stringContaining('r2.example.com/mockups/'),
       values: { u_speed: 1.5 },
     });
     expect(saved[0].id).toBeTruthy();
@@ -178,7 +181,7 @@ describe('POST /generate-mockup — design saving', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.mockup_url).toBe(MOCKUP_URL);
+    expect(body.mockup_url).toContain('r2.example.com/mockups/');
     expect(body.design_url).toContain('r2.example.com/designs/');
   });
 });
