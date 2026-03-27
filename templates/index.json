@@ -20,12 +20,8 @@
         "button_label": "Buy Original Design"
       }
     },
-    "recent-designs": {
-      "type": "recent-designs",
-      "settings": {}
-    },
-    "community-designs": {
-      "type": "community-designs",
+    "designs-row": {
+      "type": "designs-row",
       "settings": {}
     },
     "featured-collection": {
@@ -39,5 +35,5 @@
       }
     }
   },
-  "order": ["hero", "shader-demo", "recent-designs", "community-designs", "featured-collection"]
+  "order": ["hero", "shader-demo", "designs-row", "featured-collection"]
 }

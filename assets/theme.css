@@ -2373,6 +2373,51 @@ h6 {
     padding-top: 16px;
 }
 
+/* ─── Designs Row (two-column on desktop) ──────────────── */
+.designs-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+}
+@media (min-width: 768px) {
+    .designs-row {
+        grid-template-columns: 1fr 1fr;
+        align-items: start;
+    }
+}
+
+/* ─── Designs Row: skeleton cards ───────────────────────── */
+.designs-row__skeleton-card {
+    flex: 0 0 120px;
+    height: 180px;
+    border-radius: var(--radius);
+    background: var(--color-surface-2);
+    animation: designs-row-pulse 1.4s ease-in-out infinite;
+}
+@keyframes designs-row-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.45; }
+}
+
+/* ─── Designs Row: empty state ───────────────────────────── */
+.designs-row__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.5rem 0 1rem;
+    color: var(--color-text-muted);
+}
+.designs-row__empty svg {
+    width: 32px;
+    height: 32px;
+    opacity: 0.4;
+}
+.designs-row__empty p {
+    margin: 0;
+    font-size: 0.8rem;
+}
+
 /* ─── Mockup modal community form ────────────────────────── */
 .mockup-modal__community {
     margin-top: 1rem;

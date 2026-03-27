@@ -1,0 +1,83 @@
+{%- assign empty_icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 15l5-5 4 4 3-3 6 6"/><circle cx="8.5" cy="8.5" r="1.5"/></svg>' -%}
+
+<section class="designs-row-section section-padding">
+  <div class="container">
+    <div class="designs-row">
+
+      <div class="designs-row__col" id="designs-row__recent">
+        <h2 class="recent-designs__heading">Your Recent Designs</h2>
+        <div id="recent-designs-container">
+          <div class="recent-designs__strip">
+            <div class="designs-row__skeleton-card"></div>
+            <div class="designs-row__skeleton-card"></div>
+            <div class="designs-row__skeleton-card"></div>
+            <div class="designs-row__skeleton-card"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="designs-row__col" id="designs-row__community">
+        <div class="community-designs__header">
+          <h2 class="community-designs__heading">Community Designs</h2>
+        </div>
+        <div id="community-designs-container">
+          <div class="community-designs__strip">
+            <div class="designs-row__skeleton-card"></div>
+            <div class="designs-row__skeleton-card"></div>
+            <div class="designs-row__skeleton-card"></div>
+            <div class="designs-row__skeleton-card"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<script src="{{ 'recent-designs.js' | asset_url }}" defer></script>
+<script src="{{ 'community-designs.js' | asset_url }}" defer></script>
+<script>
+(function () {
+  var EMPTY_ICON = {{ empty_icon | json }};
+
+  function emptyState(message) {
+    return '<div class="designs-row__empty">'
+      + EMPTY_ICON
+      + '<p>' + message + '</p>'
+      + '</div>';
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var recentContainer = document.getElementById('recent-designs-container');
+    if (recentContainer && window.RecentDesigns) {
+      RecentDesigns.fetchDesigns().then(function (designs) {
+        RecentDesigns.renderFilmstrip(recentContainer, designs);
+        if (!designs || !designs.length) {
+          recentContainer.innerHTML = emptyState('No saved designs yet');
+        }
+      });
+    }
+
+    var communityContainer = document.getElementById('community-designs-container');
+    if (communityContainer && window.CommunityDesigns) {
+      CommunityDesigns.fetchCommunityDesigns().then(function (designs) {
+        if (!designs || !designs.length) {
+          communityContainer.innerHTML = emptyState('No community designs yet');
+          return;
+        }
+        CommunityDesigns.renderStrip(communityContainer, designs, {
+          getDeviceId: window.RecentDesigns && window.RecentDesigns.getDeviceId
+        });
+      });
+    }
+  });
+}());
+</script>
+
+{% schema %}
+{
+  "name": "Designs Row",
+  "settings": [],
+  "presets": [{ "name": "Designs Row" }]
+}
+{% endschema %}
