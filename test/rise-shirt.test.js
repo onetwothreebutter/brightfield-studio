@@ -48,10 +48,10 @@ describe('rise-shirt.js', () => {
     [
       'u_time', 'u_resolution', 'u_rows', 'u_cols',
       'u_min_radius', 'u_max_radius', 'u_invert',
-      'u_dot_color', 'u_bg_color', 'u_top_margin', 'u_ratio',
+      'u_bg_color', 'u_top_margin', 'u_ratio',
       'u_text_texture', 'u_text_grid_cols', 'u_text_grid_rows',
       'u_text_blend', 'u_text_radius', 'u_text_ratio',
-      'u_text_color', 'u_text_bg_color',
+      'u_text_bg_color',
       'u_a', 'u_b', 'u_c', 'u_d',
       'u_color_mode', 'u_transparent_bg',
     ].forEach((name) => {
@@ -72,9 +72,9 @@ describe('rise-shirt.js', () => {
     const uniforms = opts.setup(gl, {});
     [
       'time', 'res', 'rows', 'cols', 'minRadius', 'maxRadius', 'invert',
-      'dotColor', 'bgColor', 'topMargin', 'ratio',
+      'bgColor', 'topMargin', 'ratio',
       'textTex', 'textGridCols', 'textGridRows', 'textBlend', 'textRadius', 'textRatio',
-      'textColor', 'textBgColor',
+      'textBgColor',
       'palA', 'palB', 'palC', 'palD',
       'colorMode', 'transparentBg',
     ].forEach((key) => {
