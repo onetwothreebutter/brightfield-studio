@@ -594,7 +594,7 @@
       var outlineWidth   = v.outlineWidth   != null ? v.outlineWidth   : 12;
       var borderWidth    = (v.u_border_width != null ? v.u_border_width : 10) / 1000;
       var borderColor    = v.u_border_color || [1.0, 1.0, 1.0];
-      var outerBorder    = v.u_outer_border != null ? v.u_outer_border : 0.0;
+      var outerBorder    = v.u_invert ? (v.u_outer_border != null ? v.u_outer_border : 0.0) : 1.0;
       var outlineColor   = v.u_outline_color || [0.0, 0.0, 0.0];
       var aspect         = h > 0 ? w / h : 1.0;
       var GRID_ASPECT    = v.u_grid_aspect != null ? v.u_grid_aspect : 0.8;
