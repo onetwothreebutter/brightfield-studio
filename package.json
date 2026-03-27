@@ -9,7 +9,7 @@
     "test-shaders": "{ sleep 1 && open http://localhost:3001/test-shaders.html; } & npx serve . --listen 3001"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^3.0.0",
+    "@vitest/coverage-v8": "^4.1.2",
     "jsdom": "^28.1.0",
     "vitest": "^3.0.0"
   }
