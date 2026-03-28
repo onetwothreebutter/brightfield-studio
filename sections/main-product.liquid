@@ -303,7 +303,7 @@
 }());
 
 // ── Auto-open Shader tab from URL hash ────────────────────────────────────────
-if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') === 0) {
+if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') === 0 || window.location.hash.indexOf('#share=') === 0) {
   var shaderTab = document.querySelector('.media-tab[data-tab="shader"]');
   if (shaderTab) shaderTab.click();
 }
@@ -936,14 +936,8 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     return result;
   }
 
-  // Restore state from #s= hash param (set by Copy Link button)
-  (function () {
-    var sp = new URLSearchParams(window.location.hash.slice(1));
-    var encoded = sp.get('s');
-    if (!encoded) return;
-    var restored;
-    try { restored = decodeState(encoded); } catch (e) { return; }
-
+  // Apply a pre-decoded state object to all controls
+  function applyRestoredState(restored) {
     controlEls.forEach(function (item) {
       var ctrl = item.ctrl, el = item.el, k = ctrl.key;
       if (!(k in restored)) return;
@@ -964,11 +958,10 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         window._shaderState.values[k] = v;
 
       } else if (ctrl.type === 'color') {
-        el.value = toHex(v);  // Coloris reads el.value when it initializes
+        el.value = toHex(v);
         window._shaderState.values[k] = v;
 
       } else {
-        // select, text
         el.value = v;
         window._shaderState.values[k] = v;
         el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -981,35 +974,80 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     applyOutlineVisibility();
     applyWordVisibility();
     applyPerLetterSizeVisibility();
+  }
 
-    // Strip #s= from URL; keep #shader so the shader tab stays open
-    history.replaceState(null, '', window.location.pathname + window.location.search + '#shader');
+  // Restore state from URL hash — supports #share=<id> (worker) and legacy #s=<base64>
+  (function () {
+    var hash = window.location.hash;
+    var cleanUrl = window.location.pathname + window.location.search + '#shader';
+
+    // Legacy: inline base64
+    if (hash.indexOf('#s=') === 0) {
+      var encoded = new URLSearchParams(hash.slice(1)).get('s');
+      if (encoded) {
+        try { applyRestoredState(decodeState(encoded)); } catch (e) {}
+      }
+      history.replaceState(null, '', cleanUrl);
+      return;
+    }
+
+    // Short ID from worker
+    if (hash.indexOf('#share=') === 0) {
+      var shareId = hash.slice('#share='.length);
+      fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/get-shader-state/' + shareId)
+        .then(function (r) { return r.json(); })
+        .then(function (state) {
+          var restored = {};
+          controlEls.forEach(function (item) {
+            var k = item.ctrl.key;
+            if (!(k in state)) return;
+            restored[k] = (item.ctrl.type === 'color') ? hexToRgb(state[k]) : state[k];
+          });
+          applyRestoredState(restored);
+          history.replaceState(null, '', cleanUrl);
+        })
+        .catch(function () { history.replaceState(null, '', cleanUrl); });
+    }
   }());
 
-  // Copy Link button — encodes current state into ?s= URL param and copies to clipboard
+  // Copy Link button — saves state to worker and copies short #share= URL
   var copyLinkBtn = document.createElement('button');
   copyLinkBtn.type = 'button';
   copyLinkBtn.className = 'shader-control__copy-link-btn';
   copyLinkBtn.textContent = 'Copy Link';
   copyLinkBtn.addEventListener('click', function () {
-    var encoded = encodeState(window._shaderState.values);
-    var url = window.location.origin + window.location.pathname + '#s=' + encoded;
-    history.replaceState(null, '', '#s=' + encoded);
     var self = this;
-    function showConfirm() {
-      self.textContent = 'Copied!';
-      setTimeout(function () { self.textContent = 'Copy Link'; }, 1800);
-    }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(showConfirm);
-    } else {
-      var ta = document.createElement('textarea');
-      ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); } catch (e) {}
-      document.body.removeChild(ta);
-      showConfirm();
-    }
+    self.textContent = 'Saving\u2026';
+    self.disabled = true;
+    fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/save-shader-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: window._shaderState.values }),
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var url = window.location.origin + window.location.pathname + '#share=' + data.id;
+      history.replaceState(null, '', '#share=' + data.id);
+      function showConfirm() {
+        self.textContent = 'Copied!';
+        self.disabled = false;
+        setTimeout(function () { self.textContent = 'Copy Link'; }, 1800);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(showConfirm);
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+        showConfirm();
+      }
+    })
+    .catch(function () {
+      self.textContent = 'Failed';
+      setTimeout(function () { self.textContent = 'Copy Link'; self.disabled = false; }, 1800);
+    });
   });
   randomizeBtn.insertAdjacentElement('afterend', copyLinkBtn);
 

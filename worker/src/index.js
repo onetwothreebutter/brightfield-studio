@@ -51,6 +51,9 @@ export default {
     if (method === 'POST' && pathname === '/community/approve') return handleCommunityModerate(request, env, origin, 'approved');
     if (method === 'POST' && pathname === '/community/reject')  return handleCommunityModerate(request, env, origin, 'rejected');
 
+    if (method === 'POST' && pathname === '/save-shader-state')           return handleSaveShaderState(request, env, origin);
+    if (method === 'GET'  && pathname.startsWith('/get-shader-state/'))   return handleGetShaderState(request, env, origin);
+
     if (method === 'GET'  && pathname.startsWith('/share/')) return handleShare(request, env);
 
     if (method === 'GET'  && pathname === '/admin-ui') return handleAdminUI(request, env);
@@ -647,6 +650,34 @@ function handleAdminUI(request, env) {
     status: 200,
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
   });
+}
+
+// ── Shader state sharing ─────────────────────────────────────────────────────
+
+async function handleSaveShaderState(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+  let body;
+  try { body = await request.json(); } catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers }); }
+  if (!body.state || typeof body.state !== 'object') {
+    return new Response(JSON.stringify({ error: 'Missing state' }), { status: 400, headers });
+  }
+  const id  = Math.random().toString(36).slice(2, 8);
+  const key = `shader-states/${id}.json`;
+  await env.MOCKUP_STAGING.put(key, JSON.stringify(body.state), {
+    httpMetadata: { contentType: 'application/json' },
+    customMetadata: { createdAt: new Date().toISOString() },
+  });
+  return new Response(JSON.stringify({ id }), { status: 200, headers });
+}
+
+async function handleGetShaderState(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+  const id  = new URL(request.url).pathname.replace('/get-shader-state/', '');
+  if (!id) return new Response(JSON.stringify({ error: 'Missing id' }), { status: 400, headers });
+  const obj = await env.MOCKUP_STAGING.get(`shader-states/${id}.json`);
+  if (!obj) return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers });
+  const text = await obj.text();
+  return new Response(text, { status: 200, headers });
 }
 
 // ── Device design gallery ────────────────────────────────────────────────────

@@ -1102,84 +1102,119 @@
   // ── Copy Link ──────────────────────────────────────────────────────────────
   var copyLinkBtn = document.getElementById('demo-copy-link');
   copyLinkBtn.addEventListener('click', function () {
-    var encoded = encodeState(window._demoState.values);
-    var url = window.location.origin + window.location.pathname + '#s=' + encoded;
-    history.replaceState(null, '', '#s=' + encoded);
     var self = this;
-    function showConfirm() {
-      self.textContent = 'Copied!';
-      setTimeout(function () { self.textContent = 'Copy Link'; }, 1800);
-    }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(showConfirm);
-    } else {
-      var ta = document.createElement('textarea');
-      ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); } catch (e) {}
-      document.body.removeChild(ta);
-      showConfirm();
-    }
+    self.textContent = 'Saving\u2026';
+    self.disabled = true;
+    fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/save-shader-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: window._demoState.values }),
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var url = window.location.origin + window.location.pathname + '#share=' + data.id;
+      history.replaceState(null, '', '#share=' + data.id);
+      function showConfirm() {
+        self.textContent = 'Copied!';
+        self.disabled = false;
+        setTimeout(function () { self.textContent = 'Copy Link'; }, 1800);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(showConfirm);
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+        showConfirm();
+      }
+    })
+    .catch(function () {
+      self.textContent = 'Failed';
+      setTimeout(function () { self.textContent = 'Copy Link'; self.disabled = false; }, 1800);
+    });
   });
 
-  // ── Restore state from #s= hash param ─────────────────────────────────────
+  // ── Restore state from URL hash — #share=<id> (worker) or legacy #s=<base64> ──
   (function () {
-    var sp = new URLSearchParams(window.location.hash.slice(1));
-    var encoded = sp.get('s');
-    if (!encoded) return;
-    var restored;
-    try { restored = decodeState(encoded); } catch (e) { return; }
+    var hash = window.location.hash;
 
-    var v = window._demoState.values;
-    Object.keys(restored).forEach(function (k) { v[k] = restored[k]; });
+    function applyDemoState(v) {
+      if (presetSel)              presetSel.value = '';
+      if (lineCountInput)       { lineCountInput.value      = v.u_line_count;           lineCountDisp.textContent        = v.u_line_count; }
+      if (powerInput)           { powerInput.value          = v.u_power;                powerDisp.textContent            = v.u_power; }
+      if (centerCircleInput)    { centerCircleInput.value   = v.u_center_circle_radius; centerCircleDisp.textContent     = v.u_center_circle_radius; }
+      if (radiusInput)          { radiusInput.value         = v.u_radius;               radiusDisp.textContent           = v.u_radius; }
+      if (widthTopInput)        { widthTopInput.value       = v.u_width_top;            widthTopDisp.textContent         = v.u_width_top; }
+      if (widthBotInput)        { widthBotInput.value       = v.u_width_bot;            widthBotDisp.textContent         = v.u_width_bot; }
+      if (triEnabledBtn)        { var triOn = !!v.u_tri_enabled; triEnabledBtn.dataset.on = triOn ? '1' : '0'; triEnabledBtn.textContent = triOn ? 'On' : 'Off'; triEnabledBtn.classList.toggle('is-on', triOn); }
+      if (triRotationInput)     { triRotationInput.value    = v.u_tri_rotation;         triRotationDisp.textContent      = v.u_tri_rotation; }
+      if (triSizeInput)         { triSizeInput.value        = v.u_tri_size;             triSizeDisp.textContent          = v.u_tri_size; }
+      if (triWidthInput)        { triWidthInput.value       = v.u_tri_width;            triWidthDisp.textContent         = v.u_tri_width; }
+      if (centerCircleEnabledBtn) { var ccOn = !!v.u_center_circle_enabled; centerCircleEnabledBtn.dataset.on = ccOn ? '1' : '0'; centerCircleEnabledBtn.textContent = ccOn ? 'On' : 'Off'; centerCircleEnabledBtn.classList.toggle('is-on', ccOn); }
+      if (colorModeSel)           colorModeSel.value = v.u_color_mode;
+      if (paletteAInput)          paletteAInput.value = rgbToHex(v.u_palette_a);
+      if (paletteBInput)          paletteBInput.value = rgbToHex(v.u_palette_b);
+      if (paletteCInput)          paletteCInput.value = rgbToHex(v.u_palette_c);
+      if (paletteDInput)          paletteDInput.value = rgbToHex(v.u_palette_d);
+      if (color0Input)            color0Input.value   = rgbToHex(v.u_color0);
+      if (color1Input)            color1Input.value   = rgbToHex(v.u_color1);
+      if (color2Input)            color2Input.value   = rgbToHex(v.u_color2);
+      if (color3Input)            color3Input.value   = rgbToHex(v.u_color3);
+      if (textInput)              textInput.value     = v.text || '';
+      if (textFontSel)            textFontSel.value   = v.textFont || 'Oswald';
+      if (textSizeInput)        { textSizeInput.value = v.textFontSize;                 textSizeDisp.textContent         = v.textFontSize; }
+      if (textXInput)           { textXInput.value    = v.textX;                        textXDisp.textContent            = v.textX; }
+      if (textYInput)           { textYInput.value    = v.textY;                        textYDisp.textContent            = v.textY; }
+      if (enableTextBtn)        { var txtOn = !!v.text; enableTextBtn.dataset.on = txtOn ? '1' : '0'; enableTextBtn.textContent = txtOn ? 'On' : 'Off'; enableTextBtn.classList.toggle('is-on', txtOn); }
+      if (useTextColorBtn)      { var utcOn = !!v.u_use_text_color; useTextColorBtn.dataset.on = utcOn ? '1' : '0'; useTextColorBtn.textContent = utcOn ? 'On' : 'Off'; useTextColorBtn.classList.toggle('is-on', utcOn); if (textColorRow) textColorRow.style.display = utcOn ? 'grid' : 'none'; }
+      if (textColorInput)         textColorInput.value = rgbToHex(v.u_text_color);
+      if (outlineBtn)           { var olOn = !!v.outlineEnabled; outlineBtn.dataset.on = olOn ? '1' : '0'; outlineBtn.textContent = olOn ? 'On' : 'Off'; outlineBtn.classList.toggle('is-on', olOn); if (outlineWidthRow) outlineWidthRow.style.display = olOn ? 'grid' : 'none'; if (outlineColorRow) outlineColorRow.style.display = olOn ? 'grid' : 'none'; }
+      if (outlineWidthInput)    { outlineWidthInput.value   = v.outlineWidth;           outlineWidthDisp.textContent     = v.outlineWidth; }
+      if (outlineColorInput)      outlineColorInput.value   = rgbToHex(v.u_outline_color);
+      if (opacityInput)         { opacityInput.value        = v.u_opacity;              opacityDisp.textContent          = parseFloat(v.u_opacity).toFixed(2); }
+      if (distressInput)        { distressInput.value       = v.u_distress;             distressDisp.textContent         = parseFloat(v.u_distress).toFixed(2); }
+      if (distressScaleInput)   { distressScaleInput.value  = v.u_distress_scale;       distressScaleDisp.textContent    = v.u_distress_scale; }
+      window._demoState.textDirty = true;
+      applyColorModeVisibility();
+      userInteracted = true;
+      stopCycle();
+      history.replaceState(null, '', window.location.pathname + '#shader-demo');
+    }
 
-    // Update all DOM inputs to reflect restored values
-    if (presetSel)              presetSel.value = '';
-    if (lineCountInput)       { lineCountInput.value      = v.u_line_count;           lineCountDisp.textContent        = v.u_line_count; }
-    if (powerInput)           { powerInput.value          = v.u_power;                powerDisp.textContent            = v.u_power; }
-    if (centerCircleInput)    { centerCircleInput.value   = v.u_center_circle_radius; centerCircleDisp.textContent     = v.u_center_circle_radius; }
-    if (radiusInput)          { radiusInput.value         = v.u_radius;               radiusDisp.textContent           = v.u_radius; }
-    if (widthTopInput)        { widthTopInput.value       = v.u_width_top;            widthTopDisp.textContent         = v.u_width_top; }
-    if (widthBotInput)        { widthBotInput.value       = v.u_width_bot;            widthBotDisp.textContent         = v.u_width_bot; }
-    if (triEnabledBtn)        { var triOn = !!v.u_tri_enabled; triEnabledBtn.dataset.on = triOn ? '1' : '0'; triEnabledBtn.textContent = triOn ? 'On' : 'Off'; triEnabledBtn.classList.toggle('is-on', triOn); }
-    if (triRotationInput)     { triRotationInput.value    = v.u_tri_rotation;         triRotationDisp.textContent      = v.u_tri_rotation; }
-    if (triSizeInput)         { triSizeInput.value        = v.u_tri_size;             triSizeDisp.textContent          = v.u_tri_size; }
-    if (triWidthInput)        { triWidthInput.value       = v.u_tri_width;            triWidthDisp.textContent         = v.u_tri_width; }
-    if (centerCircleEnabledBtn) { var ccOn = !!v.u_center_circle_enabled; centerCircleEnabledBtn.dataset.on = ccOn ? '1' : '0'; centerCircleEnabledBtn.textContent = ccOn ? 'On' : 'Off'; centerCircleEnabledBtn.classList.toggle('is-on', ccOn); }
-    if (colorModeSel)           colorModeSel.value = v.u_color_mode;
-    if (paletteAInput)          paletteAInput.value = rgbToHex(v.u_palette_a);
-    if (paletteBInput)          paletteBInput.value = rgbToHex(v.u_palette_b);
-    if (paletteCInput)          paletteCInput.value = rgbToHex(v.u_palette_c);
-    if (paletteDInput)          paletteDInput.value = rgbToHex(v.u_palette_d);
-    if (color0Input)            color0Input.value   = rgbToHex(v.u_color0);
-    if (color1Input)            color1Input.value   = rgbToHex(v.u_color1);
-    if (color2Input)            color2Input.value   = rgbToHex(v.u_color2);
-    if (color3Input)            color3Input.value   = rgbToHex(v.u_color3);
-    if (textInput)              textInput.value     = v.text || '';
-    if (textFontSel)            textFontSel.value   = v.textFont || 'Oswald';
-    if (textSizeInput)        { textSizeInput.value = v.textFontSize;                 textSizeDisp.textContent         = v.textFontSize; }
-    if (textXInput)           { textXInput.value    = v.textX;                        textXDisp.textContent            = v.textX; }
-    if (textYInput)           { textYInput.value    = v.textY;                        textYDisp.textContent            = v.textY; }
-    if (enableTextBtn)        { var txtOn = !!v.text; enableTextBtn.dataset.on = txtOn ? '1' : '0'; enableTextBtn.textContent = txtOn ? 'On' : 'Off'; enableTextBtn.classList.toggle('is-on', txtOn); }
-    if (useTextColorBtn)      { var utcOn = !!v.u_use_text_color; useTextColorBtn.dataset.on = utcOn ? '1' : '0'; useTextColorBtn.textContent = utcOn ? 'On' : 'Off'; useTextColorBtn.classList.toggle('is-on', utcOn); if (textColorRow) textColorRow.style.display = utcOn ? 'grid' : 'none'; }
-    if (textColorInput)         textColorInput.value = rgbToHex(v.u_text_color);
-    if (outlineBtn)           { var olOn = !!v.outlineEnabled; outlineBtn.dataset.on = olOn ? '1' : '0'; outlineBtn.textContent = olOn ? 'On' : 'Off'; outlineBtn.classList.toggle('is-on', olOn); if (outlineWidthRow) outlineWidthRow.style.display = olOn ? 'grid' : 'none'; if (outlineColorRow) outlineColorRow.style.display = olOn ? 'grid' : 'none'; }
-    if (outlineWidthInput)    { outlineWidthInput.value   = v.outlineWidth;           outlineWidthDisp.textContent     = v.outlineWidth; }
-    if (outlineColorInput)      outlineColorInput.value   = rgbToHex(v.u_outline_color);
-    if (opacityInput)         { opacityInput.value        = v.u_opacity;              opacityDisp.textContent          = parseFloat(v.u_opacity).toFixed(2); }
-    if (distressInput)        { distressInput.value       = v.u_distress;             distressDisp.textContent         = parseFloat(v.u_distress).toFixed(2); }
-    if (distressScaleInput)   { distressScaleInput.value  = v.u_distress_scale;       distressScaleDisp.textContent    = v.u_distress_scale; }
+    // Legacy: inline base64
+    if (hash.indexOf('#s=') === 0) {
+      var encoded = new URLSearchParams(hash.slice(1)).get('s');
+      if (encoded) {
+        var restored;
+        try { restored = decodeState(encoded); } catch (e) {}
+        if (restored) {
+          var v = window._demoState.values;
+          Object.keys(restored).forEach(function (k) { v[k] = restored[k]; });
+          applyDemoState(v);
+        }
+      }
+      return;
+    }
 
-    window._demoState.textDirty = true;
-    applyColorModeVisibility();
-
-    // Suppress auto-cycle — user is viewing a shared state
-    userInteracted = true;
-    stopCycle();
-
-    // Strip #s= from URL, keep #shader-demo so the section stays in view
-    history.replaceState(null, '', window.location.pathname + '#shader-demo');
+    // Short ID from worker
+    if (hash.indexOf('#share=') === 0) {
+      var shareId = hash.slice('#share='.length);
+      fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/get-shader-state/' + shareId)
+        .then(function (r) { return r.json(); })
+        .then(function (state) {
+          var v = window._demoState.values;
+          Object.keys(state).forEach(function (k) {
+            if (k in v) v[k] = (typeof state[k] === 'string' && state[k][0] === '#') ? hexToRgb(state[k]) : state[k];
+          });
+          applyDemoState(v);
+        })
+        .catch(function () { history.replaceState(null, '', window.location.pathname + '#shader-demo'); });
+      return;
+    }
   }());
+
 
   // ── Boot ───────────────────────────────────────────────────────────────────
   applyColorModeVisibility();
