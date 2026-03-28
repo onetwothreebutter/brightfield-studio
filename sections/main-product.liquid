@@ -303,7 +303,7 @@
 }());
 
 // ── Auto-open Shader tab from URL hash ────────────────────────────────────────
-if (window.location.hash === '#shader') {
+if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') === 0) {
   var shaderTab = document.querySelector('.media-tab[data-tab="shader"]');
   if (shaderTab) shaderTab.click();
 }
@@ -934,9 +934,9 @@ if (window.location.hash === '#shader') {
     return result;
   }
 
-  // Restore state from ?s= URL param (set by Copy Link button)
+  // Restore state from #s= hash param (set by Copy Link button)
   (function () {
-    var sp = new URLSearchParams(window.location.search);
+    var sp = new URLSearchParams(window.location.hash.slice(1));
     var encoded = sp.get('s');
     if (!encoded) return;
     var restored;
@@ -980,10 +980,8 @@ if (window.location.hash === '#shader') {
     applyWordVisibility();
     applyPerLetterSizeVisibility();
 
-    // Strip ?s= from URL; append #shader so the shader tab auto-opens
-    sp.delete('s');
-    var newSearch = sp.toString() ? ('?' + sp.toString()) : '';
-    history.replaceState(null, '', window.location.pathname + newSearch + '#shader');
+    // Strip #s= from URL; keep #shader so the shader tab stays open
+    history.replaceState(null, '', window.location.pathname + window.location.search + '#shader');
   }());
 
   // Copy Link button — encodes current state into ?s= URL param and copies to clipboard
@@ -993,8 +991,8 @@ if (window.location.hash === '#shader') {
   copyLinkBtn.textContent = 'Copy Link';
   copyLinkBtn.addEventListener('click', function () {
     var encoded = encodeState(window._shaderState.values);
-    var url = window.location.origin + window.location.pathname + '?s=' + encoded + '#shader';
-    history.replaceState(null, '', '?s=' + encoded + '#shader');
+    var url = window.location.origin + window.location.pathname + '#s=' + encoded;
+    history.replaceState(null, '', '#s=' + encoded);
     var self = this;
     function showConfirm() {
       self.textContent = 'Copied!';
