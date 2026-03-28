@@ -77,14 +77,14 @@ var controls = [
   { key: 'u_section_gap',    label: 'Section Gap (px)', type: 'range', textDirty: true, min: -200, max: 500, step: 1,    value: 0    },
   // ── Stamps ────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Stamps' },
-  { key: 'u_drag_enabled',  label: 'Enable Stamps',   type: 'toggle', textDirty: true, value: 0    },
+  { key: 'u_drag_enabled',  label: 'Enable Stamps',   type: 'toggle', textDirty: true, value: 0, noRandomize: true    },
   { key: 'u_drag_angle',    label: 'Angle (°)',        type: 'range',  textDirty: true, min: 0, max: 360, step: 1, value: 180 },
   { key: 'u_drag_distance', label: 'Distance (px)',    type: 'range',  textDirty: true, min: 0, max: 800, step: 1,    value: 120, gaussian: true, randomMin: 30,  randomMax: 300 },
   { key: 'u_drag_steps',    label: 'Stamp Count',      type: 'range',  textDirty: true, min: 1, max: 30,  step: 1,    value: 8,   gaussian: true, randomMin: 3,   randomMax: 18  },
   { key: 'u_drag_decay',    label: 'Stamp Decay',      type: 'range',  textDirty: true, min: 0.1, max: 1.0, step: 0.01, value: 0.7, gaussian: true, randomMin: 0.4, randomMax: 0.9 },
   // ── Blur ──────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Blur' },
-  { key: 'u_blur_enabled', label: 'Enable Blur',   type: 'toggle', value: 0 },
+  { key: 'u_blur_enabled', label: 'Enable Blur',   type: 'toggle', value: 0, noRandomize: true },
   { key: 'u_blur_angle',   label: 'Blur Angle (°)', type: 'range', toRadians: true, min: 0, max: 360, step: 1,     value: 180  },
   { key: 'u_blur_length',  label: 'Blur Length',   type: 'range', min: 0.0, max: 0.5, step: 0.005, value: 0.08, gaussian: true, randomMin: 0.01, randomMax: 0.25 },
   { key: 'u_blur_falloff', label: 'Blur Falloff',  type: 'range', min: 0.0, max: 1.0, step: 0.01,  value: 0.6,  gaussian: true, randomMin: 0.3,  randomMax: 0.9  },
