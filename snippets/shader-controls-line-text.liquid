@@ -6,8 +6,6 @@ var controls = [
   { key: 'u_text_thickness', label: 'Text Thickness',  type: 'range', min: 0,     max: 0.5,  step: 0.01,  value: 0.4  },
   { key: 'textCapRadius', label: 'Cap Radius', type: 'range', min: 0,  max: 100, step: 1,  value: 20,  textDirty: true,
     tip: 'Blur radius applied to line ends — higher values give softer, more rounded caps.' },
-  { key: 'u_vignette_x',    label: 'Vignette X',       type: 'range', min: 0,     max: 20,   step: 0.1,   value: 2,   randomMin: 0, randomMax: 4 },
-  { key: 'u_vignette_y',    label: 'Vignette Y',       type: 'range', min: 0,     max: 30,   step: 0.1,   value: 2,   randomMin: 0, randomMax: 9.3 },
   // ── Text ──────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Text' },
   { key: 'text',         label: 'Text',       type: 'text',   value: 'HELLO',       textDirty: true,
@@ -45,6 +43,10 @@ var controls = [
   { key: 'u_color1', label: 'Color 2',         type: 'color', stopDependent: true, value: '#ffcc00' },
   { key: 'u_color2', label: 'Color 3',         type: 'color', stopDependent: true, value: '#00ccff' },
   { key: 'u_color3', label: 'Color 4 (Right)', type: 'color', stopDependent: true, value: '#aa00ff' },
+  // ── Finish ────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Finish' },
+  { key: 'u_vignette_x', label: 'Vignette X', type: 'range', min: 0, max: 20, step: 0.1, value: 2,   randomMin: 0, randomMax: 4 },
+  { key: 'u_vignette_y', label: 'Vignette Y', type: 'range', min: 0, max: 30, step: 0.1, value: 2,   randomMin: 0, randomMax: 9.3 },
 ];
 
 var customAfterBuild = function () {
