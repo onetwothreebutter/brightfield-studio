@@ -383,6 +383,80 @@ describe('CORS', () => {
   });
 });
 
+// ── /save-shader-state + /get-shader-state ────────────────────────────────────
+
+describe('POST /save-shader-state', () => {
+  let env;
+  beforeEach(() => { env = makeEnv(); });
+
+  it('returns 200 with a 6-char id', async () => {
+    const res = await worker.fetch(
+      post('/save-shader-state', { state: { u_rows: 23, u_color_mode: '0' } }),
+      env
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.id).toMatch(/^[a-z0-9]{6}$/);
+  });
+
+  it('stores the state in R2 under shader-states/{id}.json', async () => {
+    const res = await worker.fetch(
+      post('/save-shader-state', { state: { u_rows: 42 } }),
+      env
+    );
+    const { id } = await res.json();
+    const obj = await env.MOCKUP_STAGING.get(`shader-states/${id}.json`);
+    const stored = JSON.parse(await obj.text());
+    expect(stored.u_rows).toBe(42);
+  });
+
+  it('returns 400 when state is missing', async () => {
+    const res = await worker.fetch(post('/save-shader-state', {}), env);
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when state is not an object', async () => {
+    const res = await worker.fetch(post('/save-shader-state', { state: 'bad' }), env);
+    expect(res.status).toBe(400);
+  });
+
+  it('includes CORS headers', async () => {
+    const res = await worker.fetch(
+      new Request('http://worker/save-shader-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: 'https://brightfield.studio' },
+        body: JSON.stringify({ state: { u_rows: 1 } }),
+      }),
+      env
+    );
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://brightfield.studio');
+  });
+});
+
+describe('GET /get-shader-state/:id', () => {
+  let env;
+  beforeEach(() => { env = makeEnv(); });
+
+  it('returns the stored state', async () => {
+    const saveRes = await worker.fetch(
+      post('/save-shader-state', { state: { u_rows: 99, u_a: '#ff0000' } }),
+      env
+    );
+    const { id } = await saveRes.json();
+
+    const res = await worker.fetch(get(`/get-shader-state/${id}`), env);
+    expect(res.status).toBe(200);
+    const state = await res.json();
+    expect(state.u_rows).toBe(99);
+    expect(state.u_a).toBe('#ff0000');
+  });
+
+  it('returns 404 for an unknown id', async () => {
+    const res = await worker.fetch(get('/get-shader-state/no-such'), env);
+    expect(res.status).toBe(404);
+  });
+});
+
 // ── /delete-design ────────────────────────────────────────────────────────────
 
 async function seedDesigns(env, deviceId, designs) {
