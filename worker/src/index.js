@@ -54,7 +54,10 @@ export default {
     if (method === 'POST' && pathname === '/save-shader-state')           return handleSaveShaderState(request, env, origin);
     if (method === 'GET'  && pathname.startsWith('/get-shader-state/'))   return handleGetShaderState(request, env, origin);
 
-    if (method === 'GET'  && pathname.startsWith('/share/')) return handleShare(request, env);
+    // Custom domain: share.brightfield.studio/{id}
+    if (method === 'GET' && url.hostname === 'share.brightfield.studio') return handleShare(request, env, pathname.slice(1));
+
+    if (method === 'GET'  && pathname.startsWith('/share/')) return handleShare(request, env, pathname.slice(7));
 
     if (method === 'GET'  && pathname === '/admin-ui') return handleAdminUI(request, env);
 
@@ -434,9 +437,7 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-async function handleShare(request, env) {
-  const url = new URL(request.url);
-  const id = url.pathname.slice(7); // strip leading '/share/'
+async function handleShare(request, env, id) {
   if (!id) return Response.redirect('https://brightfield.studio', 302);
 
   const obj = await env.MOCKUP_STAGING.get(`community/submissions/${id}.json`);
@@ -449,7 +450,7 @@ async function handleShare(request, env) {
   const shaderLabel = (design.shader || '').replace(/-/g, ' ');
   const title      = escHtml((design.creatorName || 'Anonymous') + "'s design on Brightfield Studio");
   const desc       = escHtml('A custom ' + shaderLabel + ' design created on Brightfield Studio');
-  const shareUrl   = escHtml('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/share/' + id);
+  const shareUrl   = escHtml('https://share.brightfield.studio/' + id);
   const mockupUrl  = escHtml(design.mockupUrl || '');
   const restorePayload = btoa(JSON.stringify({
     values: design.values,

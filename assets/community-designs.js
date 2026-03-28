@@ -146,7 +146,7 @@
       (function (d, likeButton, countEl, shareButton) {
         shareButton.addEventListener('click', function (e) {
           e.stopPropagation();
-          var shareUrl = WORKER_URL + '/share/' + d.id;
+          var shareUrl = 'https://share.brightfield.studio/' + d.id;
           function showCopied() {
             shareButton.textContent = '\u2713';
             setTimeout(function () { shareButton.textContent = '\uD83D\uDD17'; }, 1500);
