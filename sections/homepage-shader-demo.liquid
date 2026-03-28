@@ -1,4 +1,4 @@
-<section class="shader-demo">
+<section class="shader-demo" id="shader-demo">
   <div class="shader-demo__header container">
     {%- if section.settings.eyebrow != blank -%}
       <p class="shader-demo__eyebrow">{{ section.settings.eyebrow }}</p>
@@ -1101,8 +1101,8 @@
   var copyLinkBtn = document.getElementById('demo-copy-link');
   copyLinkBtn.addEventListener('click', function () {
     var encoded = encodeState(window._demoState.values);
-    var url = window.location.origin + window.location.pathname + '?s=' + encoded;
-    history.replaceState(null, '', '?s=' + encoded);
+    var url = window.location.origin + window.location.pathname + '?s=' + encoded + '#shader-demo';
+    history.replaceState(null, '', '?s=' + encoded + '#shader-demo');
     var self = this;
     function showConfirm() {
       self.textContent = 'Copied!';
@@ -1175,10 +1175,10 @@
     userInteracted = true;
     stopCycle();
 
-    // Strip ?s= from URL
+    // Strip ?s= from URL, keep #shader-demo so the section stays in view
     sp.delete('s');
     var newSearch = sp.toString() ? ('?' + sp.toString()) : '';
-    history.replaceState(null, '', window.location.pathname + newSearch);
+    history.replaceState(null, '', window.location.pathname + newSearch + '#shader-demo');
   }());
 
   // ── Boot ───────────────────────────────────────────────────────────────────
