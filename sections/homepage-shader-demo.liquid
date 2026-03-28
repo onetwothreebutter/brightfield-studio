@@ -651,11 +651,13 @@
       var v = values[k];
       out[k] = Array.isArray(v) ? rgbToHex(v) : v;
     });
-    return btoa(JSON.stringify(out));
+    return btoa(JSON.stringify(out)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
   function decodeState(b64) {
-    var obj = JSON.parse(atob(b64));
+    var padded = b64.replace(/-/g, '+').replace(/_/g, '/');
+    while (padded.length % 4) padded += '=';
+    var obj = JSON.parse(atob(padded));
     var result = {};
     Object.keys(obj).forEach(function (k) {
       var v = obj[k];
