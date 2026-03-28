@@ -350,6 +350,17 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   });
   window._shaderState = { values: values, textDirty: true };
 
+  // Pre-populate restore key from ?bfr= share param (set by Worker share page)
+  (function () {
+    try {
+      var bfr = new URLSearchParams(location.search).get('bfr');
+      if (bfr) {
+        localStorage.setItem('brightfield_restore', atob(bfr));
+        history.replaceState(null, '', location.pathname + '#shader');
+      }
+    } catch (e) {}
+  }());
+
   // Restore saved design if user clicked a gallery card
   (function () {
     var raw = localStorage.getItem('brightfield_restore');

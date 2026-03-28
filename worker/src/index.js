@@ -448,7 +448,13 @@ async function handleShare(request, env) {
   const desc       = escHtml('A custom ' + shaderLabel + ' design created on Brightfield Studio');
   const shareUrl   = escHtml('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/share/' + id);
   const mockupUrl  = escHtml(design.mockupUrl || '');
-  const productUrl = 'https://brightfield.studio/products/' + encodeURIComponent(design.productHandle || '');
+  const restorePayload = btoa(JSON.stringify({
+    values: design.values,
+    shader: design.shader,
+    creatorName: design.creatorName || null,
+  }));
+  const productUrl = 'https://brightfield.studio/products/' + encodeURIComponent(design.productHandle || '')
+    + '?bfr=' + encodeURIComponent(restorePayload) + '#shader';
 
   const html = `<!DOCTYPE html>
 <html lang="en">
