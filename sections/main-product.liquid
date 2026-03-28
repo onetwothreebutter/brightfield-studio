@@ -913,6 +913,106 @@ if (window.location.hash === '#shader') {
   randomizeBtn.addEventListener('click', randomizeAll);
   body.insertBefore(randomizeBtn, body.firstChild);
 
+  // Encode/decode _shaderState.values to/from base64 for URL sharing.
+  // Colors are stored as [r,g,b] float arrays; convert to hex for compactness.
+  function encodeState(values) {
+    var out = {};
+    Object.keys(values).forEach(function (k) {
+      var v = values[k];
+      out[k] = Array.isArray(v) ? toHex(v) : v;
+    });
+    return btoa(JSON.stringify(out));
+  }
+
+  function decodeState(b64) {
+    var obj = JSON.parse(atob(b64));
+    var result = {};
+    controlEls.forEach(function (item) {
+      var k = item.ctrl.key;
+      if (!(k in obj)) return;
+      result[k] = (item.ctrl.type === 'color') ? hexToRgb(obj[k]) : obj[k];
+    });
+    return result;
+  }
+
+  // Restore state from ?s= URL param (set by Copy Link button)
+  (function () {
+    var sp = new URLSearchParams(window.location.search);
+    var encoded = sp.get('s');
+    if (!encoded) return;
+    var restored;
+    try { restored = decodeState(encoded); } catch (e) { return; }
+
+    controlEls.forEach(function (item) {
+      var ctrl = item.ctrl, el = item.el, k = ctrl.key;
+      if (!(k in restored)) return;
+      var v = restored[k];
+
+      if (ctrl.type === 'range') {
+        var displayVal = ctrl.toRadians ? parseFloat((v * 180 / Math.PI).toFixed(10)) : v;
+        el.value = displayVal;
+        var display = el.parentNode.querySelector('.shader-control__value');
+        if (display) display.textContent = displayVal;
+        window._shaderState.values[k] = v;
+
+      } else if (ctrl.type === 'toggle') {
+        var isOn = v === 1;
+        el.dataset.on  = isOn ? '1' : '0';
+        el.textContent = isOn ? 'On' : 'Off';
+        el.classList.toggle('is-on', isOn);
+        window._shaderState.values[k] = v;
+
+      } else if (ctrl.type === 'color') {
+        el.value = toHex(v);  // Coloris reads el.value when it initializes
+        window._shaderState.values[k] = v;
+
+      } else {
+        // select, text
+        el.value = v;
+        window._shaderState.values[k] = v;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+
+    window._shaderState.textDirty = true;
+    applyPaletteVisibility();
+    applyTextColorVisibility();
+    applyOutlineVisibility();
+    applyWordVisibility();
+    applyPerLetterSizeVisibility();
+
+    // Strip ?s= from URL; append #shader so the shader tab auto-opens
+    sp.delete('s');
+    var newSearch = sp.toString() ? ('?' + sp.toString()) : '';
+    history.replaceState(null, '', window.location.pathname + newSearch + '#shader');
+  }());
+
+  // Copy Link button — encodes current state into ?s= URL param and copies to clipboard
+  var copyLinkBtn = document.createElement('button');
+  copyLinkBtn.type = 'button';
+  copyLinkBtn.className = 'shader-control__copy-link-btn';
+  copyLinkBtn.textContent = 'Copy Link';
+  copyLinkBtn.addEventListener('click', function () {
+    var encoded = encodeState(window._shaderState.values);
+    var url = window.location.origin + window.location.pathname + '?s=' + encoded + '#shader';
+    var self = this;
+    function showConfirm() {
+      self.textContent = 'Copied!';
+      setTimeout(function () { self.textContent = 'Copy Link'; }, 1800);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(showConfirm);
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      showConfirm();
+    }
+  });
+  randomizeBtn.insertAdjacentElement('afterend', copyLinkBtn);
+
   // Desktop popout — draggable floating panel (desktop only)
   var popoutBtn   = document.getElementById('shader-gui-popout');
   var shaderGuiEl = document.getElementById('shader-gui');
