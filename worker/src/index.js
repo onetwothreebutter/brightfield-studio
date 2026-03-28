@@ -51,6 +51,8 @@ export default {
     if (method === 'POST' && pathname === '/community/approve') return handleCommunityModerate(request, env, origin, 'approved');
     if (method === 'POST' && pathname === '/community/reject')  return handleCommunityModerate(request, env, origin, 'rejected');
 
+    if (method === 'GET'  && pathname.startsWith('/share/')) return handleShare(request, env);
+
     if (method === 'GET'  && pathname === '/admin-ui') return handleAdminUI(request, env);
 
     return new Response('Not found', { status: 404 });
@@ -417,6 +419,63 @@ async function handleCommunityModerate(request, env, origin, newStatus) {
   submission.status = newStatus;
   await writeJson(env, `community/submissions/${id}.json`, submission);
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+}
+
+// ── Share page ───────────────────────────────────────────────────────────────
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+async function handleShare(request, env) {
+  const url = new URL(request.url);
+  const id = url.pathname.slice(7); // strip leading '/share/'
+  if (!id) return Response.redirect('https://brightfield.studio', 302);
+
+  const obj = await env.MOCKUP_STAGING.get(`community/submissions/${id}.json`);
+  if (!obj) return Response.redirect('https://brightfield.studio', 302);
+
+  let design;
+  try { design = JSON.parse(await obj.text()); } catch { return Response.redirect('https://brightfield.studio', 302); }
+  if (design.status !== 'approved') return Response.redirect('https://brightfield.studio', 302);
+
+  const shaderLabel = (design.shader || '').replace(/-/g, ' ');
+  const title      = escHtml((design.creatorName || 'Anonymous') + "'s design on Brightfield Studio");
+  const desc       = escHtml('A custom ' + shaderLabel + ' design created on Brightfield Studio');
+  const shareUrl   = escHtml('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/share/' + id);
+  const mockupUrl  = escHtml(design.mockupUrl || '');
+  const productUrl = 'https://brightfield.studio/products/' + encodeURIComponent(design.productHandle || '');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+  <meta property="og:title" content="${title}" />
+  <meta property="og:description" content="${desc}" />
+  <meta property="og:image" content="${mockupUrl}" />
+  <meta property="og:url" content="${shareUrl}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Brightfield Studio" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${title}" />
+  <meta name="twitter:description" content="${desc}" />
+  <meta name="twitter:image" content="${mockupUrl}" />
+  <script>window.location.href = ${JSON.stringify(productUrl)};<\/script>
+</head>
+<body>
+  <p>Redirecting to <a href="${escHtml(productUrl)}">Brightfield Studio</a>\u2026</p>
+</body>
+</html>`;
+
+  return new Response(html, {
+    status: 200,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  });
 }
 
 // ── Shopify Admin App UI ──────────────────────────────────────────────────────

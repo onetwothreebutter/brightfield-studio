@@ -2368,6 +2368,26 @@ h6 {
 .community-designs__like-icon {
     line-height: 1;
 }
+.community-designs__share-btn {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 4px;
+    margin-left: 4px;
+    padding: 0.15rem 0.35rem;
+    font-size: 0.65rem;
+    color: var(--color-text-muted);
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition:
+        color var(--transition-fast),
+        border-color var(--transition-fast);
+}
+.community-designs__share-btn:hover {
+    color: var(--color-text);
+    border-color: var(--color-text);
+}
 
 /* Product page community strip */
 .product-community-designs {
