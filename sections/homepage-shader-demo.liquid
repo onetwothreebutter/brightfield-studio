@@ -1101,8 +1101,8 @@
   var copyLinkBtn = document.getElementById('demo-copy-link');
   copyLinkBtn.addEventListener('click', function () {
     var encoded = encodeState(window._demoState.values);
-    var url = window.location.origin + window.location.pathname + '?s=' + encoded + '#shader-demo';
-    history.replaceState(null, '', '?s=' + encoded + '#shader-demo');
+    var url = window.location.origin + window.location.pathname + '#s=' + encoded;
+    history.replaceState(null, '', '#s=' + encoded);
     var self = this;
     function showConfirm() {
       self.textContent = 'Copied!';
@@ -1120,9 +1120,9 @@
     }
   });
 
-  // ── Restore state from ?s= URL param ──────────────────────────────────────
+  // ── Restore state from #s= hash param ─────────────────────────────────────
   (function () {
-    var sp = new URLSearchParams(window.location.search);
+    var sp = new URLSearchParams(window.location.hash.slice(1));
     var encoded = sp.get('s');
     if (!encoded) return;
     var restored;
@@ -1175,10 +1175,8 @@
     userInteracted = true;
     stopCycle();
 
-    // Strip ?s= from URL, keep #shader-demo so the section stays in view
-    sp.delete('s');
-    var newSearch = sp.toString() ? ('?' + sp.toString()) : '';
-    history.replaceState(null, '', window.location.pathname + newSearch + '#shader-demo');
+    // Strip #s= from URL, keep #shader-demo so the section stays in view
+    history.replaceState(null, '', window.location.pathname + '#shader-demo');
   }());
 
   // ── Boot ───────────────────────────────────────────────────────────────────
