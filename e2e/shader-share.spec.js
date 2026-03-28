@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const PRODUCT_PATH = '/products/rise-shirt';
+const PRODUCT_PATH = '/products/dot-rise';
 
 test.describe('Shader share link', () => {
   test('Copy Link button copies a URL containing ?s= and #shader', async ({ page, context }) => {
