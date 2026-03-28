@@ -995,6 +995,7 @@ if (window.location.hash === '#shader') {
   copyLinkBtn.addEventListener('click', function () {
     var encoded = encodeState(window._shaderState.values);
     var url = window.location.origin + window.location.pathname + '?s=' + encoded + '#shader';
+    history.replaceState(null, '', '?s=' + encoded + '#shader');
     var self = this;
     function showConfirm() {
       self.textContent = 'Copied!';
