@@ -1524,7 +1524,7 @@ h6 {
 
 .shader-control {
     display: grid;
-    grid-template-columns: 5.5rem 1fr;
+    grid-template-columns: 7rem 1fr;
     align-items: center;
     gap: 0.75rem;
     padding: 0.3rem 0.75rem;
@@ -1970,26 +1970,6 @@ h6 {
     flex: 1;
 }
 
-.shader-demo__desktop-only-note,
-.shader-gui__desktop-only-note {
-    display: none;
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-    text-align: center;
-    padding: 0.5rem 0.75rem;
-    letter-spacing: 0.03em;
-}
-@media (max-width: 800px) {
-    .shader-demo__desktop-only-note {
-        display: block;
-    }
-}
-@media (max-width: 900px) {
-    .shader-gui__desktop-only-note {
-        display: block;
-    }
-}
-
 /* ── Custom scrollbar (controls panels) ─────────────────────── */
 .shader-demo__controls,
 .shader-gui {
@@ -2179,8 +2159,9 @@ h6 {
 @media (max-width: 900px) {
     /* Taller rows so fingers don't need to be pixel-precise */
     .shader-control {
+        grid-template-columns: 1fr;
         padding: 0.55rem 0.75rem;
-        gap: 0.5rem;
+        gap: 0.25rem;
     }
 
     /* Sliders: tall enough to grab comfortably; pan-y lets the panel scroll */
