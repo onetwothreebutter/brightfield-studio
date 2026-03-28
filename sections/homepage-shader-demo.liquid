@@ -1183,7 +1183,7 @@
 
   // ── Boot ───────────────────────────────────────────────────────────────────
   applyColorModeVisibility();
-  startCycle();
+  if (!userInteracted) startCycle();
 }());
 
 // ── Desktop: lock controls height to canvas height ────────────────────────────
