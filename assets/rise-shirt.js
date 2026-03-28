@@ -168,10 +168,10 @@
     '  float alpha    = mix(1.0, dotAlpha, u_transparent_bg);',
     '  vec3 finalCol  = mix(mainColor, marginColor, inMargin);',
     '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
-    '  float dist = clamp(length(dUV - 0.5) * 2.0, 0.0, 1.0);',
+    '  float distEdge = clamp(length(dUV - 0.5) * 2.0, 0.0, 1.0);',
     '  float dn = distressNoise(dUV, u_distress_scale) * 0.67',
     '           + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
-    '  alpha = alpha * step(u_distress * dist, dn) * u_opacity;',
+    '  alpha = alpha * step(u_distress * distEdge, dn) * u_opacity;',
     '  vec3 encoded   = pow(max(finalCol, 0.0), vec3(1.0 / 2.2));',
     '  fragColor      = vec4(encoded, alpha);',
     '}'
