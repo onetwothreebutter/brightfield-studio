@@ -458,7 +458,7 @@ async function handleShare(request, env) {
   <meta property="og:title" content="${title}" />
   <meta property="og:description" content="${desc}" />
   <meta property="og:image" content="${mockupUrl}" />
-  <meta property="og:url" content="${shareUrl}" />
+  <meta property="og:url" content="${escHtml(productUrl)}" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Brightfield Studio" />
   <meta name="twitter:card" content="summary_large_image" />
