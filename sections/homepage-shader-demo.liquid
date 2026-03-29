@@ -124,6 +124,30 @@
             </div>
           </div>
 
+          <!-- Cosine Preset -->
+          <div class="shader-control" id="demo-cosine-preset-row">
+            <label class="shader-control__label">Preset</label>
+            <select class="shader-control__select" id="demo-cosine-preset">
+              <option value="Rainbow">Rainbow</option>
+              <option value="Cool Blue">Cool Blue</option>
+              <option value="Neon Heat">Neon Heat</option>
+              <option value="Golden">Golden</option>
+              <option value="Retro">Retro</option>
+            </select>
+          </div>
+
+          <!-- 4-Color Preset -->
+          <div class="shader-control" id="demo-stop-preset-row" style="display:none">
+            <label class="shader-control__label">Preset</label>
+            <select class="shader-control__select" id="demo-stop-preset">
+              <option value="Neon">Neon</option>
+              <option value="Sunset">Sunset</option>
+              <option value="Aurora">Aurora</option>
+              <option value="Dusk">Dusk</option>
+              <option value="Retro 4C">Retro</option>
+            </select>
+          </div>
+
           <!-- Palette A -->
           <div class="shader-control" id="demo-palette-a-row">
             <label class="shader-control__label">Palette A</label>
@@ -492,6 +516,10 @@
   var triWidthDisp        = document.getElementById('demo-tri-width-display');
   var centerCircleEnabledBtn = document.getElementById('demo-center-circle-enabled');
   var colorModeSel        = document.getElementById('demo-color-mode');
+  var cosinePresetSel     = document.getElementById('demo-cosine-preset');
+  var cosinePresetRow     = document.getElementById('demo-cosine-preset-row');
+  var stopPresetSel       = document.getElementById('demo-stop-preset');
+  var stopPresetRow       = document.getElementById('demo-stop-preset-row');
   var cosineHelpBtn       = document.getElementById('demo-cosine-help');
   var cosineModal         = document.getElementById('demo-cosine-modal');
   var cosineBackdrop      = document.getElementById('demo-cosine-backdrop');
@@ -579,6 +607,8 @@
       applyColorModeVisibility();
     }
     presetSel.value = name;
+    if (p.mode === 0 && cosinePresetSel) cosinePresetSel.value = name;
+    if (p.mode === 1 && stopPresetSel)   stopPresetSel.value   = name;
     window._demoState.dirty = true;
   }
 
@@ -670,6 +700,8 @@
     var is4Color = colorModeSel && colorModeSel.value === '1';
     paletteRows.forEach(function (r) { if (r) r.style.display = is4Color ? 'none' : 'grid'; });
     stopRows.forEach(function (r)    { if (r) r.style.display = is4Color ? 'grid' : 'none'; });
+    if (cosinePresetRow) cosinePresetRow.style.display = is4Color ? 'none' : 'grid';
+    if (stopPresetRow)   stopPresetRow.style.display   = is4Color ? 'grid' : 'none';
   }
 
   function onUserInteract() {
@@ -770,6 +802,16 @@
     window._demoState.values.u_color_mode = parseInt(this.value, 10);
     applyColorModeVisibility();
     window._demoState.dirty = true;
+  });
+
+  if (cosinePresetSel) cosinePresetSel.addEventListener('change', function () {
+    onUserInteract();
+    applyPreset(this.value);
+  });
+
+  if (stopPresetSel) stopPresetSel.addEventListener('change', function () {
+    onUserInteract();
+    applyPreset(this.value);
   });
 
   paletteAInput.addEventListener('input', function () {
