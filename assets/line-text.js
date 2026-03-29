@@ -143,10 +143,16 @@
       octx.fillText(txt, size / 2, cy);
 
       // Blurred pass first — creates smooth falloff at glyph edges (rounded line caps)
+      // shadowBlur offset trick: draw off-screen so only the blurred shadow lands on ctx.
+      // Works cross-browser (ctx.filter is unsupported in Safari).
       if (capRadius > 0) {
-        ctx.filter = 'blur(' + capRadius + 'px)';
-        ctx.drawImage(off, 0, 0);
-        ctx.filter = 'none';
+        ctx.shadowColor    = 'white';
+        ctx.shadowBlur     = capRadius;
+        ctx.shadowOffsetX  = size;
+        ctx.drawImage(off, -size, 0);
+        ctx.shadowOffsetX  = 0;
+        ctx.shadowBlur     = 0;
+        ctx.shadowColor    = 'transparent';
       }
 
       // Hard pass on top — keeps interior fully solid
