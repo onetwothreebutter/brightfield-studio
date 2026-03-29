@@ -22,17 +22,43 @@
     'uniform float u_text_y;',
     'uniform float u_vignette_x;',
     'uniform float u_vignette_y;',
+    'uniform float u_cap_radius;',
     'out vec4 fragColor;',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
     '  return a + b * cos(6.28318 * (c * t + d));',
     '}',
     '',
+    '// Gaussian-weighted 5x5 blur of the text texture, done in GLSL for',
+    '// cross-browser consistency (canvas blur APIs differ across browsers).',
+    '// u_cap_radius is in texture pixels; step = capRadius/2 px, sigma = 2 steps.',
+    'float blurredTextSample(vec2 uv) {',
+    '  float hard = texture(u_text_texture, uv).r;',
+    '  if (u_cap_radius <= 0.0) return hard;',
+    '  float texelSize = 1.0 / float(textureSize(u_text_texture, 0).x);',
+    '  float uvStep    = u_cap_radius * 0.5 * texelSize;',
+    '  float sigma     = 2.0;',
+    '  float sum = 0.0;',
+    '  float totalWeight = 0.0;',
+    '  for (int i = -2; i <= 2; i++) {',
+    '    for (int j = -2; j <= 2; j++) {',
+    '      float fi = float(i);',
+    '      float fj = float(j);',
+    '      float w  = exp(-0.5 * (fi * fi + fj * fj) / (sigma * sigma));',
+    '      sum         += texture(u_text_texture, uv + vec2(fi, fj) * uvStep).r * w;',
+    '      totalWeight += w;',
+    '    }',
+    '  }',
+    '  float blurred = sum / totalWeight;',
+    '  // max with hard sample keeps the interior of letters at 1.0',
+    '  return max(hard, blurred);',
+    '}',
+    '',
     'void main() {',
     '  vec2 uv = gl_FragCoord.xy / u_resolution;',
     '',
-    '  // R channel = text mask (0..1); blur in drawText creates soft cap falloff',
-    '  float textSample = texture(u_text_texture, uv).r;',
+    '  // R channel = text mask (0..1); blur in blurredTextSample creates soft cap falloff',
+    '  float textSample = blurredTextSample(uv);',
     '',
     '  float rowY      = fract(uv.y * u_rows);',
     '  float distCenter = abs(rowY - 0.5);',
@@ -90,6 +116,7 @@
         textY:         gl.getUniformLocation(program, 'u_text_y'),
         vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
         vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
+        capRadius:     gl.getUniformLocation(program, 'u_cap_radius'),
       };
     },
 
@@ -110,6 +137,7 @@
       gl.uniform1f(u.textY,         v.textY != null ? v.textY : 0.5);
       gl.uniform1f(u.vignetteX,     v.u_vignette_x != null ? v.u_vignette_x : 2.0);
       gl.uniform1f(u.vignetteY,     v.u_vignette_y != null ? v.u_vignette_y : 2.0);
+      gl.uniform1f(u.capRadius,     v.textCapRadius != null ? v.textCapRadius : 20.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);
@@ -125,42 +153,20 @@
 
       var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"Montserrat"';
       var fontSize   = v.textFontSize != null ? v.textFontSize : 202;
-      var capRadius  = v.textCapRadius != null ? v.textCapRadius : 20;
 
-      // Draw white text on offscreen canvas so blur compositing is clean
-      var off = document.createElement('canvas');
-      off.width  = size;
-      off.height = size;
-      var octx = off.getContext('2d');
-      octx.font         = 'bold ' + fontSize + 'px ' + fontFamily + ', sans-serif';
-      octx.textAlign    = 'center';
-      octx.textBaseline = 'middle';
-      octx.fillStyle    = 'white';
+      // Hard white text on black — blur is applied in the fragment shader
+      ctx.font         = 'bold ' + fontSize + 'px ' + fontFamily + ', sans-serif';
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle    = 'white';
       // Canvas Y=0 is top; UNPACK_FLIP_Y maps canvas top → UV bottom.
       // textY=0.5 (center) → canvas y = (1-0.5)*size = size/2.
       var ty = v.textY != null ? v.textY : 0.5;
-      var cy = (1 - ty) * size;
-      octx.fillText(txt, size / 2, cy);
-
-      // Blurred pass first — creates smooth falloff at glyph edges (rounded line caps)
-      // shadowBlur offset trick: draw off-screen so only the blurred shadow lands on ctx.
-      // Works cross-browser (ctx.filter is unsupported in Safari).
-      if (capRadius > 0) {
-        ctx.shadowColor    = 'white';
-        ctx.shadowBlur     = capRadius;
-        ctx.shadowOffsetX  = size;
-        ctx.drawImage(off, -size, 0);
-        ctx.shadowOffsetX  = 0;
-        ctx.shadowBlur     = 0;
-        ctx.shadowColor    = 'transparent';
-      }
-
-      // Hard pass on top — keeps interior fully solid
-      ctx.drawImage(off, 0, 0);
+      ctx.fillText(txt, size / 2, (1 - ty) * size);
     },
 
     textKey: function (v) {
-      return JSON.stringify([v.text, v.textFont, v.textFontSize, v.textCapRadius, v.textY]);
+      return JSON.stringify([v.text, v.textFont, v.textFontSize, v.textY]);
     },
   });
 }());
