@@ -1,6 +1,8 @@
 (function () {
   'use strict';
 
+  console.log('[line-text] loaded 2026-03-29T21:00Z');
+
   // LineText port — faithful to the Three.js TSL original
   var fragSrc = [
     '#version 300 es',
