@@ -42,9 +42,8 @@ test.describe('Shader share link', () => {
     // Shader tab auto-opens via #share= hash
     await expect(page.locator('.media-tab[data-tab="shader"]')).toHaveClass(/is-active/, { timeout: 5000 });
 
-    // Control value matches the restored state
-    const restoredValue = await page.locator('[data-param-key="u_rows"]').inputValue();
-    expect(restoredValue).toBe(String(mockState.u_rows));
+    // Control value matches the restored state (wait for async fetch to apply)
+    await expect(page.locator('[data-param-key="u_rows"]')).toHaveValue(String(mockState.u_rows), { timeout: 5000 });
 
     // #share= is replaced with #shader after restore
     expect(page.url()).not.toContain('#share=');
