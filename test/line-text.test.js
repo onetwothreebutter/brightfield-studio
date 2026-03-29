@@ -187,40 +187,24 @@ describe('line-text.js', () => {
     const ctx = makeCanvasCtxMock();
     opts.drawText(ctx, 1024, { text: 'HI', textFont: 'Montserrat', textFontSize: 600, textCapRadius: 0 });
     expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 1024, 1024);
-    expect(ctx.fillStyle).toBe('#000000');
   });
 
-  it('drawText() draws text when text value is non-empty', () => {
+  it('drawText() calls fillText when text value is non-empty', () => {
     const ctx = makeCanvasCtxMock();
-    opts.drawText(ctx, 1024, { text: 'HELLO', textFont: 'Montserrat', textFontSize: 600, textCapRadius: 0 });
-    // drawImage copies from offscreen canvas
-    expect(ctx.drawImage).toHaveBeenCalled();
+    opts.drawText(ctx, 1024, { text: 'HELLO', textFont: 'Montserrat', textFontSize: 600 });
+    expect(ctx.fillText).toHaveBeenCalled();
   });
 
-  it('drawText() does not call drawImage when text is empty', () => {
+  it('drawText() does not call fillText when text is empty', () => {
     const ctx = makeCanvasCtxMock();
-    opts.drawText(ctx, 1024, { text: '', textFont: 'Montserrat', textFontSize: 600, textCapRadius: 0 });
-    expect(ctx.drawImage).not.toHaveBeenCalled();
+    opts.drawText(ctx, 1024, { text: '', textFont: 'Montserrat', textFontSize: 600 });
+    expect(ctx.fillText).not.toHaveBeenCalled();
   });
 
-  it('drawText() applies blur filter when capRadius > 0', () => {
+  it('drawText() does not use canvas blur APIs (blur is in GLSL)', () => {
     const ctx = makeCanvasCtxMock();
     opts.drawText(ctx, 1024, { text: 'HI', textFont: 'Montserrat', textFontSize: 300, textCapRadius: 20 });
-    // With blur: drawImage called twice (blurred + hard)
-    expect(ctx.drawImage).toHaveBeenCalledTimes(2);
-  });
-
-  it('drawText() calls drawImage only once when capRadius = 0', () => {
-    const ctx = makeCanvasCtxMock();
-    opts.drawText(ctx, 1024, { text: 'HI', textFont: 'Montserrat', textFontSize: 300, textCapRadius: 0 });
-    // No blur: drawImage called once (hard pass only)
-    expect(ctx.drawImage).toHaveBeenCalledTimes(1);
-  });
-
-  it('drawText() resets filter to none after blur pass', () => {
-    const ctx = makeCanvasCtxMock();
-    opts.drawText(ctx, 1024, { text: 'HI', textFont: 'Montserrat', textFontSize: 300, textCapRadius: 10 });
-    expect(ctx.filter).toBe('none');
+    expect(ctx.drawImage).not.toHaveBeenCalled();
   });
 
   // ── textKey() ────────────────────────────────────────────────────────────
@@ -247,10 +231,10 @@ describe('line-text.js', () => {
     expect(k1).not.toBe(k2);
   });
 
-  it('textKey() changes when capRadius changes', () => {
+  it('textKey() is unaffected by capRadius (blur is a shader uniform, not baked into texture)', () => {
     const k1 = opts.textKey({ text: 'HI', textCapRadius: 0 });
     const k2 = opts.textKey({ text: 'HI', textCapRadius: 20 });
-    expect(k1).not.toBe(k2);
+    expect(k1).toBe(k2);
   });
 
   it('textKey() changes when textY changes', () => {
