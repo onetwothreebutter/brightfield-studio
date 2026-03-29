@@ -1021,58 +1021,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     }
   }());
 
-  // Copy Link button — saves state to worker and copies short #share= URL
-  var copyLinkBtn = document.createElement('button');
-  copyLinkBtn.type = 'button';
-  copyLinkBtn.className = 'shader-control__copy-link-btn';
-  copyLinkBtn.textContent = 'Copy Link';
-  copyLinkBtn.addEventListener('click', function () {
-    var self = this;
-    self.textContent = 'Saving\u2026';
-    self.disabled = true;
-
-    var fetchPromise = fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/save-shader-state', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ state: window._shaderState.values }),
-    })
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      var url = window.location.origin + window.location.pathname + '#share=' + data.id;
-      history.replaceState(null, '', '#share=' + data.id);
-      return url;
-    });
-
-    function onSuccess() {
-      self.textContent = 'Copied!';
-      self.disabled = false;
-      setTimeout(function () { self.textContent = 'Copy Link'; }, 1800);
-    }
-    function onError() {
-      self.textContent = 'Failed';
-      self.disabled = false;
-      setTimeout(function () { self.textContent = 'Copy Link'; }, 1800);
-    }
-
-    if (navigator.clipboard && window.ClipboardItem) {
-      navigator.clipboard.write([
-        new ClipboardItem({
-          'text/plain': fetchPromise.then(function (url) { return new Blob([url], { type: 'text/plain' }); })
-        })
-      ]).then(onSuccess).catch(onError);
-    } else {
-      fetchPromise.then(function (url) {
-        var ta = document.createElement('textarea');
-        ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
-        document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); } catch (e) {}
-        document.body.removeChild(ta);
-        onSuccess();
-      }).catch(onError);
-    }
-  });
-  randomizeBtn.insertAdjacentElement('afterend', copyLinkBtn);
-
   // Share button — captures canvas as JPEG, uploads image + state, copies share.brightfield.studio URL
   var shareBtn = document.createElement('button');
   shareBtn.type = 'button';
@@ -1087,8 +1035,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     catch (e) { alert('Could not capture canvas: ' + e.message); return; }
     self.textContent = 'Generating\u2026';
     self.disabled = true;
-
-    var fetchPromise = fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/create-share', {
+    fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/create-share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1101,38 +1048,26 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     .then(function (r) { return r.json(); })
     .then(function (data) {
       if (!data.url) throw new Error(data.error || 'No URL');
-      return data.url;
-    });
-
-    function onSuccess() {
-      self.textContent = 'Copied!';
-      self.disabled = false;
-      setTimeout(function () { self.textContent = 'Share'; }, 1800);
-    }
-    function onError() {
+      var shareUrl = data.url;
+      function showConfirm() {
+        self.textContent = 'Copied!';
+        self.disabled = false;
+        setTimeout(function () { self.textContent = 'Share'; }, 1800);
+      }
+      var ta = document.createElement('textarea');
+      ta.value = shareUrl; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      showConfirm();
+    })
+    .catch(function () {
       self.textContent = 'Failed';
       self.disabled = false;
       setTimeout(function () { self.textContent = 'Share'; }, 1800);
-    }
-
-    if (navigator.clipboard && window.ClipboardItem) {
-      navigator.clipboard.write([
-        new ClipboardItem({
-          'text/plain': fetchPromise.then(function (url) { return new Blob([url], { type: 'text/plain' }); })
-        })
-      ]).then(onSuccess).catch(onError);
-    } else {
-      fetchPromise.then(function (url) {
-        var ta = document.createElement('textarea');
-        ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
-        document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); } catch (e) {}
-        document.body.removeChild(ta);
-        onSuccess();
-      }).catch(onError);
-    }
+    });
   });
-  copyLinkBtn.insertAdjacentElement('afterend', shareBtn);
+  randomizeBtn.insertAdjacentElement('afterend', shareBtn);
 
   // Desktop popout — draggable floating panel (desktop only)
   var popoutBtn   = document.getElementById('shader-gui-popout');
