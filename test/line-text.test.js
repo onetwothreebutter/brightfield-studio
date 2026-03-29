@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { make2DContextMock } from './helpers/webgl-mock.js';
+import { make2DContextMock, makeWebGLMock } from './helpers/webgl-mock.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const src = readFileSync(join(__dirname, '../assets/line-text.js'), 'utf8');
@@ -24,27 +24,6 @@ function mockDocumentCreateCanvas() {
     if (tag === 'canvas') return makeCanvasCtxMock().canvas;
     return origCreateElement(tag);
   });
-}
-
-// GL mock for setup()
-function makeSetupGl() {
-  return {
-    getUniformLocation: vi.fn((_p, name) => ({ _loc: name })),
-  };
-}
-
-// GL mock for render()
-function makeRenderGl() {
-  return {
-    TEXTURE0:   33984,
-    TEXTURE_2D: 3553,
-    uniform1f:    vi.fn(),
-    uniform2f:    vi.fn(),
-    uniform1i:    vi.fn(),
-    uniform3fv:   vi.fn(),
-    activeTexture: vi.fn(),
-    bindTexture:   vi.fn(),
-  };
 }
 
 describe('line-text.js', () => {
@@ -95,10 +74,16 @@ describe('line-text.js', () => {
     expect(frag).toContain('1.0 / 2.2');
   });
 
+  it('fragSrc does not use texture() inside a for loop (avoids Safari GLSL bug)', () => {
+    const frag = Array.isArray(opts.fragSrc) ? opts.fragSrc.join('\n') : opts.fragSrc;
+    // There should be no for-loop in the fragment shader
+    expect(frag).not.toContain('for (');
+  });
+
   // ── setup() ───────────────────────────────────────────────────────────────
 
   it('setup() returns an object with all required uniform keys', () => {
-    const gl = makeSetupGl();
+    const gl = makeWebGLMock();
     const uniforms = opts.setup(gl, {});
     ['res', 'rows', 'baseThickness', 'textThickness', 'textY', 'vignetteX', 'vignetteY',
      'palA', 'palB', 'palC', 'palD',
@@ -108,8 +93,18 @@ describe('line-text.js', () => {
     });
   });
 
+  it('setup() returns _mainProg and _blur for WebGL framebuffer blur', () => {
+    const gl = makeWebGLMock();
+    const uniforms = opts.setup(gl, {});
+    expect(uniforms).toHaveProperty('_mainProg');
+    expect(uniforms).toHaveProperty('_blur');
+    expect(uniforms._blur).toHaveProperty('prog');
+    expect(uniforms._blur).toHaveProperty('hPass');
+    expect(uniforms._blur).toHaveProperty('vPass');
+  });
+
   it('every uniform key accessed by render() exists in the setup() return value', () => {
-    const uniforms = opts.setup(makeSetupGl(), {});
+    const uniforms = opts.setup(makeWebGLMock(), {});
 
     const accessed = new Set();
     const proxy = new Proxy(uniforms, {
@@ -119,7 +114,7 @@ describe('line-text.js', () => {
       },
     });
 
-    opts.render(makeRenderGl(), proxy, {}, 500, 500, 0, {});
+    opts.render(makeWebGLMock(), proxy, {}, 500, 500, 0, {});
 
     accessed.forEach((key) => {
       expect(uniforms, `render() accessed "u.${key}" but setup() didn't return it`).toHaveProperty(key);
@@ -129,8 +124,8 @@ describe('line-text.js', () => {
   // ── render() ──────────────────────────────────────────────────────────────
 
   it('render() sets u_resolution to canvas dimensions', () => {
-    const uniforms = opts.setup(makeSetupGl(), {});
-    const renderGl = makeRenderGl();
+    const uniforms = opts.setup(makeWebGLMock(), {});
+    const renderGl = makeWebGLMock();
     opts.render(renderGl, uniforms, {}, 400, 600, 0, {});
     const call = renderGl.uniform2f.mock.calls.find(([loc]) => loc === uniforms.res);
     expect(call).toBeDefined();
@@ -139,8 +134,8 @@ describe('line-text.js', () => {
   });
 
   it('render() uses default values when values object is empty', () => {
-    const uniforms = opts.setup(makeSetupGl(), {});
-    const renderGl = makeRenderGl();
+    const uniforms = opts.setup(makeWebGLMock(), {});
+    const renderGl = makeWebGLMock();
     opts.render(renderGl, uniforms, {}, 500, 500, 0, {});
 
     function find1f(loc) {
@@ -155,8 +150,8 @@ describe('line-text.js', () => {
   });
 
   it('render() passes supplied values to uniforms', () => {
-    const uniforms = opts.setup(makeSetupGl(), {});
-    const renderGl = makeRenderGl();
+    const uniforms = opts.setup(makeWebGLMock(), {});
+    const renderGl = makeWebGLMock();
     opts.render(renderGl, uniforms, { u_rows: 120, u_base_thickness: 0.05, u_text_thickness: 0.3 }, 500, 500, 0, {});
 
     function find1f(loc) {
@@ -168,8 +163,8 @@ describe('line-text.js', () => {
   });
 
   it('render() binds text texture to TEXTURE0', () => {
-    const uniforms = opts.setup(makeSetupGl(), {});
-    const renderGl = makeRenderGl();
+    const uniforms = opts.setup(makeWebGLMock(), {});
+    const renderGl = makeWebGLMock();
     const mockTex = { id: 'tex' };
     opts.render(renderGl, uniforms, {}, 500, 500, 0, mockTex);
 
@@ -179,6 +174,46 @@ describe('line-text.js', () => {
     const samplerCall = renderGl.uniform1i.mock.calls.find(([loc]) => loc === uniforms.textTex);
     expect(samplerCall).toBeDefined();
     expect(samplerCall[1]).toBe(0);
+  });
+
+  it('render() runs blur passes when capRadius > 0', () => {
+    const uniforms = opts.setup(makeWebGLMock(), {});
+    const renderGl = makeWebGLMock();
+    opts.render(renderGl, uniforms, { textCapRadius: 20 }, 500, 500, 0, {});
+
+    // Should have switched to blur program and back
+    expect(renderGl.useProgram).toHaveBeenCalledWith(uniforms._blur.prog);
+    expect(renderGl.useProgram).toHaveBeenCalledWith(uniforms._mainProg);
+    // Should have bound both FBOs
+    expect(renderGl.bindFramebuffer).toHaveBeenCalledWith(renderGl.FRAMEBUFFER, uniforms._blur.hPass.fbo);
+    expect(renderGl.bindFramebuffer).toHaveBeenCalledWith(renderGl.FRAMEBUFFER, uniforms._blur.vPass.fbo);
+    // Should have restored default framebuffer
+    expect(renderGl.bindFramebuffer).toHaveBeenCalledWith(renderGl.FRAMEBUFFER, null);
+  });
+
+  it('render() skips blur passes when capRadius is 0', () => {
+    const uniforms = opts.setup(makeWebGLMock(), {});
+    const renderGl = makeWebGLMock();
+    opts.render(renderGl, uniforms, { textCapRadius: 0 }, 500, 500, 0, {});
+
+    // Blur program should never be activated
+    expect(renderGl.useProgram).not.toHaveBeenCalledWith(uniforms._blur.prog);
+    expect(renderGl.bindFramebuffer).not.toHaveBeenCalled();
+  });
+
+  it('render() does not re-run blur passes when blurKey is unchanged', () => {
+    const uniforms = opts.setup(makeWebGLMock(), {});
+    const renderGl = makeWebGLMock();
+    const v = { text: 'HI', textCapRadius: 20 };
+
+    opts.render(renderGl, uniforms, v, 500, 500, 0, {});
+    const firstDrawCount = renderGl.drawArrays.mock.calls.length;
+
+    opts.render(renderGl, uniforms, v, 500, 500, 1, {});
+    const secondDrawCount = renderGl.drawArrays.mock.calls.length;
+
+    // Second call should not add new drawArrays calls from blur passes
+    expect(secondDrawCount).toBe(firstDrawCount);
   });
 
   // ── drawText() ────────────────────────────────────────────────────────────
@@ -201,7 +236,7 @@ describe('line-text.js', () => {
     expect(ctx.fillText).not.toHaveBeenCalled();
   });
 
-  it('drawText() does not use canvas blur APIs (blur is in GLSL)', () => {
+  it('drawText() does not use canvas blur APIs (blur is in WebGL)', () => {
     const ctx = makeCanvasCtxMock();
     opts.drawText(ctx, 1024, { text: 'HI', textFont: 'Montserrat', textFontSize: 300, textCapRadius: 20 });
     expect(ctx.drawImage).not.toHaveBeenCalled();
@@ -231,7 +266,7 @@ describe('line-text.js', () => {
     expect(k1).not.toBe(k2);
   });
 
-  it('textKey() is unaffected by capRadius (blur is a shader uniform, not baked into texture)', () => {
+  it('textKey() is unaffected by capRadius (blur is a WebGL pass, not baked into texture)', () => {
     const k1 = opts.textKey({ text: 'HI', textCapRadius: 0 });
     const k2 = opts.textKey({ text: 'HI', textCapRadius: 20 });
     expect(k1).toBe(k2);

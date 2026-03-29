@@ -58,6 +58,11 @@ export function makeWebGLMock() {
     pixelStorei:             vi.fn(),
     viewport:                vi.fn(),
     drawArrays:              vi.fn(),
+    FRAMEBUFFER:             36160,
+    COLOR_ATTACHMENT0:       36064,
+    createFramebuffer:       vi.fn(() => ({})),
+    bindFramebuffer:         vi.fn(),
+    framebufferTexture2D:    vi.fn(),
   };
 }
 
