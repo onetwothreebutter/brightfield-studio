@@ -1062,6 +1062,58 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   });
   randomizeBtn.insertAdjacentElement('afterend', copyLinkBtn);
 
+  // Share button — captures canvas as JPEG, uploads image + state, copies share.brightfield.studio URL
+  var shareBtn = document.createElement('button');
+  shareBtn.type = 'button';
+  shareBtn.className = 'shader-control__share-btn';
+  shareBtn.textContent = 'Share';
+  shareBtn.addEventListener('click', function () {
+    var self = this;
+    var canvas = document.getElementById('shader-canvas');
+    if (!canvas) return;
+    var base64jpeg;
+    try { base64jpeg = canvas.toDataURL('image/jpeg', 0.9).split(',')[1]; }
+    catch (e) { alert('Could not capture canvas: ' + e.message); return; }
+    self.textContent = 'Generating\u2026';
+    self.disabled = true;
+    fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/create-share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image:         base64jpeg,
+        shader:        '{{ shader_file }}',
+        productHandle: '{{ product.handle }}',
+        values:        window._shaderState ? window._shaderState.values : {},
+      }),
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.url) throw new Error(data.error || 'No URL');
+      var shareUrl = data.url;
+      function showConfirm() {
+        self.textContent = 'Copied!';
+        self.disabled = false;
+        setTimeout(function () { self.textContent = 'Share'; }, 1800);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).then(showConfirm);
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = shareUrl; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+        showConfirm();
+      }
+    })
+    .catch(function () {
+      self.textContent = 'Failed';
+      self.disabled = false;
+      setTimeout(function () { self.textContent = 'Share'; }, 1800);
+    });
+  });
+  copyLinkBtn.insertAdjacentElement('afterend', shareBtn);
+
   // Desktop popout — draggable floating panel (desktop only)
   var popoutBtn   = document.getElementById('shader-gui-popout');
   var shaderGuiEl = document.getElementById('shader-gui');
