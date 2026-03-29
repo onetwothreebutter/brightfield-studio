@@ -1030,7 +1030,8 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     var self = this;
     self.textContent = 'Saving\u2026';
     self.disabled = true;
-    fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/save-shader-state', {
+
+    var fetchPromise = fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/save-shader-state', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state: window._shaderState.values }),
@@ -1039,22 +1040,36 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     .then(function (data) {
       var url = window.location.origin + window.location.pathname + '#share=' + data.id;
       history.replaceState(null, '', '#share=' + data.id);
-      function showConfirm() {
-        self.textContent = 'Copied!';
-        self.disabled = false;
-        setTimeout(function () { self.textContent = 'Copy Link'; }, 1800);
-      }
-      var ta = document.createElement('textarea');
-      ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); } catch (e) {}
-      document.body.removeChild(ta);
-      showConfirm();
-    })
-    .catch(function () {
-      self.textContent = 'Failed';
-      setTimeout(function () { self.textContent = 'Copy Link'; self.disabled = false; }, 1800);
+      return url;
     });
+
+    function onSuccess() {
+      self.textContent = 'Copied!';
+      self.disabled = false;
+      setTimeout(function () { self.textContent = 'Copy Link'; }, 1800);
+    }
+    function onError() {
+      self.textContent = 'Failed';
+      self.disabled = false;
+      setTimeout(function () { self.textContent = 'Copy Link'; }, 1800);
+    }
+
+    if (navigator.clipboard && window.ClipboardItem) {
+      navigator.clipboard.write([
+        new ClipboardItem({
+          'text/plain': fetchPromise.then(function (url) { return new Blob([url], { type: 'text/plain' }); })
+        })
+      ]).then(onSuccess).catch(onError);
+    } else {
+      fetchPromise.then(function (url) {
+        var ta = document.createElement('textarea');
+        ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+        onSuccess();
+      }).catch(onError);
+    }
   });
   randomizeBtn.insertAdjacentElement('afterend', copyLinkBtn);
 
@@ -1072,7 +1087,8 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     catch (e) { alert('Could not capture canvas: ' + e.message); return; }
     self.textContent = 'Generating\u2026';
     self.disabled = true;
-    fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/create-share', {
+
+    var fetchPromise = fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/create-share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1085,24 +1101,36 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     .then(function (r) { return r.json(); })
     .then(function (data) {
       if (!data.url) throw new Error(data.error || 'No URL');
-      var shareUrl = data.url;
-      function showConfirm() {
-        self.textContent = 'Copied!';
-        self.disabled = false;
-        setTimeout(function () { self.textContent = 'Share'; }, 1800);
-      }
-      var ta = document.createElement('textarea');
-      ta.value = shareUrl; ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); } catch (e) {}
-      document.body.removeChild(ta);
-      showConfirm();
-    })
-    .catch(function () {
+      return data.url;
+    });
+
+    function onSuccess() {
+      self.textContent = 'Copied!';
+      self.disabled = false;
+      setTimeout(function () { self.textContent = 'Share'; }, 1800);
+    }
+    function onError() {
       self.textContent = 'Failed';
       self.disabled = false;
       setTimeout(function () { self.textContent = 'Share'; }, 1800);
-    });
+    }
+
+    if (navigator.clipboard && window.ClipboardItem) {
+      navigator.clipboard.write([
+        new ClipboardItem({
+          'text/plain': fetchPromise.then(function (url) { return new Blob([url], { type: 'text/plain' }); })
+        })
+      ]).then(onSuccess).catch(onError);
+    } else {
+      fetchPromise.then(function (url) {
+        var ta = document.createElement('textarea');
+        ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+        onSuccess();
+      }).catch(onError);
+    }
   });
   copyLinkBtn.insertAdjacentElement('afterend', shareBtn);
 
