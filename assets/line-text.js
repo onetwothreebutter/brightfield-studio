@@ -25,6 +25,7 @@
     'uniform float u_vignette_x;',
     'uniform float u_vignette_y;',
     'uniform float u_cap_radius;',
+    'uniform float u_text_tex_size;',
     'out vec4 fragColor;',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
@@ -37,7 +38,7 @@
     'float blurredTextSample(vec2 uv) {',
     '  float hard = texture(u_text_texture, uv).r;',
     '  if (u_cap_radius <= 0.0) return hard;',
-    '  float texelSize = 1.0 / float(textureSize(u_text_texture, 0).x);',
+    '  float texelSize = 1.0 / u_text_tex_size;',
     '  float uvStep    = u_cap_radius * 0.5 * texelSize;',
     '  float sigma     = 2.0;',
     '  float sum = 0.0;',
@@ -119,6 +120,7 @@
         vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
         vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
         capRadius:     gl.getUniformLocation(program, 'u_cap_radius'),
+        texSize:       gl.getUniformLocation(program, 'u_text_tex_size'),
       };
     },
 
@@ -140,6 +142,7 @@
       gl.uniform1f(u.vignetteX,     v.u_vignette_x != null ? v.u_vignette_x : 2.0);
       gl.uniform1f(u.vignetteY,     v.u_vignette_y != null ? v.u_vignette_y : 2.0);
       gl.uniform1f(u.capRadius,     v.textCapRadius != null ? v.textCapRadius : 20.0);
+      gl.uniform1f(u.texSize,       1024.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);
