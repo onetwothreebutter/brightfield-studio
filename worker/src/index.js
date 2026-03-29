@@ -53,6 +53,7 @@ export default {
 
     if (method === 'POST' && pathname === '/save-shader-state')           return handleSaveShaderState(request, env, origin);
     if (method === 'GET'  && pathname.startsWith('/get-shader-state/'))   return handleGetShaderState(request, env, origin);
+    if (method === 'POST' && pathname === '/create-share')                return handleCreateShare(request, env, origin);
 
     // Custom domain: share.brightfield.studio/{id}
     if (method === 'GET' && url.hostname === 'share.brightfield.studio') return handleShare(request, env, pathname.slice(1));
@@ -437,9 +438,53 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+function buildShareHtml(title, desc, shareUrl, imageUrl, productUrl) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+  <meta property="og:title" content="${title}" />
+  <meta property="og:description" content="${desc}" />
+  <meta property="og:image" content="${imageUrl}" />
+  <meta property="og:url" content="${shareUrl}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Brightfield Studio" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${title}" />
+  <meta name="twitter:description" content="${desc}" />
+  <meta name="twitter:image" content="${imageUrl}" />
+  <script>window.location.href = ${JSON.stringify(productUrl)};<\/script>
+</head>
+<body>
+  <p>Redirecting to <a href="${escHtml(productUrl)}">Brightfield Studio</a>\u2026</p>
+</body>
+</html>`;
+}
+
 async function handleShare(request, env, id) {
   if (!id) return Response.redirect('https://brightfield.studio', 302);
 
+  // Direct share (from Share button — image uploaded to shares/{id}.jpg)
+  const shareObj = await env.MOCKUP_STAGING.get(`shares/${id}.json`);
+  if (shareObj) {
+    let meta;
+    try { meta = JSON.parse(await shareObj.text()); }
+    catch { return Response.redirect('https://brightfield.studio', 302); }
+    const shaderLabel = (meta.shader || '').replace(/-/g, ' ');
+    const title    = escHtml('A custom ' + shaderLabel + ' design from Brightfield Studio');
+    const desc     = escHtml('Customize your own design at Brightfield Studio');
+    const shareUrl = escHtml('https://share.brightfield.studio/' + id);
+    const imageUrl = escHtml(meta.imageUrl || '');
+    const restorePayload = btoa(JSON.stringify({ values: meta.values, shader: meta.shader }));
+    const productUrl = 'https://brightfield.studio/products/' + encodeURIComponent(meta.productHandle || '')
+      + '?bfr=' + encodeURIComponent(restorePayload) + '#shader';
+    return new Response(buildShareHtml(title, desc, shareUrl, imageUrl, productUrl), {
+      status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
+  }
+
+  // Community submission (existing path)
   const obj = await env.MOCKUP_STAGING.get(`community/submissions/${id}.json`);
   if (!obj) return Response.redirect('https://brightfield.studio', 302);
 
@@ -460,29 +505,7 @@ async function handleShare(request, env, id) {
   const productUrl = 'https://brightfield.studio/products/' + encodeURIComponent(design.productHandle || '')
     + '?bfr=' + encodeURIComponent(restorePayload) + '#shader';
 
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>${title}</title>
-  <meta property="og:title" content="${title}" />
-  <meta property="og:description" content="${desc}" />
-  <meta property="og:image" content="${mockupUrl}" />
-  <meta property="og:url" content="${escHtml(productUrl)}" />
-  <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Brightfield Studio" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="${title}" />
-  <meta name="twitter:description" content="${desc}" />
-  <meta name="twitter:image" content="${mockupUrl}" />
-  <script>window.location.href = ${JSON.stringify(productUrl)};<\/script>
-</head>
-<body>
-  <p>Redirecting to <a href="${escHtml(productUrl)}">Brightfield Studio</a>\u2026</p>
-</body>
-</html>`;
-
-  return new Response(html, {
+  return new Response(buildShareHtml(title, desc, shareUrl, mockupUrl, productUrl), {
     status: 200,
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
   });
@@ -685,6 +708,36 @@ async function handleGetShaderState(request, env, origin) {
   if (!obj) return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers });
   const text = await obj.text();
   return new Response(text, { status: 200, headers });
+}
+
+async function handleCreateShare(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+  let body;
+  try { body = await request.json(); } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
+  }
+  const { image, shader, productHandle, values } = body;
+  if (!image || !productHandle) {
+    return new Response(JSON.stringify({ error: 'Missing image or productHandle' }), { status: 400, headers });
+  }
+  const id       = crypto.randomUUID();
+  const imageKey = `shares/${id}.jpg`;
+  const metaKey  = `shares/${id}.json`;
+  const imageData = Uint8Array.from(atob(image), c => c.charCodeAt(0));
+  await env.MOCKUP_STAGING.put(imageKey, imageData, { httpMetadata: { contentType: 'image/jpeg' } });
+  const imageUrl = `https://${env.R2_PUBLIC_DOMAIN}/${imageKey}`;
+  await writeJson(env, metaKey, {
+    id,
+    shader:        shader        || '',
+    productHandle: productHandle || '',
+    values:        values        || {},
+    imageUrl,
+    timestamp:     Math.floor(Date.now() / 1000),
+  });
+  return new Response(
+    JSON.stringify({ id, url: `https://share.brightfield.studio/${id}` }),
+    { status: 201, headers }
+  );
 }
 
 // ── Device design gallery ────────────────────────────────────────────────────
