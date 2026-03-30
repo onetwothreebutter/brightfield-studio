@@ -21,6 +21,20 @@ var controls = [
   { key: 'u_color1', label: 'Color 1',     type: 'color', value: '#24c5f2' },
   { key: 'u_color2', label: 'Color 2',     type: 'color', value: '#f2249a' },
   { key: 'u_chroma', label: 'Chroma Shift', type: 'range', min: 0, max: 6.0, step: 0.1, value: 1.5 },
+  // ── Text Overlay ───────────────────────────────────────────────────────────
+  { type: 'header', label: 'Text Overlay' },
+  { key: 'text',           label: 'Text',      type: 'text',   value: '',            textDirty: true, noRandomize: true },
+  { key: 'textFont',       label: 'Font',      type: 'select', value: 'Montserrat',  textDirty: true, noRandomize: true,
+    options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
+  },
+  { key: 'textFontSize', label: 'Font Size', type: 'range', min: 8, max: 300, step: 1,    value: 120, textDirty: true, noRandomize: true },
+  { key: 'textX',        label: 'Text X',    type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.5, textDirty: true, noRandomize: true },
+  { key: 'textY',        label: 'Text Y',    type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.5, textDirty: true, noRandomize: true },
+  { key: 'u_use_text_color', label: 'Custom Color', type: 'toggle', value: 0, noRandomize: true },
+  { key: 'u_text_color',    label: 'Text Color',    type: 'color',  value: '#ffffff', textColorDependent: true, noRandomize: true },
+  { key: 'outlineEnabled',  label: 'Outline',       type: 'toggle', value: 0, textDirty: true, noRandomize: true },
+  { key: 'outlineWidth',    label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true, outlineDependent: true, noRandomize: true },
+  { key: 'u_outline_color', label: 'Outline Color', type: 'color',  value: '#000000', outlineDependent: true, noRandomize: true },
   // ── Finish ────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Finish' },
   { key: 'u_opacity',        label: 'Opacity',  type: 'range', min: 0, max: 1,    step: 0.01, value: 1.0, noRandomize: true,
@@ -32,8 +46,6 @@ var controls = [
   { key: 'u_vignette_x', label: 'Vignette X', type: 'range', min: 0, max: 20, step: 0.1, value: 0 },
   { key: 'u_vignette_y', label: 'Vignette Y', type: 'range', min: 0, max: 30, step: 0.1, value: 0 },
 ];
-
-// No text overlay — no fonts to preload
 
 // ── Randomize button ─────────────────────────────────────────────────────────
 (function () {

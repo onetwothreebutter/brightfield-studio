@@ -23,6 +23,13 @@
     'uniform float u_distress_scale;',
     'uniform float u_vignette_x;',
     'uniform float u_vignette_y;',
+    'uniform float u_aspect;',
+    'uniform vec3  u_text_color;',
+    'uniform float u_use_text_color;',
+    'uniform vec3  u_outline_color;',
+    'uniform float u_text_x;',
+    'uniform float u_text_y;',
+    'uniform sampler2D u_text_texture;',
     '',
     'out vec4 fragColor;',
     '',
@@ -94,7 +101,20 @@
     '  vec2 vigCoord = dUV - 0.5;',
     '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
     '  col = col * clamp(1.0 - vigVal, 0.0, 1.0);',
-    '  fragColor = vec4(col, alpha);',
+    '  vec2 uv = gl_FragCoord.xy / u_resolution;',
+    '  vec2 textAnchor    = vec2(u_text_x, u_text_y);',
+    '  vec2 textDelta     = uv - textAnchor;',
+    '  vec2 textUV        = vec2(textDelta.x * u_aspect, textDelta.y) + textAnchor;',
+    '  vec4 texSample     = texture(u_text_texture, textUV);',
+    '  float fillSample    = smoothstep(0.05, 0.6, texSample.r);',
+    '  float outlineSample = smoothstep(0.05, 0.6, texSample.g);',
+    '  vec3 withOutline   = mix(col, u_outline_color, outlineSample);',
+    '  vec3 textFillColor = mix(baseColor, u_text_color, u_use_text_color);',
+    '  vec3 finalColor    = mix(withOutline, textFillColor, fillSample);',
+    '  float textAlpha    = clamp(fillSample + outlineSample, 0.0, 1.0);',
+    '  alpha = mix(alpha, 1.0, textAlpha);',
+    '  vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
+    '  fragColor = vec4(encoded, alpha);',
     '}'
   ].join('\n');
 
@@ -121,10 +141,17 @@
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
         vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
         vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
+        aspect:        gl.getUniformLocation(program, 'u_aspect'),
+        textColor:     gl.getUniformLocation(program, 'u_text_color'),
+        useTextColor:  gl.getUniformLocation(program, 'u_use_text_color'),
+        outlineColor:  gl.getUniformLocation(program, 'u_outline_color'),
+        textX:         gl.getUniformLocation(program, 'u_text_x'),
+        textY:         gl.getUniformLocation(program, 'u_text_y'),
+        textTex:       gl.getUniformLocation(program, 'u_text_texture'),
       };
     },
 
-    render: function (gl, u, v, w, h) {
+    render: function (gl, u, v, w, h, t, textTex) {
       gl.uniform2f(u.res,        w, h);
       gl.uniform1f(u.n,          v.u_n         != null ? v.u_n         : 8.5);
       gl.uniform1f(u.m,          v.u_m         != null ? v.u_m         : 4.5);
@@ -143,6 +170,49 @@
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
       gl.uniform1f(u.vignetteX,     v.u_vignette_x     != null ? v.u_vignette_x     : 0.0);
       gl.uniform1f(u.vignetteY,     v.u_vignette_y     != null ? v.u_vignette_y     : 0.0);
+      gl.uniform1f(u.aspect,        w / h);
+      gl.uniform3fv(u.textColor,    v.u_text_color    || [1.0, 1.0, 1.0]);
+      gl.uniform1f(u.useTextColor,  v.u_use_text_color != null ? v.u_use_text_color : 0.0);
+      gl.uniform3fv(u.outlineColor, v.u_outline_color || [0.0, 0.0, 0.0]);
+      gl.uniform1f(u.textX,         v.textX            != null ? v.textX            : 0.5);
+      gl.uniform1f(u.textY,         v.textY            != null ? v.textY            : 0.5);
+
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, textTex);
+      gl.uniform1i(u.textTex, 0);
+    },
+
+    drawText: function (ctx, size, v) {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, size, size);
+
+      var txt = v.text || '';
+      if (txt) {
+        var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"Montserrat"';
+        var fontSize   = v.textFontSize || 120;
+        var tx         = v.textX != null ? v.textX : 0.5;
+        var ty         = v.textY != null ? v.textY : 0.5;
+        var cx         = tx * size;
+        var cy         = (1 - ty) * size;
+
+        ctx.font         = 'bold ' + fontSize + 'px ' + fontFamily + ', monospace';
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'middle';
+
+        if (v.outlineEnabled && v.outlineWidth > 0) {
+          ctx.strokeStyle = 'rgb(0,255,0)';
+          ctx.lineWidth   = (v.outlineWidth || 8) * 2;
+          ctx.lineJoin    = 'round';
+          ctx.strokeText(txt, cx, cy);
+        }
+
+        ctx.fillStyle = 'rgb(255,0,0)';
+        ctx.fillText(txt, cx, cy);
+      }
+    },
+
+    textKey: function (v) {
+      return JSON.stringify([v.text, v.textX, v.textY, v.textFontSize, v.textFont, v.outlineEnabled, v.outlineWidth, v.u_outline_color]);
     },
   });
 }());
