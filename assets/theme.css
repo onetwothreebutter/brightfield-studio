@@ -2411,6 +2411,39 @@ h6 {
     border-color: var(--color-text);
 }
 
+/* Community Designs full page — grid layout */
+.community-designs__strip--grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 20px;
+    overflow-x: visible;
+    padding-bottom: 0;
+}
+.community-designs__strip--grid .community-designs__card {
+    flex: none;
+    width: 100%;
+}
+.community-designs__strip--grid .community-designs__card-img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 2 / 3;
+}
+.community-designs-page__heading {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+}
+.community-designs-page__sub {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    margin-bottom: 1.5rem;
+}
+.community-designs-page__loading,
+.community-designs-page__empty {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    padding: 2rem 0;
+}
+
 /* Product page community strip */
 .product-community-designs {
     margin-top: 24px;

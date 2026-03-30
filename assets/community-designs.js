@@ -86,6 +86,7 @@
 
     var strip = document.createElement('div');
     strip.className = 'community-designs__strip';
+    if (opts.grid) strip.classList.add('community-designs__strip--grid');
 
     designs.forEach(function (design) {
       var card = document.createElement('div');

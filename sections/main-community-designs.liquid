@@ -1,0 +1,35 @@
+<section class="community-designs-page section-padding">
+  <div class="container">
+    <h1 class="community-designs-page__heading">Community Designs</h1>
+    <p class="community-designs-page__sub">Designs created and shared by the Brightfield community.</p>
+    <div id="community-page-loading" class="community-designs-page__loading">Loading&hellip;</div>
+    <div id="community-page-empty" class="community-designs-page__empty" style="display:none">No designs yet &mdash; be the first to share one!</div>
+    <div id="community-page-container"></div>
+  </div>
+</section>
+
+<script src="{{ 'recent-designs.js' | asset_url }}" defer></script>
+<script src="{{ 'community-designs.js' | asset_url }}" defer></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var container = document.getElementById('community-page-container');
+    var loading   = document.getElementById('community-page-loading');
+    var empty     = document.getElementById('community-page-empty');
+    CommunityDesigns.fetchCommunityDesigns().then(function (designs) {
+      loading.style.display = 'none';
+      if (!designs || !designs.length) { empty.style.display = ''; return; }
+      CommunityDesigns.renderStrip(container, designs, {
+        getDeviceId: window.RecentDesigns && window.RecentDesigns.getDeviceId,
+        grid: true,
+      });
+    });
+  });
+</script>
+
+{% schema %}
+{
+  "name": "Community Designs Page",
+  "settings": [],
+  "presets": [{ "name": "Community Designs Page" }]
+}
+{% endschema %}
