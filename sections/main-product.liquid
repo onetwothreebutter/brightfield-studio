@@ -1035,7 +1035,19 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     catch (e) { alert('Could not capture canvas: ' + e.message); return; }
     self.textContent = 'Generating\u2026';
     self.disabled = true;
-    fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/create-share', {
+
+    function showConfirm() {
+      self.textContent = 'Copied!';
+      self.disabled = false;
+      setTimeout(function () { self.textContent = 'Share'; }, 1800);
+    }
+    function onError() {
+      self.textContent = 'Failed';
+      self.disabled = false;
+      setTimeout(function () { self.textContent = 'Share'; }, 1800);
+    }
+
+    var urlPromise = fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/create-share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1048,24 +1060,35 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     .then(function (r) { return r.json(); })
     .then(function (data) {
       if (!data.url) throw new Error(data.error || 'No URL');
-      var shareUrl = data.url;
-      function showConfirm() {
-        self.textContent = 'Copied!';
-        self.disabled = false;
-        setTimeout(function () { self.textContent = 'Share'; }, 1800);
-      }
-      var ta = document.createElement('textarea');
-      ta.value = shareUrl; ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); } catch (e) {}
-      document.body.removeChild(ta);
-      showConfirm();
-    })
-    .catch(function () {
-      self.textContent = 'Failed';
-      self.disabled = false;
-      setTimeout(function () { self.textContent = 'Share'; }, 1800);
+      return data.url;
     });
+
+    // Safari requires clipboard.write() to be called synchronously within the
+    // user gesture. Passing a Promise inside ClipboardItem satisfies that while
+    // still resolving the URL asynchronously.
+    if (navigator.clipboard && window.ClipboardItem) {
+      navigator.clipboard.write([
+        new ClipboardItem({
+          'text/plain': urlPromise.then(function (url) {
+            return new Blob([url], { type: 'text/plain' });
+          }),
+        }),
+      ])
+      .then(showConfirm)
+      .catch(onError);
+    } else {
+      // Fallback for browsers without ClipboardItem
+      urlPromise
+        .then(function (url) {
+          var ta = document.createElement('textarea');
+          ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); } catch (e) {}
+          document.body.removeChild(ta);
+          showConfirm();
+        })
+        .catch(onError);
+    }
   });
   randomizeBtn.insertAdjacentElement('afterend', shareBtn);
 
