@@ -98,7 +98,8 @@
     window.addEventListener('resize', resize);
     resize();
 
-    var start = performance.now();
+    var start    = performance.now();
+    var revealed = false;
 
     function render() {
       var t = (performance.now() - start) / 1000.0;
@@ -123,6 +124,10 @@
 
         opts.render(gl, uniforms, v, w, h, t, textTex || null);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        if (!revealed) {
+          canvas.style.opacity = '1';
+          revealed = true;
+        }
       }
 
       requestAnimationFrame(render);
