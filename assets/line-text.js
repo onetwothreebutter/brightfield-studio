@@ -22,6 +22,7 @@
     'uniform float u_text_y;',
     'uniform float u_vignette_x;',
     'uniform float u_vignette_y;',
+    'uniform float u_transparent_bg;',
     'out vec4 fragColor;',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
@@ -64,7 +65,10 @@
     '  float vignette = clamp(1.0 - vigVal, 0.0, 1.0);',
     '',
     '  vec3 encoded = pow(max(col, 0.0), vec3(1.0 / 2.2));',
-    '  fragColor = vec4(encoded * vignette, lineMask);',
+    '  // Display mode (u_transparent_bg=0): opaque black between lines — avoids Safari alpha compositing bug',
+    '  // Export mode  (u_transparent_bg=1): transparent between lines — product image shows through PNG',
+    '  float alpha = mix(1.0, lineMask, u_transparent_bg);',
+    '  fragColor = vec4(encoded * vignette * mix(lineMask, 1.0, u_transparent_bg), alpha);',
     '}',
   ].join('\n');
 
@@ -182,6 +186,7 @@
         textY:         gl.getUniformLocation(program, 'u_text_y'),
         vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
         vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
+        transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
       };
     },
 
@@ -243,6 +248,7 @@
       gl.uniform1f(u.textY,         v.textY != null ? v.textY : 0.5);
       gl.uniform1f(u.vignetteX,     v.u_vignette_x != null ? v.u_vignette_x : 2.0);
       gl.uniform1f(u.vignetteY,     v.u_vignette_y != null ? v.u_vignette_y : 2.0);
+      gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, activeTex);

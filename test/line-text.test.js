@@ -59,7 +59,7 @@ describe('line-text.js', () => {
      'u_text_y', 'u_vignette_x', 'u_vignette_y',
      'u_a', 'u_b', 'u_c', 'u_d',
      'u_color_mode', 'u_color0', 'u_color1', 'u_color2', 'u_color3',
-     'u_text_texture'].forEach((name) => {
+     'u_text_texture', 'u_transparent_bg'].forEach((name) => {
       expect(frag, `missing uniform ${name}`).toContain(name);
     });
   });
@@ -87,7 +87,7 @@ describe('line-text.js', () => {
     const uniforms = opts.setup(gl, {});
     ['res', 'rows', 'baseThickness', 'textThickness', 'textY', 'vignetteX', 'vignetteY',
      'palA', 'palB', 'palC', 'palD',
-     'colorMode', 'color0', 'color1', 'color2', 'color3',
+     'colorMode', 'color0', 'color1', 'color2', 'color3', 'transparentBg',
      'textTex'].forEach((key) => {
       expect(uniforms, `setup() is missing key "${key}"`).toHaveProperty(key);
     });
@@ -147,6 +147,8 @@ describe('line-text.js', () => {
     expect(find1f(uniforms.vignetteX)).toBeCloseTo(2.0);
     expect(find1f(uniforms.vignetteY)).toBeCloseTo(2.0);
     expect(find1f(uniforms.colorMode)).toBe(0.0);
+    // Default is opaque (display) mode — avoids Safari alpha compositing bug
+    expect(find1f(uniforms.transparentBg)).toBe(0.0);
   });
 
   it('render() passes supplied values to uniforms', () => {
