@@ -1,6 +1,7 @@
 (function () {
   'use strict';
 
+
   // LineText port — faithful to the Three.js TSL original
   var fragSrc = [
     '#version 300 es',
@@ -22,6 +23,8 @@
     'uniform float u_text_y;',
     'uniform float u_vignette_x;',
     'uniform float u_vignette_y;',
+    'uniform float u_cap_radius;',
+    'uniform float u_text_tex_size;',
     'uniform float u_transparent_bg;',
     'out vec4 fragColor;',
     '',
@@ -29,11 +32,36 @@
     '  return a + b * cos(6.28318 * (c * t + d));',
     '}',
     '',
+    '// Gaussian-weighted 5x5 blur of the text texture, done in GLSL for',
+    '// cross-browser consistency (canvas blur APIs differ across browsers).',
+    '// u_cap_radius is in texture pixels; step = capRadius/2 px, sigma = 2 steps.',
+    'float blurredTextSample(vec2 uv) {',
+    '  float hard = texture(u_text_texture, uv).r;',
+    '  if (u_cap_radius <= 0.0) return hard;',
+    '  float texelSize = 1.0 / u_text_tex_size;',
+    '  float uvStep    = u_cap_radius * 0.5 * texelSize;',
+    '  float sigma     = 2.0;',
+    '  float sum = 0.0;',
+    '  float totalWeight = 0.0;',
+    '  for (int i = -2; i <= 2; i++) {',
+    '    for (int j = -2; j <= 2; j++) {',
+    '      float fi = float(i);',
+    '      float fj = float(j);',
+    '      float w  = exp(-0.5 * (fi * fi + fj * fj) / (sigma * sigma));',
+    '      sum         += texture(u_text_texture, uv + vec2(fi, fj) * uvStep).r * w;',
+    '      totalWeight += w;',
+    '    }',
+    '  }',
+    '  float blurred = sum / totalWeight;',
+    '  // max with hard sample keeps the interior of letters at 1.0',
+    '  return max(hard, blurred);',
+    '}',
+    '',
     'void main() {',
     '  vec2 uv = gl_FragCoord.xy / u_resolution;',
     '',
-    '  // R channel = text mask (0..1); blur pre-applied via WebGL framebuffer passes',
-    '  float textSample = texture(u_text_texture, uv).r;',
+    '  // R channel = text mask (0..1); blur in blurredTextSample creates soft cap falloff',
+    '  float textSample = blurredTextSample(uv);',
     '',
     '  float rowY      = fract(uv.y * u_rows);',
     '  float distCenter = abs(rowY - 0.5);',
@@ -72,103 +100,11 @@
     '}',
   ].join('\n');
 
-  // ── Two-pass separable Gaussian blur (WebGL framebuffer) ───────────────────
-  // Blur is done entirely in WebGL to avoid Safari's missing ctx.filter and
-  // its GLSL bug where texture() inside for-loops silently returns NaN.
-
-  var blurVertSrc = [
-    '#version 300 es',
-    'in vec2 a_position;',
-    'out vec2 v_uv;',
-    'void main() {',
-    '  v_uv = a_position * 0.5 + 0.5;',
-    '  gl_Position = vec4(a_position, 0.0, 1.0);',
-    '}',
-  ].join('\n');
-
-  // 9-tap 1D Gaussian — no loops (avoids Safari GLSL loop+texture bug).
-  // Weights are for σ≈1-step kernel (c0..c4 are the half-kernel, normalized).
-  var blurFragSrc = [
-    '#version 300 es',
-    'precision mediump float;',
-    'in vec2 v_uv;',
-    'uniform sampler2D u_src;',
-    'uniform vec2 u_dir;',
-    'out vec4 fragColor;',
-    'void main() {',
-    '  vec2 s = u_dir;',
-    '  float c0 = 0.39905;',
-    '  float c1 = 0.24173;',
-    '  float c2 = 0.05399;',
-    '  float c3 = 0.00443;',
-    '  float c4 = 0.00013;',
-    '  float r =',
-    '    texture(u_src, v_uv - s*4.0).r * c4 +',
-    '    texture(u_src, v_uv - s*3.0).r * c3 +',
-    '    texture(u_src, v_uv - s*2.0).r * c2 +',
-    '    texture(u_src, v_uv - s*1.0).r * c1 +',
-    '    texture(u_src, v_uv        ).r * c0 +',
-    '    texture(u_src, v_uv + s*1.0).r * c1 +',
-    '    texture(u_src, v_uv + s*2.0).r * c2 +',
-    '    texture(u_src, v_uv + s*3.0).r * c3 +',
-    '    texture(u_src, v_uv + s*4.0).r * c4;',
-    '  fragColor = vec4(r, r, r, 1.0);',
-    '}',
-  ].join('\n');
-
-  function compileShader(gl, type, src) {
-    var s = gl.createShader(type);
-    gl.shaderSource(s, src);
-    gl.compileShader(s);
-    return s;
-  }
-
-  function makeBlurFbo(gl, size) {
-    var tex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    var fbo = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-    return { fbo: fbo, tex: tex };
-  }
-
-  function compileBlurResources(gl) {
-    var vert = compileShader(gl, gl.VERTEX_SHADER, blurVertSrc);
-    var frag = compileShader(gl, gl.FRAGMENT_SHADER, blurFragSrc);
-    var prog = gl.createProgram();
-    gl.attachShader(prog, vert);
-    gl.attachShader(prog, frag);
-    gl.linkProgram(prog);
-
-    var TEX_SIZE = 1024;
-    return {
-      prog:       prog,
-      posLoc:     gl.getAttribLocation(prog, 'a_position'),
-      srcLoc:     gl.getUniformLocation(prog, 'u_src'),
-      dirLoc:     gl.getUniformLocation(prog, 'u_dir'),
-      hPass:      makeBlurFbo(gl, TEX_SIZE),
-      vPass:      makeBlurFbo(gl, TEX_SIZE),
-      texSize:    TEX_SIZE,
-      lastKey:    null,
-      blurredTex: null,
-    };
-  }
-
   window.ShaderBase.create({
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
       return {
-        _mainProg:     program,
-        _mainPosLoc:   gl.getAttribLocation(program, 'a_position'),
-        _blur:         compileBlurResources(gl),
         res:           gl.getUniformLocation(program, 'u_resolution'),
         rows:          gl.getUniformLocation(program, 'u_rows'),
         baseThickness: gl.getUniformLocation(program, 'u_base_thickness'),
@@ -186,52 +122,13 @@
         textY:         gl.getUniformLocation(program, 'u_text_y'),
         vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
         vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
+        capRadius:     gl.getUniformLocation(program, 'u_cap_radius'),
+        texSize:       gl.getUniformLocation(program, 'u_text_tex_size'),
         transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
       };
     },
 
     render: function (gl, u, v, w, h, t, textTex) {
-      var capRadius = v.textCapRadius != null ? v.textCapRadius : 20.0;
-      var blur      = u._blur;
-      var blurKey   = JSON.stringify([v.text, v.textFont, v.textFontSize, v.textY, capRadius]);
-
-      // ── Two-pass Gaussian blur (H then V) into framebuffer textures ────────
-      if (capRadius > 0 && blurKey !== blur.lastKey) {
-        var step = capRadius / blur.texSize;
-
-        gl.useProgram(blur.prog);
-        gl.enableVertexAttribArray(blur.posLoc);
-        gl.vertexAttribPointer(blur.posLoc, 2, gl.FLOAT, false, 0, 0);
-        gl.viewport(0, 0, blur.texSize, blur.texSize);
-
-        // H pass: raw text texture → hPass FBO
-        gl.bindFramebuffer(gl.FRAMEBUFFER, blur.hPass.fbo);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, textTex);
-        gl.uniform1i(blur.srcLoc, 0);
-        gl.uniform2f(blur.dirLoc, step, 0.0);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-        // V pass: hPass texture → vPass FBO
-        gl.bindFramebuffer(gl.FRAMEBUFFER, blur.vPass.fbo);
-        gl.bindTexture(gl.TEXTURE_2D, blur.hPass.tex);
-        gl.uniform2f(blur.dirLoc, 0.0, step);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-        // Restore main program + state for the draw call that follows render()
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.viewport(0, 0, w, h);
-        gl.useProgram(u._mainProg);
-        gl.enableVertexAttribArray(u._mainPosLoc);
-        gl.vertexAttribPointer(u._mainPosLoc, 2, gl.FLOAT, false, 0, 0);
-
-        blur.lastKey    = blurKey;
-        blur.blurredTex = blur.vPass.tex;
-      }
-
-      // ── Main shader uniforms ───────────────────────────────────────────────
-      var activeTex = (capRadius > 0 && blur.blurredTex) ? blur.blurredTex : textTex;
-
       gl.uniform2f(u.res,           w, h);
       gl.uniform1f(u.rows,          v.u_rows           != null ? v.u_rows           : 80.0);
       gl.uniform1f(u.baseThickness, v.u_base_thickness != null ? v.u_base_thickness : 0.02);
@@ -248,10 +145,12 @@
       gl.uniform1f(u.textY,         v.textY != null ? v.textY : 0.5);
       gl.uniform1f(u.vignetteX,     v.u_vignette_x != null ? v.u_vignette_x : 2.0);
       gl.uniform1f(u.vignetteY,     v.u_vignette_y != null ? v.u_vignette_y : 2.0);
+      gl.uniform1f(u.capRadius,     v.textCapRadius != null ? v.textCapRadius : 20.0);
+      gl.uniform1f(u.texSize,       1024.0);
       gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);
 
       gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, activeTex);
+      gl.bindTexture(gl.TEXTURE_2D, textTex);
       gl.uniform1i(u.textTex, 0);
     },
 
@@ -265,7 +164,7 @@
       var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"Montserrat"';
       var fontSize   = v.textFontSize != null ? v.textFontSize : 202;
 
-      // Hard white text on black — blur is applied via WebGL framebuffer passes
+      // Hard white text on black — blur is applied in the fragment shader
       ctx.font         = 'bold ' + fontSize + 'px ' + fontFamily + ', sans-serif';
       ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
