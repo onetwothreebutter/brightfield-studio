@@ -26,12 +26,18 @@ test.describe('Shader share link', () => {
   });
 
   test('#share= URL auto-opens shader tab and replaces hash with #shader', async ({ page }) => {
+    // Mock the worker fetch so the test doesn't depend on a live network call
+    await page.route('**/get-shader-state/**', async route => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    });
+
     await page.goto(`${PRODUCT_PATH}#share=xyz789`);
+    await page.waitForLoadState('domcontentloaded');
 
     // Shader tab auto-opens via #share= hash
-    await expect(page.locator('.media-tab[data-tab="shader"]')).toHaveClass(/is-active/, { timeout: 5000 });
+    await expect(page.locator('.media-tab[data-tab="shader"]')).toHaveClass(/is-active/, { timeout: 8000 });
 
-    // #share= is replaced with #shader after the restore fetch completes (success or failure)
+    // #share= is replaced with #shader after the restore fetch completes
     await expect(page).toHaveURL(/#shader/, { timeout: 10000 });
     expect(page.url()).not.toContain('#share=');
   });
