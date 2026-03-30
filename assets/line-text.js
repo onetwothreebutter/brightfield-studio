@@ -26,6 +26,7 @@
     'uniform float u_vignette_y;',
     'uniform float u_cap_radius;',
     'uniform float u_text_tex_size;',
+    'uniform float u_transparent_bg;',
     'out vec4 fragColor;',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
@@ -93,7 +94,8 @@
     '  float vignette = clamp(1.0 - vigVal, 0.0, 1.0);',
     '',
     '  vec3 encoded = pow(max(col, 0.0), vec3(1.0 / 2.2));',
-    '  fragColor = vec4(encoded * vignette, lineMask);',
+    '  float alpha = mix(1.0, lineMask, u_transparent_bg);',
+    '  fragColor = vec4(encoded * vignette * mix(lineMask, 1.0, u_transparent_bg), alpha);',
     '}',
   ].join('\n');
 
@@ -121,6 +123,7 @@
         vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
         capRadius:     gl.getUniformLocation(program, 'u_cap_radius'),
         texSize:       gl.getUniformLocation(program, 'u_text_tex_size'),
+        transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
       };
     },
 
@@ -143,6 +146,7 @@
       gl.uniform1f(u.vignetteY,     v.u_vignette_y != null ? v.u_vignette_y : 2.0);
       gl.uniform1f(u.capRadius,     v.textCapRadius != null ? v.textCapRadius : 20.0);
       gl.uniform1f(u.texSize,       1024.0);
+      gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);
