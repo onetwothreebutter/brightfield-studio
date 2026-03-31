@@ -6,9 +6,9 @@
     <div class="section-header">
       <h2
         class="section-title glitch"
-        data-text="{{ section.settings.heading | default: 'Latest Drops' | escape }}"
+        data-text="{{ section.settings.heading | default: 'In-House Designs' | escape }}"
       >
-        {{ section.settings.heading | default: 'Latest Drops' }}
+        {{ section.settings.heading | default: 'In-House Designs' }}
       </h2>
       {%- if section.settings.description != blank -%}
         <p class="section-description">{{ section.settings.description }}</p>
@@ -52,7 +52,7 @@
       "type": "text",
       "id": "heading",
       "label": "Heading",
-      "default": "Latest Drops"
+      "default": "In-House Designs"
     },
     {
       "type": "textarea",
