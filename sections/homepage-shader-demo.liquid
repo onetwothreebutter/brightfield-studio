@@ -428,6 +428,19 @@
         <a id="demo-mockup-download" class="btn btn--outline btn--sm" download="my-design.jpg">Download</a>
         <button id="demo-mockup-order" class="btn btn--primary btn--sm">Order This Design</button>
       </div>
+      <div class="mockup-modal__community" id="demo-community-wrap">
+        <button class="btn btn--ghost btn--sm" id="demo-community-toggle">Share with Community</button>
+        <div class="mockup-modal__community-form" id="demo-community-form" style="display:none">
+          <input type="text" id="demo-community-name" class="mockup-modal__community-input" placeholder="Your name (displayed publicly)">
+          <input type="email" id="demo-community-email" class="mockup-modal__community-input" placeholder="Email (kept private)">
+          <button class="btn btn--primary btn--sm" id="demo-community-submit">Submit Design</button>
+          <p class="mockup-modal__community-error" id="demo-community-error" style="display:none">Submission failed. Please try again.</p>
+          <p class="mockup-modal__community-note">Designs are reviewed before appearing publicly.</p>
+        </div>
+        <p class="mockup-modal__community-success" id="demo-community-success" style="display:none">
+          Submitted! Your design will appear after review.
+        </p>
+      </div>
     </div>
   </div>
 </div>
@@ -1024,6 +1037,7 @@
   var MOCKUP_VARIANT_ID  = 4017;
   var PRODUCT_HANDLE     = {{ section.settings.product_handle | default: 'line-circle' | json }};
   var currentDesignUrl   = null;
+  var _lastMockupData    = null;
   var variantsLoaded     = false;
 
   function loadVariants() {
@@ -1089,6 +1103,20 @@
             throw new Error(data.error || 'No mockup_url in response');
           }
           currentDesignUrl = data.design_url || null;
+          _lastMockupData = {
+            mockupUrl:     data.mockup_url,
+            shader:        PRODUCT_HANDLE,
+            productHandle: PRODUCT_HANDLE,
+            values:        JSON.parse(JSON.stringify(window._demoState ? window._demoState.values : {}))
+          };
+          var dCommunityForm    = document.getElementById('demo-community-form');
+          var dCommunitySuccess = document.getElementById('demo-community-success');
+          var dCommunityError   = document.getElementById('demo-community-error');
+          var dCommunitySubmit  = document.getElementById('demo-community-submit');
+          if (dCommunityForm)    dCommunityForm.style.display = 'none';
+          if (dCommunitySuccess) dCommunitySuccess.style.display = 'none';
+          if (dCommunityError)   dCommunityError.style.display = 'none';
+          if (dCommunitySubmit)  { dCommunitySubmit.disabled = false; dCommunitySubmit.textContent = 'Submit Design'; }
           mockupLoading.style.display = 'none';
           mockupImg.src = data.mockup_url;
           mockupImg.style.display = '';
@@ -1257,6 +1285,58 @@
     }
   }());
 
+
+  // ── Community submit ────────────────────────────────────────────────────────
+  var demoCommunityToggle  = document.getElementById('demo-community-toggle');
+  var demoCommunityForm    = document.getElementById('demo-community-form');
+  var demoCommunitySuccess = document.getElementById('demo-community-success');
+  var demoCommunityError   = document.getElementById('demo-community-error');
+  var demoCommunitySubmit  = document.getElementById('demo-community-submit');
+  var demoCommunityName    = document.getElementById('demo-community-name');
+  var demoCommunityEmail   = document.getElementById('demo-community-email');
+
+  if (demoCommunityToggle && demoCommunityForm) {
+    demoCommunityToggle.addEventListener('click', function () {
+      demoCommunityForm.style.display = demoCommunityForm.style.display === 'none' ? '' : 'none';
+    });
+  }
+
+  if (demoCommunitySubmit) {
+    demoCommunitySubmit.addEventListener('click', function () {
+      if (!_lastMockupData) return;
+      var name  = demoCommunityName  ? demoCommunityName.value.trim()  : '';
+      var email = demoCommunityEmail ? demoCommunityEmail.value.trim() : '';
+      if (!name)  { demoCommunityName  && demoCommunityName.focus();  return; }
+      if (!email) { demoCommunityEmail && demoCommunityEmail.focus(); return; }
+
+      demoCommunitySubmit.disabled    = true;
+      demoCommunitySubmit.textContent = 'Submitting\u2026';
+      if (demoCommunityError) demoCommunityError.style.display = 'none';
+
+      fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/community/submit', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mockupUrl:     _lastMockupData.mockupUrl,
+          shader:        _lastMockupData.shader,
+          productHandle: _lastMockupData.productHandle,
+          values:        _lastMockupData.values,
+          creatorName:   name,
+          creatorEmail:  email,
+        })
+      })
+      .then(function (r) {
+        if (!r.ok) throw new Error('Submit failed');
+        if (demoCommunityForm)    demoCommunityForm.style.display = 'none';
+        if (demoCommunitySuccess) demoCommunitySuccess.style.display = '';
+      })
+      .catch(function () {
+        demoCommunitySubmit.disabled    = false;
+        demoCommunitySubmit.textContent = 'Submit Design';
+        if (demoCommunityError) demoCommunityError.style.display = '';
+      });
+    });
+  }
 
   // ── Boot ───────────────────────────────────────────────────────────────────
   applyColorModeVisibility();
