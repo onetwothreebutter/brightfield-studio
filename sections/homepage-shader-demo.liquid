@@ -1084,7 +1084,10 @@
       })
         .then(function (res) { return res.json(); })
         .then(function (data) {
-          if (!data.mockup_url) throw new Error('No mockup_url in response');
+          if (!data.mockup_url) {
+            console.error('[mockup] worker error:', data.error || data);
+            throw new Error(data.error || 'No mockup_url in response');
+          }
           currentDesignUrl = data.design_url || null;
           mockupLoading.style.display = 'none';
           mockupImg.src = data.mockup_url;
@@ -1092,7 +1095,8 @@
           if (mockupDownload) mockupDownload.href = data.mockup_url;
           if (mockupFooter) mockupFooter.style.display = '';
         })
-        .catch(function () {
+        .catch(function (err) {
+          console.error('[mockup] preview failed:', err);
           mockupLoading.style.display = 'none';
           mockupError.style.display = '';
         });
