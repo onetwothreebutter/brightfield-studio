@@ -2294,6 +2294,7 @@ h6 {
 .recent-designs__card-name {
     display: block;
     font-size: 0.7rem;
+    font-weight: 600;
     text-transform: capitalize;
     color: var(--color-text);
     white-space: nowrap;
@@ -2303,7 +2304,7 @@ h6 {
 .recent-designs__card-time {
     display: block;
     font-size: 0.65rem;
-    color: var(--color-text);
+    color: var(--color-text-muted);
 }
 
 /* ─── Community Designs ──────────────────────────────────── */
