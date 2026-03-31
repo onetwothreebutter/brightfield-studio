@@ -1173,6 +1173,26 @@
     });
   }
 
+  // ── Download (blob fetch to bypass cross-origin <a download> restriction) ──
+  if (mockupDownload) {
+    mockupDownload.addEventListener('click', function (e) {
+      e.preventDefault();
+      var url = mockupImg && mockupImg.src;
+      if (!url) return;
+      fetch(url)
+        .then(function (r) { return r.blob(); })
+        .then(function (blob) {
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'my-design.jpg';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+        });
+    });
+  }
+
   // ── Copy Link ──────────────────────────────────────────────────────────────
   var copyLinkBtn = document.getElementById('demo-copy-link');
   copyLinkBtn.addEventListener('click', function () {

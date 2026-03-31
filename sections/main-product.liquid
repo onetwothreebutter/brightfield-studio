@@ -1398,6 +1398,26 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     if (e.key === 'Escape') closeModal();
   });
 
+  // ── Download (blob fetch to bypass cross-origin <a download> restriction) ──
+  if (modalDl) {
+    modalDl.addEventListener('click', function (e) {
+      e.preventDefault();
+      var url = modalImg && modalImg.src;
+      if (!url) return;
+      fetch(url)
+        .then(function (r) { return r.blob(); })
+        .then(function (blob) {
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'my-design.jpg';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+        });
+    });
+  }
+
   // ── Community submit form ───────────────────────────────────
   var communityToggle  = document.getElementById('community-toggle');
   var communityForm    = document.getElementById('community-form');
