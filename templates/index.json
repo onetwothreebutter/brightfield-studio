@@ -27,7 +27,7 @@
     "featured-collection": {
       "type": "featured-collection",
       "settings": {
-        "heading": "Latest Drops",
+        "heading": "In-House Designs",
         "description": "",
         "collection": "frontpage",
         "products_to_show": 9,
