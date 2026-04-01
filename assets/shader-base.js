@@ -125,9 +125,12 @@
         if (opts.animateValues) {
           var dt = Math.min(t - lastT, 0.1);
           var factor = 1 - Math.exp(-8 * dt);
+          var instant = opts.instantKeys || [];
           if (!animVals) { animVals = {}; }
           Object.keys(v).forEach(function (k) {
-            if (animVals[k] === undefined) {
+            if (instant.indexOf(k) !== -1) {
+              animVals[k] = v[k]; // bypass lerp — instant feedback
+            } else if (animVals[k] === undefined) {
               animVals[k] = Array.isArray(v[k]) ? v[k].slice() : v[k];
             } else {
               animVals[k] = lerpVal(animVals[k], v[k], factor);
