@@ -241,7 +241,7 @@
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, size, size);
 
-      var txt = v.text || '';
+      var txt = v.u_text_enabled ? (v.text || '') : '';
       if (txt) {
         var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"Montserrat"';
         var fontSize   = v.textFontSize || 120;
@@ -271,7 +271,7 @@
     },
 
     textKey: function (v) {
-      return JSON.stringify([v.text, v.textX, v.textY, v.textFontSize, v.textFont, v.outlineEnabled, v.outlineWidth, v.u_outline_color]);
+      return JSON.stringify([v.u_text_enabled, v.text, v.textX, v.textY, v.textFontSize, v.textFont, v.outlineEnabled, v.outlineWidth, v.u_outline_color]);
     },
   });
 }());
