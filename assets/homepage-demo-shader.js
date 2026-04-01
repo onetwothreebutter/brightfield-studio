@@ -135,10 +135,11 @@
   });
 
   window.ShaderBase.create({
-    canvasId:  'demo-shader-canvas',
-    stateKey:  '_demoState',
-    exportKey: '_demoExport',
-    fragSrc:   fragSrc,
+    canvasId:       'demo-shader-canvas',
+    stateKey:       '_demoState',
+    exportKey:      '_demoExport',
+    animateValues:  true,
+    fragSrc:        fragSrc,
 
     setup: function (gl, program) {
       function loc(name) { return gl.getUniformLocation(program, name); }

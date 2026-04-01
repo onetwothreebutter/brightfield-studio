@@ -100,6 +100,18 @@
 
     var start    = performance.now();
     var revealed = false;
+    var lastT    = 0;
+    var animVals = null;
+
+    function lerpVal(a, b, factor) {
+      if (typeof b === 'number' && typeof a === 'number') {
+        return a + (b - a) * factor;
+      }
+      if (Array.isArray(b) && Array.isArray(a)) {
+        return b.map(function (bv, i) { return (a[i] || 0) + (bv - (a[i] || 0)) * factor; });
+      }
+      return b; // instant for strings, booleans, etc.
+    }
 
     function render() {
       var t = (performance.now() - start) / 1000.0;
@@ -108,9 +120,25 @@
       var h = canvas.height;
 
       if (w && h) {
+        // ── Animated value interpolation (opt-in) ───────────
+        var renderV = v;
+        if (opts.animateValues) {
+          var dt = Math.min(t - lastT, 0.1);
+          var factor = 1 - Math.exp(-8 * dt);
+          if (!animVals) { animVals = {}; }
+          Object.keys(v).forEach(function (k) {
+            if (animVals[k] === undefined) {
+              animVals[k] = Array.isArray(v[k]) ? v[k].slice() : v[k];
+            } else {
+              animVals[k] = lerpVal(animVals[k], v[k], factor);
+            }
+          });
+          renderV = animVals;
+        }
+
         if (opts.drawText) {
           var getKey  = opts.textKey || defaultTextKey;
-          var textKey = getKey(v);
+          var textKey = getKey(v); // always key off real v so text updates instantly
           var dirty   = window[stateKey] && window[stateKey].textDirty;
           if (dirty || textKey !== lastTextKey || w !== lastTexW || h !== lastTexH) {
             opts.drawText(textCtx, 1024, v, w, h);
@@ -122,7 +150,7 @@
           }
         }
 
-        opts.render(gl, uniforms, v, w, h, t, textTex || null);
+        opts.render(gl, uniforms, renderV, w, h, t, textTex || null);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         if (!revealed) {
           canvas.style.opacity = '1';
@@ -130,6 +158,7 @@
         }
       }
 
+      lastT = t;
       requestAnimationFrame(render);
     }
 
