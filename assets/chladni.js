@@ -119,6 +119,7 @@
   ].join('\n');
 
   window.ShaderBase.create({
+    animateValues:  true,
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
