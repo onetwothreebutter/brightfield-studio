@@ -96,6 +96,17 @@
     ]
   },
   {
+    "name": "Social sharing",
+    "settings": [
+      {
+        "type": "image_picker",
+        "id": "og_image",
+        "label": "Default social sharing image",
+        "info": "Used as the og:image fallback when a page has no featured image. Recommended: 1200×630px."
+      }
+    ]
+  },
+  {
     "name": "Admin",
     "settings": [
       {

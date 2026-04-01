@@ -7,7 +7,9 @@
         "heading": "",
         "subheading": "T-shirts generated from GLSL fragment shaders. Every design is a living program.",
         "cta_label": "Shop the Collection",
-        "cta_url": "/collections/all"
+        "cta_url": "/collections/all",
+        "cta2_label": "Make it Yours",
+        "cta2_url": "/#shader-demo"
       }
     },
     "shader-demo": {

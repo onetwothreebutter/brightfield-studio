@@ -17,10 +17,19 @@
       <p class="hero__subtitle">{{ section.settings.subheading }}</p>
     {%- endif -%}
 
-    {%- if section.settings.cta_url != blank -%}
-      <a href="{{ section.settings.cta_url }}" class="btn btn--primary btn--lg">
-        {{ section.settings.cta_label | default: 'Shop the Collection' }}
-      </a>
+    {%- if section.settings.cta_url != blank or section.settings.cta2_url != blank -%}
+      <div class="hero__ctas">
+        {%- if section.settings.cta_url != blank -%}
+          <a href="{{ section.settings.cta_url }}" class="btn btn--primary btn--lg">
+            {{ section.settings.cta_label | default: 'Shop the Collection' }}
+          </a>
+        {%- endif -%}
+        {%- if section.settings.cta2_url != blank -%}
+          <a href="{{ section.settings.cta2_url }}" class="btn btn--outline btn--lg">
+            {{ section.settings.cta2_label | default: 'Make it Yours' }}
+          </a>
+        {%- endif -%}
+      </div>
     {%- endif -%}
   </div>
 
@@ -63,6 +72,17 @@
       "id": "cta_label",
       "label": "Button label",
       "default": "Shop the Collection"
+    },
+    {
+      "type": "url",
+      "id": "cta2_url",
+      "label": "Second button link"
+    },
+    {
+      "type": "text",
+      "id": "cta2_label",
+      "label": "Second button label",
+      "default": "Make it Yours"
     }
   ],
   "presets": [

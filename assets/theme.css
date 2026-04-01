@@ -398,6 +398,13 @@ h6 {
     line-height: 1.85;
 }
 
+.hero__ctas {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
 .hero__scroll-hint {
     position: absolute;
     bottom: 2rem;
