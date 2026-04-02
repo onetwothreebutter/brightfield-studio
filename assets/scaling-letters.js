@@ -47,7 +47,7 @@
     return (1 / (3 * row4Count) / H4_4) * gridAspect;
   }
 
-  function drawLetter(ctx, letter, font, size, outlineEnabled, outlineWidth, ca) {
+  function drawLetter(ctx, letter, font, size, outlineEnabled, outlineWidth, ca, center) {
     var canvas   = ctx.canvas;
     var canvasW  = Math.max(1, Math.round(CANVAS_SIZE * ca));
     canvas.width  = canvasW;
@@ -58,14 +58,21 @@
       ctx.font         = '600 ' + size + 'px ' + font + ', monospace';
       ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
+      var x = canvasW / 2;
+      var y = CANVAS_SIZE / 2;
+      if (center) {
+        var m = ctx.measureText(letter);
+        x = canvasW / 2 + (m.actualBoundingBoxLeft - m.actualBoundingBoxRight) / 2;
+        y = CANVAS_SIZE / 2 + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
+      }
       if (outlineEnabled && outlineWidth > 0) {
         ctx.strokeStyle = 'rgb(0,255,0)';
         ctx.lineWidth   = outlineWidth * 2;
         ctx.lineJoin    = 'round';
-        ctx.strokeText(letter, canvasW / 2, CANVAS_SIZE / 2);
+        ctx.strokeText(letter, x, y);
       }
       ctx.fillStyle = 'rgb(255,0,0)';
-      ctx.fillText(letter, canvasW / 2, CANVAS_SIZE / 2);
+      ctx.fillText(letter, x, y);
     }
   }
 
@@ -610,6 +617,7 @@
       ];
       var texUniforms = [u.tex1, u.tex2, u.tex3, u.tex4, u.tex5, u.tex6, u.tex7, u.tex8, u.tex9, u.tex10, u.tex11];
 
+      var centerLetters  = v.centerLetters ? true : false;
       var perLetterSize = v.perLetterSizeEnabled ? true : false;
       var perLetterSizes = [
         perLetterSize && v.u_font_size_1  != null ? v.u_font_size_1  : fontSize,
@@ -629,9 +637,9 @@
         var letter    = textEnabled ? (letters[i] || '') : '';
         var letterSz  = perLetterSizes[i];
         var ca        = getCellCa(i + 1, letterCount, GRID_ASPECT);
-        var key       = letter + '|' + fontFamily + '|' + letterSz + '|' + outlineEnabled + '|' + outlineWidth + '|' + letterCount + '|' + ca;
+        var key       = letter + '|' + fontFamily + '|' + letterSz + '|' + outlineEnabled + '|' + outlineWidth + '|' + letterCount + '|' + ca + '|' + centerLetters;
         if (key !== u._lastLetterKeys[i]) {
-          drawLetter(u._texCtxs[i], letter, fontFamily, letterSz, outlineEnabled, outlineWidth, ca);
+          drawLetter(u._texCtxs[i], letter, fontFamily, letterSz, outlineEnabled, outlineWidth, ca, centerLetters);
           uploadTex(gl, u._glTextures[i], u._texCanvases[i]);
           u._lastLetterKeys[i] = key;
         }
