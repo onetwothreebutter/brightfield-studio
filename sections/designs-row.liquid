@@ -39,6 +39,7 @@
 <script>
 (function () {
   var EMPTY_ICON = {{ empty_icon | json }};
+  var SEE_ALL_MAX = 15;
 
   function emptyState(message) {
     return '<div class="designs-row__empty">'
@@ -47,27 +48,42 @@
       + '</div>';
   }
 
+  function addSeeAllBtn(col, href) {
+    var a = document.createElement('a');
+    a.href = href;
+    a.className = 'designs-row__see-all';
+    a.textContent = 'See All';
+    col.appendChild(a);
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     var recentContainer = document.getElementById('recent-designs-container');
+    var recentCol = document.getElementById('designs-row__recent');
     if (recentContainer && window.RecentDesigns) {
       RecentDesigns.fetchDesigns().then(function (designs) {
-        RecentDesigns.renderFilmstrip(recentContainer, designs);
         if (!designs || !designs.length) {
           recentContainer.innerHTML = emptyState('No saved designs yet');
+          return;
         }
+        var hasMore = designs.length > SEE_ALL_MAX;
+        RecentDesigns.renderFilmstrip(recentContainer, hasMore ? designs.slice(0, SEE_ALL_MAX) : designs);
+        if (hasMore) addSeeAllBtn(recentCol, '/pages/recent-designs');
       });
     }
 
     var communityContainer = document.getElementById('community-designs-container');
+    var communityCol = document.getElementById('designs-row__community');
     if (communityContainer && window.CommunityDesigns) {
       CommunityDesigns.fetchCommunityDesigns().then(function (designs) {
         if (!designs || !designs.length) {
           communityContainer.innerHTML = emptyState('No community designs yet');
           return;
         }
-        CommunityDesigns.renderStrip(communityContainer, designs, {
+        var hasMore = designs.length > SEE_ALL_MAX;
+        CommunityDesigns.renderStrip(communityContainer, hasMore ? designs.slice(0, SEE_ALL_MAX) : designs, {
           getDeviceId: window.RecentDesigns && window.RecentDesigns.getDeviceId
         });
+        if (hasMore) addSeeAllBtn(communityCol, '/pages/community-designs');
       });
     }
   });

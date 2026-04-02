@@ -2476,6 +2476,20 @@ h6 {
     }
 }
 
+/* ─── Designs Row: see-all button ───────────────────────── */
+.designs-row__see-all {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    text-decoration: underline;
+    letter-spacing: 0.04em;
+    transition: color var(--transition-fast);
+}
+.designs-row__see-all:hover {
+    color: var(--color-text);
+}
+
 /* ─── Designs Row: skeleton cards ───────────────────────── */
 .designs-row__skeleton-card {
     flex: 0 0 120px;

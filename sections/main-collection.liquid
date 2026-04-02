@@ -4,11 +4,15 @@
   <div class="container">
 
     <div class="collection-header">
+      {%- assign collection_heading = collection.title -%}
+      {%- if collection.handle == 'all' -%}
+        {%- assign collection_heading = 'Shop' -%}
+      {%- endif -%}
       <h1
         class="collection-title glitch"
-        data-text="{{ collection.title | escape }}"
+        data-text="{{ collection_heading | escape }}"
       >
-        {{ collection.title | escape }}
+        {{ collection_heading | escape }}
       </h1>
       {%- if collection.description != blank -%}
         <div class="collection-description rte">{{ collection.description }}</div>
