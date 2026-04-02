@@ -2475,6 +2475,11 @@ h6 {
         align-items: start;
     }
 }
+/* Prevent grid children from overflowing their 1fr track when
+   the inner flex strip's content is wider than 50% of the container */
+.designs-row__col {
+    min-width: 0;
+}
 
 /* ─── Designs Row: see-all button ───────────────────────── */
 .designs-row__see-all {
