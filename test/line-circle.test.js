@@ -156,13 +156,13 @@ describe('line-circle.js', () => {
 
   // ── textKey() ─────────────────────────────────────────────────────────────────
 
-  it('textKey() serializes [text, textX, textY, textFontSize, textFont, outlineEnabled, outlineWidth]', () => {
+  it('textKey() serializes [u_text_enabled, text, textX, textY, textFontSize, textFont, outlineEnabled, outlineWidth]', () => {
     const v = {
-      text: 'X', textX: 0.5, textY: 0.5, textFontSize: 120, textFont: 'IBM Plex Mono',
+      u_text_enabled: true, text: 'X', textX: 0.5, textY: 0.5, textFontSize: 120, textFont: 'IBM Plex Mono',
       outlineEnabled: true, outlineWidth: 8,
     };
     expect(opts.textKey(v)).toBe(
-      JSON.stringify(['X', 0.5, 0.5, 120, 'IBM Plex Mono', true, 8, null])
+      JSON.stringify([true, 'X', 0.5, 0.5, 120, 'IBM Plex Mono', true, 8, null])
     );
   });
 
@@ -187,14 +187,14 @@ describe('line-circle.js', () => {
 
   it('drawText() uses red channel (rgb(255,0,0)) for text fill', () => {
     const ctx = make2DContextMock();
-    opts.drawText(ctx, 1024, { text: 'X', textFontSize: 100 }, 500, 500);
+    opts.drawText(ctx, 1024, { u_text_enabled: true, text: 'X', textFontSize: 100 }, 500, 500);
     expect(ctx.fillText).toHaveBeenCalledWith('X', expect.any(Number), expect.any(Number));
     expect(ctx.fillStyle).toBe('rgb(255,0,0)');
   });
 
   it('drawText() uses green channel (rgb(0,255,0)) for outline stroke', () => {
     const ctx = make2DContextMock();
-    opts.drawText(ctx, 1024, { text: 'X', outlineEnabled: true, outlineWidth: 8 }, 500, 500);
+    opts.drawText(ctx, 1024, { u_text_enabled: true, text: 'X', outlineEnabled: true, outlineWidth: 8 }, 500, 500);
     expect(ctx.strokeStyle).toBe('rgb(0,255,0)');
     expect(ctx.strokeText).toHaveBeenCalledWith('X', expect.any(Number), expect.any(Number));
   });
