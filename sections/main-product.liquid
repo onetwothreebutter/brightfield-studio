@@ -1398,11 +1398,19 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     if (e.key === 'Escape') closeModal();
   });
 
-  // Download — href is set to the worker /download-mockup endpoint which returns
-  // Content-Disposition: attachment, so the browser downloads natively without blob fetch.
+  // Download — append local datetime before following the link so the filename
+  // reflects the user's timezone rather than UTC.
   if (modalDl) {
     modalDl.addEventListener('click', function (e) {
-      if (!this.href || this.href === window.location.href) e.preventDefault();
+      if (!this.href || this.href === window.location.href) { e.preventDefault(); return; }
+      var now = new Date();
+      var h   = now.getHours() % 12 || 12;
+      var mm  = String(now.getMinutes()).padStart(2, '0');
+      var dt  = now.getFullYear() + '-' +
+                String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                String(now.getDate()).padStart(2, '0') + '-' +
+                h + mm + (now.getHours() >= 12 ? 'pm' : 'am');
+      this.href = this.href.split('&dt=')[0] + '&dt=' + encodeURIComponent(dt);
     });
   }
 
