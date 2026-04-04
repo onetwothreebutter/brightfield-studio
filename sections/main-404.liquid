@@ -1,23 +1,41 @@
-<div class="not-found section-padding">
-  <div class="container">
-    <div class="not-found__inner">
-      <p class="not-found__code glitch" data-text="404">404</p>
-      <h1 class="not-found__heading">Page not found.</h1>
-      <p class="not-found__sub">This URL didn't compile.</p>
-      <a href="/" class="btn btn--outline">Go Home</a>
-    </div>
+<div class="not-found">
+  <canvas class="not-found__canvas" id="shader-404-canvas"></canvas>
+  <div class="not-found__overlay">
+    <p class="not-found__code glitch" data-text="404">404</p>
+    <h1 class="not-found__heading">Page not found.</h1>
+    <p class="not-found__sub">Signal lost.</p>
+    <a href="/" class="btn btn--outline">Go Home</a>
   </div>
 </div>
 
+<script src="{{ 'shader-404.js' | asset_url }}" defer></script>
+
 {% stylesheet %}
-  .not-found__inner {
+  .not-found {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - var(--header-height));
+    overflow: hidden;
+  }
+
+  .not-found__canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .not-found__overlay {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     text-align: center;
-    max-width: 480px;
-    margin: 0 auto;
-    gap: 1.5rem;
+    height: 100%;
+    gap: 1.25rem;
+    padding: 2rem;
   }
 
   .not-found__code {
