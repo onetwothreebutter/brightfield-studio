@@ -14,8 +14,24 @@
     'uniform sampler2D u_image;',
     'uniform vec2 u_resolution;',
     'uniform float u_opacity;',
+    'uniform float u_time;',
     '',
     'out vec4 fragColor;',
+    '',
+    '// Value noise — smooth interpolation between random grid points',
+    'float hash(vec2 p) {',
+    '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);',
+    '}',
+    'float noise(vec2 p) {',
+    '  vec2 i = floor(p);',
+    '  vec2 f = fract(p);',
+    '  f = f * f * (3.0 - 2.0 * f);',
+    '  return mix(',
+    '    mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),',
+    '    mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x),',
+    '    f.y',
+    '  );',
+    '}',
     '',
     'bool isBackground(vec4 c) {',
     '  return c.r > 0.88 && c.g > 0.88 && c.b > 0.88;',
@@ -33,13 +49,13 @@
     '    return;',
     '  }',
     '',
-    '  // Background pixel — find distance to nearest shirt pixel',
-    '  float glowRadius = 24.0;',
+    '  // Find distance to nearest shirt pixel',
+    '  float glowRadius = 40.0;',
     '  float minDist = glowRadius;',
     '',
     '  for (int i = 0; i < 8; i++) {',
     '    float angle = float(i) * 0.7854;',
-    '    for (float r = 2.0; r <= 24.0; r += 4.0) {',
+    '    for (float r = 2.0; r <= 40.0; r += 4.0) {',
     '      vec2 offset = vec2(cos(angle), -sin(angle)) * r / u_resolution;',
     '      if (!isBackground(texture(u_image, uv + offset))) {',
     '        minDist = min(minDist, r);',
@@ -53,10 +69,29 @@
     '    return;',
     '  }',
     '',
-    '  float t = minDist / glowRadius;',
-    '  float glow = pow(1.0 - t, 1.8);',
-    '  vec3 color = mix(vec3(0.0, 1.0, 1.0), vec3(0.6, 0.0, 1.0), t);',
-    '  fragColor = vec4(color * glow * 0.75, glow * u_opacity);',
+    '  // Noise perturbation — shifts the apparent edge outward irregularly',
+    '  // Two octaves for more organic feel',
+    '  float n = noise(uv * 5.0 + u_time * 0.12) * 0.6',
+    '          + noise(uv * 11.0 - u_time * 0.07) * 0.4;',
+    '  float perturbedDist = minDist - n * 10.0;',
+    '',
+    '  // Pulsing ring: expands from shirt edge outward, fades as it goes',
+    '  float pulseSpeed = 0.3;',
+    '  float t = fract(u_time * pulseSpeed);       // 0→1 per cycle',
+    '  float ringPos = t * glowRadius;              // ring position in pixels',
+    '  float ringWidth = 5.0 + n * 4.0;            // noise widens the ring edge',
+    '  float distToRing = abs(perturbedDist - ringPos);',
+    '  float ring = max(0.0, 1.0 - distToRing / ringWidth);',
+    '  float fade = pow(1.0 - t, 1.2);             // fades as it expands',
+    '  float glow = ring * fade;',
+    '',
+    '  // Subtle persistent base glow right at the edge',
+    '  float baseGlow = pow(max(0.0, 1.0 - minDist / 10.0), 2.5) * 0.25;',
+    '  glow = max(glow, baseGlow);',
+    '',
+    '  // Cyan core, bleeds toward violet at the expanding edge',
+    '  vec3 color = mix(vec3(0.0, 1.0, 1.0), vec3(0.5, 0.0, 1.0), t);',
+    '  fragColor = vec4(color * glow * 0.85, glow * u_opacity);',
     '}',
   ].join('\n');
 
@@ -101,8 +136,9 @@
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
 
-    var uRes = gl.getUniformLocation(program, 'u_resolution');
+    var uRes  = gl.getUniformLocation(program, 'u_resolution');
     var uOpacity = gl.getUniformLocation(program, 'u_opacity');
+    var uTime = gl.getUniformLocation(program, 'u_time');
     var uImage = gl.getUniformLocation(program, 'u_image');
 
     gl.activeTexture(gl.TEXTURE0);
@@ -119,7 +155,7 @@
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-    return { gl: gl, program: program, uOpacity: uOpacity };
+    return { gl: gl, program: program, uOpacity: uOpacity, uTime: uTime, startTime: performance.now() };
   }
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -130,27 +166,27 @@
       var img = media.querySelector('.product-card__image');
       if (!canvas || !img || img.tagName !== 'IMG') return;
 
-      var state = null; // lazy-init on first hover
+      var state = null;
       var opacity = 0;
       var target = 0;
       var rafId = null;
 
-      function draw(ts) {
-        var dt = 1 / 60;
-        opacity += (target - opacity) * Math.min(dt * 16, 1); // ~250ms lerp
+      function draw() {
+        opacity += (target - opacity) * (1 / 60 * 16);
 
+        var t = (performance.now() - state.startTime) / 1000;
         state.gl.useProgram(state.program);
         state.gl.uniform1f(state.uOpacity, opacity);
+        state.gl.uniform1f(state.uTime, t);
         state.gl.drawArrays(state.gl.TRIANGLE_STRIP, 0, 4);
 
-        if (Math.abs(opacity - target) > 0.005) {
+        // Keep animating while visible (time-based animation requires continuous RAF)
+        if (opacity > 0.005 || target > 0) {
           rafId = requestAnimationFrame(draw);
         } else {
-          opacity = target;
-          if (opacity === 0) {
-            state.gl.uniform1f(state.uOpacity, 0);
-            state.gl.drawArrays(state.gl.TRIANGLE_STRIP, 0, 4);
-          }
+          opacity = 0;
+          state.gl.uniform1f(state.uOpacity, 0);
+          state.gl.drawArrays(state.gl.TRIANGLE_STRIP, 0, 4);
           rafId = null;
         }
       }
