@@ -7,6 +7,9 @@ routes = [
   { pattern = "share.brightfield.studio", custom_domain = true }
 ]
 
+[images]
+binding = "IMAGES"
+
 [[r2_buckets]]
 binding = "MOCKUP_STAGING"
 preview_bucket_name = "mockup-staging"
