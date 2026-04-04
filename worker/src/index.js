@@ -122,6 +122,7 @@ async function handleGenerateMockup(request, env, origin) {
     });
 
     const taskJson = await taskRes.json();
+    console.log('[mockup] Printful create-task response:', JSON.stringify(taskJson));
     if (taskJson.code !== 200) {
       throw new Error(taskJson.result || taskJson.error || JSON.stringify(taskJson));
     }
@@ -136,6 +137,7 @@ async function handleGenerateMockup(request, env, origin) {
         headers: { 'Authorization': `Bearer ${env.PRINTFUL_API_KEY}` }
       });
       const resultJson = await resultRes.json();
+      console.log('[mockup] Printful poll result:', JSON.stringify(resultJson.result));
       const status     = resultJson.result?.status;
 
       if (status === 'completed') {
