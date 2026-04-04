@@ -3,6 +3,10 @@ main = "src/index.js"
 compatibility_date = "2025-01-01"
 workers_dev = true
 
+[observability.logs]
+enabled = true
+invocation_logs = true
+
 routes = [
   { pattern = "share.brightfield.studio", custom_domain = true }
 ]
