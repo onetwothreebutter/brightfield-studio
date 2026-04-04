@@ -78,7 +78,7 @@ async function handleGenerateMockup(request, env, origin) {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
   }
 
-  const { image, variant_id, deviceId, shader, productHandle, values } = body;
+  const { image, variant_id, deviceId, shader, productHandle, values, skipBgRemoval } = body;
   if (!image || !variant_id) {
     return new Response(JSON.stringify({ error: 'Missing image or variant_id' }), { status: 400, headers });
   }
@@ -161,7 +161,7 @@ async function handleGenerateMockup(request, env, origin) {
       let mockupExt         = 'jpg';
 
       // Remove background via Cloudflare Images (best-effort — falls back to original on failure)
-      if (env.IMAGES) {
+      if (env.IMAGES && !skipBgRemoval) {
         try {
           const processed = await env.IMAGES
             .input(mockupData)
