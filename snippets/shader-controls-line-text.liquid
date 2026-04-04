@@ -50,6 +50,15 @@ var controls = [
 ];
 
 var customAfterBuild = function () {
+  var textCtrl = null;
+  controls.forEach(function (c) { if (c.key === 'text') textCtrl = c; });
+  var textInput = document.querySelector('[data-param-key="text"]');
+  if (textInput && textCtrl) {
+    textInput.addEventListener('input', function () {
+      textCtrl.noRandomize = true;
+    });
+  }
+
   var cosineKeys = ['u_a', 'u_b', 'u_c', 'u_d'];
 
   function applyCosinePreset(p) {
