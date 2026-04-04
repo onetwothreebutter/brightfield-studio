@@ -515,19 +515,15 @@ h6 {
 }
 
 .product-card__glow {
+    display: none;
+}
+
+.product-card__shader {
     position: absolute;
     inset: 0;
-    background: linear-gradient(
-        135deg,
-        rgba(0, 255, 255, 0.07) 0%,
-        rgba(255, 0, 255, 0.07) 100%
-    );
-    opacity: 0;
-    transition: opacity var(--transition-base);
+    width: 100%;
+    height: 100%;
     pointer-events: none;
-}
-.product-card:hover .product-card__glow {
-    opacity: 1;
 }
 
 .product-card__info {

@@ -6,6 +6,7 @@
           src="{{ product.featured_image | image_url: width: 600 }}"
           alt="{{ product.featured_image.alt | escape }}"
           class="product-card__image"
+          crossorigin="anonymous"
           loading="lazy"
           width="600"
           height="600"
@@ -14,6 +15,7 @@
         <div class="product-card__image product-card__image--placeholder"></div>
       {%- endif -%}
       <div class="product-card__glow" aria-hidden="true"></div>
+      <canvas class="product-card__shader" aria-hidden="true"></canvas>
     </div>
 
     <div class="product-card__info">
@@ -57,3 +59,7 @@
     {%- endif -%}
   </div>
 </article>
+{% unless product_card_fresnel_loaded %}
+  <script src="{{ 'product-card-fresnel.js' | asset_url }}" defer></script>
+  {%- assign product_card_fresnel_loaded = true -%}
+{% endunless %}
