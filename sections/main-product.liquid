@@ -1302,7 +1302,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         if (!data.mockup_url) throw new Error(data.error || 'No mockup URL returned');
         currentDesignUrl    = data.design_url || null;
         modalImg.src        = data.mockup_url;
-        modalDl.href        = data.mockup_url;
+        modalDl.href        = data.download_url || data.mockup_url;
         modal.classList.remove('mockup-modal--hidden');
         document.body.style.overflow = 'hidden';
         _lastMockupData = {
@@ -1398,23 +1398,11 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     if (e.key === 'Escape') closeModal();
   });
 
-  // ── Download (blob fetch to bypass cross-origin <a download> restriction) ──
+  // Download — href is set to the worker /download-mockup endpoint which returns
+  // Content-Disposition: attachment, so the browser downloads natively without blob fetch.
   if (modalDl) {
     modalDl.addEventListener('click', function (e) {
-      e.preventDefault();
-      var url = modalImg && modalImg.src;
-      if (!url) return;
-      fetch(url)
-        .then(function (r) { return r.blob(); })
-        .then(function (blob) {
-          var a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = 'my-design.jpg';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-        });
+      if (!this.href || this.href === window.location.href) e.preventDefault();
     });
   }
 

@@ -1120,7 +1120,7 @@
           mockupLoading.style.display = 'none';
           mockupImg.src = data.mockup_url;
           mockupImg.style.display = '';
-          if (mockupDownload) mockupDownload.href = data.mockup_url;
+          if (mockupDownload) mockupDownload.href = data.download_url || data.mockup_url;
           if (mockupFooter) mockupFooter.style.display = '';
         })
         .catch(function (err) {
@@ -1173,23 +1173,11 @@
     });
   }
 
-  // ── Download (blob fetch to bypass cross-origin <a download> restriction) ──
+  // Download — href is set to the worker /download-mockup endpoint which returns
+  // Content-Disposition: attachment, so the browser downloads natively without blob fetch.
   if (mockupDownload) {
     mockupDownload.addEventListener('click', function (e) {
-      e.preventDefault();
-      var url = mockupImg && mockupImg.src;
-      if (!url) return;
-      fetch(url)
-        .then(function (r) { return r.blob(); })
-        .then(function (blob) {
-          var a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = 'my-design.jpg';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-        });
+      if (!this.href || this.href === window.location.href) e.preventDefault();
     });
   }
 

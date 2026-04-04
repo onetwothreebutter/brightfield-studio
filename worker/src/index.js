@@ -62,6 +62,8 @@ export default {
 
     if (method === 'GET'  && pathname === '/admin-ui') return handleAdminUI(request, env);
 
+    if (method === 'GET'  && pathname === '/download-mockup') return handleDownloadMockup(request, env, origin);
+
     return new Response('Not found', { status: 404 });
   }
 };
@@ -153,12 +155,14 @@ async function handleGenerateMockup(request, env, origin) {
     // 4. Re-host the Printful mockup in R2 so the URL doesn't expire
     const mockupKey = `mockups/${crypto.randomUUID()}.jpg`;
     const mockupImageRes = await fetch(mockupUrl);
+    let downloadUrl = null;
     if (mockupImageRes.ok) {
       const mockupImageData = await mockupImageRes.arrayBuffer();
       await env.MOCKUP_STAGING.put(mockupKey, mockupImageData, {
         httpMetadata: { contentType: 'image/jpeg' }
       });
       mockupUrl = `https://${env.R2_PUBLIC_DOMAIN}/${mockupKey}`;
+      downloadUrl = `${new URL(request.url).origin}/download-mockup?key=${encodeURIComponent(mockupKey)}`;
     }
 
     // 5. Keep the design file in R2 — merchant needs the URL to submit to Printful when fulfilling
@@ -176,13 +180,29 @@ async function handleGenerateMockup(request, env, origin) {
       await saveDesignEntry(env, deviceId, entry).catch(() => {});
     }
 
-    return new Response(JSON.stringify({ mockup_url: mockupUrl, design_url: imageUrl }), { status: 200, headers });
+    const responseBody = { mockup_url: mockupUrl, design_url: imageUrl };
+    if (downloadUrl) responseBody.download_url = downloadUrl;
+    return new Response(JSON.stringify(responseBody), { status: 200, headers });
 
   } catch (err) {
     // Clean up orphaned R2 file on failure only
     env.MOCKUP_STAGING.delete(imageKey).catch(() => {});
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
   }
+}
+
+async function handleDownloadMockup(request, env, origin) {
+  const key = new URL(request.url).searchParams.get('key');
+  if (!key) return new Response('Missing key', { status: 400, headers: corsHeaders(origin) });
+  const obj = await env.MOCKUP_STAGING.get(key);
+  if (!obj) return new Response('Not found', { status: 404, headers: corsHeaders(origin) });
+  return new Response(obj.body, {
+    headers: {
+      'Content-Type': 'image/jpeg',
+      'Content-Disposition': 'attachment; filename="my-design.jpg"',
+      ...corsHeaders(origin),
+    },
+  });
 }
 
 function sleep(ms) {
