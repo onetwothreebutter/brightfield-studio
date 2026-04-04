@@ -178,8 +178,6 @@
       canvas.height = targetH;
       gl.viewport(0, 0, targetW, targetH);
 
-      if (window[stateKey]) window[stateKey].values.u_transparent_bg = 1.0;
-
       render();
 
       // Use gl.readPixels() instead of canvas.toDataURL() — Safari's WebGL toDataURL
@@ -209,7 +207,6 @@
       canvas.height = prevH;
       gl.viewport(0, 0, prevW, prevH);
       if (window[stateKey]) {
-        window[stateKey].values.u_transparent_bg = 0.0;
         window[stateKey].textDirty = true;
       }
 
