@@ -153,13 +153,31 @@ async function handleGenerateMockup(request, env, origin) {
     }
 
     // 4. Re-host the Printful mockup in R2 so the URL doesn't expire
-    const mockupKey = `mockups/${crypto.randomUUID()}.jpg`;
     const mockupImageRes = await fetch(mockupUrl);
     let downloadUrl = null;
     if (mockupImageRes.ok) {
-      const mockupImageData = await mockupImageRes.arrayBuffer();
-      await env.MOCKUP_STAGING.put(mockupKey, mockupImageData, {
-        httpMetadata: { contentType: 'image/jpeg' }
+      let mockupData        = await mockupImageRes.arrayBuffer();
+      let mockupContentType = 'image/jpeg';
+      let mockupExt         = 'jpg';
+
+      // Remove background via Cloudflare Images (best-effort — falls back to original on failure)
+      if (env.IMAGES) {
+        try {
+          const processed = await env.IMAGES
+            .input(mockupData)
+            .transform({ segment: 'foreground' })
+            .output({ format: 'image/png' });
+          mockupData        = await processed.response().arrayBuffer();
+          mockupContentType = 'image/png';
+          mockupExt         = 'png';
+        } catch (imgErr) {
+          console.error('Background removal failed, using original:', imgErr.message);
+        }
+      }
+
+      const mockupKey = `mockups/${crypto.randomUUID()}.${mockupExt}`;
+      await env.MOCKUP_STAGING.put(mockupKey, mockupData, {
+        httpMetadata: { contentType: mockupContentType }
       });
       mockupUrl = `https://${env.R2_PUBLIC_DOMAIN}/${mockupKey}`;
       const shaderSlug = (shader || '').replace(/[^a-z0-9-]/g, '') || 'design';
@@ -213,10 +231,12 @@ async function handleDownloadMockup(request, env, origin) {
     const minutes = String(now.getUTCMinutes()).padStart(2, '0');
     datetime = `${year}-${month}-${day}-${hour}${minutes}${ampm}`;
   }
-  const filename = `my-${shader}-design--brightfield--${datetime}.jpg`;
+  const ext         = key.endsWith('.png') ? 'png' : 'jpg';
+  const contentType = ext === 'png' ? 'image/png' : 'image/jpeg';
+  const filename = `my-${shader}-design--brightfield--${datetime}.${ext}`;
   return new Response(obj.body, {
     headers: {
-      'Content-Type': 'image/jpeg',
+      'Content-Type': contentType,
       'Content-Disposition': `attachment; filename="${filename}"`,
       ...corsHeaders(origin),
     },
