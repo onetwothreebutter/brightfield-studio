@@ -1095,7 +1095,7 @@
       fetch(MOCKUP_WORKER, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64png, variant_id: MOCKUP_VARIANT_ID }),
+        body: JSON.stringify({ image: base64png, variant_id: MOCKUP_VARIANT_ID, skipBgRemoval: true }),
       })
         .then(function (res) { return res.json(); })
         .then(function (data) {
