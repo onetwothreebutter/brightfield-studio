@@ -1295,7 +1295,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           shader:        '{{ shader_file }}',
           productHandle: '{{ product.handle }}',
           values:        window._shaderState ? window._shaderState.values : {},
-          skipBgRemoval: true
+          skipBgRemoval: false
         })
       })
       .then(function (r) { return r.json(); })
