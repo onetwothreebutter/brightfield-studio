@@ -64,6 +64,9 @@
     var s = gl.createShader(type);
     gl.shaderSource(s, src);
     gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      console.error('Fresnel shader compile error:', gl.getShaderInfoLog(s));
+    }
     return s;
   }
 
@@ -75,6 +78,12 @@
     gl.attachShader(program, compileShader(gl, gl.VERTEX_SHADER, vertSrc));
     gl.attachShader(program, compileShader(gl, gl.FRAGMENT_SHADER, fragSrc));
     gl.linkProgram(program);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error('Fresnel program link error:', gl.getProgramInfoLog(program));
+      return null;
+    }
+
     gl.useProgram(program);
 
     var buf = gl.createBuffer();
@@ -110,7 +119,7 @@
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-    return { gl: gl, uOpacity: uOpacity };
+    return { gl: gl, program: program, uOpacity: uOpacity };
   }
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -130,6 +139,7 @@
         var dt = 1 / 60;
         opacity += (target - opacity) * Math.min(dt * 16, 1); // ~250ms lerp
 
+        state.gl.useProgram(state.program);
         state.gl.uniform1f(state.uOpacity, opacity);
         state.gl.drawArrays(state.gl.TRIANGLE_STRIP, 0, 4);
 
