@@ -1088,6 +1088,7 @@
 
   previewBtn.addEventListener('click', function () {
     if (!window._demoExport) return;
+    stopCycle();
     loadVariants();
     openMockupModal();
     window._demoExport(1800, 2400, function (base64png) {
