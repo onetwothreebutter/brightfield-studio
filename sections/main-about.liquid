@@ -1,0 +1,225 @@
+<div class="about-page">
+
+  <section class="about-story section-padding">
+    <div class="container">
+      <div class="about-story__inner">
+        <p class="about-eyebrow">About Brightfield</p>
+        <h1 class="about-story__heading">Hi, I'm Eric.</h1>
+        <div class="about-story__body">
+          <p>I'm a developer who started playing with GLSL fragment shaders — the programs that run entirely on your GPU and paint pixels based on pure math. Somewhere between <code>vec3</code> and <code>gl_FragColor</code>, I realized the outputs were too interesting to keep on a screen.</p>
+          <p>Brightfield is my small studio for putting that code onto fabric. Every shirt comes from an actual shader program — not a filter, not a preset, not stock art. You configure the parameters live, generate a preview, and what you get is genuinely one of a kind.</p>
+          <p>If you appreciate the craft behind the output — whether you're a developer, a designer, or just someone who wants a shirt that feels a little different — this shop is for you.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="about-process section-padding">
+    <div class="container">
+      <p class="about-eyebrow">How It Works</p>
+      <h2 class="about-section-heading">From fragment shader to front door.</h2>
+      <ol class="about-process__steps">
+        <li class="about-process__step">
+          <span class="about-process__number" aria-hidden="true">01</span>
+          <div class="about-process__content">
+            <h3 class="about-process__title">Write the shader</h3>
+            <p class="about-process__desc">A GLSL program runs on your GPU, blending geometry, color math, and live animation into a moving image.</p>
+          </div>
+        </li>
+        <li class="about-process__step">
+          <span class="about-process__number" aria-hidden="true">02</span>
+          <div class="about-process__content">
+            <h3 class="about-process__title">Configure &amp; generate</h3>
+            <p class="about-process__desc">Use the on-page GUI to dial in colors, speed, and text. Hit Generate Preview when it looks right.</p>
+          </div>
+        </li>
+        <li class="about-process__step">
+          <span class="about-process__number" aria-hidden="true">03</span>
+          <div class="about-process__content">
+            <h3 class="about-process__title">Print on demand</h3>
+            <p class="about-process__desc">Your design goes to Printful, gets printed on a quality garment, and ships directly to your door.</p>
+          </div>
+        </li>
+        <li class="about-process__step">
+          <span class="about-process__number" aria-hidden="true">04</span>
+          <div class="about-process__content">
+            <h3 class="about-process__title">Wear it</h3>
+            <p class="about-process__desc">Your shirt arrives. No one else has one like it.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="about-values section-padding">
+    <div class="container">
+      <p class="about-eyebrow">What We're About</p>
+      <h2 class="about-section-heading">A few things we believe in.</h2>
+      <div class="about-values__grid">
+        <div class="about-values__card">
+          <h3 class="about-values__title">Generated, not drawn.</h3>
+          <p class="about-values__desc">The output comes from math. There's no Illustrator file behind it — just shader code and a seed.</p>
+        </div>
+        <div class="about-values__card">
+          <h3 class="about-values__title">One of one.</h3>
+          <p class="about-values__desc">The same shader run twice never produces the same result. Your configuration lives in your order, not our catalog.</p>
+        </div>
+        <div class="about-values__card">
+          <h3 class="about-values__title">Made by someone who codes.</h3>
+          <p class="about-values__desc">Every shader is hand-written, tested, and iterated. Not stock art dressed up — actual programs built to look good on fabric.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+{% stylesheet %}
+  .about-eyebrow {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-primary);
+    margin: 0 0 1rem;
+  }
+
+  /* Story */
+  .about-story__inner {
+    max-width: 680px;
+  }
+
+  .about-story__heading {
+    font-family: var(--font-heading);
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0 0 2rem;
+    line-height: 1.1;
+  }
+
+  .about-story__body p {
+    font-family: var(--font-body);
+    font-size: 1rem;
+    line-height: 1.8;
+    color: var(--color-text-muted);
+    margin: 0 0 1.25rem;
+  }
+
+  .about-story__body p:last-child {
+    margin-bottom: 0;
+  }
+
+  .about-story__body code {
+    font-family: var(--font-body);
+    font-size: 0.9em;
+    color: var(--color-primary);
+    background: rgba(0, 255, 255, 0.08);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+
+  /* Section heading shared */
+  .about-section-heading {
+    font-family: var(--font-heading);
+    font-size: clamp(1.5rem, 3.5vw, 2.5rem);
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0 0 3rem;
+    line-height: 1.2;
+  }
+
+  /* Process */
+  .about-process {
+    background: var(--color-surface);
+  }
+
+  .about-process__steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+    max-width: 720px;
+  }
+
+  .about-process__step {
+    display: grid;
+    grid-template-columns: 3rem 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .about-process__number {
+    font-family: var(--font-heading);
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--color-primary);
+    padding-top: 0.2rem;
+  }
+
+  .about-process__title {
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0 0 0.5rem;
+  }
+
+  .about-process__desc {
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+    line-height: 1.7;
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  /* Values */
+  .about-values__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .about-values__card {
+    background: var(--color-surface);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+    padding: 2rem;
+  }
+
+  .about-values__title {
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0 0 0.75rem;
+  }
+
+  .about-values__desc {
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+    line-height: 1.7;
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  @media (max-width: 640px) {
+    .about-process__step {
+      grid-template-columns: 2.5rem 1fr;
+      gap: 1rem;
+    }
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "About",
+  "presets": [
+    { "name": "About" }
+  ]
+}
+{% endschema %}
