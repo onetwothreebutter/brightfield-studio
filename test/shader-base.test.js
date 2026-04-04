@@ -35,11 +35,13 @@ describe('shader-base.js', () => {
     // "Not implemented: getContext('2d')" warnings.
     mockGl = makeWebGLMock();
     canvas.getContext = vi.fn((type) => (type === 'webgl2' || type === 'webgl' || type === 'experimental-webgl') ? mockGl : null);
-    const stub2D = { fillStyle: '', strokeStyle: '', fillRect: vi.fn(), fillText: vi.fn(), strokeText: vi.fn(), save: vi.fn(), restore: vi.fn(), scale: vi.fn(), font: '', textAlign: '', textBaseline: '', lineWidth: 0, lineJoin: '' };
+    const stub2D = { fillStyle: '', strokeStyle: '', fillRect: vi.fn(), fillText: vi.fn(), strokeText: vi.fn(), save: vi.fn(), restore: vi.fn(), scale: vi.fn(), font: '', textAlign: '', textBaseline: '', lineWidth: 0, lineJoin: '', createImageData: vi.fn((w, h) => ({ data: new Uint8ClampedArray(w * h * 4) })), putImageData: vi.fn() };
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (type) {
       if (type === '2d') return stub2D;
       return null;
     });
+    // Default toDataURL so the offscreen canvas encode in _shaderExport doesn't return null
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,AAAA');
 
     // Prevent the animation loop from spinning during tests
     vi.stubGlobal('requestAnimationFrame', vi.fn());
@@ -130,7 +132,9 @@ describe('shader-base.js', () => {
 
   it('_shaderExport calls callback with base64 string (no data URL prefix)', () => {
     window.ShaderBase.create({ fragSrc: DUMMY_FRAG, setup: () => ({}), render: vi.fn() });
-    canvas.toDataURL = vi.fn(() => 'data:image/png;base64,iVBORw0KGgo=');
+    // Export now uses gl.readPixels → offscreen 2D canvas → toDataURL
+    // Mock toDataURL on HTMLCanvasElement.prototype to intercept the offscreen canvas call
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,iVBORw0KGgo=');
     const cb = vi.fn();
     window._shaderExport(100, 100, cb);
     expect(cb).toHaveBeenCalledWith('iVBORw0KGgo=');

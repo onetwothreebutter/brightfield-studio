@@ -125,7 +125,9 @@
         if (opts.animateValues) {
           var dt = Math.min(t - lastT, 0.1);
           var factor = 1 - Math.exp(-8 * dt);
-          var instant = opts.instantKeys || [];
+          // u_transparent_bg must snap instantly — it's toggled only during export
+          // and must be exactly 1.0/0.0 or the PNG will have a semi-opaque background
+          var instant = (opts.instantKeys || []).concat(['u_transparent_bg']);
           if (!animVals) { animVals = {}; }
           Object.keys(v).forEach(function (k) {
             if (instant.indexOf(k) !== -1) {
@@ -180,7 +182,28 @@
 
       render();
 
-      var dataUrl = canvas.toDataURL('image/png');
+      // Use gl.readPixels() instead of canvas.toDataURL() — Safari's WebGL toDataURL
+      // composites transparent pixels against black before encoding, producing an opaque
+      // black background. readPixels() reads raw GPU bytes, bypassing that compositing.
+      var pixels = new Uint8Array(targetW * targetH * 4);
+      gl.readPixels(0, 0, targetW, targetH, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+      // gl.readPixels returns rows bottom-to-top; flip vertically for canvas (top-to-bottom)
+      var flipped = new Uint8Array(targetW * targetH * 4);
+      var rowBytes = targetW * 4;
+      for (var row = 0; row < targetH; row++) {
+        flipped.set(pixels.subarray((targetH - 1 - row) * rowBytes, (targetH - row) * rowBytes), row * rowBytes);
+      }
+
+      // Encode via a 2D canvas (avoids the WebGL-specific toDataURL Safari bug)
+      var offscreen = document.createElement('canvas');
+      offscreen.width  = targetW;
+      offscreen.height = targetH;
+      var ctx2d = offscreen.getContext('2d');
+      var imageData = ctx2d.createImageData(targetW, targetH);
+      imageData.data.set(flipped);
+      ctx2d.putImageData(imageData, 0, 0);
+      var dataUrl = offscreen.toDataURL('image/png');
 
       canvas.width  = prevW;
       canvas.height = prevH;
