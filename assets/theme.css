@@ -830,6 +830,7 @@ h6 {
 .footer-nav {
     display: flex;
     gap: 3rem;
+    justify-content: flex-end;
     flex-wrap: wrap;
 }
 
