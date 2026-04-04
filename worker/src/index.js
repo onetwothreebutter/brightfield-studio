@@ -162,7 +162,8 @@ async function handleGenerateMockup(request, env, origin) {
         httpMetadata: { contentType: 'image/jpeg' }
       });
       mockupUrl = `https://${env.R2_PUBLIC_DOMAIN}/${mockupKey}`;
-      downloadUrl = `${new URL(request.url).origin}/download-mockup?key=${encodeURIComponent(mockupKey)}`;
+      const shaderSlug = (shader || '').replace(/[^a-z0-9-]/g, '') || 'design';
+      downloadUrl = `${new URL(request.url).origin}/download-mockup?key=${encodeURIComponent(mockupKey)}&shader=${encodeURIComponent(shaderSlug)}`;
     }
 
     // 5. Keep the design file in R2 — merchant needs the URL to submit to Printful when fulfilling
@@ -192,14 +193,17 @@ async function handleGenerateMockup(request, env, origin) {
 }
 
 async function handleDownloadMockup(request, env, origin) {
-  const key = new URL(request.url).searchParams.get('key');
+  const params = new URL(request.url).searchParams;
+  const key    = params.get('key');
+  const shader = (params.get('shader') || '').replace(/[^a-z0-9-]/g, '') || 'design';
   if (!key) return new Response('Missing key', { status: 400, headers: corsHeaders(origin) });
   const obj = await env.MOCKUP_STAGING.get(key);
   if (!obj) return new Response('Not found', { status: 404, headers: corsHeaders(origin) });
+  const filename = `my-${shader}-design--brightfield.jpg`;
   return new Response(obj.body, {
     headers: {
       'Content-Type': 'image/jpeg',
-      'Content-Disposition': 'attachment; filename="my-design.jpg"',
+      'Content-Disposition': `attachment; filename="${filename}"`,
       ...corsHeaders(origin),
     },
   });
