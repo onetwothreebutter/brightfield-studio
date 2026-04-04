@@ -139,6 +139,7 @@
     stateKey:       '_demoState',
     exportKey:      '_demoExport',
     animateValues:  true,
+    instantKeys:    ['textX', 'textY', 'textFontSize', 'outlineWidth', 'u_opacity'],
     fragSrc:        fragSrc,
 
     setup: function (gl, program) {
