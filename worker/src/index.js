@@ -199,7 +199,16 @@ async function handleDownloadMockup(request, env, origin) {
   if (!key) return new Response('Missing key', { status: 400, headers: corsHeaders(origin) });
   const obj = await env.MOCKUP_STAGING.get(key);
   if (!obj) return new Response('Not found', { status: 404, headers: corsHeaders(origin) });
-  const filename = `my-${shader}-design--brightfield.jpg`;
+  const now     = new Date();
+  const year    = now.getUTCFullYear();
+  const month   = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const day     = String(now.getUTCDate()).padStart(2, '0');
+  const h24     = now.getUTCHours();
+  const ampm    = h24 >= 12 ? 'pm' : 'am';
+  const hour    = h24 % 12 || 12;
+  const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+  const datetime = `${year}-${month}-${day}-${hour}${minutes}${ampm}`;
+  const filename = `my-${shader}-design--brightfield-${datetime}.jpg`;
   return new Response(obj.body, {
     headers: {
       'Content-Type': 'image/jpeg',
