@@ -208,7 +208,7 @@ async function handleDownloadMockup(request, env, origin) {
   const hour    = h24 % 12 || 12;
   const minutes = String(now.getUTCMinutes()).padStart(2, '0');
   const datetime = `${year}-${month}-${day}-${hour}${minutes}${ampm}`;
-  const filename = `my-${shader}-design--brightfield-${datetime}.jpg`;
+  const filename = `my-${shader}-design--brightfield--${datetime}.jpg`;
   return new Response(obj.body, {
     headers: {
       'Content-Type': 'image/jpeg',
