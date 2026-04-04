@@ -1,0 +1,197 @@
+<div class="faq-page">
+
+  <section class="faq-hero section-padding">
+    <div class="container">
+      <p class="faq-eyebrow">FAQ</p>
+      <h1 class="faq-heading">Frequently asked questions</h1>
+    </div>
+  </section>
+
+  <section class="faq-body section-padding">
+    <div class="container">
+      <div class="faq-sections">
+
+        <div class="faq-group">
+          <h2 class="faq-group__heading">Customization</h2>
+          <dl class="faq-list">
+
+            <div class="faq-item">
+              <dt class="faq-item__question">How does the customization work?</dt>
+              <dd class="faq-item__answer">Each product page has a live shader preview and a set of controls — sliders, color pickers, font selects, and toggles. Adjust them until the design looks right to you, then hit Generate Preview to create a mockup of your shirt.</dd>
+            </div>
+
+            <div class="faq-item">
+              <dt class="faq-item__question">What's a shader?</dt>
+              <dd class="faq-item__answer">A shader is a small program that runs on your GPU and generates visuals from math — no images, no stock art. Every Brightfield design is produced by a hand-written GLSL fragment shader running in real time in your browser.</dd>
+            </div>
+
+            <div class="faq-item">
+              <dt class="faq-item__question">Will my design be unique?</dt>
+              <dd class="faq-item__answer">Yes. Shaders start with randomized values, and every combination of settings you dial in is your own. No two orders need to be identical.</dd>
+            </div>
+
+            <div class="faq-item">
+              <dt class="faq-item__question">Can I add my own text?</dt>
+              <dd class="faq-item__answer">Most designs support a custom text overlay — choose a font, size, position, and color to make it yours. Check the product's controls for a Text section.</dd>
+            </div>
+
+            <div class="faq-item">
+              <dt class="faq-item__question">Can I save my design and come back to it?</dt>
+              <dd class="faq-item__answer">Your most recent design is automatically saved in your browser. If you share a design, the share link will restore your exact settings on any device.</dd>
+            </div>
+
+          </dl>
+        </div>
+
+        <div class="faq-group">
+          <h2 class="faq-group__heading">Community</h2>
+          <dl class="faq-list">
+
+            <div class="faq-item">
+              <dt class="faq-item__question">What is the community feature?</dt>
+              <dd class="faq-item__answer">After generating a preview, you can optionally share your design with the Brightfield community. Approved designs appear on the Community page, where anyone can browse them and load the settings into their own session.</dd>
+            </div>
+
+            <div class="faq-item">
+              <dt class="faq-item__question">Are all submitted designs approved?</dt>
+              <dd class="faq-item__answer">Submissions are reviewed before appearing publicly. We keep it to on-brand, appropriate designs.</dd>
+            </div>
+
+          </dl>
+        </div>
+
+        <div class="faq-group">
+          <h2 class="faq-group__heading">Ordering &amp; printing</h2>
+          <dl class="faq-list">
+
+            <div class="faq-item">
+              <dt class="faq-item__question">Who prints the shirts?</dt>
+              <dd class="faq-item__answer">We use Printful for print-on-demand fulfillment. Orders are printed and shipped directly from their facilities — no inventory, no minimums.</dd>
+            </div>
+
+            <div class="faq-item">
+              <dt class="faq-item__question">What's the print quality like?</dt>
+              <dd class="faq-item__answer">Designs are printed at high resolution using direct-to-garment (DTG) printing on quality blanks. The shader output is exported at print resolution before your order is submitted.</dd>
+            </div>
+
+            <div class="faq-item">
+              <dt class="faq-item__question">How long does shipping take?</dt>
+              <dd class="faq-item__answer">Production typically takes 2–5 business days, plus shipping time depending on your location. You'll receive a tracking number once your order ships.</dd>
+            </div>
+
+            <div class="faq-item">
+              <dt class="faq-item__question">What sizes are available?</dt>
+              <dd class="faq-item__answer">Available sizes vary by product — check the size selector on each product page. Most designs are offered in a full range of unisex sizes.</dd>
+            </div>
+
+          </dl>
+        </div>
+
+        <div class="faq-group">
+          <h2 class="faq-group__heading">Returns &amp; support</h2>
+          <dl class="faq-list">
+
+            <div class="faq-item">
+              <dt class="faq-item__question">Can I return or exchange my order?</dt>
+              <dd class="faq-item__answer">Because every shirt is made to order, we can't accept returns for buyer's remorse. If your order arrives damaged or with a print defect, contact us and we'll make it right.</dd>
+            </div>
+
+            <div class="faq-item">
+              <dt class="faq-item__question">I have a question that isn't answered here.</dt>
+              <dd class="faq-item__answer">Reach out via the <a href="/pages/contact">contact page</a> and we'll get back to you.</dd>
+            </div>
+
+          </dl>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+</div>
+
+{% stylesheet %}
+  .faq-eyebrow {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-primary);
+    margin: 0 0 1rem;
+  }
+
+  .faq-heading {
+    font-family: var(--font-heading);
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0;
+    line-height: 1.1;
+  }
+
+  .faq-hero {
+    padding-bottom: 0;
+  }
+
+  .faq-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 3.5rem;
+    max-width: 760px;
+  }
+
+  .faq-group__heading {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-primary);
+    margin: 0 0 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .faq-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+    margin: 0;
+    padding: 0;
+  }
+
+  .faq-item__question {
+    font-family: var(--font-heading);
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0 0 0.5rem;
+  }
+
+  .faq-item__answer {
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+    line-height: 1.75;
+    color: var(--color-text);
+    margin: 0;
+  }
+
+  .faq-item__answer a {
+    color: var(--color-primary);
+    text-decoration: underline;
+  }
+
+  .faq-item__answer a:hover {
+    color: var(--color-text);
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "FAQ",
+  "presets": [
+    { "name": "FAQ" }
+  ]
+}
+{% endschema %}
