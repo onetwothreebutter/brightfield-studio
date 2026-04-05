@@ -15,3 +15,6 @@ config/settings_data.json
 
 # Local shader previews
 preview/
+
+# Local secrets
+*.env

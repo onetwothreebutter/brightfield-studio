@@ -7,7 +7,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test-shaders": "{ sleep 1 && open http://localhost:3001/test-shaders.html; } & npx serve . --listen 3001",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "remove-bg": "node --env-file=worker/.env worker/process-product-images.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",
