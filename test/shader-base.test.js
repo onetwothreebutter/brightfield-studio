@@ -140,6 +140,26 @@ describe('shader-base.js', () => {
     expect(cb).toHaveBeenCalledWith('iVBORw0KGgo=');
   });
 
+  it('_shaderExport does not set u_transparent_bg=1 during export (blank-design regression)', () => {
+    window._shaderState = { values: { u_transparent_bg: 0.0 }, textDirty: false };
+    const transparentBgValues = [];
+    window.ShaderBase.create({
+      fragSrc: DUMMY_FRAG,
+      setup: () => ({}),
+      render: vi.fn(() => {
+        transparentBgValues.push(window._shaderState.values.u_transparent_bg);
+      }),
+    });
+    transparentBgValues.length = 0; // discard the initial render call
+
+    window._shaderExport(100, 100, vi.fn());
+
+    // u_transparent_bg must never be 1.0 during the export render call
+    expect(transparentBgValues).not.toContain(1.0);
+    // Export should still mark textDirty for the post-export refresh
+    expect(window._shaderState.textDirty).toBe(true);
+  });
+
   // ── useDerivatives ───────────────────────────────────────────────────────────
 
   it('does not call gl.getExtension — fwidth is built-in in WebGL 2', () => {
