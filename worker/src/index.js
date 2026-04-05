@@ -604,6 +604,10 @@ function handleAdminUI(request, env) {
     .btn-outline { background: #fff; color: #202223; border-color: #c9cccf; }
     .status { color: #6d7175; font-size: 0.875rem; padding: 1.5rem 0; }
     .error { color: #d72c0d; }
+    .remove-bg-form { display: flex; flex-direction: column; gap: 1rem; max-width: 560px; }
+    .remove-bg-form input { width: 100%; padding: 0.5rem 0.75rem; font-size: 0.875rem; border: 1px solid #c9cccf; border-radius: 6px; }
+    .remove-bg-preview { margin-top: 1rem; }
+    .remove-bg-preview img { max-width: 100%; max-height: 400px; border-radius: 8px; background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%); background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0px; }
   </style>
 </head>
 <body>
@@ -613,6 +617,7 @@ function handleAdminUI(request, env) {
       <button class="tab active" data-tab="pending">Pending</button>
       <button class="tab" data-tab="approved">Approved</button>
       <button class="tab" data-tab="rejected">Rejected</button>
+      <button class="tab" data-tab="remove-bg">Bg Removal</button>
     </div>
     <div id="content"><p class="status">Loading…</p></div>
   </div>
@@ -652,6 +657,7 @@ function handleAdminUI(request, env) {
     }
 
     async function loadTab(tab) {
+      if (tab === 'remove-bg') { renderRemoveBg(); return; }
       content.innerHTML = '<p class="status">Loading\u2026</p>';
       var headers = authHeaders();
       if (!headers) return;
@@ -663,6 +669,71 @@ function handleAdminUI(request, env) {
         renderCards(await r.json(), tab);
       } catch (err) {
         content.innerHTML = '<p class="status error">Error: ' + esc(err.message) + '</p>';
+      }
+    }
+
+    function renderRemoveBg() {
+      content.innerHTML = '';
+      var form = document.createElement('div');
+      form.className = 'remove-bg-form';
+
+      var row = document.createElement('div');
+      row.style.display = 'flex'; row.style.gap = '0.5rem';
+
+      var input = document.createElement('input');
+      input.type = 'text'; input.placeholder = 'Image URL (https://\u2026)';
+
+      var btn = document.createElement('button');
+      btn.className = 'btn btn-primary'; btn.textContent = 'Remove Background';
+      btn.style.flex = '0 0 auto';
+
+      row.appendChild(input); row.appendChild(btn);
+      form.appendChild(row);
+      content.appendChild(form);
+
+      var preview = document.createElement('div');
+      preview.className = 'remove-bg-preview';
+      content.appendChild(preview);
+
+      btn.addEventListener('click', function() { runRemoveBg(input.value.trim(), preview, btn); });
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') runRemoveBg(input.value.trim(), preview, btn);
+      });
+    }
+
+    async function runRemoveBg(url, preview, btn) {
+      if (!url) return;
+      var headers = authHeaders();
+      if (!headers) return;
+      preview.innerHTML = '<p class="status">Processing\u2026</p>';
+      btn.disabled = true;
+      try {
+        var r = await fetch('/remove-bg', {
+          method: 'POST', headers: headers, body: JSON.stringify({ url: url })
+        });
+        if (r.status === 401) { refreshApp(); return; }
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        var data = await r.json();
+        if (data.error) throw new Error(data.error);
+
+        var imgSrc = 'data:image/png;base64,' + data.png;
+        var img = document.createElement('img');
+        img.src = imgSrc;
+
+        var dlBtn = document.createElement('a');
+        dlBtn.href = imgSrc;
+        dlBtn.download = 'product-nobg.png';
+        dlBtn.className = 'btn btn-outline';
+        dlBtn.style.cssText = 'display:inline-flex;margin-top:0.75rem;flex:0 0 auto;';
+        dlBtn.textContent = 'Download PNG';
+
+        preview.innerHTML = '';
+        preview.appendChild(img);
+        preview.appendChild(dlBtn);
+      } catch (err) {
+        preview.innerHTML = '<p class="status error">Error: ' + esc(err.message) + '</p>';
+      } finally {
+        btn.disabled = false;
       }
     }
 
