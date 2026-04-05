@@ -533,7 +533,7 @@
 
   window.ShaderBase.create({
     animateValues:  true,
-    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale', 'u_grid_aspect'],
+    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale', 'u_grid_aspect', 'u_invert'],
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
