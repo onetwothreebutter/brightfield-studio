@@ -64,6 +64,8 @@ export default {
 
     if (method === 'GET'  && pathname === '/download-mockup') return handleDownloadMockup(request, env, origin);
 
+    if (method === 'POST' && pathname === '/remove-bg') return handleRemoveBg(request, env, origin);
+
     return new Response('Not found', { status: 404 });
   }
 };
@@ -798,6 +800,51 @@ async function handleCreateShare(request, env, origin) {
     JSON.stringify({ id, url: `https://share.brightfield.studio/${id}` }),
     { status: 201, headers }
   );
+}
+
+// ── Background removal utility ───────────────────────────────────────────────
+
+async function handleRemoveBg(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+
+  if (!await requireAdmin(request, env)) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
+  }
+
+  if (!env.IMAGES) {
+    return new Response(JSON.stringify({ error: 'IMAGES binding not configured' }), { status: 503, headers });
+  }
+
+  let body;
+  try { body = await request.json(); } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
+  }
+
+  const { url } = body;
+  if (!url) {
+    return new Response(JSON.stringify({ error: 'Missing url' }), { status: 400, headers });
+  }
+
+  let sourceData;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    sourceData = await res.arrayBuffer();
+  } catch (err) {
+    return new Response(JSON.stringify({ error: `Failed to fetch image: ${err.message}` }), { status: 502, headers });
+  }
+
+  try {
+    const processed = await env.IMAGES
+      .input(sourceData)
+      .transform({ segment: 'foreground' })
+      .output({ format: 'image/png' });
+    const pngBuffer = await processed.response().arrayBuffer();
+    const base64    = btoa(String.fromCharCode(...new Uint8Array(pngBuffer)));
+    return new Response(JSON.stringify({ png: base64 }), { status: 200, headers });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: `Background removal failed: ${err.message}` }), { status: 500, headers });
+  }
 }
 
 // ── Device design gallery ────────────────────────────────────────────────────
