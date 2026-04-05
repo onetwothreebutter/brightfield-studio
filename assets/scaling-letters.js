@@ -127,6 +127,7 @@
     'uniform float     u_pos_x;',
     'uniform float     u_pos_y;',
     'uniform float     u_scale;',
+    'uniform float     u_grain_mode;',
     '',
     'out vec4 fragColor;',
     '',
@@ -150,6 +151,10 @@
     '    p *= 2.0; a *= 0.5;',
     '  }',
     '  return v;',
+    '}',
+    '// Interleaved Gradient Noise — blue-noise approximation at pixel coords',
+    'float ign(vec2 p) {',
+    '  return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));',
     '}',
     '',
     'void main() {',
@@ -537,7 +542,10 @@
     '',
     '  // ── Distress + finish ─────────────────────────────────────────────────────',
     '  float dist = clamp(length(dUV - 0.5) * 2.0, 0.0, 1.0);',
-    '  float dn = fbm(gridUV * u_distress_scale);',
+    '  float grainSize = max(1.0, u_distress_scale / 40.0);',
+    '  float dn = u_grain_mode < 0.5',
+    '    ? fbm(gridUV * u_distress_scale)',
+    '    : ign(floor(gl_FragCoord.xy / grainSize));',
     '  alpha = alpha * step(u_distress * dist, dn) * u_opacity;',
     '',
     '  vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
@@ -547,7 +555,7 @@
 
   window.ShaderBase.create({
     animateValues:  true,
-    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale', 'u_grid_aspect', 'u_invert'],
+    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale', 'u_grid_aspect', 'u_invert', 'u_grain_mode'],
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
@@ -609,6 +617,7 @@
         posX:          gl.getUniformLocation(program, 'u_pos_x'),
         posY:          gl.getUniformLocation(program, 'u_pos_y'),
         scale:         gl.getUniformLocation(program, 'u_scale'),
+        grainMode:     gl.getUniformLocation(program, 'u_grain_mode'),
         // Internal letter-texture state (not uniform locations).
         _texCanvases:    texCanvases,
         _texCtxs:        texCtxs,
@@ -698,6 +707,7 @@
       gl.uniform1f(u.posX,          v.u_pos_x          != null ? v.u_pos_x          : 0.0);
       gl.uniform1f(u.posY,          v.u_pos_y          != null ? v.u_pos_y          : 0.0);
       gl.uniform1f(u.scale,         v.u_scale          != null ? v.u_scale          : 1.0);
+      gl.uniform1f(u.grainMode,     v.u_grain_mode     != null ? parseFloat(v.u_grain_mode) : 0.0);
     },
   });
 }());
