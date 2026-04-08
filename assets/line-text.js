@@ -95,7 +95,7 @@
     '  vec3 encoded = pow(max(col, 0.0), vec3(1.0 / 2.2));',
     '  // Display mode (u_transparent_bg=0): opaque black between lines — avoids Safari alpha compositing bug',
     '  // Export mode  (u_transparent_bg=1): transparent between lines — product image shows through PNG',
-    '  float alpha = mix(1.0, lineMask, u_transparent_bg);',
+    '  float alpha = mix(1.0, lineMask * vignette, u_transparent_bg);',
     '  fragColor = vec4(encoded * vignette * mix(lineMask, 1.0, u_transparent_bg), alpha);',
     '}',
   ].join('\n');
@@ -103,6 +103,7 @@
   window.ShaderBase.create({
     animateValues:  true,
     instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale'],
+    exportValues:   { u_transparent_bg: 1.0 },
     fragSrc: fragSrc,
 
     setup: function (gl, program) {

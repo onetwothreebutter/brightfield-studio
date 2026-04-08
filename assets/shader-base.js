@@ -178,7 +178,25 @@
       canvas.height = targetH;
       gl.viewport(0, 0, targetW, targetH);
 
+      // Apply per-shader export overrides (e.g. u_transparent_bg=1 for line-text).
+      // Opt-in only — avoids the blank-design regression that occurred when this was forced globally.
+      var stateValues = window[stateKey] && window[stateKey].values;
+      var exportOverrides = opts.exportValues || {};
+      var savedOverrides = {};
+      if (stateValues) {
+        Object.keys(exportOverrides).forEach(function (k) {
+          savedOverrides[k] = stateValues[k];
+          stateValues[k] = exportOverrides[k];
+        });
+      }
+
       render();
+
+      if (stateValues) {
+        Object.keys(savedOverrides).forEach(function (k) {
+          stateValues[k] = savedOverrides[k];
+        });
+      }
 
       // Use gl.readPixels() instead of canvas.toDataURL() — Safari's WebGL toDataURL
       // composites transparent pixels against black before encoding, producing an opaque

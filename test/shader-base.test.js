@@ -160,6 +160,27 @@ describe('shader-base.js', () => {
     expect(window._shaderState.textDirty).toBe(true);
   });
 
+  it('_shaderExport applies exportValues overrides and restores them after', () => {
+    window._shaderState = { values: { u_transparent_bg: 0.0 }, textDirty: false };
+    const transparentBgValues = [];
+    window.ShaderBase.create({
+      fragSrc: DUMMY_FRAG,
+      setup: () => ({}),
+      exportValues: { u_transparent_bg: 1.0 },
+      render: vi.fn(() => {
+        transparentBgValues.push(window._shaderState.values.u_transparent_bg);
+      }),
+    });
+    transparentBgValues.length = 0; // discard the initial render call
+
+    window._shaderExport(100, 100, vi.fn());
+
+    // exportValues override must be applied during the export render
+    expect(transparentBgValues).toContain(1.0);
+    // original value must be restored after export
+    expect(window._shaderState.values.u_transparent_bg).toBe(0.0);
+  });
+
   // ── useDerivatives ───────────────────────────────────────────────────────────
 
   it('does not call gl.getExtension — fwidth is built-in in WebGL 2', () => {

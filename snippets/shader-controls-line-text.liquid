@@ -2,7 +2,7 @@ var controls = [
   // ── Lines ─────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Lines' },
   { key: 'u_rows',           label: 'Row Count',       type: 'range', min: 5,     max: 150,  step: 1,     value: 80   },
-  { key: 'u_base_thickness', label: 'Base Thickness',  type: 'range', min: 0.001, max: 0.1,  step: 0.001, value: 0.02 },
+  { key: 'u_base_thickness', label: 'Base Thickness',  type: 'range', min: 0.001, max: 0.2,  step: 0.001, value: 0.02 },
   { key: 'u_text_thickness', label: 'Text Thickness',  type: 'range', min: 0,     max: 0.5,  step: 0.01,  value: 0.4  },
   { key: 'textCapRadius', label: 'Cap Radius', type: 'range', min: 0,  max: 100, step: 1,  value: 20,  textDirty: true,
     tip: 'Blur radius applied to line ends — higher values give softer, more rounded caps.' },
@@ -20,13 +20,7 @@ var controls = [
   { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
     tip: 'Off = cosine palette. On = 4-stop linear gradient from left to right.' },
   { key: '_lt_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, noRandomize: true, value: 'Rainbow',
-    options: [
-      { label: 'Rainbow',   value: 'Rainbow'   },
-      { label: 'Cool Blue', value: 'Cool Blue' },
-      { label: 'Neon Heat', value: 'Neon Heat' },
-      { label: 'Cyberpunk', value: 'Cyberpunk' },
-      { label: 'Golden',    value: 'Golden'    },
-    ]
+    options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
   { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
     tip: 'Offset — base brightness per channel. Sets the center point colors oscillate around.' },
