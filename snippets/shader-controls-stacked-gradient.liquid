@@ -38,13 +38,7 @@ var controls = [
     tip: '0 = every row shows the same gradient section. 1 = rows are evenly spread across the full palette.' },
   // Cosine palette controls (hidden when not in Cosine mode)
   { key: '_sg_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
-    options: [
-      { label: 'Rainbow',   value: 'Rainbow'   },
-      { label: 'Cool Blue', value: 'Cool Blue' },
-      { label: 'Neon Heat', value: 'Neon Heat' },
-      { label: 'Cyberpunk', value: 'Cyberpunk' },
-      { label: 'Golden',    value: 'Golden'    },
-    ]
+    options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
   { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080', noRandomize: true,
     tip: 'Offset — base brightness per channel. Sets the center point colors oscillate around.' },

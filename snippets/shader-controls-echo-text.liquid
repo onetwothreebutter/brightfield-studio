@@ -37,13 +37,7 @@ var controls = [
   },
   // Cosine palette controls (shown/hidden by customAfterBuild)
   { key: '_et_palette_preset', label: 'Preset', type: 'select', value: 'Rainbow',
-    options: [
-      { label: 'Rainbow',   value: 'Rainbow'   },
-      { label: 'Cool Blue', value: 'Cool Blue' },
-      { label: 'Neon Heat', value: 'Neon Heat' },
-      { label: 'Cyberpunk', value: 'Cyberpunk' },
-      { label: 'Golden',    value: 'Golden'    },
-    ]
+    options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
   { key: 'u_a', label: 'Palette A', type: 'color', value: '#808080',
     tip: 'Offset — base brightness per channel.' },
@@ -103,15 +97,8 @@ var controls = [
     tip: 'Size of the distress grain — lower = finer, higher = coarser.' },
 ];
 
-// Palette preset data
 var customAfterBuild = function () {
-  var presets = {
-    'Rainbow':   { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.0,   0.33,  0.67]  },
-    'Cool Blue': { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.263, 0.416, 0.557] },
-    'Neon Heat': { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.3,   0.2,   0.2]   },
-    'Cyberpunk': { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [2.0, 1.0, 0.0], d: [0.5,   0.2,   0.25]  },
-    'Golden':    { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 0.5], d: [0.8,   0.9,   0.3]   },
-  };
+  var presets = COSINE_PRESETS;
 
   function toHex(v) {
     return '#' + v.map(function (x) {

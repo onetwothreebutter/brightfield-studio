@@ -169,6 +169,19 @@ describe('line-text.js', () => {
     expect(find1f(uniforms.textThickness)).toBeCloseTo(0.3);
   });
 
+  it('render() passes u_transparent_bg=1 when set (export mode)', () => {
+    // In export mode, alpha = lineMask * vignette so lines fade to transparent at vignette edges.
+    // Display mode keeps alpha=1 (u_transparent_bg=0) to avoid the Safari compositing bug.
+    const uniforms = opts.setup(makeSetupGl(), {});
+    const renderGl = makeRenderGl();
+    opts.render(renderGl, uniforms, { u_transparent_bg: 1.0 }, 500, 500, 0, {});
+
+    function find1f(loc) {
+      return renderGl.uniform1f.mock.calls.find(([l]) => l === loc)?.[1];
+    }
+    expect(find1f(uniforms.transparentBg)).toBe(1.0);
+  });
+
   it('render() binds text texture to TEXTURE0', () => {
     const uniforms = opts.setup(makeSetupGl(), {});
     const renderGl = makeRenderGl();

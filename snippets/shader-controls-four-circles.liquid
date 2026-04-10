@@ -36,13 +36,7 @@ var controls = [
     tip: 'Off = each quadrant has its own gradient. On = gradient spans the full image.' },
   // Cosine palette controls (hidden when 4-Stop mode is on)
   { key: '_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
-    options: [
-      { label: 'Rainbow',   value: 'Rainbow'   },
-      { label: 'Cool Blue', value: 'Cool Blue' },
-      { label: 'Neon Heat', value: 'Neon Heat' },
-      { label: 'Cyberpunk', value: 'Cyberpunk' },
-      { label: 'Golden',    value: 'Golden'    },
-    ]
+    options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
   { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
     tip: 'Offset — base brightness per channel.' },
