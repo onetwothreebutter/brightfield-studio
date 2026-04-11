@@ -71,6 +71,8 @@ export default {
 
     if (method === 'POST' && pathname === '/remove-bg') return handleRemoveBg(request, env, origin);
 
+    if (method === 'POST' && pathname === '/save-preview') return handleSavePreview(request, env, origin);
+
     return new Response('Not found', { status: 404 });
   }
 };
@@ -254,6 +256,51 @@ async function handleDownloadMockup(request, env, origin) {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function handleSavePreview(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
+  }
+
+  const { designImage, mockupImage, deviceId, shader, productHandle, values } = body;
+  if (!designImage || !mockupImage) {
+    return new Response(JSON.stringify({ error: 'Missing designImage or mockupImage' }), { status: 400, headers });
+  }
+
+  const designKey = `designs/${crypto.randomUUID()}.png`;
+  const mockupKey = `mockups/${crypto.randomUUID()}.jpg`;
+
+  const designData = Uint8Array.from(atob(designImage), c => c.charCodeAt(0));
+  const mockupData = Uint8Array.from(atob(mockupImage), c => c.charCodeAt(0));
+
+  await Promise.all([
+    env.MOCKUP_STAGING.put(designKey, designData, { httpMetadata: { contentType: 'image/png' } }),
+    env.MOCKUP_STAGING.put(mockupKey, mockupData, { httpMetadata: { contentType: 'image/jpeg' } }),
+  ]);
+
+  const designUrl = `https://${env.R2_PUBLIC_DOMAIN}/${designKey}`;
+  const mockupUrl = `https://${env.R2_PUBLIC_DOMAIN}/${mockupKey}`;
+
+  if (deviceId) {
+    const entry = {
+      id: crypto.randomUUID(),
+      shader: shader || '',
+      productHandle: productHandle || '',
+      designUrl,
+      mockupUrl,
+      values: values || {},
+      timestamp: Math.floor(Date.now() / 1000),
+    };
+    await saveDesignEntry(env, deviceId, entry).catch(() => {});
+  }
+
+  return new Response(JSON.stringify({ design_url: designUrl, mockup_url: mockupUrl }), { status: 200, headers });
 }
 
 async function handleListDesigns(request, env, origin) {
