@@ -280,7 +280,7 @@
       gl.uniform3fv(u.palD,        v.u_d            || [0.263, 0.416, 0.557]);
       gl.uniform1f(u.colorMode,    parseFloat(v.u_color_mode || '0'));
       gl.uniform1f(u.invertText,   v.u_invert_text  != null ? v.u_invert_text  : 0.0);
-      gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);
+      gl.uniform1f(u.transparentBg, 1.0);
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);

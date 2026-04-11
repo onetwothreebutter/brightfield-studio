@@ -201,7 +201,7 @@ textColor:     gl.getUniformLocation(program, 'u_text_color'),
       gl.uniform1f(u.textY,         v.textY            != null ? v.textY            : 0.5);
 gl.uniform3fv(u.textColor,    v.u_text_color     || [1.0, 1.0, 1.0]);
       gl.uniform3fv(u.outlineColor, v.u_outline_color  || [0.0, 0.0, 0.0]);
-      gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);
+      gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 1.0);
       // Palette
       gl.uniform1f(u.colorMode,  colorMode);
       gl.uniform3fv(u.palA,      palA);
