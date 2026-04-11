@@ -32,6 +32,9 @@
     'uniform float u_opacity;',
     'uniform float u_distress;',
     'uniform float u_distress_scale;',
+    'uniform float u_pos_x;',
+    'uniform float u_pos_y;',
+    'uniform float u_scale;',
     'uniform vec3  u_color0;',
     'uniform vec3  u_color1;',
     'uniform vec3  u_color2;',
@@ -120,6 +123,7 @@
     '',
     'void main() {',
     '  vec2 uv = gl_FragCoord.xy / u_resolution;',
+    '  uv = (uv - 0.5) / u_scale + 0.5 + vec2(u_pos_x, u_pos_y);',
     '',
     '  // Top margin — area above marginThreshold is collar / text zone',
     '  float marginThreshold = 1.0 - u_top_margin;',
@@ -211,6 +215,9 @@
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
+        posX:         gl.getUniformLocation(program, 'u_pos_x'),
+        posY:         gl.getUniformLocation(program, 'u_pos_y'),
+        scale:        gl.getUniformLocation(program, 'u_scale'),
         color0:       gl.getUniformLocation(program, 'u_color0'),
         color1:       gl.getUniformLocation(program, 'u_color1'),
         color2:       gl.getUniformLocation(program, 'u_color2'),
@@ -284,6 +291,9 @@
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
+      gl.uniform1f(u.posX,         v.u_pos_x  != null ? v.u_pos_x  : 0.0);
+      gl.uniform1f(u.posY,         v.u_pos_y  != null ? v.u_pos_y  : 0.0);
+      gl.uniform1f(u.scale,        v.u_scale  != null ? v.u_scale  : 1.0);
       gl.uniform3fv(u.color0,      v.u_color0       || [1.0, 0.2,  0.4]);
       gl.uniform3fv(u.color1,      v.u_color1       || [1.0, 0.8,  0.0]);
       gl.uniform3fv(u.color2,      v.u_color2       || [0.0, 0.8,  1.0]);

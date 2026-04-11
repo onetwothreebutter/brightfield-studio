@@ -6,8 +6,6 @@ var controls = [
   { key: 'u_power',      label: 'Power',         type: 'range', min: 0.5,  max: 6.0,  step: 0.1,  value: 2.5  },
   { key: 'u_width_top',  label: 'Width Top',     type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.05, noRandomize: true },
   { key: 'u_width_bot',  label: 'Width Bottom',  type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.75, noRandomize: true },
-  { key: 'u_offset_y',  label: 'Shift Y',       type: 'range', min: -0.5, max: 0.5,  step: 0.01, value: 0.0, noRandomize: true,
-    tip: 'Moves the whole design up or down on the canvas.' },
   // ── Color Palette ──────────────────────────────────────────────────────────
   { type: 'header', label: 'Color Palette' },
   { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
@@ -63,6 +61,9 @@ var controls = [
     tip: 'Adds a worn, aged look by knocking out random ink spots.' },
   { key: 'u_distress_scale', label: 'Grain',    type: 'range', min: 10, max: 300, step: 1,    value: 80, noRandomize: true,
     tip: 'Size of the distress grain — lower = finer, higher = coarser.' },
+  { key: 'u_pos_x', label: 'Position X', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0, noRandomize: true },
+  { key: 'u_pos_y', label: 'Position Y', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0, noRandomize: true },
+  { key: 'u_scale', label: 'Scale',      type: 'range', min: 0.2,  max: 3.0,  step: 0.05, value: 1.0, noRandomize: true },
 ];
 
 var customAfterBuild = function () {

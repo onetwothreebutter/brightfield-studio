@@ -71,6 +71,55 @@ if (fSel) fSel.addEventListener('change', function () {
 });
 ```
 
+### Finish section — standard controls (every shader must include these)
+The Finish section is always the last section in the controls array and contains these controls in order:
+1. `u_opacity` — range 0–1, default 1.0, `noRandomize: true`
+2. `u_distress` — range 0–0.85, default 0.0, `noRandomize: true`
+3. `u_distress_scale` — range 10–300, default 80, `noRandomize: true`
+4. `u_pos_x` — range -0.5–0.5, default 0.0, `noRandomize: true`
+5. `u_pos_y` — range -0.5–0.5, default 0.0, `noRandomize: true`
+6. `u_scale` — range 0.2–3.0, step 0.05, default 1.0, `noRandomize: true`
+
+Shader-specific extras (e.g. vignette) go between `u_distress_scale` and `u_pos_x`.
+
+**GLSL uniforms to declare in every shader:**
+```glsl
+uniform float u_opacity;
+uniform float u_distress;
+uniform float u_distress_scale;
+uniform float u_pos_x;
+uniform float u_pos_y;
+uniform float u_scale;
+```
+
+**UV position/scale transform — apply at the very top of `main()`, right after computing `uv`:**
+```glsl
+vec2 uv = gl_FragCoord.xy / u_resolution;
+uv = (uv - 0.5) / u_scale + 0.5 + vec2(u_pos_x, u_pos_y);
+```
+This shifts and zooms the entire design. All subsequent coordinate work derives from `uv`, so everything (pattern, palette, text overlay) moves together. Use a separate `dUV = gl_FragCoord.xy / u_resolution` (raw, untransformed) for distress/vignette edge calculations so those remain anchored to the actual screen.
+
+**Shaders with a non-standard coordinate system** (e.g. Chladni uses a centered `p` space): compute `uv` first, apply the transform, then derive `p` from the transformed `uv`:
+```glsl
+vec2 uv = gl_FragCoord.xy / u_resolution;
+uv = (uv - 0.5) / u_scale + 0.5 + vec2(u_pos_x, u_pos_y);
+vec2 p = vec2((uv.x * 2.0 - 1.0) * u_aspect, uv.y * 2.0 - 1.0);
+```
+
+**`setup()` additions:**
+```js
+posX:  gl.getUniformLocation(program, 'u_pos_x'),
+posY:  gl.getUniformLocation(program, 'u_pos_y'),
+scale: gl.getUniformLocation(program, 'u_scale'),
+```
+
+**`render()` additions:**
+```js
+gl.uniform1f(u.posX,  v.u_pos_x != null ? v.u_pos_x : 0.0);
+gl.uniform1f(u.posY,  v.u_pos_y != null ? v.u_pos_y : 0.0);
+gl.uniform1f(u.scale, v.u_scale  != null ? v.u_scale  : 1.0);
+```
+
 ### Gamma encoding (always include in GLSL)
 ```glsl
 vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));
