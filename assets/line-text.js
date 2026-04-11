@@ -26,6 +26,9 @@
     'uniform float u_cap_radius;',
     'uniform float u_text_tex_size;',
     'uniform float u_transparent_bg;',
+    'uniform float u_pos_x;',
+    'uniform float u_pos_y;',
+    'uniform float u_scale;',
     'out vec4 fragColor;',
     '',
     'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
@@ -59,6 +62,7 @@
     '',
     'void main() {',
     '  vec2 uv = gl_FragCoord.xy / u_resolution;',
+    '  uv = (uv - 0.5) / u_scale + 0.5 + vec2(u_pos_x, u_pos_y);',
     '',
     '  // R channel = text mask (0..1); blur in blurredTextSample creates soft cap falloff',
     '  float textSample = blurredTextSample(uv);',
@@ -128,6 +132,9 @@
         capRadius:     gl.getUniformLocation(program, 'u_cap_radius'),
         texSize:       gl.getUniformLocation(program, 'u_text_tex_size'),
         transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
+        posX:          gl.getUniformLocation(program, 'u_pos_x'),
+        posY:          gl.getUniformLocation(program, 'u_pos_y'),
+        scale:         gl.getUniformLocation(program, 'u_scale'),
       };
     },
 
@@ -151,6 +158,9 @@
       gl.uniform1f(u.capRadius,     v.textCapRadius != null ? v.textCapRadius : 20.0);
       gl.uniform1f(u.texSize,       1024.0);
       gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);
+      gl.uniform1f(u.posX,         v.u_pos_x  != null ? v.u_pos_x  : 0.0);
+      gl.uniform1f(u.posY,         v.u_pos_y  != null ? v.u_pos_y  : 0.0);
+      gl.uniform1f(u.scale,        v.u_scale  != null ? v.u_scale  : 1.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);

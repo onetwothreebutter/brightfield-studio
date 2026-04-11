@@ -21,6 +21,9 @@
     'uniform float u_opacity;',
     'uniform float u_distress;',
     'uniform float u_distress_scale;',
+    'uniform float u_pos_x;',
+    'uniform float u_pos_y;',
+    'uniform float u_scale;',
     'uniform float u_vignette_x;',
     'uniform float u_vignette_y;',
     'uniform float u_aspect;',
@@ -52,7 +55,9 @@
     '}',
     '',
     'void main() {',
-    '  vec2 p = (2.0 * gl_FragCoord.xy - u_resolution) / u_resolution.y;',
+    '  vec2 uv = gl_FragCoord.xy / u_resolution;',
+    '  uv = (uv - 0.5) / u_scale + 0.5 + vec2(u_pos_x, u_pos_y);',
+    '  vec2 p = vec2((uv.x * 2.0 - 1.0) * u_aspect, uv.y * 2.0 - 1.0);',
     '',
     '  float cr = cos(u_rotation), sr = sin(u_rotation);',
     '  vec2  rp = vec2(cr * p.x - sr * p.y, sr * p.x + cr * p.y);',
@@ -101,7 +106,6 @@
     '  vec2 vigCoord = dUV - 0.5;',
     '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
     '  col = col * clamp(1.0 - vigVal, 0.0, 1.0);',
-    '  vec2 uv = gl_FragCoord.xy / u_resolution;',
     '  vec2 textAnchor    = vec2(u_text_x, u_text_y);',
     '  vec2 textDelta     = uv - textAnchor;',
     '  vec2 textUV        = vec2(textDelta.x * u_aspect, textDelta.y) + textAnchor;',
@@ -141,6 +145,9 @@
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
+        posX:          gl.getUniformLocation(program, 'u_pos_x'),
+        posY:          gl.getUniformLocation(program, 'u_pos_y'),
+        scale:         gl.getUniformLocation(program, 'u_scale'),
         vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
         vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
         aspect:        gl.getUniformLocation(program, 'u_aspect'),
@@ -170,6 +177,9 @@
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
+      gl.uniform1f(u.posX,         v.u_pos_x  != null ? v.u_pos_x  : 0.0);
+      gl.uniform1f(u.posY,         v.u_pos_y  != null ? v.u_pos_y  : 0.0);
+      gl.uniform1f(u.scale,        v.u_scale  != null ? v.u_scale  : 1.0);
       gl.uniform1f(u.vignetteX,     v.u_vignette_x     != null ? v.u_vignette_x     : 0.0);
       gl.uniform1f(u.vignetteY,     v.u_vignette_y     != null ? v.u_vignette_y     : 0.0);
       gl.uniform1f(u.aspect,        w / h);

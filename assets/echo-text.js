@@ -45,6 +45,9 @@
     'uniform float     u_opacity;',
     'uniform float     u_distress;',
     'uniform float     u_distress_scale;',
+    'uniform float     u_pos_x;',
+    'uniform float     u_pos_y;',
+    'uniform float     u_scale;',
     '',
     'float hash21(vec2 p) {',
     '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);',
@@ -65,6 +68,7 @@
     '',
     'void main() {',
     '  vec2 uv = gl_FragCoord.xy / u_resolution;',
+    '  uv = (uv - 0.5) / u_scale + 0.5 + vec2(u_pos_x, u_pos_y);',
     '',
     '  // Aspect-correct UV — maps square texture onto canvas without squishing.',
     '  vec2 anchor = vec2(u_text_x, u_text_y);',
@@ -175,6 +179,9 @@ textColor:     gl.getUniformLocation(program, 'u_text_color'),
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
+        posX:          gl.getUniformLocation(program, 'u_pos_x'),
+        posY:          gl.getUniformLocation(program, 'u_pos_y'),
+        scale:         gl.getUniformLocation(program, 'u_scale'),
       };
     },
 
@@ -224,6 +231,9 @@ gl.uniform3fv(u.textColor,    v.u_text_color     || [1.0, 1.0, 1.0]);
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
+      gl.uniform1f(u.posX,         v.u_pos_x  != null ? v.u_pos_x  : 0.0);
+      gl.uniform1f(u.posY,         v.u_pos_y  != null ? v.u_pos_y  : 0.0);
+      gl.uniform1f(u.scale,        v.u_scale  != null ? v.u_scale  : 1.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);
