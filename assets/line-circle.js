@@ -227,7 +227,7 @@
       gl.uniform1f(u.triWidth,     v.u_tri_width            != null ? v.u_tri_width            : (45 * Math.PI) / 180);
       gl.uniform1f(u.centerCircleEnabled, v.u_center_circle_enabled != null ? v.u_center_circle_enabled : 1.0);
       gl.uniform1f(u.centerCircleRadius,  v.u_center_circle_radius  != null ? v.u_center_circle_radius  : 0.04);
-      gl.uniform1f(u.transparentBg, v.u_transparent_bg      != null ? v.u_transparent_bg      : 0.0);
+      gl.uniform1f(u.transparentBg, 1.0);
       gl.uniform1f(u.offsetY,      v.u_offset_y             != null ? v.u_offset_y             : 0.0);
       gl.uniform1f(u.opacity,      v.u_opacity              != null ? v.u_opacity              : 1.0);
       gl.uniform1f(u.distress,     v.u_distress             != null ? v.u_distress             : 0.0);
