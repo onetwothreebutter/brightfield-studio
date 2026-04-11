@@ -911,7 +911,10 @@ async function handleRemoveBg(request, env, origin) {
       .transform({ segment: 'foreground' })
       .output({ format: 'image/png' });
     const pngBuffer = await processed.response().arrayBuffer();
-    const base64    = btoa(String.fromCharCode(...new Uint8Array(pngBuffer)));
+    const bytes     = new Uint8Array(pngBuffer);
+    let binary      = '';
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+    const base64    = btoa(binary);
     return new Response(JSON.stringify({ png: base64 }), { status: 200, headers });
   } catch (err) {
     return new Response(JSON.stringify({ error: `Background removal failed: ${err.message}` }), { status: 500, headers });
