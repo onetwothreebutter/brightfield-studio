@@ -1,9 +1,35 @@
-<section class="community-designs-section">
+<section class="community-designs-section section-padding">
   <div class="container">
-    <div class="community-designs__header">
-      <h2 class="community-designs__heading">Community Designs</h2>
+
+    <div class="section-header">
+      <h2
+        class="section-title glitch"
+        data-text="Community Designs"
+      >
+        Community Designs
+      </h2>
     </div>
-    <div id="community-designs-container"></div>
+
+    <div id="community-designs-container">
+      <div class="product-grid">
+        {%- for i in (1..4) -%}
+          <div class="product-card product-card--placeholder">
+            <div class="product-card__media">
+              <div class="product-card__image product-card__image--placeholder"></div>
+            </div>
+            <div class="product-card__info">
+              <div class="placeholder-line placeholder-line--title"></div>
+              <div class="placeholder-line placeholder-line--price"></div>
+            </div>
+          </div>
+        {%- endfor -%}
+      </div>
+    </div>
+
+    <div class="section-footer" id="community-designs-footer" style="display:none">
+      <a href="/pages/community-designs" class="btn btn--outline">See All</a>
+    </div>
+
   </div>
 </section>
 
@@ -12,15 +38,19 @@
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     var container = document.getElementById('community-designs-container');
+    var footer = document.getElementById('community-designs-footer');
+    var SEE_ALL_MAX = 15;
     if (!container || !window.CommunityDesigns) return;
     CommunityDesigns.fetchCommunityDesigns().then(function (designs) {
       if (!designs || !designs.length) {
-        document.querySelector('.community-designs-section').style.display = 'none';
+        container.innerHTML = '<p class="community-designs__empty-msg">No community designs yet — be the first to share one!</p>';
         return;
       }
-      CommunityDesigns.renderStrip(container, designs, {
+      var hasMore = designs.length > SEE_ALL_MAX;
+      CommunityDesigns.renderStrip(container, hasMore ? designs.slice(0, SEE_ALL_MAX) : designs, {
         getDeviceId: window.RecentDesigns && window.RecentDesigns.getDeviceId
       });
+      if (hasMore && footer) footer.style.display = '';
     });
   });
 </script>

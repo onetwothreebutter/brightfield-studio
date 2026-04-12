@@ -1,7 +1,6 @@
 const ALLOWED_ORIGINS = new Set([
   'https://brightfield.studio',
   'https://brightfield-2.myshopify.com',
-  'http://127.0.0.1:9292',
 ]);
 const PRINTFUL_API = 'https://api.printful.com';
 
@@ -10,8 +9,14 @@ const PRODUCT_ID   = 71;
 const PRINT_WIDTH  = 1800;
 const PRINT_HEIGHT = 2400;
 
+function isAllowedOrigin(origin) {
+  if (ALLOWED_ORIGINS.has(origin)) return true;
+  try { const u = new URL(origin); return u.hostname === '127.0.0.1' || u.hostname === 'localhost'; }
+  catch { return false; }
+}
+
 function corsHeaders(origin) {
-  const allowed = ALLOWED_ORIGINS.has(origin);
+  const allowed = isAllowedOrigin(origin);
   return {
     'Access-Control-Allow-Origin':  allowed ? origin : 'https://brightfield.studio',
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',

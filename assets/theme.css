@@ -2315,8 +2315,51 @@ h6 {
 }
 
 /* ─── Community Designs ──────────────────────────────────── */
-.community-designs-section {
+.community-card-group {
+    margin-bottom: 3rem;
+}
+.community-card-group:last-child {
+    margin-bottom: 0;
+}
+@media (max-width: 600px) {
+    .community-card-group .product-grid {
+        display: flex;
+        overflow-x: auto;
+        gap: 12px;
+        padding-bottom: 10px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-border) transparent;
+    }
+    .community-card-group .product-grid .community-card {
+        flex: 0 0 60vw;
+    }
+}
+.community-card-group__heading {
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    margin: 0 0 1.25rem;
+}
+.community-designs__empty-msg {
+    color: var(--color-text-muted);
+    font-size: 0.9375rem;
+    text-align: center;
     padding: 2rem 0;
+}
+.community-card .product-card__media {
+    aspect-ratio: 3 / 4;
+}
+.community-card__meta {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    margin: 0;
+    text-transform: capitalize;
+}
+.community-designs__like-btn--liked {
+    color: #e05;
+    border-color: #e05;
 }
 .community-designs__header {
     margin-bottom: 1rem;
