@@ -35,7 +35,11 @@
         "products_to_show": 9,
         "show_view_all": true
       }
+    },
+    "community-designs": {
+      "type": "community-designs",
+      "settings": {}
     }
   },
-  "order": ["hero", "shader-demo", "featured-collection", "designs-row"]
+  "order": ["hero", "shader-demo", "designs-row", "featured-collection", "community-designs"]
 }

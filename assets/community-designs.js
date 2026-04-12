@@ -72,6 +72,129 @@
     document.body.removeChild(ta);
   }
 
+  function formatShaderName(shader) {
+    return (shader || 'Unknown').replace(/-/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+
+  function buildCard(design, likedSet, getDeviceIdFn, onCardClick) {
+    var card = document.createElement('article');
+    card.className = 'product-card community-card';
+
+    var media = document.createElement('div');
+    media.className = 'product-card__media';
+
+    var img = document.createElement('img');
+    img.src = design.mockupUrl;
+    img.alt = (design.creatorName || 'Community') + ' design';
+    img.className = 'product-card__image';
+    img.loading = 'lazy';
+
+    var glow = document.createElement('div');
+    glow.className = 'product-card__glow';
+    glow.setAttribute('aria-hidden', 'true');
+
+    media.appendChild(img);
+    media.appendChild(glow);
+
+    var info = document.createElement('div');
+    info.className = 'product-card__info';
+
+    var nameEl = document.createElement('h3');
+    nameEl.className = 'product-card__title';
+    nameEl.textContent = design.creatorName || 'Anonymous';
+
+    var metaEl = document.createElement('p');
+    metaEl.className = 'community-card__meta';
+    metaEl.textContent = timeAgo(design.timestamp);
+
+    info.appendChild(nameEl);
+    info.appendChild(metaEl);
+
+    var actions = document.createElement('div');
+    actions.className = 'product-card__actions';
+
+    var isLiked = !!likedSet[design.id];
+    var likeBtn = document.createElement('button');
+    likeBtn.className = 'btn btn--outline btn--sm community-designs__like-btn' + (isLiked ? ' community-designs__like-btn--liked' : '');
+    likeBtn.dataset.id = design.id;
+    likeBtn.setAttribute('aria-label', 'Like');
+
+    var likeIcon = document.createElement('span');
+    likeIcon.className = 'community-designs__like-icon';
+    likeIcon.textContent = '\u2665';
+
+    var likeCount = document.createElement('span');
+    likeCount.className = 'community-designs__like-count';
+    likeCount.textContent = design.likes || 0;
+
+    likeBtn.appendChild(likeIcon);
+    likeBtn.appendChild(likeCount);
+
+    var shareBtn = document.createElement('button');
+    shareBtn.className = 'btn btn--outline btn--sm community-designs__share-btn';
+    shareBtn.setAttribute('aria-label', 'Copy share link');
+    shareBtn.textContent = '\uD83D\uDD17';
+
+    actions.appendChild(likeBtn);
+    actions.appendChild(shareBtn);
+
+    card.appendChild(media);
+    card.appendChild(info);
+    card.appendChild(actions);
+
+    (function (d, likeButton, countEl, shareButton) {
+      shareButton.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var shareUrl = 'https://share.brightfield.studio/' + d.id;
+        function showCopied() {
+          shareButton.textContent = '\u2713';
+          setTimeout(function () { shareButton.textContent = '\uD83D\uDD17'; }, 1500);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(shareUrl).then(showCopied).catch(function () {
+            fallbackCopy(shareUrl, showCopied);
+          });
+        } else {
+          fallbackCopy(shareUrl, showCopied);
+        }
+      });
+
+      likeButton.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var deviceId = getDeviceIdFn();
+        toggleLike(d.id, deviceId).then(function (result) {
+          if (!result) return;
+          countEl.textContent = result.likes;
+          var liked = result.liked;
+          likeButton.classList.toggle('community-designs__like-btn--liked', liked);
+          var set = getLikedSet();
+          if (liked) {
+            set[d.id] = 1;
+          } else {
+            delete set[d.id];
+          }
+          setLikedSet(set);
+        });
+      });
+
+      card.addEventListener('click', function () {
+        if (onCardClick) {
+          onCardClick(d, card);
+        } else {
+          var RESTORE_KEY = 'brightfield_restore';
+          localStorage.setItem(RESTORE_KEY, JSON.stringify({
+            values: d.values,
+            shader: d.shader,
+            creatorName: d.creatorName || null
+          }));
+          window.location.href = '/products/' + d.productHandle + '#shader';
+        }
+      });
+    }(design, likeBtn, likeCount, shareBtn));
+
+    return card;
+  }
+
   function renderStrip(container, designs, opts) {
     opts = opts || {};
     var getDeviceIdFn = (opts.getDeviceId && typeof opts.getDeviceId === 'function')
@@ -84,120 +207,33 @@
 
     var likedSet = getLikedSet();
 
-    var strip = document.createElement('div');
-    strip.className = 'community-designs__strip';
-    if (opts.grid) strip.classList.add('community-designs__strip--grid');
-
+    // Group by shader, preserving first-seen order
+    var groups = {};
+    var order = [];
     designs.forEach(function (design) {
-      var card = document.createElement('div');
-      card.className = 'community-designs__card';
-
-      var img = document.createElement('img');
-      img.src = design.mockupUrl;
-      img.alt = (design.creatorName || 'Community') + ' design';
-      img.className = 'community-designs__card-img';
-      img.loading = 'lazy';
-
-      var label = document.createElement('div');
-      label.className = 'community-designs__card-label';
-
-      var nameEl = document.createElement('span');
-      nameEl.className = 'community-designs__card-name';
-      nameEl.textContent = design.creatorName || 'Anonymous';
-
-      var shaderEl = document.createElement('span');
-      shaderEl.className = 'community-designs__card-shader';
-      shaderEl.textContent = (design.shader || '').replace(/-/g, ' ');
-
-      var timeEl = document.createElement('span');
-      timeEl.className = 'community-designs__card-time';
-      timeEl.textContent = timeAgo(design.timestamp);
-
-      var isLiked = !!likedSet[design.id];
-      var likeBtn = document.createElement('button');
-      likeBtn.className = 'community-designs__like-btn' + (isLiked ? ' community-designs__like-btn--liked' : '');
-      likeBtn.dataset.id = design.id;
-      likeBtn.setAttribute('aria-label', 'Like');
-
-      var likeIcon = document.createElement('span');
-      likeIcon.className = 'community-designs__like-icon';
-      likeIcon.textContent = '\u2665';
-
-      var likeCount = document.createElement('span');
-      likeCount.className = 'community-designs__like-count';
-      likeCount.textContent = design.likes || 0;
-
-      likeBtn.appendChild(likeIcon);
-      likeBtn.appendChild(likeCount);
-
-      var shareBtn = document.createElement('button');
-      shareBtn.className = 'community-designs__share-btn';
-      shareBtn.setAttribute('aria-label', 'Copy share link');
-      shareBtn.textContent = '\uD83D\uDD17';
-
-      label.appendChild(nameEl);
-      label.appendChild(shaderEl);
-      label.appendChild(timeEl);
-      label.appendChild(likeBtn);
-      label.appendChild(shareBtn);
-
-      card.appendChild(img);
-      card.appendChild(label);
-
-      (function (d, likeButton, countEl, shareButton) {
-        shareButton.addEventListener('click', function (e) {
-          e.stopPropagation();
-          var shareUrl = 'https://share.brightfield.studio/' + d.id;
-          function showCopied() {
-            shareButton.textContent = '\u2713';
-            setTimeout(function () { shareButton.textContent = '\uD83D\uDD17'; }, 1500);
-          }
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(shareUrl).then(showCopied).catch(function () {
-              fallbackCopy(shareUrl, showCopied);
-            });
-          } else {
-            fallbackCopy(shareUrl, showCopied);
-          }
-        });
-
-        likeButton.addEventListener('click', function (e) {
-          e.stopPropagation();
-          var deviceId = getDeviceIdFn();
-          toggleLike(d.id, deviceId).then(function (result) {
-            if (!result) return;
-            countEl.textContent = result.likes;
-            var liked = result.liked;
-            likeButton.classList.toggle('community-designs__like-btn--liked', liked);
-            var set = getLikedSet();
-            if (liked) {
-              set[d.id] = 1;
-            } else {
-              delete set[d.id];
-            }
-            setLikedSet(set);
-          });
-        });
-
-        card.addEventListener('click', function () {
-          if (onCardClick) {
-            onCardClick(d, card);
-          } else {
-            var RESTORE_KEY = 'brightfield_restore';
-            localStorage.setItem(RESTORE_KEY, JSON.stringify({
-              values: d.values,
-              shader: d.shader,
-              creatorName: d.creatorName || null
-            }));
-            window.location.href = '/products/' + d.productHandle + '#shader';
-          }
-        });
-      }(design, likeBtn, likeCount, shareBtn));
-
-      strip.appendChild(card);
+      var key = design.shader || 'unknown';
+      if (!groups[key]) { groups[key] = []; order.push(key); }
+      groups[key].push(design);
     });
 
-    container.appendChild(strip);
+    order.forEach(function (shader) {
+      var group = document.createElement('div');
+      group.className = 'community-card-group';
+
+      var heading = document.createElement('h3');
+      heading.className = 'community-card-group__heading';
+      heading.textContent = formatShaderName(shader);
+      group.appendChild(heading);
+
+      var grid = document.createElement('div');
+      grid.className = 'product-grid';
+      groups[shader].forEach(function (design) {
+        grid.appendChild(buildCard(design, likedSet, getDeviceIdFn, onCardClick));
+      });
+      group.appendChild(grid);
+
+      container.appendChild(group);
+    });
   }
 
   window.CommunityDesigns = {

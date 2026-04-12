@@ -2,40 +2,21 @@
 
 <section class="designs-row-section section-padding">
   <div class="container">
-    <div class="designs-row">
-
-      <div class="designs-row__col" id="designs-row__recent">
-        <h2 class="recent-designs__heading">Your Recent Designs</h2>
-        <div id="recent-designs-container">
-          <div class="recent-designs__strip">
-            <div class="designs-row__skeleton-card"></div>
-            <div class="designs-row__skeleton-card"></div>
-            <div class="designs-row__skeleton-card"></div>
-            <div class="designs-row__skeleton-card"></div>
-          </div>
+    <div class="designs-row__col" id="designs-row__recent">
+      <h2 class="recent-designs__heading">Your Recent Designs</h2>
+      <div id="recent-designs-container">
+        <div class="recent-designs__strip">
+          <div class="designs-row__skeleton-card"></div>
+          <div class="designs-row__skeleton-card"></div>
+          <div class="designs-row__skeleton-card"></div>
+          <div class="designs-row__skeleton-card"></div>
         </div>
       </div>
-
-      <div class="designs-row__col" id="designs-row__community">
-        <div class="community-designs__header">
-          <h2 class="community-designs__heading">Community Designs</h2>
-        </div>
-        <div id="community-designs-container">
-          <div class="community-designs__strip">
-            <div class="designs-row__skeleton-card"></div>
-            <div class="designs-row__skeleton-card"></div>
-            <div class="designs-row__skeleton-card"></div>
-            <div class="designs-row__skeleton-card"></div>
-          </div>
-        </div>
-      </div>
-
     </div>
   </div>
 </section>
 
 <script src="{{ 'recent-designs.js' | asset_url }}" defer></script>
-<script src="{{ 'community-designs.js' | asset_url }}" defer></script>
 <script>
 (function () {
   var EMPTY_ICON = {{ empty_icon | json }};
@@ -68,22 +49,6 @@
         var hasMore = designs.length > SEE_ALL_MAX;
         RecentDesigns.renderFilmstrip(recentContainer, hasMore ? designs.slice(0, SEE_ALL_MAX) : designs);
         if (hasMore) addSeeAllBtn(recentCol, '/pages/recent-designs');
-      });
-    }
-
-    var communityContainer = document.getElementById('community-designs-container');
-    var communityCol = document.getElementById('designs-row__community');
-    if (communityContainer && window.CommunityDesigns) {
-      CommunityDesigns.fetchCommunityDesigns().then(function (designs) {
-        if (!designs || !designs.length) {
-          communityContainer.innerHTML = emptyState('No community designs yet');
-          return;
-        }
-        var hasMore = designs.length > SEE_ALL_MAX;
-        CommunityDesigns.renderStrip(communityContainer, hasMore ? designs.slice(0, SEE_ALL_MAX) : designs, {
-          getDeviceId: window.RecentDesigns && window.RecentDesigns.getDeviceId
-        });
-        if (hasMore) addSeeAllBtn(communityCol, '/pages/community-designs');
       });
     }
   });
