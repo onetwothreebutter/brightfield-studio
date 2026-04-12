@@ -37,5 +37,5 @@
       }
     }
   },
-  "order": ["hero", "shader-demo", "designs-row", "featured-collection"]
+  "order": ["hero", "shader-demo", "featured-collection", "designs-row"]
 }
