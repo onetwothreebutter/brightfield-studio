@@ -109,38 +109,38 @@ describe('renderStrip()', () => {
   it('renders one card per design', () => {
     const container = document.createElement('div');
     window.CommunityDesigns.renderStrip(container, [makeDesign(), makeDesign()]);
-    expect(container.querySelectorAll('.community-designs__card')).toHaveLength(2);
+    expect(container.querySelectorAll('.community-card')).toHaveLength(2);
   });
 
   it('sets img src from mockupUrl', () => {
     const container = document.createElement('div');
     window.CommunityDesigns.renderStrip(container, [makeDesign({ mockupUrl: 'https://img.example.com/1.jpg' })]);
-    expect(container.querySelector('.community-designs__card-img').getAttribute('src'))
+    expect(container.querySelector('.product-card__image').getAttribute('src'))
       .toBe('https://img.example.com/1.jpg');
   });
 
   it('shows creator name', () => {
     const container = document.createElement('div');
     window.CommunityDesigns.renderStrip(container, [makeDesign({ creatorName: 'Alice' })]);
-    expect(container.querySelector('.community-designs__card-name').textContent).toBe('Alice');
+    expect(container.querySelector('.product-card__title').textContent).toBe('Alice');
   });
 
   it('shows "Anonymous" when creatorName is absent', () => {
     const container = document.createElement('div');
     window.CommunityDesigns.renderStrip(container, [makeDesign({ creatorName: '' })]);
-    expect(container.querySelector('.community-designs__card-name').textContent).toBe('Anonymous');
+    expect(container.querySelector('.product-card__title').textContent).toBe('Anonymous');
   });
 
-  it('shows shader name with hyphens replaced by spaces', () => {
+  it('shows shader name as title-cased group heading', () => {
     const container = document.createElement('div');
     window.CommunityDesigns.renderStrip(container, [makeDesign({ shader: 'echo-text' })]);
-    expect(container.querySelector('.community-designs__card-shader').textContent).toBe('echo text');
+    expect(container.querySelector('.community-card-group__heading').textContent).toBe('Echo Text');
   });
 
   it('renders a timestamp label', () => {
     const container = document.createElement('div');
     window.CommunityDesigns.renderStrip(container, [makeDesign()]);
-    expect(container.querySelector('.community-designs__card-time').textContent).toMatch(/ago$/);
+    expect(container.querySelector('.community-card__meta').textContent).toMatch(/ago$/);
   });
 
   it('renders like button with initial count', () => {
@@ -167,7 +167,7 @@ describe('renderStrip()', () => {
     const container = document.createElement('div');
     window.CommunityDesigns.renderStrip(container, [makeDesign()]);
     window.CommunityDesigns.renderStrip(container, [makeDesign(), makeDesign()]);
-    expect(container.querySelectorAll('.community-designs__card')).toHaveLength(2);
+    expect(container.querySelectorAll('.community-card')).toHaveLength(2);
   });
 
   it('does nothing when designs array is empty', () => {
@@ -185,7 +185,7 @@ describe('card click — default navigation', () => {
     const design = makeDesign({ shader: 'echo-text', values: { u_speed: 2 } });
     const container = document.createElement('div');
     window.CommunityDesigns.renderStrip(container, [design]);
-    container.querySelector('.community-designs__card').click();
+    container.querySelector('.community-card').click();
     const stored = JSON.parse(localStorage.getItem('brightfield_restore'));
     expect(stored).toEqual({ values: design.values, shader: 'echo-text', creatorName: 'Jane' });
   });
@@ -195,7 +195,7 @@ describe('card click — default navigation', () => {
     const design = makeDesign({ productHandle: 'echo-text-shirt' });
     const container = document.createElement('div');
     window.CommunityDesigns.renderStrip(container, [design]);
-    container.querySelector('.community-designs__card').click();
+    container.querySelector('.community-card').click();
     expect(window.location.href).toBe('/products/echo-text-shirt#shader');
   });
 
@@ -205,7 +205,7 @@ describe('card click — default navigation', () => {
     const container = document.createElement('div');
     const cb = vi.fn();
     window.CommunityDesigns.renderStrip(container, [design], { onCardClick: cb });
-    container.querySelector('.community-designs__card').click();
+    container.querySelector('.community-card').click();
     expect(cb).toHaveBeenCalledWith(design, expect.any(Object));
     expect(window.location.href).toBe('');
   });
