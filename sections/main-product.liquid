@@ -232,6 +232,7 @@
             class="btn btn--primary btn--lg btn--full"
             data-worker-url="https://brightfield-mockup-worker.eric-d-johnson.workers.dev"
             data-shirt-template="{{ 'shirt-template.png' | asset_url }}"
+            data-shirt-sdf="{{ 'shirt-sdf.png' | asset_url }}"
             data-print-area="0.20,0.15,0.60,0.68"
           >Preview on Shirt</button>
           <p class="product-customize-actions__note">You'll select your size when you order.</p>
@@ -340,6 +341,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   {% when 'stacked-gradient' %} {% render 'shader-controls-stacked-gradient' %}
   {% when 'echo-text' %}        {% render 'shader-controls-echo-text' %}
   {% when 'line-text' %}        {% render 'shader-controls-line-text' %}
+  {% when 'outline-pulse' %}    {% render 'shader-controls-outline-pulse' %}
   {% else %}                    {% render 'shader-controls-rise-shirt' %}
   {% endcase %}
 
