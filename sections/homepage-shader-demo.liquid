@@ -412,18 +412,8 @@
       <span class="mockup-modal__title">Preview on Shirt</span>
       <button class="mockup-modal__close" id="demo-mockup-close" aria-label="Close preview">&times;</button>
     </div>
-    <div class="mockup-modal__body mockup-modal__body--compare">
-      <div class="mockup-modal__compare-col">
-        <span class="mockup-modal__compare-label">Yours</span>
-        <img class="mockup-modal__img" id="demo-mockup-img" src="" alt="Client composite">
-        <a id="demo-mockup-download" class="btn btn--outline btn--sm mockup-modal__compare-dl" download="yours.png">Download</a>
-      </div>
-      <div class="mockup-modal__compare-col">
-        <span class="mockup-modal__compare-label">Printful</span>
-        <p id="demo-printful-status" class="mockup-modal__printful-status">Requesting…</p>
-        <img id="demo-printful-img" class="mockup-modal__img" src="" alt="Printful mockup" style="display:none">
-        <a id="demo-printful-download" class="btn btn--outline btn--sm mockup-modal__compare-dl" download="printful.jpg" style="display:none">Download</a>
-      </div>
+    <div class="mockup-modal__body">
+      <img class="mockup-modal__img" id="demo-mockup-img" src="" alt="Shirt preview">
     </div>
     <div class="mockup-modal__footer" id="demo-mockup-footer">
       <div class="mockup-modal__size" id="demo-mockup-size-wrap">
@@ -433,6 +423,7 @@
         </select>
       </div>
       <div class="mockup-modal__footer-actions">
+        <a id="demo-mockup-download" class="btn btn--outline btn--sm" download="your-design.png">Download</a>
         <button id="demo-mockup-order" class="btn btn--primary btn--sm">Order This Design</button>
       </div>
       <div class="mockup-modal__community" id="demo-community-wrap">
@@ -580,9 +571,6 @@
   var mockupSizeEl        = document.getElementById('demo-mockup-size');
   var mockupDownload      = document.getElementById('demo-mockup-download');
   var mockupOrder         = document.getElementById('demo-mockup-order');
-  var printfulImg         = document.getElementById('demo-printful-img');
-  var printfulStatus      = document.getElementById('demo-printful-status');
-  var printfulDl          = document.getElementById('demo-printful-download');
 
   // ── Cycle dots ─────────────────────────────────────────────────────────────
   CYCLE_STEPS.forEach(function () {
@@ -1041,7 +1029,6 @@
 
   // ── Preview on Shirt ───────────────────────────────────────────────────────
   var WORKER_BASE_URL    = 'https://brightfield-mockup-worker.eric-d-johnson.workers.dev';
-  var MOCKUP_VARIANT_ID  = 4017;
   var PRODUCT_HANDLE     = {{ section.settings.product_handle | default: 'line-circle' | json }};
   var PRINT_AREA         = [0.30, 0.20, 0.40, 0.45];
   var currentDesignUrl   = null;
@@ -1170,28 +1157,6 @@
         if (dCommunitySuccess) dCommunitySuccess.style.display = 'none';
         if (dCommunityError)   dCommunityError.style.display = 'none';
         if (dCommunitySubmit)  { dCommunitySubmit.disabled = false; dCommunitySubmit.textContent = 'Submit Design'; }
-
-        // Fetch Printful version in parallel for side-by-side comparison
-        if (printfulImg)    { printfulImg.style.display = 'none'; printfulImg.src = ''; }
-        if (printfulStatus) { printfulStatus.style.display = ''; printfulStatus.textContent = 'Requesting\u2026'; }
-        if (printfulDl)     { printfulDl.style.display = 'none'; printfulDl.href = ''; }
-        fetch(WORKER_BASE_URL + '/generate-mockup', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ image: base64png, variant_id: MOCKUP_VARIANT_ID })
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          if (data.mockup_url) {
-            printfulImg.src              = data.mockup_url;
-            printfulImg.style.display    = '';
-            printfulStatus.style.display = 'none';
-            if (printfulDl) { printfulDl.href = data.mockup_url; printfulDl.style.display = ''; }
-          } else {
-            printfulStatus.textContent = 'Printful error: ' + (data.error || 'unknown');
-          }
-        })
-        .catch(function () { if (printfulStatus) printfulStatus.textContent = 'Printful request failed.'; });
 
         // Upload design + composite to R2 in the background for stable URLs (order/community)
         var snapshotValues = JSON.parse(JSON.stringify(window._demoState ? window._demoState.values : {}));
