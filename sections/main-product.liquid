@@ -102,8 +102,18 @@
                 <span class="mockup-modal__title">Shirt Preview</span>
                 <button class="mockup-modal__close" id="mockup-modal-close" aria-label="Close">&times;</button>
               </div>
-              <div class="mockup-modal__body">
-                <img id="mockup-modal-img" class="mockup-modal__img" src="" alt="Shirt mockup">
+              <div class="mockup-modal__body mockup-modal__body--compare">
+                <div class="mockup-modal__compare-col">
+                  <span class="mockup-modal__compare-label">Yours</span>
+                  <img id="mockup-modal-img" class="mockup-modal__img" src="" alt="Client composite">
+                  <a id="mockup-modal-download" class="btn btn--outline btn--sm mockup-modal__compare-dl" download="yours.png">Download</a>
+                </div>
+                <div class="mockup-modal__compare-col">
+                  <span class="mockup-modal__compare-label">Printful</span>
+                  <p id="mockup-printful-status" class="mockup-modal__printful-status">Requesting…</p>
+                  <img id="mockup-printful-img" class="mockup-modal__img" src="" alt="Printful mockup" style="display:none">
+                  <a id="mockup-printful-download" class="btn btn--outline btn--sm mockup-modal__compare-dl" download="printful.jpg" style="display:none">Download</a>
+                </div>
               </div>
               <div class="mockup-modal__footer">
                 {%- if product.variants.size > 1 -%}
@@ -119,7 +129,6 @@
                   </div>
                 {%- endif -%}
                 <div class="mockup-modal__footer-actions">
-                  <a id="mockup-modal-download" class="btn btn--outline btn--sm" download="mockup.jpg">Download</a>
                   <button id="mockup-modal-order" class="btn btn--primary btn--sm">Order This Design</button>
                 </div>
                 <div class="mockup-modal__community">
@@ -230,8 +239,10 @@
           <button
             id="shader-preview-btn"
             class="btn btn--primary btn--lg btn--full"
-            data-variant-id="4017"
             data-worker-url="https://brightfield-mockup-worker.eric-d-johnson.workers.dev"
+            data-shirt-template="{{ 'shirt-template.png' | asset_url }}"
+            data-print-area="0.30,0.165,0.40,0.45"
+            data-printful-variant-id="{{ product.metafields.printful.variant_id | default: 4017 }}"
           >Preview on Shirt</button>
           <p class="product-customize-actions__note">You'll select your size when you order.</p>
         </div>
@@ -731,7 +742,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
                 // String or boolean-ish
                 if (progress === 1) window._shaderState.values[k] = end;
               }
-              
+
               // Update UI at the end or occasionally
               if (progress === 1 || Math.random() > 0.8) {
                 var displayVal = window._shaderState.values[k];
@@ -763,7 +774,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         var img = cardElement ? cardElement.querySelector('img') : null;
         var target = document.getElementById('shader-canvas');
         var targetContainer = document.querySelector('.media-panel[data-panel="shader"]');
-        
+
         function scheduleTween() {
           if (fa.tweenDelay <= 0) { startValuesAnimation(); }
           else { setTimeout(startValuesAnimation, fa.tweenDelay); }
@@ -803,7 +814,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
 
         var targetCenterX = targetRect.left + targetRect.width / 2;
         var targetCenterY = targetRect.top + targetRect.height / 2;
-        
+
         clone.style.left = (targetCenterX - imgRect.width / 2) + 'px';
         clone.style.top = (targetCenterY - imgRect.height / 2) + 'px';
         clone.style.transform = 'scale(0.1)';
@@ -1259,18 +1270,27 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
 
 // ── Preview on Shirt ──────────────────────────────────────────────────────────
 (function () {
-  var btn        = document.getElementById('shader-preview-btn');
-  var modal      = document.getElementById('mockup-modal');
-  var modalImg   = document.getElementById('mockup-modal-img');
-  var modalDl    = document.getElementById('mockup-modal-download');
-  var modalOrder = document.getElementById('mockup-modal-order');
-  var closeBtn   = document.getElementById('mockup-modal-close');
-  var backdrop   = modal.querySelector('.mockup-modal__backdrop');
+  var btn           = document.getElementById('shader-preview-btn');
+  var modal         = document.getElementById('mockup-modal');
+  var modalImg      = document.getElementById('mockup-modal-img');
+  var modalDl       = document.getElementById('mockup-modal-download');
+  var modalOrder    = document.getElementById('mockup-modal-order');
+  var closeBtn      = document.getElementById('mockup-modal-close');
+  var backdrop      = modal.querySelector('.mockup-modal__backdrop');
+  var printfulImg    = document.getElementById('mockup-printful-img');
+  var printfulStatus = document.getElementById('mockup-printful-status');
+  var printfulDl     = document.getElementById('mockup-printful-download');
 
   if (!btn) return;
 
-  var currentDesignUrl = null;
-  var _lastMockupData  = null;
+  var workerUrl    = btn.dataset.workerUrl;
+  var printArea    = (btn.dataset.printArea || '0.20,0.15,0.60,0.68').split(',').map(Number);
+  var _pendingDesign = null;
+
+  // Preload shirt template so compositing is instant on click
+  var shirtImg = new Image();
+  shirtImg.crossOrigin = 'anonymous';
+  shirtImg.src = btn.dataset.shirtTemplate || '';
 
   btn.addEventListener('click', function () {
     if (!window._shaderExport) {
@@ -1278,70 +1298,159 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       return;
     }
 
-    var variantId = btn.dataset.variantId;
-    var workerUrl = btn.dataset.workerUrl;
-
     btn.disabled    = true;
-    btn.textContent = 'Generating…';
+    btn.textContent = 'Compositing…';
 
     window._shaderExport(1800, 2400, function (base64png) {
-      fetch(workerUrl + '/generate-mockup', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          image:         base64png,
-          variant_id:    variantId,
-          deviceId:      window.RecentDesigns ? window.RecentDesigns.getDeviceId() : null,
-          shader:        '{{ shader_file }}',
-          productHandle: '{{ product.handle }}',
-          values:        window._shaderState ? window._shaderState.values : {},
-          skipBgRemoval: false
-        })
-      })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (!data.mockup_url) throw new Error(data.error || 'No mockup URL returned');
-        currentDesignUrl    = data.design_url || null;
-        modalImg.src        = data.mockup_url;
-        modalDl.href        = data.download_url || data.mockup_url;
+      var canvas = document.createElement('canvas');
+      var ctx    = canvas.getContext('2d');
+
+      var designImg = new Image();
+      designImg.onerror = function () {
+        btn.disabled    = false;
+        btn.textContent = 'Preview on Shirt';
+      };
+      designImg.onload = function () {
+        var srcW = designImg.naturalWidth;
+        var srcH = designImg.naturalHeight;
+        var designAspect = srcW / srcH;
+        var areaAspect   = printArea[2] / printArea[3];
+        var shirtNW = shirtImg.naturalWidth  || 669;
+        var shirtNH = shirtImg.naturalHeight || 669;
+
+        // Size the canvas so the design renders at its native resolution,
+        // then scale the shirt template up to fill.
+        var tW, tH;
+        if (designAspect > areaAspect) {
+          tW = Math.round(srcW / printArea[2]);
+          tH = Math.round(tW * shirtNH / shirtNW);
+        } else {
+          tH = Math.round(srcH / printArea[3]);
+          tW = Math.round(tH * shirtNW / shirtNH);
+        }
+
+        canvas.width  = tW;
+        canvas.height = tH;
+
+        if (shirtImg.complete && shirtImg.naturalWidth) {
+          ctx.drawImage(shirtImg, 0, 0, tW, tH);
+        }
+
+        var px = Math.round(printArea[0] * tW);
+        var py = Math.round(printArea[1] * tH);
+        var pw = Math.round(printArea[2] * tW);
+        var ph = Math.round(printArea[3] * tH);
+
+        // Contain the design within the print area preserving the export aspect ratio
+        // (1800×2400 = 0.75); without this, drawImage would stretch to fill pw×ph.
+        var drawW, drawH, drawX, drawY;
+        if (designAspect > areaAspect) {
+          // design wider relative to area → constrain by width
+          drawW = pw;
+          drawH = pw / designAspect;
+          drawX = px;
+          drawY = py + Math.round((ph - drawH) / 2);
+        } else {
+          // design taller relative to area → constrain by height
+          drawH = ph;
+          drawW = ph * designAspect;
+          drawX = px + Math.round((pw - drawW) / 2);
+          drawY = py;
+        }
+        ctx.drawImage(designImg, drawX, drawY, drawW, drawH);
+
+        var compositeDataUrl = canvas.toDataURL('image/png');
+
+        // Show modal immediately — no waiting for API
+        modalImg.src = compositeDataUrl;
+        modalDl.href = compositeDataUrl;
         modal.classList.remove('mockup-modal--hidden');
         document.body.style.overflow = 'hidden';
-        _lastMockupData = {
-          mockupUrl:     data.mockup_url,
-          shader:        '{{ shader_file }}',
-          productHandle: '{{ product.handle }}',
-          values:        JSON.parse(JSON.stringify(window._shaderState ? window._shaderState.values : {}))
-        };
-        // Reset community form state on each new mockup
+
         var communityForm    = document.getElementById('community-form');
         var communitySuccess = document.getElementById('community-success');
         var communityError   = document.getElementById('community-error');
         var communitySubmit  = document.getElementById('community-submit');
-        if (communityForm)    { communityForm.style.display = 'none'; }
-        if (communitySuccess) { communitySuccess.style.display = 'none'; }
-        if (communityError)   { communityError.style.display = 'none'; }
+        if (communityForm)    communityForm.style.display = 'none';
+        if (communitySuccess) communitySuccess.style.display = 'none';
+        if (communityError)   communityError.style.display = 'none';
         if (communitySubmit)  { communitySubmit.disabled = false; communitySubmit.textContent = 'Submit Design'; }
-        document.dispatchEvent(new CustomEvent('brightfield:design-saved', { detail: {
-          mockupUrl:     data.mockup_url,
+
+        // Fetch Printful version in parallel for side-by-side comparison
+        if (printfulImg)    { printfulImg.style.display = 'none'; printfulImg.src = ''; }
+        if (printfulStatus) { printfulStatus.style.display = ''; printfulStatus.textContent = 'Requesting…'; }
+        if (printfulDl)     { printfulDl.style.display = 'none'; printfulDl.href = ''; }
+        var printfulVariantId = btn.dataset.printfulVariantId;
+        if (printfulVariantId) {
+          fetch(workerUrl + '/generate-mockup', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ image: base64png, variant_id: printfulVariantId })
+          })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.mockup_url) {
+              printfulImg.src              = data.mockup_url;
+              printfulImg.style.display    = '';
+              printfulStatus.style.display = 'none';
+              if (printfulDl) { printfulDl.href = data.mockup_url; printfulDl.style.display = ''; }
+            } else {
+              printfulStatus.textContent = 'Printful error: ' + (data.error || 'unknown');
+            }
+          })
+          .catch(function () {
+            if (printfulStatus) printfulStatus.textContent = 'Printful request failed.';
+          });
+        } else {
+          if (printfulStatus) printfulStatus.textContent = 'No Printful variant ID configured.';
+        }
+
+        // Upload design + composite to R2 in the background
+        var snapshotValues = JSON.parse(JSON.stringify(window._shaderState ? window._shaderState.values : {}));
+        var uploadPromise = fetch(workerUrl + '/save-preview', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            designImage:   base64png,
+            mockupImage:   compositeDataUrl.split(',')[1],
+            deviceId:      window.RecentDesigns ? window.RecentDesigns.getDeviceId() : null,
+            shader:        '{{ shader_file }}',
+            productHandle: '{{ product.handle }}',
+            values:        snapshotValues
+          })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (!data.design_url) throw new Error(data.error || 'Upload failed');
+          // Upgrade download link to stable hosted URL
+          modalDl.href = data.mockup_url;
+          document.dispatchEvent(new CustomEvent('brightfield:design-saved', { detail: {
+            mockupUrl:     data.mockup_url,
+            shader:        '{{ shader_file }}',
+            productHandle: '{{ product.handle }}',
+            values:        snapshotValues,
+            timestamp:     Math.floor(Date.now() / 1000)
+          }}));
+          return data;
+        });
+
+        _pendingDesign = {
           shader:        '{{ shader_file }}',
           productHandle: '{{ product.handle }}',
-          values:        JSON.parse(JSON.stringify(window._shaderState ? window._shaderState.values : {})),
-          timestamp:     Math.floor(Date.now() / 1000)
-        }}));
-      })
-      .catch(function (err) {
-        alert('Mockup failed: ' + err.message);
-      })
-      .finally(function () {
+          values:        snapshotValues,
+          uploadPromise: uploadPromise,
+        };
+
         btn.disabled    = false;
         btn.textContent = 'Preview on Shirt';
-      });
+      };
+      designImg.src = 'data:image/png;base64,' + base64png;
     });
   });
 
   modalOrder.addEventListener('click', function () {
-    if (!currentDesignUrl) {
-      alert('Design URL not available. Try generating a new preview.');
+    if (!_pendingDesign) {
+      alert('Generate a preview first.');
       return;
     }
 
@@ -1355,37 +1464,40 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     }
 
     modalOrder.disabled    = true;
-    modalOrder.textContent = 'Adding…';
+    modalOrder.textContent = 'Saving…';
 
-    fetch('/cart/add.js', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id:       Number(shopifyVariantId),
-        quantity: 1,
-        properties: {
-          '_design_url':  currentDesignUrl,
-          '_mockup_url':  modalImg.src,
-          'Customization': 'Custom Shader Design'
-        }
-      })
-    })
-    .then(function (r) {
-      if (!r.ok) {
-        return r.text().then(function (text) {
-          console.error('Cart add failed', r.status, text);
-          var msg = 'Cart error (' + r.status + ')';
-          try { msg = JSON.parse(text).description || msg; } catch (e) {}
-          throw new Error(msg);
+    _pendingDesign.uploadPromise
+      .then(function (data) {
+        return fetch('/cart/add.js', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id:       Number(shopifyVariantId),
+            quantity: 1,
+            properties: {
+              '_design_url':  data.design_url,
+              '_mockup_url':  data.mockup_url,
+              'Customization': 'Custom Shader Design'
+            }
+          })
         });
-      }
-      window.location.href = '/cart';
-    })
-    .catch(function (err) {
-      alert('Could not add to cart: ' + err.message);
-      modalOrder.disabled    = false;
-      modalOrder.textContent = 'Order This Design';
-    });
+      })
+      .then(function (r) {
+        if (!r.ok) {
+          return r.text().then(function (text) {
+            console.error('Cart add failed', r.status, text);
+            var msg = 'Cart error (' + r.status + ')';
+            try { msg = JSON.parse(text).description || msg; } catch (e) {}
+            throw new Error(msg);
+          });
+        }
+        window.location.href = '/cart';
+      })
+      .catch(function (err) {
+        alert('Could not add to cart: ' + err.message);
+        modalOrder.disabled    = false;
+        modalOrder.textContent = 'Order This Design';
+      });
   });
 
   function closeModal() {
@@ -1432,7 +1544,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
 
   if (communitySubmit) {
     communitySubmit.addEventListener('click', function () {
-      if (!_lastMockupData) return;
+      if (!_pendingDesign) return;
       var name  = communityName  ? communityName.value.trim()  : '';
       var email = communityEmail ? communityEmail.value.trim() : '';
       if (!name)  { communityName  && communityName.focus();  return; }
@@ -1442,28 +1554,31 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       communitySubmit.textContent = 'Submitting…';
       if (communityError) communityError.style.display = 'none';
 
-      fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/community/submit', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          shader:        _lastMockupData.shader,
-          productHandle: _lastMockupData.productHandle,
-          mockupUrl:     _lastMockupData.mockupUrl,
-          values:        _lastMockupData.values,
-          creatorName:   name,
-          creatorEmail:  email
+      _pendingDesign.uploadPromise
+        .then(function (data) {
+          return fetch(workerUrl + '/community/submit', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+              shader:        _pendingDesign.shader,
+              productHandle: _pendingDesign.productHandle,
+              mockupUrl:     data.mockup_url,
+              values:        _pendingDesign.values,
+              creatorName:   name,
+              creatorEmail:  email
+            })
+          });
         })
-      })
-      .then(function (r) {
-        if (!r.ok) throw new Error('Submit failed');
-        communityForm.style.display    = 'none';
-        communitySuccess.style.display = '';
-      })
-      .catch(function () {
-        communitySubmit.disabled    = false;
-        communitySubmit.textContent = 'Submit Design';
-        if (communityError) communityError.style.display = '';
-      });
+        .then(function (r) {
+          if (!r.ok) throw new Error('Submit failed');
+          if (communityForm)    communityForm.style.display    = 'none';
+          if (communitySuccess) communitySuccess.style.display = '';
+        })
+        .catch(function () {
+          communitySubmit.disabled    = false;
+          communitySubmit.textContent = 'Submit Design';
+          if (communityError) communityError.style.display = '';
+        });
     });
   }
 }());

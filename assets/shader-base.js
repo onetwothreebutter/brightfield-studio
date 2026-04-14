@@ -98,10 +98,11 @@
     window.addEventListener('resize', resize);
     resize();
 
-    var start    = performance.now();
-    var revealed = false;
-    var lastT    = 0;
-    var animVals = null;
+    var start      = performance.now();
+    var revealed   = false;
+    var lastT      = 0;
+    var animVals   = null;
+    var exporting  = false; // true while _shaderExport is running; suppresses extra rAF
 
     function lerpVal(a, b, factor) {
       if (typeof b === 'number' && typeof a === 'number') {
@@ -164,12 +165,14 @@
       }
 
       lastT = t;
-      requestAnimationFrame(render);
+      // Only schedule the next frame when not exporting; prevents an extra rAF
+      // chain from accumulating each time _shaderExport calls render() directly.
+      if (!exporting) requestAnimationFrame(render);
     }
 
     render();
 
-    // Export the shader at print resolution and return base64 PNG via callback
+    // Export the shader at print resolution and return base64 PNG via callback.
     window[exportKey] = function (targetW, targetH, callback) {
       var prevW = canvas.width;
       var prevH = canvas.height;
@@ -184,13 +187,17 @@
       var exportOverrides = opts.exportValues || {};
       var savedOverrides = {};
       if (stateValues) {
+        stateValues.textDirty = true; // force texture re-upload at export size
         Object.keys(exportOverrides).forEach(function (k) {
           savedOverrides[k] = stateValues[k];
           stateValues[k] = exportOverrides[k];
         });
       }
 
-      render();
+      exporting = true;
+      render();   // synchronous draw at export size; no extra rAF scheduled
+      exporting = false;
+      gl.finish(); // block until GPU has flushed so toDataURL sees the new frame
 
       if (stateValues) {
         Object.keys(savedOverrides).forEach(function (k) {
