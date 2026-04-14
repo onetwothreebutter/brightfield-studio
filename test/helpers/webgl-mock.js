@@ -65,6 +65,7 @@ export function makeWebGLMock() {
     framebufferTexture2D:    vi.fn(),
     // readPixels fills the output buffer with zeros (transparent black) by default
     readPixels:              vi.fn((_x, _y, _w, _h, _fmt, _type, buf) => { buf.fill(0); }),
+    finish:                  vi.fn(),
   };
 }
 
