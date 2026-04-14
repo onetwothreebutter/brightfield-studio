@@ -102,18 +102,8 @@
                 <span class="mockup-modal__title">Shirt Preview</span>
                 <button class="mockup-modal__close" id="mockup-modal-close" aria-label="Close">&times;</button>
               </div>
-              <div class="mockup-modal__body mockup-modal__body--compare">
-                <div class="mockup-modal__compare-col">
-                  <span class="mockup-modal__compare-label">Yours</span>
-                  <img id="mockup-modal-img" class="mockup-modal__img" src="" alt="Client composite">
-                  <a id="mockup-modal-download" class="btn btn--outline btn--sm mockup-modal__compare-dl" download="yours.png">Download</a>
-                </div>
-                <div class="mockup-modal__compare-col">
-                  <span class="mockup-modal__compare-label">Printful</span>
-                  <p id="mockup-printful-status" class="mockup-modal__printful-status">Requesting…</p>
-                  <img id="mockup-printful-img" class="mockup-modal__img" src="" alt="Printful mockup" style="display:none">
-                  <a id="mockup-printful-download" class="btn btn--outline btn--sm mockup-modal__compare-dl" download="printful.jpg" style="display:none">Download</a>
-                </div>
+              <div class="mockup-modal__body">
+                <img id="mockup-modal-img" class="mockup-modal__img" src="" alt="Shirt preview">
               </div>
               <div class="mockup-modal__footer">
                 {%- if product.variants.size > 1 -%}
@@ -129,6 +119,7 @@
                   </div>
                 {%- endif -%}
                 <div class="mockup-modal__footer-actions">
+                  <a id="mockup-modal-download" class="btn btn--outline btn--sm" download="your-design.png">Download</a>
                   <button id="mockup-modal-order" class="btn btn--primary btn--sm">Order This Design</button>
                 </div>
                 <div class="mockup-modal__community">
@@ -242,7 +233,6 @@
             data-worker-url="https://brightfield-mockup-worker.eric-d-johnson.workers.dev"
             data-shirt-template="{{ 'shirt-template.png' | asset_url }}"
             data-print-area="0.30,0.165,0.40,0.45"
-            data-printful-variant-id="{{ product.metafields.printful.variant_id | default: 4017 }}"
           >Preview on Shirt</button>
           <p class="product-customize-actions__note">You'll select your size when you order.</p>
         </div>
@@ -1277,10 +1267,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   var modalOrder    = document.getElementById('mockup-modal-order');
   var closeBtn      = document.getElementById('mockup-modal-close');
   var backdrop      = modal.querySelector('.mockup-modal__backdrop');
-  var printfulImg    = document.getElementById('mockup-printful-img');
-  var printfulStatus = document.getElementById('mockup-printful-status');
-  var printfulDl     = document.getElementById('mockup-printful-download');
-
   if (!btn) return;
 
   var workerUrl    = btn.dataset.workerUrl;
@@ -1375,35 +1361,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         if (communitySuccess) communitySuccess.style.display = 'none';
         if (communityError)   communityError.style.display = 'none';
         if (communitySubmit)  { communitySubmit.disabled = false; communitySubmit.textContent = 'Submit Design'; }
-
-        // Fetch Printful version in parallel for side-by-side comparison
-        if (printfulImg)    { printfulImg.style.display = 'none'; printfulImg.src = ''; }
-        if (printfulStatus) { printfulStatus.style.display = ''; printfulStatus.textContent = 'Requesting…'; }
-        if (printfulDl)     { printfulDl.style.display = 'none'; printfulDl.href = ''; }
-        var printfulVariantId = btn.dataset.printfulVariantId;
-        if (printfulVariantId) {
-          fetch(workerUrl + '/generate-mockup', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ image: base64png, variant_id: printfulVariantId })
-          })
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
-            if (data.mockup_url) {
-              printfulImg.src              = data.mockup_url;
-              printfulImg.style.display    = '';
-              printfulStatus.style.display = 'none';
-              if (printfulDl) { printfulDl.href = data.mockup_url; printfulDl.style.display = ''; }
-            } else {
-              printfulStatus.textContent = 'Printful error: ' + (data.error || 'unknown');
-            }
-          })
-          .catch(function () {
-            if (printfulStatus) printfulStatus.textContent = 'Printful request failed.';
-          });
-        } else {
-          if (printfulStatus) printfulStatus.textContent = 'No Printful variant ID configured.';
-        }
 
         // Upload design + composite to R2 in the background
         var snapshotValues = JSON.parse(JSON.stringify(window._shaderState ? window._shaderState.values : {}));
