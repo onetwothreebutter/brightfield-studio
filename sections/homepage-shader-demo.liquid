@@ -357,6 +357,33 @@
             </div>
           </div>
 
+          <!-- Position X -->
+          <div class="shader-control">
+            <label class="shader-control__label">Position X</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-pos-x" min="-0.5" max="0.5" step="0.01" value="0">
+              <span class="shader-control__value" id="demo-pos-x-display">0</span>
+            </div>
+          </div>
+
+          <!-- Position Y -->
+          <div class="shader-control">
+            <label class="shader-control__label">Position Y</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-pos-y" min="-0.5" max="0.5" step="0.01" value="-0.08">
+              <span class="shader-control__value" id="demo-pos-y-display">-0.08</span>
+            </div>
+          </div>
+
+          <!-- Scale -->
+          <div class="shader-control">
+            <label class="shader-control__label">Scale</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-scale" min="0.2" max="3.0" step="0.05" value="1">
+              <span class="shader-control__value" id="demo-scale-display">1</span>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -496,6 +523,7 @@
       textX: 0.5, textY: 0.2,
       u_use_text_color: 0, u_text_color: [1.0, 1.0, 1.0],
       outlineEnabled: false, outlineWidth: 8, u_outline_color: [0.0, 0.0, 0.0],
+      u_pos_x: 0.0, u_pos_y: -0.08, u_scale: 1.0,
     },
     dirty: true,
   };
@@ -1004,6 +1032,12 @@
   var distressDisp        = document.getElementById('demo-distress-display');
   var distressScaleInput  = document.getElementById('demo-distress-scale');
   var distressScaleDisp   = document.getElementById('demo-distress-scale-display');
+  var posXInput           = document.getElementById('demo-pos-x');
+  var posXDisp            = document.getElementById('demo-pos-x-display');
+  var posYInput           = document.getElementById('demo-pos-y');
+  var posYDisp            = document.getElementById('demo-pos-y-display');
+  var scaleInput          = document.getElementById('demo-scale');
+  var scaleDisp           = document.getElementById('demo-scale-display');
 
   opacityInput.addEventListener('input', function () {
     onUserInteract();
@@ -1024,6 +1058,27 @@
     var n = parseInt(this.value, 10);
     window._demoState.values.u_distress_scale = n;
     distressScaleDisp.textContent = n;
+    window._demoState.dirty = true;
+  });
+  posXInput.addEventListener('input', function () {
+    onUserInteract();
+    var n = parseFloat(this.value);
+    window._demoState.values.u_pos_x = n;
+    posXDisp.textContent = n.toFixed(2);
+    window._demoState.dirty = true;
+  });
+  posYInput.addEventListener('input', function () {
+    onUserInteract();
+    var n = parseFloat(this.value);
+    window._demoState.values.u_pos_y = n;
+    posYDisp.textContent = n.toFixed(2);
+    window._demoState.dirty = true;
+  });
+  scaleInput.addEventListener('input', function () {
+    onUserInteract();
+    var n = parseFloat(this.value);
+    window._demoState.values.u_scale = n;
+    scaleDisp.textContent = n.toFixed(2);
     window._demoState.dirty = true;
   });
 
@@ -1331,6 +1386,9 @@
       if (opacityInput)         { opacityInput.value        = v.u_opacity;              opacityDisp.textContent          = parseFloat(v.u_opacity).toFixed(2); }
       if (distressInput)        { distressInput.value       = v.u_distress;             distressDisp.textContent         = parseFloat(v.u_distress).toFixed(2); }
       if (distressScaleInput)   { distressScaleInput.value  = v.u_distress_scale;       distressScaleDisp.textContent    = v.u_distress_scale; }
+      if (posXInput)            { posXInput.value           = v.u_pos_x  != null ? v.u_pos_x  : 0;   posXDisp.textContent   = parseFloat(posXInput.value).toFixed(2); }
+      if (posYInput)            { posYInput.value           = v.u_pos_y  != null ? v.u_pos_y  : 0;   posYDisp.textContent   = parseFloat(posYInput.value).toFixed(2); }
+      if (scaleInput)           { scaleInput.value          = v.u_scale  != null ? v.u_scale  : 1;   scaleDisp.textContent  = parseFloat(scaleInput.value).toFixed(2); }
       window._demoState.textDirty = true;
       applyColorModeVisibility();
       userInteracted = true;
