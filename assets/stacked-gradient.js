@@ -109,6 +109,9 @@
     'uniform float u_opacity;',
     'uniform float u_distress;',
     'uniform float u_distress_scale;',
+    'uniform float u_pos_x;',
+    'uniform float u_pos_y;',
+    'uniform float u_scale;',
     '',
     'out vec4 fragColor;',
     '',
@@ -178,6 +181,7 @@
     '',
     'void main() {',
     '  vec2  uv = gl_FragCoord.xy / u_resolution;',
+    '  uv = (uv - 0.5) / u_scale + 0.5 + vec2(u_pos_x, u_pos_y);',
     '  float x  = uv.x;',
     '  float y  = uv.y;',
     '  float yOff = fract(y + u_offset_y);',
@@ -324,6 +328,9 @@
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
+        posX:          gl.getUniformLocation(program, 'u_pos_x'),
+        posY:          gl.getUniformLocation(program, 'u_pos_y'),
+        scale:         gl.getUniformLocation(program, 'u_scale'),
         // Internal threshold cache (not uniform locations)
         _thresholdData: new Float32Array(19).fill(1.0),
         _lastThreshKey: null,
@@ -434,6 +441,9 @@
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
+      gl.uniform1f(u.posX,          v.u_pos_x          != null ? v.u_pos_x          : 0.0);
+      gl.uniform1f(u.posY,          v.u_pos_y          != null ? v.u_pos_y          : 0.0);
+      gl.uniform1f(u.scale,         v.u_scale          != null ? v.u_scale          : 1.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);

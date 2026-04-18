@@ -124,6 +124,9 @@
     'uniform float     u_opacity;',
     'uniform float     u_distress;',
     'uniform float     u_distress_scale;',
+    'uniform float     u_pos_x;',
+    'uniform float     u_pos_y;',
+    'uniform float     u_scale;',
     '',
     'out vec4 fragColor;',
     '',
@@ -150,7 +153,8 @@
     '}',
     '',
     'void main() {',
-    '  vec2  uvCoord    = gl_FragCoord.xy / u_resolution;',
+    '  vec2  dUV        = gl_FragCoord.xy / u_resolution;',
+    '  vec2  uvCoord    = (dUV - 0.5) / u_scale + 0.5 + vec2(u_pos_x, u_pos_y);',
     '  float bw         = u_border_width;',
     '  float aa         = 0.0008;',
     '',
@@ -532,7 +536,7 @@
     '  alpha    *= 1.0 - smoothstep(-_aa, _aa, _d);',
     '',
     '  // ── Distress + finish ─────────────────────────────────────────────────────',
-    '  float dist = clamp(length(uvCoord - 0.5) * 2.0, 0.0, 1.0);',
+    '  float dist = clamp(length(dUV - 0.5) * 2.0, 0.0, 1.0);',
     '  float dn = fbm(gridUV * u_distress_scale);',
     '  alpha = alpha * step(u_distress * dist, dn) * u_opacity;',
     '',
@@ -602,6 +606,9 @@
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
+        posX:          gl.getUniformLocation(program, 'u_pos_x'),
+        posY:          gl.getUniformLocation(program, 'u_pos_y'),
+        scale:         gl.getUniformLocation(program, 'u_scale'),
         // Internal letter-texture state (not uniform locations).
         _texCanvases:    texCanvases,
         _texCtxs:        texCtxs,
@@ -688,6 +695,9 @@
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
+      gl.uniform1f(u.posX,          v.u_pos_x          != null ? v.u_pos_x          : 0.0);
+      gl.uniform1f(u.posY,          v.u_pos_y          != null ? v.u_pos_y          : 0.0);
+      gl.uniform1f(u.scale,         v.u_scale          != null ? v.u_scale          : 1.0);
     },
   });
 }());

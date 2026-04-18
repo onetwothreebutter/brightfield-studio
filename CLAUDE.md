@@ -134,3 +134,6 @@ Always use bold: `ctx.font = 'bold ' + fontSize + 'px ' + fontFamily`
 2. Create `assets/[name].js` — call `window.ShaderBase.create({ fragSrc, setup, render, textKey })`
 3. Add `{% when '[name]' %} {% render 'shader-controls-[name]' %}` to the case block in `sections/main-product.liquid`
 4. Tag the product `shader-[name]` in Shopify
+5. Add the shader to `test-shaders.html`
+
+**Checklist before submitting:** confirm `u_pos_x`, `u_pos_y`, `u_scale` are in the Finish section controls AND declared as GLSL uniforms + UV transform + `setup()` locations + `render()` calls. See "Finish section — standard controls" above.
