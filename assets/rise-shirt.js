@@ -35,6 +35,8 @@
     'uniform float u_pos_x;',
     'uniform float u_pos_y;',
     'uniform float u_scale;',
+    'uniform float u_vignette_x;',
+    'uniform float u_vignette_y;',
     'uniform vec3  u_color0;',
     'uniform vec3  u_color1;',
     'uniform vec3  u_color2;',
@@ -176,6 +178,9 @@
     '  float dn = distressNoise(dUV, u_distress_scale) * 0.67',
     '           + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
     '  alpha = alpha * step(u_distress * distEdge, dn) * u_opacity;',
+    '  vec2 vigCoord = dUV - 0.5;',
+    '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
+    '  finalCol = finalCol * clamp(1.0 - vigVal, 0.0, 1.0);',
     '  vec3 encoded   = pow(max(finalCol, 0.0), vec3(1.0 / 2.2));',
     '  fragColor      = vec4(encoded, alpha);',
     '}'
@@ -183,7 +188,7 @@
 
   window.ShaderBase.create({
     animateValues:  true,
-    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale'],
+    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale', 'u_vignette_x', 'u_vignette_y'],
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
@@ -218,6 +223,8 @@
         posX:         gl.getUniformLocation(program, 'u_pos_x'),
         posY:         gl.getUniformLocation(program, 'u_pos_y'),
         scale:        gl.getUniformLocation(program, 'u_scale'),
+        vignetteX:    gl.getUniformLocation(program, 'u_vignette_x'),
+        vignetteY:    gl.getUniformLocation(program, 'u_vignette_y'),
         color0:       gl.getUniformLocation(program, 'u_color0'),
         color1:       gl.getUniformLocation(program, 'u_color1'),
         color2:       gl.getUniformLocation(program, 'u_color2'),
@@ -291,9 +298,11 @@
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
-      gl.uniform1f(u.posX,         v.u_pos_x  != null ? v.u_pos_x  : 0.0);
-      gl.uniform1f(u.posY,         v.u_pos_y  != null ? v.u_pos_y  : 0.0);
-      gl.uniform1f(u.scale,        v.u_scale  != null ? v.u_scale  : 1.0);
+      gl.uniform1f(u.posX,         v.u_pos_x      != null ? v.u_pos_x      : 0.0);
+      gl.uniform1f(u.posY,         v.u_pos_y      != null ? v.u_pos_y      : 0.0);
+      gl.uniform1f(u.scale,        v.u_scale      != null ? v.u_scale      : 1.0);
+      gl.uniform1f(u.vignetteX,    v.u_vignette_x != null ? v.u_vignette_x : 0.0);
+      gl.uniform1f(u.vignetteY,    v.u_vignette_y != null ? v.u_vignette_y : 0.0);
       gl.uniform3fv(u.color0,      v.u_color0       || [1.0, 0.2,  0.4]);
       gl.uniform3fv(u.color1,      v.u_color1       || [1.0, 0.8,  0.0]);
       gl.uniform3fv(u.color2,      v.u_color2       || [0.0, 0.8,  1.0]);
