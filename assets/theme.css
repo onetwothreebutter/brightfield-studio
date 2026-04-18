@@ -2278,7 +2278,9 @@ h6 {
     margin-bottom: 12px;
 }
 .recent-designs__strip {
-    display: flex;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: auto;
     gap: 12px;
     overflow-x: auto;
     padding-bottom: 8px;
@@ -2286,12 +2288,12 @@ h6 {
     scrollbar-color: var(--color-border) transparent;
 }
 .recent-designs__card {
-    flex: 0 0 120px;
+    width: 120px;
     cursor: pointer;
-    transition: flex-basis var(--transition-fast);
+    transition: width var(--transition-fast);
 }
 .recent-designs__card:hover {
-    flex-basis: 360px;
+    width: 360px;
 }
 .recent-designs__card-img-wrap {
     position: relative;
