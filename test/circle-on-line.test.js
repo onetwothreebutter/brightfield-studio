@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { make2DContextMock } from './helpers/webgl-mock.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const src = readFileSync(join(__dirname, '../assets/line-circle.js'), 'utf8');
+const src = readFileSync(join(__dirname, '../assets/circle-on-line.js'), 'utf8');
 
 // Minimal GL mock with only the methods render() uses
 function makeRenderGl() {
@@ -21,7 +21,7 @@ function makeRenderGl() {
   };
 }
 
-describe('line-circle.js', () => {
+describe('circle-on-line.js', () => {
   let opts;
 
   beforeEach(() => {

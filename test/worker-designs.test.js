@@ -132,7 +132,7 @@ describe('POST /generate-mockup — design saving', () => {
 
   it('prepends new entry so newest is first', async () => {
     const r2 = makeR2();
-    const existing = [{ id: 'old', shader: 'line-circle', timestamp: 1000 }];
+    const existing = [{ id: 'old', shader: 'circle-on-line', timestamp: 1000 }];
     r2._store.set('device-designs/dev-2.json', JSON.stringify(existing));
 
     await worker.fetch(makeRequest('POST', '/generate-mockup', {
@@ -147,7 +147,7 @@ describe('POST /generate-mockup — design saving', () => {
     const saveCall = r2.put.mock.calls.find(([k]) => k === 'device-designs/dev-2.json');
     const saved = JSON.parse(saveCall[1]);
     expect(saved[0].shader).toBe('echo-text');    // newest first
-    expect(saved[1].shader).toBe('line-circle');  // old entry preserved
+    expect(saved[1].shader).toBe('circle-on-line');  // old entry preserved
   });
 
   it('trims stored designs to a maximum of 20', async () => {

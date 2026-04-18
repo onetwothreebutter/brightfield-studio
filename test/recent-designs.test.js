@@ -70,7 +70,7 @@ describe('fetchDesigns()', () => {
   });
 
   it('returns all designs when no shader filter is given', async () => {
-    const designs = [makeDesign({ shader: 'echo-text' }), makeDesign({ shader: 'line-circle' })];
+    const designs = [makeDesign({ shader: 'echo-text' }), makeDesign({ shader: 'circle-on-line' })];
     vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => designs })));
 
     const result = await window.RecentDesigns.fetchDesigns();
@@ -78,7 +78,7 @@ describe('fetchDesigns()', () => {
   });
 
   it('filters designs by shader when shader arg is provided', async () => {
-    const designs = [makeDesign({ shader: 'echo-text' }), makeDesign({ shader: 'line-circle' })];
+    const designs = [makeDesign({ shader: 'echo-text' }), makeDesign({ shader: 'circle-on-line' })];
     vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => designs })));
 
     const result = await window.RecentDesigns.fetchDesigns('echo-text');
@@ -272,7 +272,7 @@ describe('card click', () => {
     const container = document.createElement('div');
     window.RecentDesigns.renderFilmstrip(container, [
       makeDesign({ productHandle: 'echo-text-shirt', shader: 'echo-text' }),
-      makeDesign({ productHandle: 'line-circle-shirt', shader: 'line-circle' }),
+      makeDesign({ productHandle: 'line-circle-shirt', shader: 'circle-on-line' }),
     ]);
 
     container.querySelectorAll('.recent-designs__card')[1].click();

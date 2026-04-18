@@ -1084,7 +1084,7 @@
 
   // ── Preview on Shirt ───────────────────────────────────────────────────────
   var WORKER_BASE_URL    = 'https://brightfield-mockup-worker.eric-d-johnson.workers.dev';
-  var PRODUCT_HANDLE     = {{ section.settings.product_handle | default: 'line-circle' | json }};
+  var PRODUCT_HANDLE     = {{ section.settings.product_handle | default: 'circle-on-line' | json }};
   var PRINT_AREA         = [0.30, 0.20, 0.40, 0.45];
   var currentDesignUrl   = null;
   var _lastMockupData    = null;
@@ -1591,7 +1591,7 @@
       "type": "text",
       "id": "product_handle",
       "label": "Product handle",
-      "default": "line-circle",
+      "default": "circle-on-line",
       "info": "Used to load size options for ordering"
     },
     {
