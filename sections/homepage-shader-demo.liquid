@@ -370,8 +370,8 @@
           <div class="shader-control">
             <label class="shader-control__label">Position Y</label>
             <div class="shader-control__range-wrap">
-              <input type="range" class="shader-control__range" id="demo-pos-y" min="-0.5" max="0.5" step="0.01" value="0">
-              <span class="shader-control__value" id="demo-pos-y-display">0</span>
+              <input type="range" class="shader-control__range" id="demo-pos-y" min="-0.5" max="0.5" step="0.01" value="-0.08">
+              <span class="shader-control__value" id="demo-pos-y-display">-0.08</span>
             </div>
           </div>
 
@@ -523,6 +523,7 @@
       textX: 0.5, textY: 0.2,
       u_use_text_color: 0, u_text_color: [1.0, 1.0, 1.0],
       outlineEnabled: false, outlineWidth: 8, u_outline_color: [0.0, 0.0, 0.0],
+      u_pos_x: 0.0, u_pos_y: -0.08, u_scale: 1.0,
     },
     dirty: true,
   };
