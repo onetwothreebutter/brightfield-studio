@@ -1,11 +1,11 @@
 <section class="shader-demo" id="shader-demo">
   <div class="shader-demo__header container">
     {%- if section.settings.eyebrow != blank -%}
-      <p class="shader-demo__eyebrow">{{ section.settings.eyebrow }}</p>
+      <p class="shader-demo__eyebrow">{{ section.settings.eyebrow | escape }}</p>
     {%- endif -%}
-    <h2 class="shader-demo__heading">{{ section.settings.heading }}</h2>
+    <h2 class="shader-demo__heading">{{ section.settings.heading | escape }}</h2>
     {%- if section.settings.subheading != blank -%}
-      <p class="shader-demo__subheading">{{ section.settings.subheading }}</p>
+      <p class="shader-demo__subheading">{{ section.settings.subheading | escape }}</p>
     {%- endif -%}
   </div>
 

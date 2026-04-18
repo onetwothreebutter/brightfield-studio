@@ -1,4 +1,4 @@
-{%- assign featured = collections[section.settings.collection] -%}
+{%- assign featured = section.settings.collection -%}
 
 <section class="featured-collection section-padding">
   <div class="container">
@@ -15,12 +15,16 @@
       {%- endif -%}
     </div>
 
-    <div class="product-grid">
-      {%- if featured != blank -%}
-        {%- for product in featured.products limit: section.settings.products_to_show -%}
-          {% render 'product-card', product: product %}
-        {%- endfor -%}
-      {%- else -%}
+    {%- if featured != blank -%}
+      {%- paginate featured.products by section.settings.products_to_show -%}
+        <div class="product-grid">
+          {%- for product in featured.products -%}
+            {% render 'product-card', product: product %}
+          {%- endfor -%}
+        </div>
+      {%- endpaginate -%}
+    {%- else -%}
+      <div class="product-grid">
         {%- for i in (1..section.settings.products_to_show) -%}
           <div class="product-card product-card--placeholder">
             <div class="product-card__media">
@@ -32,8 +36,8 @@
             </div>
           </div>
         {%- endfor -%}
-      {%- endif -%}
-    </div>
+      </div>
+    {%- endif -%}
 
     {%- if section.settings.show_view_all and featured != blank -%}
       <div class="section-footer">

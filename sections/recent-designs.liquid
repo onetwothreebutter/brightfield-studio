@@ -5,10 +5,10 @@
   </div>
 </section>
 
-<style>
-.recent-designs__heading { margin-bottom: 1rem; font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text); margin-top: 0; }
-.recent-designs__strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
-</style>
+{% stylesheet %}
+  .recent-designs__heading { margin-bottom: 1rem; font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text); margin-top: 0; }
+  .recent-designs__strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+{% endstylesheet %}
 
 <script src="{{ 'recent-designs.js' | asset_url }}" defer></script>
 <script>
