@@ -1301,105 +1301,116 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         var srcH = designImg.naturalHeight;
         var designAspect = srcW / srcH;
         var areaAspect   = printArea[2] / printArea[3];
-        var shirtNW = shirtImg.naturalWidth  || 669;
-        var shirtNH = shirtImg.naturalHeight || 669;
+        function doComposite() {
+          var shirtNW = shirtImg.naturalWidth  || 669;
+          var shirtNH = shirtImg.naturalHeight || 669;
 
-        // Size the canvas so the design renders at its native resolution,
-        // then scale the shirt template up to fill.
-        var tW, tH;
-        if (designAspect > areaAspect) {
-          tW = Math.round(srcW / printArea[2]);
-          tH = Math.round(tW * shirtNH / shirtNW);
-        } else {
-          tH = Math.round(srcH / printArea[3]);
-          tW = Math.round(tH * shirtNW / shirtNH);
-        }
+          // Size the canvas so the design renders at its native resolution,
+          // then scale the shirt template up to fill.
+          var tW, tH;
+          if (designAspect > areaAspect) {
+            tW = Math.round(srcW / printArea[2]);
+            tH = Math.round(tW * shirtNH / shirtNW);
+          } else {
+            tH = Math.round(srcH / printArea[3]);
+            tW = Math.round(tH * shirtNW / shirtNH);
+          }
 
-        canvas.width  = tW;
-        canvas.height = tH;
+          canvas.width  = tW;
+          canvas.height = tH;
 
-        if (shirtImg.complete && shirtImg.naturalWidth) {
-          ctx.drawImage(shirtImg, 0, 0, tW, tH);
-        }
+          if (shirtImg.complete && shirtImg.naturalWidth) {
+            ctx.drawImage(shirtImg, 0, 0, tW, tH);
+          }
 
-        var px = Math.round(printArea[0] * tW);
-        var py = Math.round(printArea[1] * tH);
-        var pw = Math.round(printArea[2] * tW);
-        var ph = Math.round(printArea[3] * tH);
+          var px = Math.round(printArea[0] * tW);
+          var py = Math.round(printArea[1] * tH);
+          var pw = Math.round(printArea[2] * tW);
+          var ph = Math.round(printArea[3] * tH);
 
-        // Contain the design within the print area preserving the export aspect ratio
-        // (1800×2400 = 0.75); without this, drawImage would stretch to fill pw×ph.
-        var drawW, drawH, drawX, drawY;
-        if (designAspect > areaAspect) {
-          // design wider relative to area → constrain by width
-          drawW = pw;
-          drawH = pw / designAspect;
-          drawX = px;
-          drawY = py + Math.round((ph - drawH) / 2);
-        } else {
-          // design taller relative to area → constrain by height
-          drawH = ph;
-          drawW = ph * designAspect;
-          drawX = px + Math.round((pw - drawW) / 2);
-          drawY = py;
-        }
-        ctx.drawImage(designImg, drawX, drawY, drawW, drawH);
+          // Contain the design within the print area preserving the export aspect ratio
+          // (1800×2400 = 0.75); without this, drawImage would stretch to fill pw×ph.
+          var drawW, drawH, drawX, drawY;
+          if (designAspect > areaAspect) {
+            // design wider relative to area → constrain by width
+            drawW = pw;
+            drawH = pw / designAspect;
+            drawX = px;
+            drawY = py + Math.round((ph - drawH) / 2);
+          } else {
+            // design taller relative to area → constrain by height
+            drawH = ph;
+            drawW = ph * designAspect;
+            drawX = px + Math.round((pw - drawW) / 2);
+            drawY = py;
+          }
+          ctx.drawImage(designImg, drawX, drawY, drawW, drawH);
 
-        var compositeDataUrl = canvas.toDataURL('image/png');
+          var compositeDataUrl = canvas.toDataURL('image/png');
 
-        // Show modal immediately — no waiting for API
-        modalImg.src = compositeDataUrl;
-        modalDl.href = compositeDataUrl;
-        modal.classList.remove('mockup-modal--hidden');
-        document.body.style.overflow = 'hidden';
+          // Show modal immediately — no waiting for API
+          modalImg.src = compositeDataUrl;
+          modalDl.href = compositeDataUrl;
+          modal.classList.remove('mockup-modal--hidden');
+          document.body.style.overflow = 'hidden';
 
-        var communityForm    = document.getElementById('community-form');
-        var communitySuccess = document.getElementById('community-success');
-        var communityError   = document.getElementById('community-error');
-        var communitySubmit  = document.getElementById('community-submit');
-        if (communityForm)    communityForm.style.display = 'none';
-        if (communitySuccess) communitySuccess.style.display = 'none';
-        if (communityError)   communityError.style.display = 'none';
-        if (communitySubmit)  { communitySubmit.disabled = false; communitySubmit.textContent = 'Submit Design'; }
+          var communityForm    = document.getElementById('community-form');
+          var communitySuccess = document.getElementById('community-success');
+          var communityError   = document.getElementById('community-error');
+          var communitySubmit  = document.getElementById('community-submit');
+          if (communityForm)    communityForm.style.display = 'none';
+          if (communitySuccess) communitySuccess.style.display = 'none';
+          if (communityError)   communityError.style.display = 'none';
+          if (communitySubmit)  { communitySubmit.disabled = false; communitySubmit.textContent = 'Submit Design'; }
 
-        // Upload design + composite to R2 in the background
-        var snapshotValues = JSON.parse(JSON.stringify(window._shaderState ? window._shaderState.values : {}));
-        var uploadPromise = fetch(workerUrl + '/save-preview', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({
-            designImage:   base64png,
-            mockupImage:   compositeDataUrl.split(',')[1],
-            deviceId:      window.RecentDesigns ? window.RecentDesigns.getDeviceId() : null,
-            shader:        '{{ shader_file }}',
-            productHandle: '{{ product.handle }}',
-            values:        snapshotValues
+          // Upload design + composite to R2 in the background
+          var snapshotValues = JSON.parse(JSON.stringify(window._shaderState ? window._shaderState.values : {}));
+          var uploadPromise = fetch(workerUrl + '/save-preview', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+              designImage:   base64png,
+              mockupImage:   compositeDataUrl.split(',')[1],
+              deviceId:      window.RecentDesigns ? window.RecentDesigns.getDeviceId() : null,
+              shader:        '{{ shader_file }}',
+              productHandle: '{{ product.handle }}',
+              values:        snapshotValues
+            })
           })
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          if (!data.design_url) throw new Error(data.error || 'Upload failed');
-          // Upgrade download link to stable hosted URL
-          modalDl.href = data.mockup_url;
-          document.dispatchEvent(new CustomEvent('brightfield:design-saved', { detail: {
-            mockupUrl:     data.mockup_url,
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (!data.design_url) throw new Error(data.error || 'Upload failed');
+            // Upgrade download link to stable hosted URL
+            modalDl.href = data.mockup_url;
+            document.dispatchEvent(new CustomEvent('brightfield:design-saved', { detail: {
+              mockupUrl:     data.mockup_url,
+              shader:        '{{ shader_file }}',
+              productHandle: '{{ product.handle }}',
+              values:        snapshotValues,
+              timestamp:     Math.floor(Date.now() / 1000)
+            }}));
+            return data;
+          });
+
+          _pendingDesign = {
             shader:        '{{ shader_file }}',
             productHandle: '{{ product.handle }}',
             values:        snapshotValues,
-            timestamp:     Math.floor(Date.now() / 1000)
-          }}));
-          return data;
-        });
+            uploadPromise: uploadPromise,
+          };
 
-        _pendingDesign = {
-          shader:        '{{ shader_file }}',
-          productHandle: '{{ product.handle }}',
-          values:        snapshotValues,
-          uploadPromise: uploadPromise,
-        };
+          btn.disabled    = false;
+          btn.textContent = 'Preview on Shirt';
+        }
 
-        btn.disabled    = false;
-        btn.textContent = 'Preview on Shirt';
+        // Wait for the shirt template if it hasn't loaded yet (race condition on first click).
+        // On retry the image is cached and complete immediately.
+        if (shirtImg.complete && shirtImg.naturalWidth) {
+          doComposite();
+        } else {
+          shirtImg.onload  = doComposite;
+          shirtImg.onerror = doComposite; // degrade gracefully: compose without shirt
+        }
       };
       designImg.src = 'data:image/png;base64,' + base64png;
     });
