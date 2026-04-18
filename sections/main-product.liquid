@@ -534,6 +534,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       var textInput       = document.createElement('input');
       textInput.type      = 'text';
       textInput.className = 'shader-control__text-input';
+      textInput.dataset.paramKey = ctrl.key;
       textInput.value     = ctrl.value;
       textInput.placeholder = 'e.g. GLOW';
 
@@ -703,6 +704,10 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
               return s.length === 1 ? '0' + s : s;
             }).join('');
             input.value = hex;
+          } else if (input.classList.contains('shader-control__text-input')) {
+            input.value = val;
+            window._shaderState.values[key] = val;
+            window._shaderState.textDirty = true;
           }
         }
 
