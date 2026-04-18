@@ -1,15 +1,26 @@
+{% doc %}
+  Renders a product card with image, title, price, and add-to-cart or customize action.
+
+  @param {product} product - The product to render
+
+  @example
+  {% render 'product-card', product: product %}
+{% enddoc %}
+
 <article class="product-card">
   <a href="{{ product.url }}" class="product-card__link" aria-label="{{ product.title | escape }}">
     <div class="product-card__media">
       {%- if product.featured_image -%}
-        <img
-          src="{{ product.featured_image | image_url: width: 600 }}"
-          alt="{{ product.featured_image.alt | escape }}"
-          class="product-card__image"
-          loading="lazy"
-          width="600"
-          height="600"
-        >
+        {{
+          product.featured_image
+          | image_url: width: 600
+          | image_tag:
+            alt: product.featured_image.alt,
+            class: 'product-card__image',
+            loading: 'lazy',
+            width: 600,
+            height: 600
+        }}
       {%- else -%}
         <div class="product-card__image product-card__image--placeholder"></div>
       {%- endif -%}

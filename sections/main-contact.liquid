@@ -4,9 +4,9 @@
 
       <div class="contact-header">
         <p class="contact-eyebrow">Get in Touch</p>
-        <h1 class="contact-title">{{ section.settings.heading }}</h1>
+        <h1 class="contact-title">{{ section.settings.heading | escape }}</h1>
         {%- if section.settings.subheading != blank -%}
-          <p class="contact-subheading">{{ section.settings.subheading }}</p>
+          <p class="contact-subheading">{{ section.settings.subheading | escape }}</p>
         {%- endif -%}
       </div>
 

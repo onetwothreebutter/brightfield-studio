@@ -7,7 +7,7 @@
 
       <div class="cart-empty">
         <p class="cart-empty__message">Your cart is empty.</p>
-        <a href="/collections/all" class="btn btn--primary btn--lg">Shop the Collection</a>
+        <a href="{{ routes.all_products_collection_url }}" class="btn btn--primary btn--lg">Shop the Collection</a>
       </div>
 
     {%- else -%}
@@ -32,14 +32,16 @@
                     loading="lazy"
                   >
                 {%- elsif item.image -%}
-                  <img
-                    src="{{ item.image | image_url: width: 160 }}"
-                    alt="{{ item.image.alt | escape }}"
-                    class="cart-item__image"
-                    width="160"
-                    height="160"
-                    loading="lazy"
-                  >
+                  {{
+                    item.image
+                    | image_url: width: 160
+                    | image_tag:
+                      alt: item.image.alt,
+                      class: 'cart-item__image',
+                      width: 160,
+                      height: 160,
+                      loading: 'lazy'
+                  }}
                 {%- endif -%}
               </a>
 

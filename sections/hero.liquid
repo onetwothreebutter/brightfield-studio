@@ -3,7 +3,7 @@
 
   <div class="hero__content container">
     {%- if section.settings.eyebrow != blank -%}
-      <p class="hero__eyebrow">{{ section.settings.eyebrow }}</p>
+      <p class="hero__eyebrow">{{ section.settings.eyebrow | escape }}</p>
     {%- endif -%}
 
     <h1
@@ -14,19 +14,19 @@
     </h1>
 
     {%- if section.settings.subheading != blank -%}
-      <p class="hero__subtitle">{{ section.settings.subheading }}</p>
+      <p class="hero__subtitle">{{ section.settings.subheading | escape }}</p>
     {%- endif -%}
 
     {%- if section.settings.cta_url != blank or section.settings.cta2_url != blank -%}
       <div class="hero__ctas">
         {%- if section.settings.cta_url != blank -%}
           <a href="{{ section.settings.cta_url }}" class="btn btn--primary btn--lg">
-            {{ section.settings.cta_label | default: 'Shop the Collection' }}
+            {{ section.settings.cta_label | default: 'Shop the Collection' | escape }}
           </a>
         {%- endif -%}
         {%- if section.settings.cta2_url != blank -%}
           <a href="{{ section.settings.cta2_url }}" class="btn btn--outline btn--lg">
-            {{ section.settings.cta2_label | default: 'Make it Yours' }}
+            {{ section.settings.cta2_label | default: 'Make it Yours' | escape }}
           </a>
         {%- endif -%}
       </div>
