@@ -2306,7 +2306,7 @@ h6 {
     transition: transform var(--transition-fast);
 }
 .recent-designs__card:hover .recent-designs__card-img {
-    transform: scale(1.1);
+    transform: scale(3);
 }
 .recent-designs__card-delete {
     position: absolute;
