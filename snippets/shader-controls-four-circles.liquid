@@ -9,9 +9,9 @@ var controls = [
     tip: 'Extra rotation applied to all triangles (degrees).' },
   { key: 'u_tri_apex',    label: 'Triangle Width',   type: 'range', min: 5,    max: 175,   step: 1,    value: 90,
     tip: 'Apex angle of the triangle — wider angle = wider cutout (degrees).' },
-  { key: 'u_offset_x',    label: 'X Spacing',        type: 'range', min: -1.0, max: 0.4,   step: 0.01, value: 0.04,
+  { key: 'u_offset_x',    label: 'X Spacing',        type: 'range', min: -1.0, max: 0.4,   step: 0.01, value: 0.04,  noRandomize: true,
     tip: 'Horizontal shift of each circle away from the image centre.' },
-  { key: 'u_offset_y',    label: 'Y Spacing',        type: 'range', min: -1.0, max: 0.4,   step: 0.01, value: -0.14,
+  { key: 'u_offset_y',    label: 'Y Spacing',        type: 'range', min: -1.0, max: 0.4,   step: 0.01, value: -0.14, noRandomize: true,
     tip: 'Vertical shift of each circle away from the image centre.' },
   // ── Rotation ──────────────────────────────────────────────────────────────
   { type: 'header', label: 'Rotation' },
