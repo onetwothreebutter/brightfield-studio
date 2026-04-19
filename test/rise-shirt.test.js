@@ -53,7 +53,7 @@ describe('rise-shirt.js', () => {
       'u_text_blend', 'u_text_radius', 'u_text_ratio',
       'u_text_bg_color',
       'u_a', 'u_b', 'u_c', 'u_d',
-      'u_color_mode', 'u_transparent_bg',
+      'u_color_mode',
     ].forEach((name) => {
       expect(frag, `missing uniform ${name}`).toContain(name);
     });
@@ -76,7 +76,7 @@ describe('rise-shirt.js', () => {
       'textTex', 'textGridCols', 'textGridRows', 'textBlend', 'textRadius', 'textRatio',
       'textBgColor',
       'palA', 'palB', 'palC', 'palD',
-      'colorMode', 'transparentBg',
+      'colorMode',
     ].forEach((key) => {
       expect(uniforms, `setup() is missing key "${key}"`).toHaveProperty(key);
     });
