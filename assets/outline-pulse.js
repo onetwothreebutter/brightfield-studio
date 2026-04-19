@@ -43,8 +43,10 @@
     'uniform float u_opacity;',
     'uniform float u_distress;',
     'uniform float u_distress_scale;',
-    'uniform float u_vignette_x;',
-    'uniform float u_vignette_y;',
+    'uniform float u_vignette_top;',
+    'uniform float u_vignette_bottom;',
+    'uniform float u_vignette_left;',
+    'uniform float u_vignette_right;',
     'uniform float u_pos_x;',
     'uniform float u_pos_y;',
     'uniform float u_scale;',
@@ -181,8 +183,14 @@
     '  float distressMask = step(u_distress * distEdge, dn);',
     '',
     '  // Vignette',
-    '  vec2 vigUV = dUV - 0.5;',
-    '  float vignette = 1.0 - smoothstep(0.0, 1.0, length(vigUV * vec2(u_vignette_x, u_vignette_y)));',
+    '  vec2 vigCoord = dUV - 0.5;',
+    '  float vigL = max(0.0, -vigCoord.x);',
+    '  float vigR = max(0.0,  vigCoord.x);',
+    '  float vigB = max(0.0, -vigCoord.y);',
+    '  float vigT = max(0.0,  vigCoord.y);',
+    '  float vigVal = vigL*vigL*u_vignette_left + vigR*vigR*u_vignette_right',
+    '               + vigB*vigB*u_vignette_bottom + vigT*vigT*u_vignette_top;',
+    '  float vignette = 1.0 - smoothstep(0.0, 1.0, vigVal);',
     '',
     '  // Alpha:',
     '  //   solid BG  → full shirt silhouette (good for preview)',
@@ -261,8 +269,10 @@
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
-        vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
-        vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
+        vignetteTop:    gl.getUniformLocation(program, 'u_vignette_top'),
+        vignetteBottom: gl.getUniformLocation(program, 'u_vignette_bottom'),
+        vignetteLeft:   gl.getUniformLocation(program, 'u_vignette_left'),
+        vignetteRight:  gl.getUniformLocation(program, 'u_vignette_right'),
         posX:          gl.getUniformLocation(program, 'u_pos_x'),
         posY:          gl.getUniformLocation(program, 'u_pos_y'),
         scale:         gl.getUniformLocation(program, 'u_scale'),
@@ -318,8 +328,10 @@
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
-      gl.uniform1f(u.vignetteX,     v.u_vignette_x     != null ? v.u_vignette_x     : 0.0);
-      gl.uniform1f(u.vignetteY,     v.u_vignette_y     != null ? v.u_vignette_y     : 0.0);
+      gl.uniform1f(u.vignetteTop,    v.u_vignette_top    != null ? v.u_vignette_top    : 0.0);
+      gl.uniform1f(u.vignetteBottom, v.u_vignette_bottom != null ? v.u_vignette_bottom : 0.0);
+      gl.uniform1f(u.vignetteLeft,   v.u_vignette_left   != null ? v.u_vignette_left   : 0.0);
+      gl.uniform1f(u.vignetteRight,  v.u_vignette_right  != null ? v.u_vignette_right  : 0.0);
       gl.uniform1f(u.posX,          v.u_pos_x          != null ? v.u_pos_x          : 0.0);
       gl.uniform1f(u.posY,          v.u_pos_y          != null ? v.u_pos_y          : 0.0);
       gl.uniform1f(u.scale,         v.u_scale          != null ? v.u_scale          : 1.0);

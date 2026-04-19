@@ -112,8 +112,10 @@
     'uniform float u_pos_x;',
     'uniform float u_pos_y;',
     'uniform float u_scale;',
-    'uniform float u_vignette_x;',
-    'uniform float u_vignette_y;',
+    'uniform float u_vignette_top;',
+    'uniform float u_vignette_bottom;',
+    'uniform float u_vignette_left;',
+    'uniform float u_vignette_right;',
     '',
     'out vec4 fragColor;',
     '',
@@ -279,7 +281,12 @@
     '           + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
     '  finalAlpha = finalAlpha * step(u_distress * dist, dn) * u_opacity;',
     '  vec2 vigCoord = dUV - 0.5;',
-    '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
+    '  float vigL = max(0.0, -vigCoord.x);',
+    '  float vigR = max(0.0,  vigCoord.x);',
+    '  float vigB = max(0.0, -vigCoord.y);',
+    '  float vigT = max(0.0,  vigCoord.y);',
+    '  float vigVal = vigL*vigL*u_vignette_left + vigR*vigR*u_vignette_right',
+    '               + vigB*vigB*u_vignette_bottom + vigT*vigT*u_vignette_top;',
     '  finalColor = vec4(finalColor.xyz * (1.0 - smoothstep(0.0, 1.0, vigVal)), finalColor.w);',
     '  // Linear -> sRGB to match Three.js renderer output',
     '  vec3 encoded = pow(finalColor.xyz, vec3(1.0 / 2.2));',
@@ -289,7 +296,7 @@
 
   window.ShaderBase.create({
     animateValues:  true,
-    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale', 'u_vignette_x', 'u_vignette_y'],
+    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
@@ -336,8 +343,10 @@
         posX:          gl.getUniformLocation(program, 'u_pos_x'),
         posY:          gl.getUniformLocation(program, 'u_pos_y'),
         scale:         gl.getUniformLocation(program, 'u_scale'),
-        vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
-        vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
+        vignetteTop:    gl.getUniformLocation(program, 'u_vignette_top'),
+        vignetteBottom: gl.getUniformLocation(program, 'u_vignette_bottom'),
+        vignetteLeft:   gl.getUniformLocation(program, 'u_vignette_left'),
+        vignetteRight:  gl.getUniformLocation(program, 'u_vignette_right'),
         // Internal threshold cache (not uniform locations)
         _thresholdData: new Float32Array(19).fill(1.0),
         _lastThreshKey: null,
@@ -451,8 +460,10 @@
       gl.uniform1f(u.posX,          v.u_pos_x          != null ? v.u_pos_x          : 0.0);
       gl.uniform1f(u.posY,          v.u_pos_y          != null ? v.u_pos_y          : 0.0);
       gl.uniform1f(u.scale,         v.u_scale          != null ? v.u_scale          : 1.0);
-      gl.uniform1f(u.vignetteX,     v.u_vignette_x     != null ? v.u_vignette_x     : 0.0);
-      gl.uniform1f(u.vignetteY,     v.u_vignette_y     != null ? v.u_vignette_y     : 0.0);
+      gl.uniform1f(u.vignetteTop,    v.u_vignette_top    != null ? v.u_vignette_top    : 0.0);
+      gl.uniform1f(u.vignetteBottom, v.u_vignette_bottom != null ? v.u_vignette_bottom : 0.0);
+      gl.uniform1f(u.vignetteLeft,   v.u_vignette_left   != null ? v.u_vignette_left   : 0.0);
+      gl.uniform1f(u.vignetteRight,  v.u_vignette_right  != null ? v.u_vignette_right  : 0.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);

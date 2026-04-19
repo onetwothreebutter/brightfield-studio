@@ -357,21 +357,39 @@
             </div>
           </div>
 
-          <!-- Vignette X -->
+          <!-- Vignette Top -->
           <div class="shader-control">
-            <label class="shader-control__label">Vignette X</label>
+            <label class="shader-control__label">Vignette Top</label>
             <div class="shader-control__range-wrap">
-              <input type="range" class="shader-control__range" id="demo-vignette-x" min="0" max="4" step="0.05" value="0">
-              <span class="shader-control__value" id="demo-vignette-x-display">0</span>
+              <input type="range" class="shader-control__range" id="demo-vignette-top" min="0" max="8" step="0.05" value="0">
+              <span class="shader-control__value" id="demo-vignette-top-display">0</span>
             </div>
           </div>
 
-          <!-- Vignette Y -->
+          <!-- Vignette Bottom -->
           <div class="shader-control">
-            <label class="shader-control__label">Vignette Y</label>
+            <label class="shader-control__label">Vignette Bottom</label>
             <div class="shader-control__range-wrap">
-              <input type="range" class="shader-control__range" id="demo-vignette-y" min="0" max="4" step="0.05" value="0">
-              <span class="shader-control__value" id="demo-vignette-y-display">0</span>
+              <input type="range" class="shader-control__range" id="demo-vignette-bottom" min="0" max="8" step="0.05" value="0">
+              <span class="shader-control__value" id="demo-vignette-bottom-display">0</span>
+            </div>
+          </div>
+
+          <!-- Vignette Left -->
+          <div class="shader-control">
+            <label class="shader-control__label">Vignette Left</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-vignette-left" min="0" max="8" step="0.05" value="0">
+              <span class="shader-control__value" id="demo-vignette-left-display">0</span>
+            </div>
+          </div>
+
+          <!-- Vignette Right -->
+          <div class="shader-control">
+            <label class="shader-control__label">Vignette Right</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-vignette-right" min="0" max="8" step="0.05" value="0">
+              <span class="shader-control__value" id="demo-vignette-right-display">0</span>
             </div>
           </div>
 
@@ -542,7 +560,7 @@
       u_use_text_color: 0, u_text_color: [1.0, 1.0, 1.0],
       outlineEnabled: false, outlineWidth: 8, u_outline_color: [0.0, 0.0, 0.0],
       u_pos_x: 0.0, u_pos_y: -0.08, u_scale: 1.0,
-      u_vignette_x: 0.0, u_vignette_y: 0.0,
+      u_vignette_top: 0.0, u_vignette_bottom: 0.0, u_vignette_left: 0.0, u_vignette_right: 0.0,
     },
     dirty: true,
   };
@@ -1057,10 +1075,14 @@
   var posYDisp            = document.getElementById('demo-pos-y-display');
   var scaleInput          = document.getElementById('demo-scale');
   var scaleDisp           = document.getElementById('demo-scale-display');
-  var vignetteXInput      = document.getElementById('demo-vignette-x');
-  var vignetteXDisp       = document.getElementById('demo-vignette-x-display');
-  var vignetteYInput      = document.getElementById('demo-vignette-y');
-  var vignetteYDisp       = document.getElementById('demo-vignette-y-display');
+  var vignetteTopInput    = document.getElementById('demo-vignette-top');
+  var vignetteTopDisp     = document.getElementById('demo-vignette-top-display');
+  var vignetteBottomInput = document.getElementById('demo-vignette-bottom');
+  var vignetteBottomDisp  = document.getElementById('demo-vignette-bottom-display');
+  var vignetteLeftInput   = document.getElementById('demo-vignette-left');
+  var vignetteLeftDisp    = document.getElementById('demo-vignette-left-display');
+  var vignetteRightInput  = document.getElementById('demo-vignette-right');
+  var vignetteRightDisp   = document.getElementById('demo-vignette-right-display');
 
   opacityInput.addEventListener('input', function () {
     onUserInteract();
@@ -1104,18 +1126,32 @@
     scaleDisp.textContent = n.toFixed(2);
     window._demoState.dirty = true;
   });
-  vignetteXInput.addEventListener('input', function () {
+  vignetteTopInput.addEventListener('input', function () {
     onUserInteract();
     var n = parseFloat(this.value);
-    window._demoState.values.u_vignette_x = n;
-    vignetteXDisp.textContent = n.toFixed(1);
+    window._demoState.values.u_vignette_top = n;
+    vignetteTopDisp.textContent = n.toFixed(1);
     window._demoState.dirty = true;
   });
-  vignetteYInput.addEventListener('input', function () {
+  vignetteBottomInput.addEventListener('input', function () {
     onUserInteract();
     var n = parseFloat(this.value);
-    window._demoState.values.u_vignette_y = n;
-    vignetteYDisp.textContent = n.toFixed(1);
+    window._demoState.values.u_vignette_bottom = n;
+    vignetteBottomDisp.textContent = n.toFixed(1);
+    window._demoState.dirty = true;
+  });
+  vignetteLeftInput.addEventListener('input', function () {
+    onUserInteract();
+    var n = parseFloat(this.value);
+    window._demoState.values.u_vignette_left = n;
+    vignetteLeftDisp.textContent = n.toFixed(1);
+    window._demoState.dirty = true;
+  });
+  vignetteRightInput.addEventListener('input', function () {
+    onUserInteract();
+    var n = parseFloat(this.value);
+    window._demoState.values.u_vignette_right = n;
+    vignetteRightDisp.textContent = n.toFixed(1);
     window._demoState.dirty = true;
   });
 
@@ -1426,8 +1462,10 @@
       if (posXInput)            { posXInput.value           = v.u_pos_x      != null ? v.u_pos_x      : 0;   posXDisp.textContent       = parseFloat(posXInput.value).toFixed(2); }
       if (posYInput)            { posYInput.value           = v.u_pos_y      != null ? v.u_pos_y      : 0;   posYDisp.textContent       = parseFloat(posYInput.value).toFixed(2); }
       if (scaleInput)           { scaleInput.value          = v.u_scale      != null ? v.u_scale      : 1;   scaleDisp.textContent      = parseFloat(scaleInput.value).toFixed(2); }
-      if (vignetteXInput)       { vignetteXInput.value      = v.u_vignette_x != null ? v.u_vignette_x : 0;   vignetteXDisp.textContent  = parseFloat(vignetteXInput.value).toFixed(1); }
-      if (vignetteYInput)       { vignetteYInput.value      = v.u_vignette_y != null ? v.u_vignette_y : 0;   vignetteYDisp.textContent  = parseFloat(vignetteYInput.value).toFixed(1); }
+      if (vignetteTopInput)    { vignetteTopInput.value    = v.u_vignette_top    != null ? v.u_vignette_top    : 0; vignetteTopDisp.textContent    = parseFloat(vignetteTopInput.value).toFixed(1); }
+      if (vignetteBottomInput) { vignetteBottomInput.value = v.u_vignette_bottom != null ? v.u_vignette_bottom : 0; vignetteBottomDisp.textContent = parseFloat(vignetteBottomInput.value).toFixed(1); }
+      if (vignetteLeftInput)   { vignetteLeftInput.value   = v.u_vignette_left   != null ? v.u_vignette_left   : 0; vignetteLeftDisp.textContent   = parseFloat(vignetteLeftInput.value).toFixed(1); }
+      if (vignetteRightInput)  { vignetteRightInput.value  = v.u_vignette_right  != null ? v.u_vignette_right  : 0; vignetteRightDisp.textContent  = parseFloat(vignetteRightInput.value).toFixed(1); }
       window._demoState.textDirty = true;
       applyColorModeVisibility();
       userInteracted = true;

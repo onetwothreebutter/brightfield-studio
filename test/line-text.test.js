@@ -77,7 +77,7 @@ describe('line-text.js', () => {
   it('fragSrc declares all expected uniforms', () => {
     const frag = Array.isArray(opts.fragSrc) ? opts.fragSrc.join('\n') : opts.fragSrc;
     ['u_resolution', 'u_rows', 'u_base_thickness', 'u_text_thickness',
-     'u_text_y', 'u_vignette_x', 'u_vignette_y',
+     'u_text_y', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right',
      'u_a', 'u_b', 'u_c', 'u_d',
      'u_color_mode', 'u_color0', 'u_color1', 'u_color2', 'u_color3',
      'u_text_texture', 'u_transparent_bg'].forEach((name) => {
@@ -100,7 +100,8 @@ describe('line-text.js', () => {
   it('setup() returns an object with all required uniform keys', () => {
     const gl = makeSetupGl();
     const uniforms = opts.setup(gl, {});
-    ['res', 'rows', 'baseThickness', 'textThickness', 'textY', 'vignetteX', 'vignetteY',
+    ['res', 'rows', 'baseThickness', 'textThickness', 'textY',
+     'vignetteTop', 'vignetteBottom', 'vignetteLeft', 'vignetteRight',
      'palA', 'palB', 'palC', 'palD',
      'colorMode', 'color0', 'color1', 'color2', 'color3',
      'textTex', 'transparentBg'].forEach((key) => {
@@ -149,8 +150,10 @@ describe('line-text.js', () => {
     expect(find1f(uniforms.rows)).toBe(80.0);
     expect(find1f(uniforms.baseThickness)).toBeCloseTo(0.02);
     expect(find1f(uniforms.textThickness)).toBeCloseTo(0.4);
-    expect(find1f(uniforms.vignetteX)).toBeCloseTo(2.0);
-    expect(find1f(uniforms.vignetteY)).toBeCloseTo(2.0);
+    expect(find1f(uniforms.vignetteTop)).toBeCloseTo(2.0);
+    expect(find1f(uniforms.vignetteBottom)).toBeCloseTo(2.0);
+    expect(find1f(uniforms.vignetteLeft)).toBeCloseTo(2.0);
+    expect(find1f(uniforms.vignetteRight)).toBeCloseTo(2.0);
     expect(find1f(uniforms.colorMode)).toBe(0.0);
     // Default is opaque (display) mode — avoids Safari alpha compositing bug
     expect(find1f(uniforms.transparentBg)).toBe(0.0);
