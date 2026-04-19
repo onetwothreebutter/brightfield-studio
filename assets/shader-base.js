@@ -35,7 +35,7 @@
     var fragSrc = Array.isArray(opts.fragSrc) ? opts.fragSrc.join('\n') : opts.fragSrc;
     var vert = compileShader(vertSrc, gl.VERTEX_SHADER);
     var frag = compileShader(fragSrc, gl.FRAGMENT_SHADER);
-    if (!vert || !frag) return;
+    if (!vert || !frag) { canvas.dataset.shaderError = 'compile'; return; }
 
     var program = gl.createProgram();
     gl.attachShader(program, vert);
@@ -43,6 +43,7 @@
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
       console.error('Program link error:', gl.getProgramInfoLog(program));
+      canvas.dataset.shaderError = 'link';
       return;
     }
     gl.useProgram(program);

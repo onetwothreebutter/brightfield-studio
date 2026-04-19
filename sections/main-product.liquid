@@ -691,7 +691,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           if (input.type === 'range') {
             input.value = val;
             var display = input.parentNode.querySelector('.shader-control__value');
-            if (display) display.textContent = val.toFixed(input.step.includes('.') ? input.step.split('.')[1].length : 0);
+            if (display) display.textContent = val.toFixed((input.step || '1').includes('.') ? (input.step || '1').split('.')[1].length : 0);
           } else if (input.tagName === 'SELECT') {
             input.value = val;
           } else if (input.classList.contains('shader-control__toggle')) {
