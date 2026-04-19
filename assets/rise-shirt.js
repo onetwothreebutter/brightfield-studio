@@ -28,7 +28,6 @@
     'uniform vec3  u_d;',
     'uniform float u_color_mode;',
     'uniform float u_invert_text;',
-    'uniform float u_transparent_bg;',
     'uniform float u_opacity;',
     'uniform float u_distress;',
     'uniform float u_distress_scale;',
@@ -172,8 +171,7 @@
     '  vec3 activeTextPal   = mix(textRaw, invertedTextPal, u_invert_text);',
     '  vec3 marginColor     = mix(u_text_bg_color, activeTextPal, textMask);',
     '',
-    '  float dotAlpha = mix(mainMask, textMask, inMargin);',
-    '  float alpha    = mix(1.0, dotAlpha, u_transparent_bg);',
+    '  float alpha = mix(mainMask, textMask, inMargin);',
     '  vec3 finalCol  = mix(mainColor, marginColor, inMargin);',
     '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
     '  float distEdge = clamp(length(dUV - 0.5) * 2.0, 0.0, 1.0);',
@@ -187,7 +185,9 @@
     '  float vigT = max(0.0,  vigCoord.y);',
     '  float vigVal = vigL*vigL*u_vignette_left + vigR*vigR*u_vignette_right',
     '               + vigB*vigB*u_vignette_bottom + vigT*vigT*u_vignette_top;',
-    '  finalCol = finalCol * (1.0 - smoothstep(0.0, 1.0, vigVal));',
+    '  float vigMask = 1.0 - smoothstep(0.0, 1.0, vigVal);',
+    '  finalCol = finalCol * vigMask;',
+    '  alpha = alpha * vigMask;',
     '  vec3 encoded   = pow(max(finalCol, 0.0), vec3(1.0 / 2.2));',
     '  fragColor      = vec4(encoded, alpha);',
     '}'
@@ -223,7 +223,6 @@
         palD:         gl.getUniformLocation(program, 'u_d'),
         colorMode:    gl.getUniformLocation(program, 'u_color_mode'),
         invertText:   gl.getUniformLocation(program, 'u_invert_text'),
-        transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
@@ -303,7 +302,6 @@
       gl.uniform3fv(u.palD,        v.u_d            || [0.263, 0.416, 0.557]);
       gl.uniform1f(u.colorMode,    parseFloat(v.u_color_mode || '0'));
       gl.uniform1f(u.invertText,   v.u_invert_text  != null ? v.u_invert_text  : 0.0);
-      gl.uniform1f(u.transparentBg, 1.0);
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
