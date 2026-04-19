@@ -76,21 +76,25 @@ The Finish section is always the last section in the controls array and contains
 1. `u_opacity` — range 0–1, default 1.0, `noRandomize: true`
 2. `u_distress` — range 0–0.85, default 0.0, `noRandomize: true`
 3. `u_distress_scale` — range 10–300, default 80, `noRandomize: true`
-4. `u_vignette_x` — range 0–8, step 0.05, default 0, `noRandomize: true`
-5. `u_vignette_y` — range 0–8, step 0.05, default 0, `noRandomize: true`
-6. `u_pos_x` — range -0.5–0.5, default 0.0, `noRandomize: true`
-7. `u_pos_y` — range -0.5–0.5, default 0.0, `noRandomize: true`
-8. `u_scale` — range 0.2–3.0, step 0.05, default 1.0, `noRandomize: true`
+4. `u_vignette_top` — range 0–20, step 0.05, default 0, `noRandomize: true`
+5. `u_vignette_bottom` — range 0–20, step 0.05, default 0, `noRandomize: true`
+6. `u_vignette_left` — range 0–20, step 0.05, default 0, `noRandomize: true`
+7. `u_vignette_right` — range 0–20, step 0.05, default 0, `noRandomize: true`
+8. `u_pos_x` — range -0.5–0.5, default 0.0, `noRandomize: true`
+9. `u_pos_y` — range -0.5–0.5, default 0.0, `noRandomize: true`
+10. `u_scale` — range 0.2–3.0, step 0.05, default 1.0, `noRandomize: true`
 
-Shader-specific extras (beyond vignette) go between `u_distress_scale` and `u_vignette_x`.
+Shader-specific extras (beyond vignette) go between `u_distress_scale` and `u_vignette_top`.
 
 **GLSL uniforms to declare in every shader:**
 ```glsl
 uniform float u_opacity;
 uniform float u_distress;
 uniform float u_distress_scale;
-uniform float u_vignette_x;
-uniform float u_vignette_y;
+uniform float u_vignette_top;
+uniform float u_vignette_bottom;
+uniform float u_vignette_left;
+uniform float u_vignette_right;
 uniform float u_pos_x;
 uniform float u_pos_y;
 uniform float u_scale;
@@ -140,4 +144,4 @@ Always use bold: `ctx.font = 'bold ' + fontSize + 'px ' + fontFamily`
 4. Tag the product `shader-[name]` in Shopify
 5. Add the shader to `test-shaders.html`
 
-**Checklist before submitting:** confirm `u_vignette_x`, `u_vignette_y`, `u_pos_x`, `u_pos_y`, `u_scale` are in the Finish section controls AND declared as GLSL uniforms + `setup()` locations + `render()` calls. See "Finish section — standard controls" above.
+**Checklist before submitting:** confirm `u_vignette_top`, `u_vignette_bottom`, `u_vignette_left`, `u_vignette_right`, `u_pos_x`, `u_pos_y`, `u_scale` are in the Finish section controls AND declared as GLSL uniforms + `setup()` locations + `render()` calls. See "Finish section — standard controls" above.

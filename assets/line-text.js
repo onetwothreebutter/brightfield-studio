@@ -21,8 +21,10 @@
     'uniform vec3  u_color3;',
     'uniform sampler2D u_text_texture;',
     'uniform float u_text_y;',
-    'uniform float u_vignette_x;',
-    'uniform float u_vignette_y;',
+    'uniform float u_vignette_top;',
+    'uniform float u_vignette_bottom;',
+    'uniform float u_vignette_left;',
+    'uniform float u_vignette_right;',
     'uniform float u_cap_radius;',
     'uniform float u_text_tex_size;',
     'uniform float u_transparent_bg;',
@@ -91,9 +93,15 @@
     '  vec3 gradColor = mix(mix(seg01, seg12, step(1.0 / 3.0, uv.x)), seg23, step(2.0 / 3.0, uv.x));',
     '  vec3 col = mix(palColor, gradColor, u_color_mode);',
     '',
-    '  // Vignette: centered on text Y position',
-    '  vec2 vigCoord = uv - vec2(0.5, u_text_y);',
-    '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
+    '  // Vignette',
+    '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
+    '  vec2 vigCoord = dUV - 0.5;',
+    '  float vigL = max(0.0, -vigCoord.x);',
+    '  float vigR = max(0.0,  vigCoord.x);',
+    '  float vigB = max(0.0, -vigCoord.y);',
+    '  float vigT = max(0.0,  vigCoord.y);',
+    '  float vigVal = vigL*vigL*u_vignette_left + vigR*vigR*u_vignette_right',
+    '               + vigB*vigB*u_vignette_bottom + vigT*vigT*u_vignette_top;',
     '  float vignette = 1.0 - smoothstep(0.0, 1.0, vigVal);',
     '',
     '  vec3 encoded = pow(max(col, 0.0), vec3(1.0 / 2.2));',
@@ -127,8 +135,10 @@
         color3:        gl.getUniformLocation(program, 'u_color3'),
         textTex:       gl.getUniformLocation(program, 'u_text_texture'),
         textY:         gl.getUniformLocation(program, 'u_text_y'),
-        vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
-        vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
+        vignetteTop:    gl.getUniformLocation(program, 'u_vignette_top'),
+        vignetteBottom: gl.getUniformLocation(program, 'u_vignette_bottom'),
+        vignetteLeft:   gl.getUniformLocation(program, 'u_vignette_left'),
+        vignetteRight:  gl.getUniformLocation(program, 'u_vignette_right'),
         capRadius:     gl.getUniformLocation(program, 'u_cap_radius'),
         texSize:       gl.getUniformLocation(program, 'u_text_tex_size'),
         transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
@@ -153,8 +163,10 @@
       gl.uniform3fv(u.color2,       v.u_color2 || [0.0, 0.8,  1.0]);
       gl.uniform3fv(u.color3,       v.u_color3 || [0.667, 0.0, 1.0]);
       gl.uniform1f(u.textY,         v.textY != null ? v.textY : 0.5);
-      gl.uniform1f(u.vignetteX,     v.u_vignette_x != null ? v.u_vignette_x : 2.0);
-      gl.uniform1f(u.vignetteY,     v.u_vignette_y != null ? v.u_vignette_y : 2.0);
+      gl.uniform1f(u.vignetteTop,    v.u_vignette_top    != null ? v.u_vignette_top    : 2.0);
+      gl.uniform1f(u.vignetteBottom, v.u_vignette_bottom != null ? v.u_vignette_bottom : 2.0);
+      gl.uniform1f(u.vignetteLeft,   v.u_vignette_left   != null ? v.u_vignette_left   : 2.0);
+      gl.uniform1f(u.vignetteRight,  v.u_vignette_right  != null ? v.u_vignette_right  : 2.0);
       gl.uniform1f(u.capRadius,     v.textCapRadius != null ? v.textCapRadius : 20.0);
       gl.uniform1f(u.texSize,       1024.0);
       gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);

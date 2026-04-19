@@ -24,8 +24,10 @@
     'uniform float u_pos_x;',
     'uniform float u_pos_y;',
     'uniform float u_scale;',
-    'uniform float u_vignette_x;',
-    'uniform float u_vignette_y;',
+    'uniform float u_vignette_top;',
+    'uniform float u_vignette_bottom;',
+    'uniform float u_vignette_left;',
+    'uniform float u_vignette_right;',
     'uniform float u_aspect;',
     'uniform vec3  u_text_color;',
     'uniform float u_use_text_color;',
@@ -104,7 +106,12 @@
     '           + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
     '  alpha = alpha * step(u_distress * dist, dn) * u_opacity;',
     '  vec2 vigCoord = dUV - 0.5;',
-    '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
+    '  float vigL = max(0.0, -vigCoord.x);',
+    '  float vigR = max(0.0,  vigCoord.x);',
+    '  float vigB = max(0.0, -vigCoord.y);',
+    '  float vigT = max(0.0,  vigCoord.y);',
+    '  float vigVal = vigL*vigL*u_vignette_left + vigR*vigR*u_vignette_right',
+    '               + vigB*vigB*u_vignette_bottom + vigT*vigT*u_vignette_top;',
     '  col = col * (1.0 - smoothstep(0.0, 1.0, vigVal));',
     '  vec2 textAnchor    = vec2(u_text_x, u_text_y);',
     '  vec2 textDelta     = uv - textAnchor;',
@@ -148,8 +155,10 @@
         posX:          gl.getUniformLocation(program, 'u_pos_x'),
         posY:          gl.getUniformLocation(program, 'u_pos_y'),
         scale:         gl.getUniformLocation(program, 'u_scale'),
-        vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
-        vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
+        vignetteTop:    gl.getUniformLocation(program, 'u_vignette_top'),
+        vignetteBottom: gl.getUniformLocation(program, 'u_vignette_bottom'),
+        vignetteLeft:   gl.getUniformLocation(program, 'u_vignette_left'),
+        vignetteRight:  gl.getUniformLocation(program, 'u_vignette_right'),
         aspect:        gl.getUniformLocation(program, 'u_aspect'),
         textColor:     gl.getUniformLocation(program, 'u_text_color'),
         useTextColor:  gl.getUniformLocation(program, 'u_use_text_color'),
@@ -173,15 +182,17 @@
       gl.uniform1f(u.gradMode,   v.u_grad_mode != null ? parseFloat(v.u_grad_mode) : 1.0);
       gl.uniform3fv(u.color1,    v.u_color1 || [0.0, 0.722, 1.0]);
       gl.uniform3fv(u.color2,    v.u_color2 || [1.0, 0.690, 0.0]);
-      gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);
+      gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 1.0);
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
       gl.uniform1f(u.posX,         v.u_pos_x  != null ? v.u_pos_x  : 0.0);
       gl.uniform1f(u.posY,         v.u_pos_y  != null ? v.u_pos_y  : 0.0);
       gl.uniform1f(u.scale,        v.u_scale  != null ? v.u_scale  : 1.0);
-      gl.uniform1f(u.vignetteX,     v.u_vignette_x     != null ? v.u_vignette_x     : 0.0);
-      gl.uniform1f(u.vignetteY,     v.u_vignette_y     != null ? v.u_vignette_y     : 0.0);
+      gl.uniform1f(u.vignetteTop,    v.u_vignette_top    != null ? v.u_vignette_top    : 0.0);
+      gl.uniform1f(u.vignetteBottom, v.u_vignette_bottom != null ? v.u_vignette_bottom : 0.0);
+      gl.uniform1f(u.vignetteLeft,   v.u_vignette_left   != null ? v.u_vignette_left   : 0.0);
+      gl.uniform1f(u.vignetteRight,  v.u_vignette_right  != null ? v.u_vignette_right  : 0.0);
       gl.uniform1f(u.aspect,        w / h);
       gl.uniform3fv(u.textColor,    v.u_text_color    || [1.0, 1.0, 1.0]);
       gl.uniform1f(u.useTextColor,  v.u_use_text_color != null ? v.u_use_text_color : 0.0);
