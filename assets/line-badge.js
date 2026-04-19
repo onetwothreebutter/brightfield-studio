@@ -40,7 +40,6 @@
     '',
     '// Finish',
     'uniform float u_offset_y;',
-    'uniform float u_transparent_bg;',
     'uniform float u_opacity;',
     'uniform float u_distress;',
     'uniform float u_distress_scale;',
@@ -120,7 +119,7 @@
     '',
     '  float textAlpha  = fillS + outlineS;',
     '  float baseAlpha  = mix(geomMask, 1.0, textAlpha);',
-    '  float alpha      = mix(1.0, baseAlpha, u_transparent_bg);',
+    '  float alpha      = baseAlpha;',
     '',
     '  // ── Distress ───────────────────────────────────────────────────────────',
     '  float distEdge = clamp(length(uv - 0.5) * 2.0, 0.0, 1.0);',
@@ -162,7 +161,6 @@
         useTextColor: gl.getUniformLocation(program, 'u_use_text_color'),
         outlineColor: gl.getUniformLocation(program, 'u_outline_color'),
         offsetY:      gl.getUniformLocation(program, 'u_offset_y'),
-        transparentBg:gl.getUniformLocation(program, 'u_transparent_bg'),
         opacity:      gl.getUniformLocation(program, 'u_opacity'),
         distress:     gl.getUniformLocation(program, 'u_distress'),
         distressScale:gl.getUniformLocation(program, 'u_distress_scale'),
@@ -196,7 +194,6 @@
       gl.uniform1f(u.useTextColor,  v.u_use_text_color  != null ? v.u_use_text_color  : 0.0);
       gl.uniform3fv(u.outlineColor, v.u_outline_color   || [0.0, 0.0, 0.0]);
       gl.uniform1f(u.offsetY,       v.u_offset_y        != null ? v.u_offset_y        : 0.0);
-      gl.uniform1f(u.transparentBg, v.u_transparent_bg  != null ? v.u_transparent_bg  : 0.0);
       gl.uniform1f(u.opacity,       v.u_opacity         != null ? v.u_opacity         : 1.0);
       gl.uniform1f(u.distress,      v.u_distress        != null ? v.u_distress        : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale  != null ? v.u_distress_scale  : 80.0);

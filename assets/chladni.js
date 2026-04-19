@@ -17,7 +17,6 @@
     'uniform float u_grad_mode;',
     'uniform vec3  u_color1;',
     'uniform vec3  u_color2;',
-    'uniform float u_transparent_bg;',
     'uniform float u_opacity;',
     'uniform float u_distress;',
     'uniform float u_distress_scale;',
@@ -99,7 +98,7 @@
     '',
     '  // For print export: make background transparent based on luminance',
     '  float luma  = dot(col, vec3(0.299, 0.587, 0.114));',
-    '  float alpha = mix(1.0, smoothstep(0.01, 0.05, luma), u_transparent_bg);',
+    '  float alpha = smoothstep(0.01, 0.05, luma);',
     '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
     '  float dist = clamp(length(dUV - 0.5) * 2.0, 0.0, 1.0);',
     '  float dn = distressNoise(dUV, u_distress_scale) * 0.67',
@@ -150,7 +149,6 @@
         gradMode:     gl.getUniformLocation(program, 'u_grad_mode'),
         color1:       gl.getUniformLocation(program, 'u_color1'),
         color2:       gl.getUniformLocation(program, 'u_color2'),
-        transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
@@ -184,7 +182,6 @@
       gl.uniform1f(u.gradMode,   v.u_grad_mode != null ? parseFloat(v.u_grad_mode) : 1.0);
       gl.uniform3fv(u.color1,    v.u_color1 || [0.0, 0.722, 1.0]);
       gl.uniform3fv(u.color2,    v.u_color2 || [1.0, 0.690, 0.0]);
-      gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 1.0);
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);

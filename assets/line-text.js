@@ -27,7 +27,6 @@
     'uniform float u_vignette_right;',
     'uniform float u_cap_radius;',
     'uniform float u_text_tex_size;',
-    'uniform float u_transparent_bg;',
     'uniform float u_pos_x;',
     'uniform float u_pos_y;',
     'uniform float u_scale;',
@@ -105,17 +104,14 @@
     '  float vignette = 1.0 - smoothstep(0.0, 1.0, vigVal);',
     '',
     '  vec3 encoded = pow(max(col, 0.0), vec3(1.0 / 2.2));',
-    '  // Display mode (u_transparent_bg=0): opaque black between lines — avoids Safari alpha compositing bug',
-    '  // Export mode  (u_transparent_bg=1): transparent between lines — product image shows through PNG',
-    '  float alpha = mix(1.0, lineMask * vignette, u_transparent_bg);',
-    '  fragColor = vec4(encoded * vignette * mix(lineMask, 1.0, u_transparent_bg), alpha);',
+    '  float alpha = lineMask * vignette;',
+    '  fragColor = vec4(encoded * vignette * lineMask, alpha);',
     '}',
   ].join('\n');
 
   window.ShaderBase.create({
     animateValues:  true,
     instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale'],
-    exportValues:   { u_transparent_bg: 1.0 },
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
@@ -141,7 +137,6 @@
         vignetteRight:  gl.getUniformLocation(program, 'u_vignette_right'),
         capRadius:     gl.getUniformLocation(program, 'u_cap_radius'),
         texSize:       gl.getUniformLocation(program, 'u_text_tex_size'),
-        transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
         posX:          gl.getUniformLocation(program, 'u_pos_x'),
         posY:          gl.getUniformLocation(program, 'u_pos_y'),
         scale:         gl.getUniformLocation(program, 'u_scale'),
@@ -169,7 +164,6 @@
       gl.uniform1f(u.vignetteRight,  v.u_vignette_right  != null ? v.u_vignette_right  : 2.0);
       gl.uniform1f(u.capRadius,     v.textCapRadius != null ? v.textCapRadius : 20.0);
       gl.uniform1f(u.texSize,       1024.0);
-      gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);
       gl.uniform1f(u.posX,         v.u_pos_x  != null ? v.u_pos_x  : 0.0);
       gl.uniform1f(u.posY,         v.u_pos_y  != null ? v.u_pos_y  : 0.0);
       gl.uniform1f(u.scale,        v.u_scale  != null ? v.u_scale  : 1.0);

@@ -39,7 +39,6 @@
     'uniform vec3  u_oklch_d;',
     '',
     '// Finish',
-    'uniform float u_transparent_bg;',
     'uniform float u_opacity;',
     'uniform float u_distress;',
     'uniform float u_distress_scale;',
@@ -197,7 +196,7 @@
     '  //   transparent → ring bands only (ring troughs are transparent, great for print)',
     '  float glowA   = min(edgeGlow, 1.0) * inside;',
     '  float ringA   = max(rings * inside, glowA);',
-    '  float alpha   = mix(inside, ringA, u_transparent_bg);',
+    '  float alpha   = ringA;',
     '  alpha *= u_opacity * distressMask * vignette;',
     '',
     '  vec3 encoded = pow(max(color, 0.0), vec3(1.0 / 2.2));',
@@ -265,7 +264,6 @@
         oklchB:        gl.getUniformLocation(program, 'u_oklch_b'),
         oklchC:        gl.getUniformLocation(program, 'u_oklch_c'),
         oklchD:        gl.getUniformLocation(program, 'u_oklch_d'),
-        transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
@@ -324,7 +322,6 @@
       gl.uniform3fv(u.oklchB,       oklchB);
       gl.uniform3fv(u.oklchC,       oklchC);
       gl.uniform3fv(u.oklchD,       oklchD);
-      gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);

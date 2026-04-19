@@ -126,9 +126,7 @@
         if (opts.animateValues) {
           var dt = Math.min(t - lastT, 0.1);
           var factor = 1 - Math.exp(-8 * dt);
-          // u_transparent_bg must snap instantly — it's toggled only during export
-          // and must be exactly 1.0/0.0 or the PNG will have a semi-opaque background
-          var instant = (opts.instantKeys || []).concat(['u_transparent_bg']);
+          var instant = (opts.instantKeys || []);
           if (!animVals) { animVals = {}; }
           Object.keys(v).forEach(function (k) {
             if (instant.indexOf(k) !== -1) {
@@ -181,8 +179,7 @@
       canvas.height = targetH;
       gl.viewport(0, 0, targetW, targetH);
 
-      // Apply per-shader export overrides (e.g. u_transparent_bg=1 for line-text).
-      // Opt-in only — avoids the blank-design regression that occurred when this was forced globally.
+      // Apply per-shader export overrides (opt-in via exportValues on ShaderBase.create).
       var stateValues = window[stateKey] && window[stateKey].values;
       var exportOverrides = opts.exportValues || {};
       var savedOverrides = {};

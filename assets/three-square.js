@@ -70,7 +70,6 @@
     'uniform sampler2D u_tex2;',
     'uniform sampler2D u_tex3;',
     'uniform sampler2D u_tex4;',
-    'uniform float     u_transparent_bg;',
     'uniform float     u_opacity;',
     'uniform float     u_distress;',
     'uniform float     u_distress_scale;',
@@ -200,7 +199,7 @@
     '  finalColor = mix(finalColor, col4, sq4);',
     '  finalAlpha = mix(finalAlpha, 1.0, sq4);',
     '',
-    '  float alpha = mix(1.0, finalAlpha, u_transparent_bg);',
+    '  float alpha = finalAlpha;',
     '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
     '  float dist = clamp(length(dUV - 0.5) * 2.0, 0.0, 1.0);',
     '  float dn = distressNoise(dUV, u_distress_scale) * 0.67',
@@ -270,7 +269,6 @@
         tex2:         gl.getUniformLocation(program, 'u_tex2'),
         tex3:         gl.getUniformLocation(program, 'u_tex3'),
         tex4:         gl.getUniformLocation(program, 'u_tex4'),
-        transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
@@ -363,7 +361,6 @@
       gl.uniform3fv(u.color1,      color1);
       gl.uniform3fv(u.color2,      color2);
       gl.uniform3fv(u.color3,      color3);
-      gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 0.0);
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);

@@ -20,7 +20,6 @@
     'uniform float     u_text_y;',
     'uniform vec3      u_text_color;',
     'uniform vec3      u_outline_color;',
-    'uniform float     u_transparent_bg;',
     '',
     '// Palette',
     'uniform float     u_color_mode;  // 0=flat, 1=4-stop, 2=cosine',
@@ -136,7 +135,7 @@
     '  color = mix(color, fillCol,         fillAlpha);',
     '',
     '  float inkAlpha = max(fillAlpha, outlineAlpha);',
-    '  float alpha    = mix(1.0, inkAlpha, u_transparent_bg);',
+    '  float alpha    = inkAlpha;',
     '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
     '  float dist = clamp(length(dUV - 0.5) * 2.0, 0.0, 1.0);',
     '  float dn = 1.0;',
@@ -171,7 +170,6 @@
         textY:         gl.getUniformLocation(program, 'u_text_y'),
 textColor:     gl.getUniformLocation(program, 'u_text_color'),
         outlineColor:  gl.getUniformLocation(program, 'u_outline_color'),
-        transparentBg: gl.getUniformLocation(program, 'u_transparent_bg'),
         // Palette
         colorMode:     gl.getUniformLocation(program, 'u_color_mode'),
         palA:          gl.getUniformLocation(program, 'u_a'),
@@ -227,7 +225,6 @@ textColor:     gl.getUniformLocation(program, 'u_text_color'),
       gl.uniform1f(u.textY,         v.textY            != null ? v.textY            : 0.5);
 gl.uniform3fv(u.textColor,    v.u_text_color     || [1.0, 1.0, 1.0]);
       gl.uniform3fv(u.outlineColor, v.u_outline_color  || [0.0, 0.0, 0.0]);
-      gl.uniform1f(u.transparentBg, v.u_transparent_bg != null ? v.u_transparent_bg : 1.0);
       // Palette
       gl.uniform1f(u.colorMode,  colorMode);
       gl.uniform3fv(u.palA,      palA);

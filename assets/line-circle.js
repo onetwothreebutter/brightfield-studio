@@ -36,7 +36,6 @@
     'uniform float u_center_circle_enabled;',
     'uniform float u_center_circle_radius;',
     // Export
-    'uniform float u_transparent_bg;',
     'uniform float u_opacity;',
     'uniform float u_distress;',
     'uniform float u_distress_scale;',
@@ -151,7 +150,7 @@
     '  float visibilityMask = circleMask * lineMask * triMask * centerMask;',
     '  float textAlpha      = fillSample + outlineSample;',
     '  float finalAlpha     = mix(visibilityMask, 1.0, textAlpha);',
-    '  float alpha          = mix(1.0, finalAlpha, u_transparent_bg);',
+    '  float alpha          = finalAlpha;',
     '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
     '  float dist = clamp(length(dUV - 0.5) * 2.0, 0.0, 1.0);',
     '  float dn = distressNoise(dUV, u_distress_scale) * 0.67',
@@ -204,7 +203,6 @@
         triWidth:            gl.getUniformLocation(program, 'u_tri_width'),
         centerCircleEnabled: gl.getUniformLocation(program, 'u_center_circle_enabled'),
         centerCircleRadius:  gl.getUniformLocation(program, 'u_center_circle_radius'),
-        transparentBg:       gl.getUniformLocation(program, 'u_transparent_bg'),
         opacity:             gl.getUniformLocation(program, 'u_opacity'),
         distress:            gl.getUniformLocation(program, 'u_distress'),
         distressScale:       gl.getUniformLocation(program, 'u_distress_scale'),
@@ -247,7 +245,6 @@
       gl.uniform1f(u.triWidth,     v.u_tri_width            != null ? v.u_tri_width            : (45 * Math.PI) / 180);
       gl.uniform1f(u.centerCircleEnabled, v.u_center_circle_enabled != null ? v.u_center_circle_enabled : 1.0);
       gl.uniform1f(u.centerCircleRadius,  v.u_center_circle_radius  != null ? v.u_center_circle_radius  : 0.04);
-      gl.uniform1f(u.transparentBg, 1.0);
       gl.uniform1f(u.opacity,      v.u_opacity              != null ? v.u_opacity              : 1.0);
       gl.uniform1f(u.distress,     v.u_distress             != null ? v.u_distress             : 0.0);
       gl.uniform1f(u.distressScale,v.u_distress_scale       != null ? v.u_distress_scale       : 80.0);
