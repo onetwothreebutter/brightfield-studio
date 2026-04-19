@@ -43,6 +43,11 @@
     'uniform float u_opacity;',
     'uniform float u_distress;',
     'uniform float u_distress_scale;',
+    'uniform float u_vignette_x;',
+    'uniform float u_vignette_y;',
+    'uniform float u_pos_x;',
+    'uniform float u_pos_y;',
+    'uniform float u_scale;',
     '',
     'out vec4 fragColor;',
     '',
@@ -138,6 +143,8 @@
     '// ── Main ───────────────────────────────────────────────────────────────────',
     'void main() {',
     '  vec2 uv = gl_FragCoord.xy / u_resolution;',
+    '  uv = (uv - 0.5) / u_scale + 0.5 + vec2(u_pos_x, u_pos_y);',
+    '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
     '',
     '  // SDF: 0 = far outside, 0.5 = shirt boundary, 1 = deepest interior',
     '  float raw = texture(u_sdf_texture, uv).r;',
@@ -168,10 +175,14 @@
     '  color = color + vec3(edgeGlow * 0.55);',
     '',
     '  // Distress (matches rise-shirt.js formula exactly)',
-    '  float distEdge = clamp(length(uv - 0.5) * 2.0, 0.0, 1.0);',
-    '  float dn = distressNoise(uv, u_distress_scale) * 0.67',
-    '           + distressNoise(uv, u_distress_scale * 2.73) * 0.33;',
+    '  float distEdge = clamp(length(dUV - 0.5) * 2.0, 0.0, 1.0);',
+    '  float dn = distressNoise(dUV, u_distress_scale) * 0.67',
+    '           + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
     '  float distressMask = step(u_distress * distEdge, dn);',
+    '',
+    '  // Vignette',
+    '  vec2 vigUV = dUV - 0.5;',
+    '  float vignette = 1.0 - smoothstep(0.0, 1.0, length(vigUV * vec2(u_vignette_x, u_vignette_y)));',
     '',
     '  // Alpha:',
     '  //   solid BG  → full shirt silhouette (good for preview)',
@@ -179,7 +190,7 @@
     '  float glowA   = min(edgeGlow, 1.0) * inside;',
     '  float ringA   = max(rings * inside, glowA);',
     '  float alpha   = mix(inside, ringA, u_transparent_bg);',
-    '  alpha *= u_opacity * distressMask;',
+    '  alpha *= u_opacity * distressMask * vignette;',
     '',
     '  vec3 encoded = pow(max(color, 0.0), vec3(1.0 / 2.2));',
     '  fragColor    = vec4(encoded, alpha);',
@@ -250,6 +261,11 @@
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
+        vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
+        vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
+        posX:          gl.getUniformLocation(program, 'u_pos_x'),
+        posY:          gl.getUniformLocation(program, 'u_pos_y'),
+        scale:         gl.getUniformLocation(program, 'u_scale'),
       };
     },
 
@@ -302,6 +318,11 @@
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
+      gl.uniform1f(u.vignetteX,     v.u_vignette_x     != null ? v.u_vignette_x     : 0.0);
+      gl.uniform1f(u.vignetteY,     v.u_vignette_y     != null ? v.u_vignette_y     : 0.0);
+      gl.uniform1f(u.posX,          v.u_pos_x          != null ? v.u_pos_x          : 0.0);
+      gl.uniform1f(u.posY,          v.u_pos_y          != null ? v.u_pos_y          : 0.0);
+      gl.uniform1f(u.scale,         v.u_scale          != null ? v.u_scale          : 1.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, sdfTex);
