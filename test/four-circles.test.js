@@ -66,7 +66,7 @@ describe('four-circles.js', () => {
       'u_color_mode', 'u_color0', 'u_color1', 'u_color2', 'u_color3',
       'u_quad0', 'u_quad1', 'u_quad2', 'u_quad3',
       'u_word_texture', 'u_word_x', 'u_word_y',
-      'u_word_color', 'u_use_word_color', 'u_word_outline_color',
+      'u_text_color', 'u_use_text_color', 'u_outline_color',
       'u_opacity', 'u_distress', 'u_distress_scale',
     ].forEach((name) => {
       expect(frag, `missing uniform ${name}`).toContain(name);
@@ -105,7 +105,7 @@ describe('four-circles.js', () => {
       'palA', 'palB', 'palC', 'palD',
       'colorMode', 'color0', 'color1', 'color2', 'color3',
       'quad0', 'quad1', 'quad2', 'quad3',
-      'wordTex', 'wordX', 'wordY', 'wordColor', 'useWordColor', 'wordOutlineColor',
+      'wordTex', 'wordX', 'wordY', 'textColor', 'useTextColor', 'outlineColor',
       'opacity', 'distress', 'distressScale',
     ].forEach((key) => {
       expect(uniforms, `setup() is missing key "${key}"`).toHaveProperty(key);
@@ -202,74 +202,74 @@ describe('four-circles.js', () => {
 
   it('textKey() serializes all word overlay state', () => {
     const v = {
-      wordEnabled: 1, text: 'GLOW', textX: 0.5, textY: 0.5,
+      u_text_enabled: 1, text: 'GLOW', textX: 0.5, textY: 0.5,
       textFontSize: 200, textFont: 'Montserrat',
-      wordOutline: 0, wordOutlineWidth: 8, u_word_outline_color: '#000000',
+      outlineEnabled: 0, outlineWidth: 8, u_outline_color: '#000000',
     };
     expect(opts.textKey(v)).toBe(
       JSON.stringify([1, 'GLOW', 0.5, 0.5, 200, 'Montserrat', 0, 8, '#000000'])
     );
   });
 
-  it('textKey() changes when wordEnabled toggles', () => {
-    const base = { wordEnabled: 0, text: 'GLOW', textX: 0.5, textY: 0.5, textFontSize: 200, textFont: 'Montserrat' };
-    expect(opts.textKey(base)).not.toBe(opts.textKey({ ...base, wordEnabled: 1 }));
+  it('textKey() changes when u_text_enabled toggles', () => {
+    const base = { u_text_enabled: 0, text: 'GLOW', textX: 0.5, textY: 0.5, textFontSize: 200, textFont: 'Montserrat' };
+    expect(opts.textKey(base)).not.toBe(opts.textKey({ ...base, u_text_enabled: 1 }));
   });
 
   it('textKey() changes when text changes', () => {
-    const base = { wordEnabled: 1, text: 'GLOW', textX: 0.5, textY: 0.5, textFontSize: 200, textFont: 'Montserrat' };
+    const base = { u_text_enabled: 1, text: 'GLOW', textX: 0.5, textY: 0.5, textFontSize: 200, textFont: 'Montserrat' };
     expect(opts.textKey(base)).not.toBe(opts.textKey({ ...base, text: 'FIRE' }));
   });
 
-  it('textKey() changes when wordOutlineWidth changes', () => {
-    const base = { wordEnabled: 1, text: 'GLOW', wordOutline: true, wordOutlineWidth: 8 };
-    expect(opts.textKey(base)).not.toBe(opts.textKey({ ...base, wordOutlineWidth: 16 }));
+  it('textKey() changes when outlineWidth changes', () => {
+    const base = { u_text_enabled: 1, text: 'GLOW', outlineEnabled: true, outlineWidth: 8 };
+    expect(opts.textKey(base)).not.toBe(opts.textKey({ ...base, outlineWidth: 16 }));
   });
 
   // ── drawText() ───────────────────────────────────────────────────────────────
 
   it('drawText() clears the canvas with black on every call', () => {
     const ctx = make2DContextMock();
-    opts.drawText(ctx, 1024, { wordEnabled: 0 });
+    opts.drawText(ctx, 1024, { u_text_enabled: 0 });
     expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 1024, 1024);
     expect(ctx.fillStyle).toBe('#000000');
   });
 
-  it('drawText() skips fillText when wordEnabled is falsy', () => {
+  it('drawText() skips fillText when u_text_enabled is falsy', () => {
     const ctx = make2DContextMock();
-    opts.drawText(ctx, 1024, { wordEnabled: 0, text: 'GLOW' });
+    opts.drawText(ctx, 1024, { u_text_enabled: 0, text: 'GLOW' });
     expect(ctx.fillText).not.toHaveBeenCalled();
   });
 
-  it('drawText() skips fillText when text is empty even if wordEnabled is truthy', () => {
+  it('drawText() skips fillText when text is empty even if u_text_enabled is truthy', () => {
     const ctx = make2DContextMock();
-    opts.drawText(ctx, 1024, { wordEnabled: 1, text: '' });
+    opts.drawText(ctx, 1024, { u_text_enabled: 1, text: '' });
     expect(ctx.fillText).not.toHaveBeenCalled();
   });
 
   it('drawText() uses red channel (rgb(255,0,0)) for text fill', () => {
     const ctx = make2DContextMock();
-    opts.drawText(ctx, 1024, { wordEnabled: 1, text: 'GLOW', textFontSize: 200 });
+    opts.drawText(ctx, 1024, { u_text_enabled: 1, text: 'GLOW', textFontSize: 200 });
     expect(ctx.fillText).toHaveBeenCalledWith('GLOW', expect.any(Number), expect.any(Number));
     expect(ctx.fillStyle).toBe('rgb(255,0,0)');
   });
 
-  it('drawText() uses green channel (rgb(0,255,0)) for outline stroke when wordOutline is on', () => {
+  it('drawText() uses green channel (rgb(0,255,0)) for outline stroke when outlineEnabled is on', () => {
     const ctx = make2DContextMock();
-    opts.drawText(ctx, 1024, { wordEnabled: 1, text: 'GLOW', wordOutline: true, wordOutlineWidth: 8 });
+    opts.drawText(ctx, 1024, { u_text_enabled: 1, text: 'GLOW', outlineEnabled: true, outlineWidth: 8 });
     expect(ctx.strokeStyle).toBe('rgb(0,255,0)');
     expect(ctx.strokeText).toHaveBeenCalledWith('GLOW', expect.any(Number), expect.any(Number));
   });
 
-  it('drawText() skips outline stroke when wordOutline is false', () => {
+  it('drawText() skips outline stroke when outlineEnabled is false', () => {
     const ctx = make2DContextMock();
-    opts.drawText(ctx, 1024, { wordEnabled: 1, text: 'GLOW', wordOutline: false, wordOutlineWidth: 8 });
+    opts.drawText(ctx, 1024, { u_text_enabled: 1, text: 'GLOW', outlineEnabled: false, outlineWidth: 8 });
     expect(ctx.strokeText).not.toHaveBeenCalled();
   });
 
   it('drawText() positions text at textX/textY fraction of canvas size', () => {
     const ctx = make2DContextMock();
-    opts.drawText(ctx, 1024, { wordEnabled: 1, text: 'GLOW', textX: 0.25, textY: 0.75 });
+    opts.drawText(ctx, 1024, { u_text_enabled: 1, text: 'GLOW', textX: 0.25, textY: 0.75 });
     const [, cx, cy] = ctx.fillText.mock.calls[0];
     expect(cx).toBeCloseTo(0.25 * 1024);
     expect(cy).toBeCloseTo((1 - 0.75) * 1024); // canvas y is flipped
