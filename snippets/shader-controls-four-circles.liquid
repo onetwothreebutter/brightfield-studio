@@ -61,7 +61,7 @@ var controls = [
   { key: 'u_quad3', label: 'Bottom Right', type: 'color', quadDependent: true, value: '#f5f5f5' },
   // ── Word Overlay ──────────────────────────────────────────────────────────
   { type: 'header', label: 'Word Overlay' },
-  { key: 'wordEnabled',  label: 'Enabled',   type: 'toggle', value: 0, textDirty: true, noRandomize: true },
+  { key: 'u_text_enabled',  label: 'Enabled',   type: 'toggle', value: 0, textDirty: true, noRandomize: true },
   { key: 'text',         label: 'Word',      type: 'text',   value: 'GLOW',        textDirty: true, noRandomize: true, wordDependent: true },
   { key: 'textFont',     label: 'Font',      type: 'select', value: 'Montserrat',  textDirty: true, noRandomize: true, wordDependent: true,
     options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
@@ -69,11 +69,11 @@ var controls = [
   { key: 'textFontSize', label: 'Size',      type: 'range', min: 8, max: 400, step: 1, value: 200, textDirty: true, noRandomize: true, wordDependent: true },
   { key: 'textX',        label: 'X',         type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.5, textDirty: true, noRandomize: true, wordDependent: true },
   { key: 'textY',        label: 'Y',         type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.5, textDirty: true, noRandomize: true, wordDependent: true },
-  { key: 'u_use_word_color',   label: 'Custom Color',   type: 'toggle', value: 0, noRandomize: true, wordDependent: true },
-  { key: 'u_word_color',       label: 'Word Color',     type: 'color',  value: '#ffffff', noRandomize: true, wordDependent: true },
-  { key: 'wordOutline',        label: 'Outline',        type: 'toggle', value: 0, textDirty: true, noRandomize: true, wordDependent: true },
-  { key: 'wordOutlineWidth',   label: 'Outline Width',  type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true, noRandomize: true, wordDependent: true },
-  { key: 'u_word_outline_color', label: 'Outline Color', type: 'color', value: '#000000', noRandomize: true, wordDependent: true },
+  { key: 'u_use_text_color',   label: 'Custom Color',   type: 'toggle', value: 0, noRandomize: true, wordDependent: true },
+  { key: 'u_text_color',       label: 'Word Color',     type: 'color',  value: '#ffffff', noRandomize: true, wordDependent: true },
+  { key: 'outlineEnabled',     label: 'Outline',        type: 'toggle', value: 0, textDirty: true, noRandomize: true, wordDependent: true },
+  { key: 'outlineWidth',       label: 'Outline Width',  type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true, noRandomize: true, wordDependent: true },
+  { key: 'u_outline_color',    label: 'Outline Color',  type: 'color',  value: '#000000', noRandomize: true, wordDependent: true },
   // ── Finish ────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Finish' },
   { key: 'u_opacity',        label: 'Opacity',  type: 'range', min: 0, max: 1,    step: 0.01, value: 1.0, noRandomize: true,

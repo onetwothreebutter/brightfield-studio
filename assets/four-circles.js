@@ -37,9 +37,9 @@
     'uniform sampler2D u_word_texture;',
     'uniform float     u_word_x;',
     'uniform float     u_word_y;',
-    'uniform vec3      u_word_color;',
-    'uniform float     u_use_word_color;',
-    'uniform vec3      u_word_outline_color;',
+    'uniform vec3      u_text_color;',
+    'uniform float     u_use_text_color;',
+    'uniform vec3      u_outline_color;',
     'uniform float     u_opacity;',
     'uniform float     u_distress;',
     'uniform float     u_distress_scale;',
@@ -180,8 +180,8 @@
     '  vec4 wordSample  = texture(u_word_texture, wordUV);',
     '  float wordFill   = smoothstep(0.05, 0.6, wordSample.r);',
     '  float wordStroke = smoothstep(0.05, 0.6, wordSample.g);',
-    '  vec3 wordFillCol = mix(col, u_word_color, u_use_word_color);',
-    '  vec3 finalColor  = mix(mix(layerColor, u_word_outline_color, wordStroke), wordFillCol, wordFill);',
+    '  vec3 wordFillCol = mix(col, u_text_color, u_use_text_color);',
+    '  vec3 finalColor  = mix(mix(layerColor, u_outline_color, wordStroke), wordFillCol, wordFill);',
     '',
     '  // ── Distress + output ───────────────────────────────────────────────────',
     '  vec2  dUV = gl_FragCoord.xy / u_resolution;',
@@ -241,9 +241,9 @@
         wordTex:      gl.getUniformLocation(program, 'u_word_texture'),
         wordX:        gl.getUniformLocation(program, 'u_word_x'),
         wordY:        gl.getUniformLocation(program, 'u_word_y'),
-        wordColor:    gl.getUniformLocation(program, 'u_word_color'),
-        useWordColor: gl.getUniformLocation(program, 'u_use_word_color'),
-        wordOutlineColor: gl.getUniformLocation(program, 'u_word_outline_color'),
+        textColor:    gl.getUniformLocation(program, 'u_text_color'),
+        useTextColor: gl.getUniformLocation(program, 'u_use_text_color'),
+        outlineColor: gl.getUniformLocation(program, 'u_outline_color'),
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
         distress:      gl.getUniformLocation(program, 'u_distress'),
         distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
@@ -314,9 +314,9 @@
       gl.uniform3fv(u.quad3,       quad3);
       gl.uniform1f(u.wordX,        v.textX          != null ? v.textX          : 0.5);
       gl.uniform1f(u.wordY,        v.textY          != null ? v.textY          : 0.5);
-      gl.uniform3fv(u.wordColor,   v.u_word_color   || [1.0, 1.0, 1.0]);
-      gl.uniform1f(u.useWordColor, v.u_use_word_color != null ? v.u_use_word_color : 0.0);
-      gl.uniform3fv(u.wordOutlineColor, v.u_word_outline_color || [0.0, 0.0, 0.0]);
+      gl.uniform3fv(u.textColor,   v.u_text_color   || [1.0, 1.0, 1.0]);
+      gl.uniform1f(u.useTextColor, v.u_use_text_color != null ? v.u_use_text_color : 0.0);
+      gl.uniform3fv(u.outlineColor, v.u_outline_color || [0.0, 0.0, 0.0]);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);
       gl.uniform1i(u.wordTex, 0);
@@ -335,7 +335,7 @@
     drawText: function (ctx, size, v) {
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, size, size);
-      var txt = (v.wordEnabled && v.text) ? v.text : '';
+      var txt = (v.u_text_enabled && v.text) ? v.text : '';
       if (txt) {
         var fontFamily = v.textFont ? '"' + v.textFont + '"' : '"Montserrat"';
         var fontSize   = v.textFontSize || 200;
@@ -344,9 +344,9 @@
         ctx.font         = 'bold ' + fontSize + 'px ' + fontFamily + ', monospace';
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
-        if (v.wordOutline && v.wordOutlineWidth > 0) {
+        if (v.outlineEnabled && v.outlineWidth > 0) {
           ctx.strokeStyle = 'rgb(0,255,0)';
-          ctx.lineWidth   = (v.wordOutlineWidth || 8) * 2;
+          ctx.lineWidth   = (v.outlineWidth || 8) * 2;
           ctx.lineJoin    = 'round';
           ctx.strokeText(txt, cx, cy);
         }
@@ -356,8 +356,8 @@
     },
 
     textKey: function (v) {
-      return JSON.stringify([v.wordEnabled, v.text, v.textX, v.textY, v.textFontSize, v.textFont,
-                             v.wordOutline, v.wordOutlineWidth, v.u_word_outline_color]);
+      return JSON.stringify([v.u_text_enabled, v.text, v.textX, v.textY, v.textFontSize, v.textFont,
+                             v.outlineEnabled, v.outlineWidth, v.u_outline_color]);
     },
   });
 }());
