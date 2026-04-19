@@ -76,8 +76,8 @@ The Finish section is always the last section in the controls array and contains
 1. `u_opacity` — range 0–1, default 1.0, `noRandomize: true`
 2. `u_distress` — range 0–0.85, default 0.0, `noRandomize: true`
 3. `u_distress_scale` — range 10–300, default 80, `noRandomize: true`
-4. `u_vignette_x` — range 0–4, step 0.05, default 0, `noRandomize: true`
-5. `u_vignette_y` — range 0–4, step 0.05, default 0, `noRandomize: true`
+4. `u_vignette_x` — range 0–8, step 0.05, default 0, `noRandomize: true`
+5. `u_vignette_y` — range 0–8, step 0.05, default 0, `noRandomize: true`
 6. `u_pos_x` — range -0.5–0.5, default 0.0, `noRandomize: true`
 7. `u_pos_y` — range -0.5–0.5, default 0.0, `noRandomize: true`
 8. `u_scale` — range 0.2–3.0, step 0.05, default 1.0, `noRandomize: true`
