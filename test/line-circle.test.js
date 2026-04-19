@@ -76,7 +76,6 @@ describe('line-circle.js', () => {
       'u_text_x', 'u_text_y', 'u_text_texture',
       'u_tri_enabled', 'u_tri_rotation', 'u_tri_size', 'u_tri_width',
       'u_center_circle_enabled', 'u_center_circle_radius',
-      'u_transparent_bg',
     ].forEach((name) => {
       expect(frag, `missing uniform ${name}`).toContain(name);
     });
@@ -92,7 +91,7 @@ describe('line-circle.js', () => {
       'palA', 'palB', 'palC', 'palD',
       'textColor', 'useTextColor', 'outlineColor', 'textX', 'textY', 'textTex',
       'triEnabled', 'triRotation', 'triSize', 'triWidth',
-      'centerCircleEnabled', 'centerCircleRadius', 'transparentBg',
+      'centerCircleEnabled', 'centerCircleRadius',
     ].forEach((key) => {
       expect(uniforms, `setup() is missing key "${key}"`).toHaveProperty(key);
     });

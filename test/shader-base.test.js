@@ -140,45 +140,23 @@ describe('shader-base.js', () => {
     expect(cb).toHaveBeenCalledWith('iVBORw0KGgo=');
   });
 
-  it('_shaderExport does not set u_transparent_bg=1 during export (blank-design regression)', () => {
-    window._shaderState = { values: { u_transparent_bg: 0.0 }, textDirty: false };
-    const transparentBgValues = [];
-    window.ShaderBase.create({
-      fragSrc: DUMMY_FRAG,
-      setup: () => ({}),
-      render: vi.fn(() => {
-        transparentBgValues.push(window._shaderState.values.u_transparent_bg);
-      }),
-    });
-    transparentBgValues.length = 0; // discard the initial render call
-
-    window._shaderExport(100, 100, vi.fn());
-
-    // u_transparent_bg must never be 1.0 during the export render call
-    expect(transparentBgValues).not.toContain(1.0);
-    // Export should still mark textDirty for the post-export refresh
-    expect(window._shaderState.textDirty).toBe(true);
-  });
-
   it('_shaderExport applies exportValues overrides and restores them after', () => {
-    window._shaderState = { values: { u_transparent_bg: 0.0 }, textDirty: false };
-    const transparentBgValues = [];
+    window._shaderState = { values: { u_some_override: 0.0 }, textDirty: false };
+    const capturedValues = [];
     window.ShaderBase.create({
       fragSrc: DUMMY_FRAG,
       setup: () => ({}),
-      exportValues: { u_transparent_bg: 1.0 },
+      exportValues: { u_some_override: 1.0 },
       render: vi.fn(() => {
-        transparentBgValues.push(window._shaderState.values.u_transparent_bg);
+        capturedValues.push(window._shaderState.values.u_some_override);
       }),
     });
-    transparentBgValues.length = 0; // discard the initial render call
+    capturedValues.length = 0; // discard the initial render call
 
     window._shaderExport(100, 100, vi.fn());
 
-    // exportValues override must be applied during the export render
-    expect(transparentBgValues).toContain(1.0);
-    // original value must be restored after export
-    expect(window._shaderState.values.u_transparent_bg).toBe(0.0);
+    expect(capturedValues).toContain(1.0);
+    expect(window._shaderState.values.u_some_override).toBe(0.0);
   });
 
   // ── useDerivatives ───────────────────────────────────────────────────────────
