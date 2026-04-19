@@ -206,7 +206,7 @@
     '  alpha = alpha * step(u_distress * dist, dn) * u_opacity;',
     '  vec2 vigCoord = dUV - 0.5;',
     '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
-    '  finalColor = finalColor * clamp(1.0 - vigVal, 0.0, 1.0);',
+    '  finalColor = finalColor * (1.0 - smoothstep(0.0, 1.0, vigVal));',
     '  vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
     '  fragColor = vec4(encoded, alpha);',
     '}'

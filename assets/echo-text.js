@@ -145,7 +145,7 @@
     '  alpha = alpha * step(u_distress * dist, dn) * u_opacity;',
     '  vec2 vigCoord = dUV - 0.5;',
     '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
-    '  color = color * clamp(1.0 - vigVal, 0.0, 1.0);',
+    '  color = color * (1.0 - smoothstep(0.0, 1.0, vigVal));',
     '  fragColor   = vec4(color, alpha);',
     '}'
   ].join('\n');

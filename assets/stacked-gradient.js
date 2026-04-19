@@ -280,7 +280,7 @@
     '  finalAlpha = finalAlpha * step(u_distress * dist, dn) * u_opacity;',
     '  vec2 vigCoord = dUV - 0.5;',
     '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
-    '  finalColor = vec4(finalColor.xyz * clamp(1.0 - vigVal, 0.0, 1.0), finalColor.w);',
+    '  finalColor = vec4(finalColor.xyz * (1.0 - smoothstep(0.0, 1.0, vigVal)), finalColor.w);',
     '  // Linear -> sRGB to match Three.js renderer output',
     '  vec3 encoded = pow(finalColor.xyz, vec3(1.0 / 2.2));',
     '  fragColor = vec4(encoded * finalAlpha, finalAlpha);',
