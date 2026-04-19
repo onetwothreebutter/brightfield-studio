@@ -48,6 +48,8 @@
     'uniform float     u_pos_x;',
     'uniform float     u_pos_y;',
     'uniform float     u_scale;',
+    'uniform float     u_vignette_x;',
+    'uniform float     u_vignette_y;',
     '',
     'float hash21(vec2 p) {',
     '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);',
@@ -141,13 +143,16 @@
     '       + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
     '  }',
     '  alpha = alpha * step(u_distress * dist, dn) * u_opacity;',
+    '  vec2 vigCoord = dUV - 0.5;',
+    '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
+    '  color = color * (1.0 - smoothstep(0.0, 1.0, vigVal));',
     '  fragColor   = vec4(color, alpha);',
     '}'
   ].join('\n');
 
   window.ShaderBase.create({
     animateValues:  true,
-    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale'],
+    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale', 'u_vignette_x', 'u_vignette_y'],
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
@@ -185,6 +190,8 @@ textColor:     gl.getUniformLocation(program, 'u_text_color'),
         posX:          gl.getUniformLocation(program, 'u_pos_x'),
         posY:          gl.getUniformLocation(program, 'u_pos_y'),
         scale:         gl.getUniformLocation(program, 'u_scale'),
+        vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
+        vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
       };
     },
 
@@ -234,9 +241,11 @@ gl.uniform3fv(u.textColor,    v.u_text_color     || [1.0, 1.0, 1.0]);
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
       gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
       gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
-      gl.uniform1f(u.posX,         v.u_pos_x  != null ? v.u_pos_x  : 0.0);
-      gl.uniform1f(u.posY,         v.u_pos_y  != null ? v.u_pos_y  : 0.0);
-      gl.uniform1f(u.scale,        v.u_scale  != null ? v.u_scale  : 1.0);
+      gl.uniform1f(u.posX,         v.u_pos_x      != null ? v.u_pos_x      : 0.0);
+      gl.uniform1f(u.posY,         v.u_pos_y      != null ? v.u_pos_y      : 0.0);
+      gl.uniform1f(u.scale,        v.u_scale      != null ? v.u_scale      : 1.0);
+      gl.uniform1f(u.vignetteX,    v.u_vignette_x != null ? v.u_vignette_x : 0.0);
+      gl.uniform1f(u.vignetteY,    v.u_vignette_y != null ? v.u_vignette_y : 0.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);

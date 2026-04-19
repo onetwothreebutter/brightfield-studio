@@ -105,7 +105,7 @@
     '  alpha = alpha * step(u_distress * dist, dn) * u_opacity;',
     '  vec2 vigCoord = dUV - 0.5;',
     '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
-    '  col = col * clamp(1.0 - vigVal, 0.0, 1.0);',
+    '  col = col * (1.0 - smoothstep(0.0, 1.0, vigVal));',
     '  vec2 textAnchor    = vec2(u_text_x, u_text_y);',
     '  vec2 textDelta     = uv - textAnchor;',
     '  vec2 textUV        = vec2(textDelta.x * u_aspect, textDelta.y) + textAnchor;',

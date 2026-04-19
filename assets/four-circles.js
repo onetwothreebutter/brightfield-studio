@@ -46,6 +46,8 @@
     'uniform float     u_pos_x;',
     'uniform float     u_pos_y;',
     'uniform float     u_scale;',
+    'uniform float     u_vignette_x;',
+    'uniform float     u_vignette_y;',
     '',
     'out vec4 fragColor;',
     '',
@@ -188,6 +190,9 @@
     '  float baseAlpha  = shapeMask * step(u_distress * dist, dn) * u_opacity;',
     '  float wordAlpha  = clamp(wordFill + wordStroke, 0.0, 1.0) * step(u_distress * dist, dn) * u_opacity;',
     '  float alpha      = max(baseAlpha, wordAlpha);',
+    '  vec2  vigCoord = dUV - 0.5;',
+    '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
+    '  finalColor = finalColor * (1.0 - smoothstep(0.0, 1.0, vigVal));',
     '  vec3  encoded    = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
     '  fragColor = vec4(encoded, alpha);',
     '}',
@@ -195,7 +200,7 @@
 
   window.ShaderBase.create({
     animateValues:  true,
-    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale'],
+    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale', 'u_vignette_x', 'u_vignette_y'],
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
@@ -238,6 +243,8 @@
         posX:          gl.getUniformLocation(program, 'u_pos_x'),
         posY:          gl.getUniformLocation(program, 'u_pos_y'),
         scale:         gl.getUniformLocation(program, 'u_scale'),
+        vignetteX:     gl.getUniformLocation(program, 'u_vignette_x'),
+        vignetteY:     gl.getUniformLocation(program, 'u_vignette_y'),
       };
     },
 
@@ -310,6 +317,8 @@
       gl.uniform1f(u.posX,          v.u_pos_x          != null ? v.u_pos_x          : 0.0);
       gl.uniform1f(u.posY,          v.u_pos_y          != null ? v.u_pos_y          : 0.0);
       gl.uniform1f(u.scale,         v.u_scale          != null ? v.u_scale          : 1.0);
+      gl.uniform1f(u.vignetteX,     v.u_vignette_x     != null ? v.u_vignette_x     : 0.0);
+      gl.uniform1f(u.vignetteY,     v.u_vignette_y     != null ? v.u_vignette_y     : 0.0);
     },
 
     drawText: function (ctx, size, v) {

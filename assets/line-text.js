@@ -94,7 +94,7 @@
     '  // Vignette: centered on text Y position',
     '  vec2 vigCoord = uv - vec2(0.5, u_text_y);',
     '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
-    '  float vignette = clamp(1.0 - vigVal, 0.0, 1.0);',
+    '  float vignette = 1.0 - smoothstep(0.0, 1.0, vigVal);',
     '',
     '  vec3 encoded = pow(max(col, 0.0), vec3(1.0 / 2.2));',
     '  // Display mode (u_transparent_bg=0): opaque black between lines — avoids Safari alpha compositing bug',

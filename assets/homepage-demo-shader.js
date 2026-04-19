@@ -39,6 +39,8 @@
     'uniform float u_pos_x;',
     'uniform float u_pos_y;',
     'uniform float u_scale;',
+    'uniform float u_vignette_x;',
+    'uniform float u_vignette_y;',
     '',
     'out vec4 fragColor;',
     '',
@@ -127,6 +129,9 @@
     '  float dn   = distressNoise(dUV, u_distress_scale) * 0.67',
     '             + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
     '  float alpha = finalAlpha * step(u_distress, dn) * u_opacity;',
+    '  vec2 vigCoord = dUV - 0.5;',
+    '  float vigVal  = vigCoord.x * vigCoord.x * u_vignette_x + vigCoord.y * vigCoord.y * u_vignette_y;',
+    '  finalColor = finalColor * (1.0 - smoothstep(0.0, 1.0, vigVal));',
     '  vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
     '  fragColor = vec4(encoded, alpha);',
     '}'
@@ -143,7 +148,7 @@
     stateKey:       '_demoState',
     exportKey:      '_demoExport',
     animateValues:  true,
-    instantKeys:    ['textX', 'textY', 'textFontSize', 'outlineWidth', 'u_opacity', 'u_pos_x', 'u_pos_y', 'u_scale'],
+    instantKeys:    ['textX', 'textY', 'textFontSize', 'outlineWidth', 'u_opacity', 'u_pos_x', 'u_pos_y', 'u_scale', 'u_vignette_x', 'u_vignette_y'],
     fragSrc:        fragSrc,
 
     setup: function (gl, program) {
@@ -183,6 +188,8 @@
         posX:                loc('u_pos_x'),
         posY:                loc('u_pos_y'),
         scale:               loc('u_scale'),
+        vignetteX:           loc('u_vignette_x'),
+        vignetteY:           loc('u_vignette_y'),
       };
     },
 
@@ -221,6 +228,8 @@
       gl.uniform1f(u.posX,          v.u_pos_x          != null ? v.u_pos_x          : 0.0);
       gl.uniform1f(u.posY,          v.u_pos_y          != null ? v.u_pos_y          : 0.0);
       gl.uniform1f(u.scale,         v.u_scale          != null ? v.u_scale          : 1.0);
+      gl.uniform1f(u.vignetteX,     v.u_vignette_x     != null ? v.u_vignette_x     : 0.0);
+      gl.uniform1f(u.vignetteY,     v.u_vignette_y     != null ? v.u_vignette_y     : 0.0);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);
       gl.uniform1i(u.textTex, 0);
