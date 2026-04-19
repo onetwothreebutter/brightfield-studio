@@ -1290,6 +1290,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       return;
     }
 
+    modalImg.src    = '';   // clear stale image before compositing starts
     btn.disabled    = true;
     btn.textContent = 'Compositing…';
 
@@ -1500,6 +1501,18 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       this.href = this.href.split('&dt=')[0] + '&dt=' + encodeURIComponent(dt);
     });
   }
+
+  // Reset modal state when page is restored from bfcache (browser back/forward)
+  // to prevent a stale preview image from showing on the next "Preview on Shirt" click.
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) {
+      modal.classList.add('mockup-modal--hidden');
+      modalImg.src    = '';
+      document.body.style.overflow = '';
+      btn.disabled    = false;
+      btn.textContent = 'Preview on Shirt';
+    }
+  });
 
   // ── Community submit form ───────────────────────────────────
   var communityToggle  = document.getElementById('community-toggle');
