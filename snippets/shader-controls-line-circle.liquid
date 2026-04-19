@@ -1,0 +1,132 @@
+var controls = [
+  // ── Shape ─────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Shape' },
+  { key: 'u_radius',     label: 'Radius',       type: 'range', min: 0.05, max: 0.5,  step: 0.01, value: 0.4, noRandomize: true  },
+  { key: 'u_line_count', label: 'Lines',         type: 'range', min: 2,    max: 80,   step: 1,    value: 20   },
+  { key: 'u_power',      label: 'Power',         type: 'range', min: 0.5,  max: 6.0,  step: 0.1,  value: 2.5  },
+  { key: 'u_width_top',  label: 'Width Top',     type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.05, noRandomize: true },
+  { key: 'u_width_bot',  label: 'Width Bottom',  type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.75, noRandomize: true },
+  // ── Color Palette ──────────────────────────────────────────────────────────
+  { type: 'header', label: 'Color Palette' },
+  { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
+    tip: 'Off = cosine palette. On = 4-stop linear gradient from top to bottom.' },
+  { key: '_lc_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
+    options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
+  },
+  { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
+    tip: 'Offset — base brightness per channel. Sets the center point colors oscillate around.' },
+  { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080',
+    tip: 'Amplitude — color swing range per channel. Higher = more vivid, saturated output.' },
+  { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff',
+    tip: 'Frequency — how many times the palette cycles per channel.' },
+  { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab',
+    tip: 'Phase — shifts the starting hue of the color cycle.' },
+  { key: '_lc_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
+    options: Object.keys(FOUR_STOP_PRESETS).map(function (k) { return { label: k, value: k }; })
+  },
+  { key: 'u_color0', label: 'Color 1 (Top)',    type: 'color', stopDependent: true, value: '#ff3366' },
+  { key: 'u_color1', label: 'Color 2',          type: 'color', stopDependent: true, value: '#ffcc00' },
+  { key: 'u_color2', label: 'Color 3',          type: 'color', stopDependent: true, value: '#00ccff' },
+  { key: 'u_color3', label: 'Color 4 (Bottom)', type: 'color', stopDependent: true, value: '#aa00ff' },
+  // ── Triangle Mask ──────────────────────────────────────────────────────────
+  { type: 'header', label: 'Triangle Mask' },
+  { key: 'u_tri_enabled',  label: 'Enabled',    type: 'toggle', value: 1, noRandomize: true },
+  { key: 'u_tri_rotation', label: 'Rotation',   type: 'range', min: 0,   max: 360, step: 1,    value: 0,  toRadians: true, noRandomize: true },
+  { key: 'u_tri_size',     label: 'Size',       type: 'range', min: 0.1, max: 2.0, step: 0.01, value: 1.0, noRandomize: true },
+  { key: 'u_tri_width',    label: 'Base Width', type: 'range', min: 5,   max: 89,  step: 1,    value: 45, toRadians: true, noRandomize: true },
+  // ── Center Circle ──────────────────────────────────────────────────────────
+  { type: 'header', label: 'Center Circle' },
+  { key: 'u_center_circle_enabled', label: 'Enabled', type: 'toggle', value: 1, noRandomize: true },
+  { key: 'u_center_circle_radius',  label: 'Radius',  type: 'range', min: 0.01, max: 0.45, step: 0.005, value: 0.04 },
+  // ── Text Overlay ───────────────────────────────────────────────────────────
+  { type: 'header', label: 'Text Overlay' },
+  { key: 'u_text_enabled', label: 'Text Overlay', type: 'toggle', value: 0, textDirty: true, noRandomize: true },
+  { key: 'text',           label: 'Text',      type: 'text',   value: '2001',         textDirty: true, noRandomize: true },
+  { key: 'textFont',       label: 'Font',      type: 'select', value: 'Oswald', textDirty: true, noRandomize: true,
+    options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
+  },
+  { key: 'textFontSize', label: 'Font Size', type: 'range', min: 8, max: 300, step: 1,    value: 69,  textDirty: true, noRandomize: true },
+  { key: 'textX',        label: 'Text X',    type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.3,  textDirty: true, noRandomize: true },
+  { key: 'textY',        label: 'Text Y',    type: 'range', min: 0, max: 1.0, step: 0.01, value: 0.2, textDirty: true, noRandomize: true },
+  { key: 'u_use_text_color', label: 'Custom Color', type: 'toggle', value: 0, noRandomize: true },
+  { key: 'u_text_color',    label: 'Text Color',    type: 'color',  value: '#ffffff', textColorDependent: true, noRandomize: true },
+  { key: 'outlineEnabled',  label: 'Outline',       type: 'toggle', value: 0, textDirty: true, noRandomize: true },
+  { key: 'outlineWidth',    label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true, outlineDependent: true, noRandomize: true },
+  { key: 'u_outline_color', label: 'Outline Color', type: 'color',  value: '#000000', outlineDependent: true, noRandomize: true },
+  // ── Finish ────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Finish' },
+  { key: 'u_opacity',        label: 'Opacity',  type: 'range', min: 0, max: 1,    step: 0.01, value: 1.0, noRandomize: true,
+    tip: 'Fades the entire design from fully visible to invisible.' },
+  { key: 'u_distress',       label: 'Distress', type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0, noRandomize: true,
+    tip: 'Adds a worn, aged look by knocking out random ink spots.' },
+  { key: 'u_distress_scale', label: 'Grain',    type: 'range', min: 10, max: 300, step: 1,    value: 80, noRandomize: true,
+    tip: 'Size of the distress grain — lower = finer, higher = coarser.' },
+  { key: 'u_vignette_top',    label: 'Vignette Top',    type: 'range', min: 0, max: 20, step: 0.05, value: 0, noRandomize: true },
+  { key: 'u_vignette_bottom', label: 'Vignette Bottom', type: 'range', min: 0, max: 20, step: 0.05, value: 0, noRandomize: true },
+  { key: 'u_vignette_left',   label: 'Vignette Left',   type: 'range', min: 0, max: 20, step: 0.05, value: 0, noRandomize: true },
+  { key: 'u_vignette_right',  label: 'Vignette Right',  type: 'range', min: 0, max: 20, step: 0.05, value: 0, noRandomize: true },
+  { key: 'u_pos_x', label: 'Position X', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0, noRandomize: true },
+  { key: 'u_pos_y', label: 'Position Y', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0, noRandomize: true },
+  { key: 'u_scale', label: 'Scale',      type: 'range', min: 0.2,  max: 3.0,  step: 0.05, value: 1.0, noRandomize: true },
+];
+
+var customAfterBuild = function () {
+  var cosineKeys = ['u_a', 'u_b', 'u_c', 'u_d'];
+
+  function applyCosinePreset(p) {
+    applyColors(cosineKeys.map(function (k, i) {
+      return [k, [p.a, p.b, p.c, p.d][i]];
+    }));
+  }
+
+  function apply4ColorPreset(p) {
+    applyColors([
+      ['u_color0', p.c0],
+      ['u_color1', p.c1],
+      ['u_color2', p.c2],
+      ['u_color3', p.c3],
+    ]);
+  }
+
+  // Apply default on load so shader matches pickers.
+  applyCosinePreset(COSINE_PRESETS['Rainbow']);
+
+  var cosinePresetSel = document.querySelector('[data-param-key="_lc_palette_preset"]');
+  if (cosinePresetSel) {
+    cosinePresetSel.addEventListener('change', function () {
+      var p = COSINE_PRESETS[this.value];
+      if (p) applyCosinePreset(p);
+    });
+  }
+
+  var fourColorPresetSel = document.querySelector('[data-param-key="_lc_4color_preset"]');
+  if (fourColorPresetSel) {
+    fourColorPresetSel.addEventListener('change', function () {
+      var p = FOUR_STOP_PRESETS[this.value];
+      if (p) apply4ColorPreset(p);
+    });
+  }
+
+  // Text Overlay enable toggle — hide all text controls when off
+  var body = document.getElementById('shader-gui-body');
+  var textEnabledRow = Array.from(body.children).find(function (el) {
+    var lbl = el.querySelector && el.querySelector('.shader-control__label');
+    return lbl && lbl.textContent.trim() === 'Text Overlay' && el.querySelector('.shader-control__toggle');
+  });
+  var textEnabledBtn = textEnabledRow && textEnabledRow.querySelector('.shader-control__toggle');
+
+  var textDependentRows = [];
+  var found = false;
+  Array.from(body.children).forEach(function (el) {
+    if (el === textEnabledRow) { found = true; return; }
+    if (found && el.classList.contains('shader-control')) textDependentRows.push(el);
+  });
+
+  function applyTextEnabledVis() {
+    var on = textEnabledBtn && textEnabledBtn.dataset.on === '1';
+    textDependentRows.forEach(function (r) { r.style.display = on ? '' : 'none'; });
+  }
+  if (textEnabledBtn) textEnabledBtn.addEventListener('click', applyTextEnabledVis);
+  applyTextEnabledVis();
+};
+
