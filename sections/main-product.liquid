@@ -333,13 +333,14 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   {% render 'shader-controls-base' %}
   {% case shader_file %}
   {% when 'chladni' %}          {% render 'shader-controls-chladni' %}
-  {% when 'line-circle' %}      {% render 'shader-controls-line-circle' %}
+  {% when 'circle-on-line' %}   {% render 'shader-controls-circle-on-line' %}
   {% when 'three-square' %}     {% render 'shader-controls-three-square' %}
   {% when 'four-circles' %}     {% render 'shader-controls-four-circles' %}
   {% when 'scaling-letters' %} {% render 'shader-controls-scaling-letters' %}
   {% when 'stacked-gradient' %} {% render 'shader-controls-stacked-gradient' %}
   {% when 'echo-text' %}        {% render 'shader-controls-echo-text' %}
   {% when 'line-text' %}        {% render 'shader-controls-line-text' %}
+  {% when 'outline-pulse' %}    {% render 'shader-controls-outline-pulse' %}
   {% else %}                    {% render 'shader-controls-rise-shirt' %}
   {% endcase %}
 
@@ -1289,6 +1290,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       return;
     }
 
+    modalImg.src    = '';   // clear stale image before compositing starts
     btn.disabled    = true;
     btn.textContent = 'Compositing…';
 
@@ -1499,6 +1501,18 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       this.href = this.href.split('&dt=')[0] + '&dt=' + encodeURIComponent(dt);
     });
   }
+
+  // Reset modal state when page is restored from bfcache (browser back/forward)
+  // to prevent a stale preview image from showing on the next "Preview on Shirt" click.
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) {
+      modal.classList.add('mockup-modal--hidden');
+      modalImg.src    = '';
+      document.body.style.overflow = '';
+      btn.disabled    = false;
+      btn.textContent = 'Preview on Shirt';
+    }
+  });
 
   // ── Community submit form ───────────────────────────────────
   var communityToggle  = document.getElementById('community-toggle');

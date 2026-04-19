@@ -473,7 +473,7 @@ describe('POST /delete-design', () => {
   it('removes the design with the matching id', async () => {
     await seedDesigns(env, 'dev-1', [
       { id: 'aaa', shader: 'rise-shirt' },
-      { id: 'bbb', shader: 'line-circle' },
+      { id: 'bbb', shader: 'circle-on-line' },
     ]);
 
     const res = await worker.fetch(post('/delete-design', { id: 'aaa', deviceId: 'dev-1' }), env);
