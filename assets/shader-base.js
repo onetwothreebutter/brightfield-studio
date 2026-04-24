@@ -209,22 +209,35 @@
       var pixels = new Uint8Array(targetW * targetH * 4);
       gl.readPixels(0, 0, targetW, targetH, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
 
-      // gl.readPixels returns rows bottom-to-top; flip vertically for canvas (top-to-bottom)
-      var flipped = new Uint8Array(targetW * targetH * 4);
-      var rowBytes = targetW * 4;
-      for (var row = 0; row < targetH; row++) {
-        flipped.set(pixels.subarray((targetH - 1 - row) * rowBytes, (targetH - row) * rowBytes), row * rowBytes);
+      // Detect if readPixels was blocked (returns all zeros) — canvas fingerprinting
+      // protection in some browsers/extensions zeroes the buffer rather than throwing.
+      // Fall back to canvas.toDataURL() which those same protections typically allow.
+      // toDataURL on a WebGL canvas may composite transparent pixels against black in
+      // Safari, but a non-blank result is better than a blank one.
+      var dataUrl;
+      var hasContent = false;
+      for (var ci = 0; ci < pixels.length; ci++) {
+        if (pixels[ci] !== 0) { hasContent = true; break; }
       }
-
-      // Encode via a 2D canvas (avoids the WebGL-specific toDataURL Safari bug)
-      var offscreen = document.createElement('canvas');
-      offscreen.width  = targetW;
-      offscreen.height = targetH;
-      var ctx2d = offscreen.getContext('2d');
-      var imageData = ctx2d.createImageData(targetW, targetH);
-      imageData.data.set(flipped);
-      ctx2d.putImageData(imageData, 0, 0);
-      var dataUrl = offscreen.toDataURL('image/png');
+      if (!hasContent) {
+        dataUrl = canvas.toDataURL('image/png');
+      } else {
+        // Normal path: flip vertically and encode via offscreen canvas
+        // (gl.readPixels returns rows bottom-to-top; canvas is top-to-bottom)
+        var flipped = new Uint8Array(targetW * targetH * 4);
+        var rowBytes = targetW * 4;
+        for (var row = 0; row < targetH; row++) {
+          flipped.set(pixels.subarray((targetH - 1 - row) * rowBytes, (targetH - row) * rowBytes), row * rowBytes);
+        }
+        var offscreen = document.createElement('canvas');
+        offscreen.width  = targetW;
+        offscreen.height = targetH;
+        var ctx2d = offscreen.getContext('2d');
+        var imageData = ctx2d.createImageData(targetW, targetH);
+        imageData.data.set(flipped);
+        ctx2d.putImageData(imageData, 0, 0);
+        dataUrl = offscreen.toDataURL('image/png');
+      }
 
       canvas.width  = prevW;
       canvas.height = prevH;
