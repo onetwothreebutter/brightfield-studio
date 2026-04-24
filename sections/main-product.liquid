@@ -282,7 +282,8 @@
       panels.forEach(function (p) { p.classList.remove('is-active'); });
 
       this.classList.add('is-active');
-      document.querySelector('[data-panel="' + target + '"]').classList.add('is-active');
+      var panel = document.querySelector('[data-panel="' + target + '"]');
+      if (panel) panel.classList.add('is-active');
 
       var isCustomize = target === 'shader';
       if (price)         price.style.display         = isCustomize ? 'none'  : '';
