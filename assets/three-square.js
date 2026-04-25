@@ -319,12 +319,12 @@
       var texUniforms = [u.tex1, u.tex2, u.tex3, u.tex4];
       for (var i = 0; i < 4; i++) {
         var key = letters[i] + '|' + fontFamily + '|' + fontSize + '|' + outlineEnabled + '|' + outlineWidth;
+        gl.activeTexture(texUnits[i]);
         if (key !== u._lastLetterKeys[i]) {
           drawLetter(u._texCtxs[i], letters[i], fontFamily, fontSize, outlineEnabled, outlineWidth);
           uploadTex(gl, u._glTextures[i], u._texCanvases[i]);
           u._lastLetterKeys[i] = key;
         }
-        gl.activeTexture(texUnits[i]);
         gl.bindTexture(gl.TEXTURE_2D, u._glTextures[i]);
         gl.uniform1i(texUniforms[i], i);
       }
