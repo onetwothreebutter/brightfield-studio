@@ -15,7 +15,7 @@ test.describe('Shader share link', () => {
     });
 
     await page.goto(PRODUCT_PATH);
-    await page.locator('.media-tab[data-tab="shader"]').click();
+    await page.locator('.product-customize-btn[data-tab="shader"]').click();
     await page.locator('.shader-control__share-btn').waitFor();
     await page.locator('.shader-control__share-btn').click();
 
@@ -34,8 +34,8 @@ test.describe('Shader share link', () => {
     await page.goto(`${PRODUCT_PATH}#share=xyz789`);
     await page.waitForLoadState('domcontentloaded');
 
-    // Shader tab auto-opens via #share= hash
-    await expect(page.locator('.media-tab[data-tab="shader"]')).toHaveClass(/is-active/, { timeout: 8000 });
+    // Shader tab auto-opens via #share= hash — verify shader panel is active
+    await expect(page.locator('[data-panel="shader"]')).toHaveClass(/is-active/, { timeout: 8000 });
 
     // #share= is replaced with #shader after the restore fetch completes
     await expect(page).toHaveURL(/#shader/, { timeout: 10000 });
