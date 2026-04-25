@@ -55,10 +55,7 @@
       <!-- Media -->
       <div class="product-media">
 
-        <div class="media-tabs">
-          <button class="media-tab is-active" data-tab="photo">Original Design</button>
-          {%- if shader_file -%}<button class="media-tab" data-tab="shader">Customize</button>{%- endif -%}
-        </div>
+        <div class="media-tabs"></div>
 
         <!-- Photo panel -->
         <div class="media-panel is-active" data-panel="photo">
@@ -218,6 +215,11 @@
         </div>
 
         {%- if shader_file -%}
+        <button class="product-customize-btn btn btn--secondary btn--lg btn--full" data-tab="shader">Design Yours</button>
+        {%- endif -%}
+
+        {%- if shader_file -%}
+        <p class="product-customize-hint">Adjust the controls to customize colors, patterns, and text — then use <em>Preview on Shirt</em> to see how it looks.</p>
         <div class="shader-gui" id="shader-gui">
           <div class="shader-gui__mobile-bar">
             <button class="shader-gui__toggle" id="shader-gui-popout">Popout</button>
@@ -234,6 +236,7 @@
             data-shirt-template="{{ 'shirt-template.png' | asset_url }}"
             data-print-area="0.30,0.165,0.40,0.45"
           >Preview on Shirt</button>
+          <button class="btn btn--secondary btn--lg btn--full shader-back-btn" data-tab="photo">← Back to Product</button>
           <p class="product-customize-actions__note">You'll select your size when you order.</p>
         </div>
         {%- endif -%}
@@ -264,12 +267,14 @@
 <script>
 // ── Tab switcher ─────────────────────────────────────────────────────────────
 (function () {
-  var tabs          = document.querySelectorAll('.media-tab');
+  var tabs          = document.querySelectorAll('.media-tab, [data-tab]');
   var panels        = document.querySelectorAll('.media-panel');
   var price         = document.querySelector('.product-price');
   var orderForm     = document.getElementById('product-order-form');
-  var shaderGui     = document.getElementById('shader-gui');
-  var shaderPreview = document.querySelector('.shader-gui__preview');
+  var shaderGui       = document.getElementById('shader-gui');
+  var shaderPreview   = document.querySelector('.shader-gui__preview');
+  var shaderHint      = document.querySelector('.product-customize-hint');
+  var customizeBtn    = document.querySelector('.product-customize-btn');
   var defaultDesc   = document.querySelector('.product-description');
   var productLayout = document.querySelector('.product-layout');
   if (!tabs.length) return;
@@ -288,8 +293,10 @@
       var isCustomize = target === 'shader';
       if (price)         price.style.display         = isCustomize ? 'none'  : '';
       if (orderForm)     orderForm.style.display     = isCustomize ? 'none'  : '';
+      if (customizeBtn)  customizeBtn.style.display  = isCustomize ? 'none'  : '';
       if (shaderGui)     shaderGui.style.display     = isCustomize ? 'block' : 'none';
       if (shaderPreview) shaderPreview.style.display = isCustomize ? 'block' : 'none';
+      if (shaderHint)    shaderHint.style.display    = isCustomize ? 'block' : 'none';
       if (defaultDesc)   defaultDesc.style.display   = isCustomize ? 'none'  : '';
       if (productLayout) productLayout.classList.toggle('shader-mode', isCustomize);
 
@@ -306,7 +313,7 @@
 
 // ── Auto-open Shader tab from URL hash ────────────────────────────────────────
 if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') === 0 || window.location.hash.indexOf('#share=') === 0) {
-  var shaderTab = document.querySelector('.media-tab[data-tab="shader"]');
+  var shaderTab = document.querySelector('[data-tab="shader"]');
   if (shaderTab) shaderTab.click();
 }
 
@@ -1034,7 +1041,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   var shareBtn = document.createElement('button');
   shareBtn.type = 'button';
   shareBtn.className = 'shader-control__share-btn';
-  shareBtn.textContent = 'Share';
+  shareBtn.textContent = 'Share Your Creation';
   shareBtn.addEventListener('click', function () {
     var self = this;
     var canvas = document.getElementById('shader-canvas');
@@ -1048,12 +1055,12 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     function showConfirm() {
       self.textContent = 'Copied!';
       self.disabled = false;
-      setTimeout(function () { self.textContent = 'Share'; }, 1800);
+      setTimeout(function () { self.textContent = 'Share Your Creation'; }, 1800);
     }
     function onError() {
       self.textContent = 'Failed';
       self.disabled = false;
-      setTimeout(function () { self.textContent = 'Share'; }, 1800);
+      setTimeout(function () { self.textContent = 'Share Your Creation'; }, 1800);
     }
 
     var urlPromise = fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/create-share', {
