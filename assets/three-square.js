@@ -207,7 +207,7 @@
 
   window.ShaderBase.create({
     animateValues:  true,
-    instantKeys:    ['u_square_count', 'u_density', 'u_opacity', 'u_distress', 'u_distress_scale', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
+    instantKeys:    ['u_square_count', 'u_density', 'u_letters_enabled', 'u_opacity', 'u_distress', 'u_distress_scale', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
