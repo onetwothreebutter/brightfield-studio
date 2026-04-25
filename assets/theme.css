@@ -1797,6 +1797,14 @@ h6 {
     .shader-demo__cta-row {
         flex-direction: column;
     }
+
+    .shader-demo__cta-row a.btn {
+        order: 2;
+    }
+
+    .shader-demo__cta-row button.btn {
+        order: 1;
+    }
 }
 
 .shader-demo__canvas-wrap {
