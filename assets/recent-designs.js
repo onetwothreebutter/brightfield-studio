@@ -60,19 +60,7 @@
     var strip = document.createElement('div');
     strip.className = 'recent-designs__strip';
 
-    var COLLAPSED = 120;
-    var EXPANDED = 360;
-
-    function setColumns(expandedIdx) {
-      var cols = designs.map(function (_, i) {
-        return (i === expandedIdx ? EXPANDED : COLLAPSED) + 'px';
-      });
-      strip.style.gridTemplateColumns = cols.join(' ');
-    }
-
-    setColumns(-1);
-
-    designs.forEach(function (design, idx) {
+    designs.forEach(function (design) {
       var card = document.createElement('div');
       card.className = 'recent-designs__card';
 
@@ -109,10 +97,7 @@
       card.appendChild(imgWrap);
       card.appendChild(label);
 
-      (function (d, c, i) {
-        card.addEventListener('mouseenter', function () { setColumns(i); });
-        card.addEventListener('mouseleave', function () { setColumns(-1); });
-
+      (function (d, c) {
         deleteBtn.addEventListener('click', function (e) {
           e.stopPropagation();
           deleteDesign(d.id).then(function (result) {
@@ -136,7 +121,7 @@
             window.location.href = '/products/' + d.productHandle + '#shader';
           }
         });
-      }(design, card, idx));
+      }(design, card));
 
       strip.appendChild(card);
     });
