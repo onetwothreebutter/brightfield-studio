@@ -119,7 +119,9 @@ var customAfterBuild = function () {
   var found = false;
   Array.from(body.children).forEach(function (el) {
     if (el === textEnabledRow) { found = true; return; }
-    if (found && el.classList.contains('shader-control')) textDependentRows.push(el);
+    if (!found) return;
+    if (el.classList.contains('shader-control__section-header')) { found = false; return; }
+    if (el.classList.contains('shader-control')) textDependentRows.push(el);
   });
 
   function applyTextEnabledVis() {
