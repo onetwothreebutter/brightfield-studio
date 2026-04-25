@@ -686,12 +686,12 @@
         var letterSz  = perLetterSizes[i];
         var ca        = getCellCa(i + 1, letterCount, GRID_ASPECT);
         var key       = letter + '|' + fontFamily + '|' + letterSz + '|' + outlineEnabled + '|' + outlineWidth + '|' + letterCount + '|' + ca + '|' + centerLetters;
+        gl.activeTexture(texUnits[i]);
         if (key !== u._lastLetterKeys[i]) {
           drawLetter(u._texCtxs[i], letter, fontFamily, letterSz, outlineEnabled, outlineWidth, ca, centerLetters);
           uploadTex(gl, u._glTextures[i], u._texCanvases[i]);
           u._lastLetterKeys[i] = key;
         }
-        gl.activeTexture(texUnits[i]);
         gl.bindTexture(gl.TEXTURE_2D, u._glTextures[i]);
         gl.uniform1i(texUniforms[i], i);
       }
