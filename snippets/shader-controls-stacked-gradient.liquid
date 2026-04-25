@@ -56,7 +56,10 @@ var controls = [
   { key: 'u_color1', label: 'Color 2', type: 'color', stopDependent: true, value: '#ffcc00', noRandomize: true },
   { key: 'u_color2', label: 'Color 3', type: 'color', stopDependent: true, value: '#00ccff', noRandomize: true },
   { key: 'u_color3', label: 'Color 4', type: 'color', stopDependent: true, value: '#aa00ff', noRandomize: true },
-  { key: 'u_stop_balance', label: 'Balance', type: 'range', min: 0.0, max: 1.0, step: 0.01, value: 0.5, stopDependent: true },
+  { key: 'u_stop1', label: 'Stop 2 Position', type: 'range', min: 0.0, max: 1.0, step: 0.01, value: 0.333, stopDependent: true,
+    tip: 'Where Color 2 begins (0 = far left, 1 = far right).' },
+  { key: 'u_stop2', label: 'Stop 3 Position', type: 'range', min: 0.0, max: 1.0, step: 0.01, value: 0.667, stopDependent: true,
+    tip: 'Where Color 3 begins (0 = far left, 1 = far right).' },
   // OKLCH palette controls (hidden when not in OKLCH mode)
   { key: '_sg_oklch_preset', label: 'Preset', type: 'select', oklchDependent: true, value: 'Vivid Rainbow',
     options: [
