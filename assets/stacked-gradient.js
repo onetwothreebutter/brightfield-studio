@@ -99,6 +99,8 @@
     'uniform vec3  u_color1;',
     'uniform vec3  u_color2;',
     'uniform vec3  u_color3;',
+    'uniform float u_stop1;',
+    'uniform float u_stop2;',
     'uniform sampler2D u_text_tex;',
     'uniform float u_text_x;',
     'uniform float u_text_y;',
@@ -222,9 +224,11 @@
     '  vec3 cosineCol = cosinePalette(palT, u_a, u_b, u_c, u_d);',
     '',
     '  // 4-stop gradient interpolated in OKLCH for vivid midpoints.',
-    '  float t01 = clamp(palT * 3.0, 0.0, 1.0);',
-    '  float t12 = clamp((palT - 0.33333) * 3.0, 0.0, 1.0);',
-    '  float t23 = clamp((palT - 0.66667) * 3.0, 0.0, 1.0);',
+    '  float s1 = u_stop1;',
+    '  float s2 = u_stop2;',
+    '  float t01 = clamp(palT / max(s1, 0.001), 0.0, 1.0);',
+    '  float t12 = clamp((palT - s1) / max(s2 - s1, 0.001), 0.0, 1.0);',
+    '  float t23 = clamp((palT - s2) / max(1.0 - s2, 0.001), 0.0, 1.0);',
     '  vec3 lch0 = oklab_to_oklch(linear_rgb_to_oklab(srgb_to_linear(u_color0)));',
     '  vec3 lch1 = oklab_to_oklch(linear_rgb_to_oklab(srgb_to_linear(u_color1)));',
     '  vec3 lch2 = oklab_to_oklch(linear_rgb_to_oklab(srgb_to_linear(u_color2)));',
@@ -232,7 +236,7 @@
     '  vec3 seg01 = mix_oklch(lch0, lch1, t01);',
     '  vec3 seg12 = mix_oklch(lch1, lch2, t12);',
     '  vec3 seg23 = mix_oklch(lch2, lch3, t23);',
-    '  vec3 blendedLch = mix(mix(seg01, seg12, step(0.33333, palT)), seg23, step(0.66667, palT));',
+    '  vec3 blendedLch = mix(mix(seg01, seg12, step(s1, palT)), seg23, step(s2, palT));',
     '  vec3 gradCol = clamp(oklab_to_linear_rgb(oklch_to_oklab(blendedLch)), 0.0, 1.0);',
     '',
     '  vec3 oklchCol = oklchPalette(palT);',
@@ -321,6 +325,8 @@
         color1:        gl.getUniformLocation(program, 'u_color1'),
         color2:        gl.getUniformLocation(program, 'u_color2'),
         color3:        gl.getUniformLocation(program, 'u_color3'),
+        stop1:         gl.getUniformLocation(program, 'u_stop1'),
+        stop2:         gl.getUniformLocation(program, 'u_stop2'),
         textTex:       gl.getUniformLocation(program, 'u_text_tex'),
         textX:         gl.getUniformLocation(program, 'u_text_x'),
         textY:         gl.getUniformLocation(program, 'u_text_y'),
@@ -439,6 +445,8 @@
       gl.uniform3fv(u.color1,       color1);
       gl.uniform3fv(u.color2,       color2);
       gl.uniform3fv(u.color3,       color3);
+      gl.uniform1f(u.stop1,         v.u_stop1 != null ? v.u_stop1 : 0.333);
+      gl.uniform1f(u.stop2,         v.u_stop2 != null ? v.u_stop2 : 0.667);
       gl.uniform1f(u.textX,         textX);
       gl.uniform1f(u.textY,         textY);
       gl.uniform3fv(u.textColor,    textColor);
