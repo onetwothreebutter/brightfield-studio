@@ -2303,34 +2303,27 @@ h6 {
 }
 .recent-designs__strip {
     display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: auto;
     gap: 12px;
     overflow-x: auto;
     padding-bottom: 8px;
     scrollbar-width: thin;
     scrollbar-color: var(--color-border) transparent;
-}
-.recent-designs__card {
-    display: grid;
-    grid-template-columns: 120px;
-    cursor: pointer;
     transition: grid-template-columns 0.35s ease-in-out;
 }
-.recent-designs__card:hover {
-    grid-template-columns: 360px;
+.recent-designs__card {
+    cursor: pointer;
+    min-width: 0;
 }
 .recent-designs__card-img-wrap {
     position: relative;
-    display: grid;
-    grid-template-rows: 180px;
-    height: auto;
     overflow: hidden;
     border-radius: var(--radius);
-    transition: grid-template-rows 0.35s ease-in-out;
+    height: 180px;
 }
-.recent-designs__card:hover .recent-designs__card-img-wrap {
-    grid-template-rows: 540px;
+.recent-designs__card-img-wrap > * {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 .recent-designs__card-img {
     width: 100%;
