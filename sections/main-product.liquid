@@ -772,7 +772,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           requestAnimationFrame(animate);
         }
 
-        var shaderTab = document.querySelector('.media-tab[data-tab="shader"]');
+        var shaderTab = document.querySelector('[data-tab="shader"]');
         if (shaderTab && !shaderTab.classList.contains('is-active')) shaderTab.click();
 
         // Animate clicked image into the settings panel
