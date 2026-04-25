@@ -698,7 +698,7 @@ h6 {
 }
 
 .product-actions {
-    margin-bottom: 2rem;
+    margin-bottom: 0;
 }
 
 .product-description {
@@ -1259,6 +1259,22 @@ h6 {
     border-color: var(--color-primary);
     color: var(--color-primary);
     background: var(--color-primary-dim);
+}
+
+.product-customize-btn {
+    margin-top: 10px;
+}
+
+.product-customize-hint {
+    display: none;
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+    color: var(--color-text, #fff);
+    line-height: 1.5;
+}
+
+.shader-back-btn {
+    margin-top: 10px;
 }
 
 /* ─── Media Panels ───────────────────────────────────────── */
