@@ -7,7 +7,8 @@
 
 {% stylesheet %}
   .recent-designs__heading { margin-bottom: 1rem; font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text); margin-top: 0; }
-  .recent-designs__strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+  .recent-designs__scroll { overflow-x: auto; padding: 80px; margin: -80px; scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+  .recent-designs__strip { display: flex; gap: 12px; }
 {% endstylesheet %}
 
 <script src="{{ 'recent-designs.js' | asset_url }}" defer></script>

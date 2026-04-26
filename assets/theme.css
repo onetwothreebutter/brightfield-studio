@@ -2109,7 +2109,7 @@ h6 {
     opacity: 1;
 }
 .scroll-shadow--bottom::after {
-    content: '↓';
+    content: "↓";
     position: absolute;
     bottom: 10px;
     left: 50%;
@@ -2124,14 +2124,23 @@ h6 {
     opacity: 1;
 }
 @keyframes scroll-hint-bounce {
-    0%, 100% { transform: translateX(-50%) translateY(0);   }
-    50%       { transform: translateX(-50%) translateY(5px); }
+    0%,
+    100% {
+        transform: translateX(-50%) translateY(0);
+    }
+    50% {
+        transform: translateX(-50%) translateY(5px);
+    }
 }
 @media (max-width: 800px) {
-    .shader-demo__controls .scroll-shadow { display: none; }
+    .shader-demo__controls .scroll-shadow {
+        display: none;
+    }
 }
 @media (max-width: 900px) {
-    .shader-gui .scroll-shadow { display: none; }
+    .shader-gui .scroll-shadow {
+        display: none;
+    }
 }
 
 /* ── Control tips ───────────────────────────────────────────── */
@@ -2301,35 +2310,62 @@ h6 {
     color: var(--color-text);
     margin-bottom: 12px;
 }
-.recent-designs__strip {
-    display: flex;
-    gap: 12px;
+.recent-designs__scroll {
     overflow-x: auto;
-    padding-bottom: 8px;
+    /* padding expands the clip boundary so scaled cards aren't clipped on any side;
+       negative margin compensates so no extra whitespace appears in the layout.
+       .container has no overflow:hidden so the scroll wrapper can bleed beyond it horizontally. */
+    padding: 80px;
+    margin: -80px;
     scrollbar-width: thin;
     scrollbar-color: var(--color-border) transparent;
+}
+.recent-designs__strip {
+    display: grid;
+    grid-template-columns: repeat(8, 250px);
+    gap: 12px;
 }
 .recent-designs__card {
     cursor: pointer;
     flex-shrink: 0;
-    width: 120px;
+    transition:
+        transform 0.3s ease,
+        opacity 0.3s ease;
 }
 .recent-designs__card-img-wrap {
     position: relative;
-    display: grid;
-    grid-template-rows: 180px;
     overflow: hidden;
     border-radius: var(--radius);
-    transition: grid-template-rows 0.35s ease-in-out;
 }
-.recent-designs__card-img-wrap > * {
-    grid-row: 1 / -1;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+/*
+ * Three-rule hover cascade: before | after | hovered
+ *
+ * Rule 1 — catches ALL cards when any card is hovered (specificity 0,4,0).
+ * This covers cards BEFORE the hovered one (the ~ combinator can't reach those).
+ */
+.recent-designs__strip:has(.recent-designs__card:hover) .recent-designs__card {
+    transform: scale(0.8) translateX(-30%);
+    opacity: 0.7;
 }
-.recent-designs__card:hover .recent-designs__card-img-wrap {
-    grid-template-rows: 540px;
+
+/*
+ * Rule 2 — overrides Rule 1 for cards AFTER the hovered one using the general
+ * sibling combinator (~). Prefixed with .recent-designs__strip to match Rule 1's
+ * specificity (0,4,0) so source order decides — this rule wins because it comes last.
+ */
+.recent-designs__strip .recent-designs__card:hover ~ .recent-designs__card {
+    transform: scale(0.8) translateX(30%);
+}
+
+/*
+ * Rule 3 — overrides both rules above for the hovered card itself.
+ */
+.recent-designs__strip:has(.recent-designs__card:hover)
+    .recent-designs__card:hover {
+    transform: scale(1.5);
+    opacity: 1;
+    z-index: 1;
+    position: relative;
 }
 .recent-designs__card-img {
     width: 100%;
@@ -2614,8 +2650,13 @@ h6 {
     animation: designs-row-pulse 1.4s ease-in-out infinite;
 }
 @keyframes designs-row-pulse {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.45; }
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.45;
+    }
 }
 
 /* ─── Designs Row: empty state ───────────────────────────── */
