@@ -126,7 +126,10 @@
       strip.appendChild(card);
     });
 
-    container.appendChild(strip);
+    var scrollWrap = document.createElement('div');
+    scrollWrap.className = 'recent-designs__scroll';
+    scrollWrap.appendChild(strip);
+    container.appendChild(scrollWrap);
   }
 
   window.RecentDesigns = {
