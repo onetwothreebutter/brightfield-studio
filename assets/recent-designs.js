@@ -57,6 +57,8 @@
       return;
     }
 
+    designs = designs.slice(0, 12);
+
     var strip = document.createElement('div');
     strip.className = 'recent-designs__strip';
 

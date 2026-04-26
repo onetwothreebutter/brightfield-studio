@@ -2321,13 +2321,13 @@ h6 {
     scrollbar-color: var(--color-border) transparent;
 }
 .recent-designs__strip {
-    display: grid;
-    grid-template-columns: repeat(8, 250px);
+    display: flex;
     gap: 12px;
 }
 .recent-designs__card {
     cursor: pointer;
     flex-shrink: 0;
+    width: 120px;
     transition:
         transform 0.3s ease,
         opacity 0.3s ease;
