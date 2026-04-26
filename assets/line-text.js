@@ -30,6 +30,11 @@
     'uniform float u_pos_x;',
     'uniform float u_pos_y;',
     'uniform float u_scale;',
+    'uniform float u_opacity;',
+    'uniform float u_distress;',
+    'uniform float u_distress_scale;',
+    'uniform float u_grain_mode;',
+    'uniform float u_distress_falloff;',
     'out vec4 fragColor;',
     '',
     window.ShaderBase.commonGLSL,
@@ -102,14 +107,14 @@
     '  float vignette = 1.0 - smoothstep(0.0, 1.0, vigVal);',
     '',
     '  vec3 encoded = pow(max(col, 0.0), vec3(1.0 / 2.2));',
-    '  float alpha = lineMask * vignette;',
-    '  fragColor = vec4(encoded * vignette * lineMask, alpha);',
+    '  float alpha = applyDistress(lineMask * vignette, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff) * u_opacity;',
+    '  fragColor = vec4(encoded, alpha);',
     '}',
   ].join('\n');
 
   window.ShaderBase.create({
     animateValues:  true,
-    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale'],
+    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale', 'u_grain_mode', 'u_distress_falloff', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
@@ -129,10 +134,15 @@
         color3:        gl.getUniformLocation(program, 'u_color3'),
         textTex:       gl.getUniformLocation(program, 'u_text_texture'),
         textY:         gl.getUniformLocation(program, 'u_text_y'),
-        vignetteTop:    gl.getUniformLocation(program, 'u_vignette_top'),
-        vignetteBottom: gl.getUniformLocation(program, 'u_vignette_bottom'),
-        vignetteLeft:   gl.getUniformLocation(program, 'u_vignette_left'),
-        vignetteRight:  gl.getUniformLocation(program, 'u_vignette_right'),
+        vignetteTop:     gl.getUniformLocation(program, 'u_vignette_top'),
+        vignetteBottom:  gl.getUniformLocation(program, 'u_vignette_bottom'),
+        vignetteLeft:    gl.getUniformLocation(program, 'u_vignette_left'),
+        vignetteRight:   gl.getUniformLocation(program, 'u_vignette_right'),
+        opacity:         gl.getUniformLocation(program, 'u_opacity'),
+        distress:        gl.getUniformLocation(program, 'u_distress'),
+        distressScale:   gl.getUniformLocation(program, 'u_distress_scale'),
+        grainMode:       gl.getUniformLocation(program, 'u_grain_mode'),
+        distressFalloff: gl.getUniformLocation(program, 'u_distress_falloff'),
         capRadius:     gl.getUniformLocation(program, 'u_cap_radius'),
         texSize:       gl.getUniformLocation(program, 'u_text_tex_size'),
         posX:          gl.getUniformLocation(program, 'u_pos_x'),
@@ -150,7 +160,7 @@
       gl.uniform3fv(u.palB,         v.u_b || [0.5, 0.5, 0.5]);
       gl.uniform3fv(u.palC,         v.u_c || [1.0, 1.0, 1.0]);
       gl.uniform3fv(u.palD,         v.u_d || [0.0, 0.33, 0.67]);
-      gl.uniform1f(u.colorMode,     v.u_color_mode != null ? v.u_color_mode : 0.0);
+      gl.uniform1f(u.colorMode,     v.u_color_mode != null ? parseFloat(v.u_color_mode) : 0.0);
       gl.uniform3fv(u.color0,       v.u_color0 || [1.0, 0.2,  0.4]);
       gl.uniform3fv(u.color1,       v.u_color1 || [1.0, 0.8,  0.0]);
       gl.uniform3fv(u.color2,       v.u_color2 || [0.0, 0.8,  1.0]);
@@ -160,6 +170,11 @@
       gl.uniform1f(u.vignetteBottom, v.u_vignette_bottom != null ? v.u_vignette_bottom : 2.0);
       gl.uniform1f(u.vignetteLeft,   v.u_vignette_left   != null ? v.u_vignette_left   : 2.0);
       gl.uniform1f(u.vignetteRight,  v.u_vignette_right  != null ? v.u_vignette_right  : 2.0);
+      gl.uniform1f(u.opacity,          v.u_opacity         != null ? v.u_opacity         : 1.0);
+      gl.uniform1f(u.distress,         v.u_distress        != null ? v.u_distress        : 0.0);
+      gl.uniform1f(u.distressScale,    v.u_distress_scale  != null ? v.u_distress_scale  : 80.0);
+      gl.uniform1f(u.grainMode,        v.u_grain_mode      != null ? parseFloat(v.u_grain_mode) : 0.0);
+      gl.uniform1f(u.distressFalloff,  v.u_distress_falloff != null ? v.u_distress_falloff : 0.0);
       gl.uniform1f(u.capRadius,     v.textCapRadius != null ? v.textCapRadius : 20.0);
       gl.uniform1f(u.texSize,       1024.0);
       gl.uniform1f(u.posX,         v.u_pos_x  != null ? v.u_pos_x  : 0.0);

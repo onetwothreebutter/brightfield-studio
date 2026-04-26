@@ -43,6 +43,8 @@
     'uniform float     u_opacity;',
     'uniform float     u_distress;',
     'uniform float     u_distress_scale;',
+    'uniform float     u_grain_mode;',
+    'uniform float     u_distress_falloff;',
     'uniform float     u_pos_x;',
     'uniform float     u_pos_y;',
     'uniform float     u_scale;',
@@ -172,12 +174,10 @@
     '',
     '  // ── Distress + output ───────────────────────────────────────────────────',
     '  vec2  dUV = gl_FragCoord.xy / u_resolution;',
-    '  float dist = clamp(length(dUV - 0.5) * 2.0, 0.0, 1.0);',
-    '  float dn  = distressNoise(dUV, u_distress_scale) * 0.67',
-    '            + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
+    '  float dm  = applyDistress(1.0, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff);',
     '',
-    '  float baseAlpha  = shapeMask * step(u_distress * dist, dn) * u_opacity;',
-    '  float wordAlpha  = clamp(wordFill + wordStroke, 0.0, 1.0) * step(u_distress * dist, dn) * u_opacity;',
+    '  float baseAlpha  = shapeMask * dm * u_opacity;',
+    '  float wordAlpha  = clamp(wordFill + wordStroke, 0.0, 1.0) * dm * u_opacity;',
     '  float alpha      = max(baseAlpha, wordAlpha);',
     '  vec2  vigCoord = dUV - 0.5;',
     '  float vigL = max(0.0, -vigCoord.x);',
@@ -194,7 +194,7 @@
 
   window.ShaderBase.create({
     animateValues:  true,
-    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
+    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale', 'u_grain_mode', 'u_distress_falloff', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
@@ -232,9 +232,11 @@
         useTextColor: gl.getUniformLocation(program, 'u_use_text_color'),
         outlineColor: gl.getUniformLocation(program, 'u_outline_color'),
         opacity:       gl.getUniformLocation(program, 'u_opacity'),
-        distress:      gl.getUniformLocation(program, 'u_distress'),
-        distressScale: gl.getUniformLocation(program, 'u_distress_scale'),
-        posX:          gl.getUniformLocation(program, 'u_pos_x'),
+        distress:        gl.getUniformLocation(program, 'u_distress'),
+        distressScale:   gl.getUniformLocation(program, 'u_distress_scale'),
+        grainMode:       gl.getUniformLocation(program, 'u_grain_mode'),
+        distressFalloff: gl.getUniformLocation(program, 'u_distress_falloff'),
+        posX:            gl.getUniformLocation(program, 'u_pos_x'),
         posY:          gl.getUniformLocation(program, 'u_pos_y'),
         scale:         gl.getUniformLocation(program, 'u_scale'),
         vignetteTop:    gl.getUniformLocation(program, 'u_vignette_top'),
@@ -308,9 +310,11 @@
       gl.bindTexture(gl.TEXTURE_2D, textTex);
       gl.uniform1i(u.wordTex, 0);
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
-      gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
-      gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
-      gl.uniform1f(u.posX,          v.u_pos_x          != null ? v.u_pos_x          : 0.0);
+      gl.uniform1f(u.distress,         v.u_distress         != null ? v.u_distress         : 0.0);
+      gl.uniform1f(u.distressScale,    v.u_distress_scale   != null ? v.u_distress_scale   : 80.0);
+      gl.uniform1f(u.grainMode,        v.u_grain_mode       != null ? parseFloat(v.u_grain_mode) : 0.0);
+      gl.uniform1f(u.distressFalloff,  v.u_distress_falloff != null ? v.u_distress_falloff : 0.0);
+      gl.uniform1f(u.posX,             v.u_pos_x            != null ? v.u_pos_x            : 0.0);
       gl.uniform1f(u.posY,          v.u_pos_y          != null ? v.u_pos_y          : 0.0);
       gl.uniform1f(u.scale,         v.u_scale          != null ? v.u_scale          : 1.0);
       gl.uniform1f(u.vignetteTop,    v.u_vignette_top    != null ? v.u_vignette_top    : 0.0);
