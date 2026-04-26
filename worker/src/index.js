@@ -287,9 +287,11 @@ async function handleSavePreview(request, env, origin) {
   const designUrl = `https://${env.R2_PUBLIC_DOMAIN}/${designKey}`;
   const mockupUrl = `https://${env.R2_PUBLIC_DOMAIN}/${mockupKey}`;
 
+  let savedId = null;
   if (deviceId) {
+    savedId = crypto.randomUUID();
     const entry = {
-      id: crypto.randomUUID(),
+      id: savedId,
       shader: shader || '',
       productHandle: productHandle || '',
       designUrl,
@@ -300,7 +302,7 @@ async function handleSavePreview(request, env, origin) {
     await saveDesignEntry(env, deviceId, entry).catch(() => {});
   }
 
-  return new Response(JSON.stringify({ design_url: designUrl, mockup_url: mockupUrl }), { status: 200, headers });
+  return new Response(JSON.stringify({ design_url: designUrl, mockup_url: mockupUrl, id: savedId }), { status: 200, headers });
 }
 
 async function handleListDesigns(request, env, origin) {
