@@ -138,7 +138,7 @@
     '  float vigT = max(0.0,  vigCoord.y);',
     '  float vigVal = vigL*vigL*u_vignette_left + vigR*vigR*u_vignette_right',
     '               + vigB*vigB*u_vignette_bottom + vigT*vigT*u_vignette_top;',
-    '  color = color * (1.0 - smoothstep(0.0, 1.0, vigVal));',
+    '  alpha = alpha * (1.0 - smoothstep(0.0, 1.0, vigVal));',
     '  fragColor   = vec4(color, alpha);',
     '}'
   ].join('\n');

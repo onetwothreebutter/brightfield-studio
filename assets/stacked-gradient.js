@@ -282,7 +282,7 @@
     '  float vigT = max(0.0,  vigCoord.y);',
     '  float vigVal = vigL*vigL*u_vignette_left + vigR*vigR*u_vignette_right',
     '               + vigB*vigB*u_vignette_bottom + vigT*vigT*u_vignette_top;',
-    '  finalColor = vec4(finalColor.xyz * (1.0 - smoothstep(0.0, 1.0, vigVal)), finalColor.w);',
+    '  finalAlpha = finalAlpha * (1.0 - smoothstep(0.0, 1.0, vigVal));',
     '  // Linear -> sRGB to match Three.js renderer output',
     '  vec3 encoded = pow(finalColor.xyz, vec3(1.0 / 2.2));',
     '  fragColor = vec4(encoded * finalAlpha, finalAlpha);',

@@ -150,7 +150,7 @@
     '  float vigT = max(0.0,  vigCoord.y);',
     '  float vigVal = vigL*vigL*u_vignette_left + vigR*vigR*u_vignette_right',
     '               + vigB*vigB*u_vignette_bottom + vigT*vigT*u_vignette_top;',
-    '  finalColor = finalColor * (1.0 - smoothstep(0.0, 1.0, vigVal));',
+    '  alpha = alpha * (1.0 - smoothstep(0.0, 1.0, vigVal));',
     '  vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
     '  fragColor = vec4(encoded, alpha);',
     '}'
