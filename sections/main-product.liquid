@@ -1363,6 +1363,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           ctx.drawImage(designImg, drawX, drawY, drawW, drawH);
 
           var compositeDataUrl = canvas.toDataURL('image/png');
+          var snapshotValues = JSON.parse(JSON.stringify(window._shaderState ? window._shaderState.values : {}));
 
           // Show modal immediately — no waiting for API
           modalImg.src = compositeDataUrl;
@@ -1379,8 +1380,18 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           if (communityError)   communityError.style.display = 'none';
           if (communitySubmit)  { communitySubmit.disabled = false; communitySubmit.textContent = 'Submit Design'; }
 
+          // Immediately add to Recent Designs strip — id filled in after upload
+          var pendingDetail = {
+            mockupUrl:     compositeDataUrl,
+            shader:        '{{ shader_file }}',
+            productHandle: '{{ product.handle }}',
+            values:        snapshotValues,
+            timestamp:     Math.floor(Date.now() / 1000),
+            id:            null
+          };
+          document.dispatchEvent(new CustomEvent('brightfield:design-saved', { detail: pendingDetail }));
+
           // Upload design + composite to R2 in the background
-          var snapshotValues = JSON.parse(JSON.stringify(window._shaderState ? window._shaderState.values : {}));
           var uploadPromise = fetch(workerUrl + '/save-preview', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1398,13 +1409,14 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
             if (!data.design_url) throw new Error(data.error || 'Upload failed');
             // Upgrade download link to stable hosted URL
             modalDl.href = data.mockup_url;
-            document.dispatchEvent(new CustomEvent('brightfield:design-saved', { detail: {
-              mockupUrl:     data.mockup_url,
-              shader:        '{{ shader_file }}',
-              productHandle: '{{ product.handle }}',
-              values:        snapshotValues,
-              timestamp:     Math.floor(Date.now() / 1000)
-            }}));
+            // Upgrade the strip card: swap data URL → stable R2 URL, enable delete
+            pendingDetail.id = data.id || null;
+            pendingDetail.mockupUrl = data.mockup_url;
+            var stripContainer = document.getElementById('product-recent-designs-container');
+            if (stripContainer) {
+              var firstImg = stripContainer.querySelector('.recent-designs__card-img');
+              if (firstImg && firstImg.src.startsWith('data:')) firstImg.src = data.mockup_url;
+            }
             return data;
           });
 
