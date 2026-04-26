@@ -132,34 +132,11 @@
     'uniform float     u_vignette_left;',
     'uniform float     u_vignette_right;',
     'uniform float     u_grain_mode;',
+    'uniform float     u_distress_falloff;',
     '',
     'out vec4 fragColor;',
     '',
-    'float hash21(vec2 p) {',
-    '  vec3 p3 = fract(vec3(p.xyx) * 0.1031);',
-    '  p3 += dot(p3, p3.yzx + 33.33);',
-    '  return fract((p3.x + p3.y) * p3.z);',
-    '}',
-    'float valueNoise(vec2 p) {',
-    '  vec2 i = floor(p); vec2 f = fract(p);',
-    '  float a = hash21(i),         b = hash21(i + vec2(1.0, 0.0)),',
-    '        c = hash21(i + vec2(0.0, 1.0)), d = hash21(i + vec2(1.0, 1.0));',
-    '  vec2 u = f * f * (3.0 - 2.0 * f);',
-    '  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);',
-    '}',
-    '// FBM: 5 octaves, lacunarity=2, gain=0.5',
-    'float fbm(vec2 p) {',
-    '  float v = 0.0; float a = 0.5;',
-    '  for (int i = 0; i < 5; i++) {',
-    '    v += a * valueNoise(p);',
-    '    p *= 2.0; a *= 0.5;',
-    '  }',
-    '  return v;',
-    '}',
-    '// Interleaved Gradient Noise — blue-noise approximation at pixel coords',
-    'float ign(vec2 p) {',
-    '  return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));',
-    '}',
+    window.ShaderBase.commonGLSL,
     '',
     'void main() {',
     '  vec2  dUV        = gl_FragCoord.xy / u_resolution;',
@@ -545,12 +522,7 @@
     '  alpha    *= 1.0 - smoothstep(-_aa, _aa, _d);',
     '',
     '  // ── Distress + finish ─────────────────────────────────────────────────────',
-    '  float dist = clamp(length(dUV - 0.5) * 2.0, 0.0, 1.0);',
-    '  float grainSize = max(1.0, u_distress_scale / 40.0);',
-    '  float dn = u_grain_mode < 0.5',
-    '    ? fbm(gridUV * u_distress_scale)',
-    '    : ign(floor(gl_FragCoord.xy / grainSize));',
-    '  alpha = alpha * step(u_distress * dist, dn) * u_opacity;',
+    '  alpha = applyDistress(alpha, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff) * u_opacity;',
     '',
     '  vec2 vigCoord = dUV - 0.5;',
     '  float vigL = max(0.0, -vigCoord.x);',
@@ -567,7 +539,7 @@
 
   window.ShaderBase.create({
     animateValues:  true,
-    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale', 'u_grid_aspect', 'u_invert', 'u_grain_mode', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
+    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale', 'u_grain_mode', 'u_distress_falloff', 'u_grid_aspect', 'u_invert', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
@@ -633,7 +605,8 @@
         vignetteBottom: gl.getUniformLocation(program, 'u_vignette_bottom'),
         vignetteLeft:   gl.getUniformLocation(program, 'u_vignette_left'),
         vignetteRight:  gl.getUniformLocation(program, 'u_vignette_right'),
-        grainMode:     gl.getUniformLocation(program, 'u_grain_mode'),
+        grainMode:       gl.getUniformLocation(program, 'u_grain_mode'),
+        distressFalloff: gl.getUniformLocation(program, 'u_distress_falloff'),
         // Internal letter-texture state (not uniform locations).
         _texCanvases:    texCanvases,
         _texCtxs:        texCtxs,
@@ -727,7 +700,8 @@
       gl.uniform1f(u.vignetteBottom, v.u_vignette_bottom != null ? v.u_vignette_bottom : 0.0);
       gl.uniform1f(u.vignetteLeft,   v.u_vignette_left   != null ? v.u_vignette_left   : 0.0);
       gl.uniform1f(u.vignetteRight,  v.u_vignette_right  != null ? v.u_vignette_right  : 0.0);
-      gl.uniform1f(u.grainMode,     v.u_grain_mode     != null ? parseFloat(v.u_grain_mode) : 0.0);
+      gl.uniform1f(u.grainMode,       v.u_grain_mode       != null ? parseFloat(v.u_grain_mode) : 0.0);
+      gl.uniform1f(u.distressFalloff, v.u_distress_falloff != null ? v.u_distress_falloff       : 0.0);
     },
   });
 }());

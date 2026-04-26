@@ -36,6 +36,8 @@
     'uniform float u_opacity;',
     'uniform float u_distress;',
     'uniform float u_distress_scale;',
+    'uniform float u_grain_mode;',
+    'uniform float u_distress_falloff;',
     'uniform float u_pos_x;',
     'uniform float u_pos_y;',
     'uniform float u_scale;',
@@ -46,20 +48,7 @@
     '',
     'out vec4 fragColor;',
     '',
-    'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
-    '  return a + b * cos(6.28318 * (c * t + d));',
-    '}',
-    '',
-    'float hash21(vec2 p) {',
-    '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);',
-    '}',
-    'float distressNoise(vec2 uv, float scale) {',
-    '  vec2 p = uv * scale; vec2 i = floor(p); vec2 f = fract(p);',
-    '  float a = hash21(i), b = hash21(i + vec2(1,0)),',
-    '        c = hash21(i + vec2(0,1)), d = hash21(i + vec2(1,1));',
-    '  vec2 u = f * f * (3.0 - 2.0 * f);',
-    '  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);',
-    '}',
+    window.ShaderBase.commonGLSL,
     '',
     'void main() {',
     '  vec2 uv          = gl_FragCoord.xy / u_resolution;',
@@ -128,9 +117,7 @@
     '  float textAlpha  = clamp(fillSample + outlineSample, 0.0, 1.0);',
     '  float finalAlpha = mix(mask, 1.0, textAlpha);',
     '  vec2  dUV  = gl_FragCoord.xy / u_resolution;',
-    '  float dn   = distressNoise(dUV, u_distress_scale) * 0.67',
-    '             + distressNoise(dUV, u_distress_scale * 2.73) * 0.33;',
-    '  float alpha = finalAlpha * step(u_distress, dn) * u_opacity;',
+    '  float alpha = applyDistress(finalAlpha, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff) * u_opacity;',
     '  vec2 vigCoord = dUV - 0.5;',
     '  float vigL = max(0.0, -vigCoord.x);',
     '  float vigR = max(0.0,  vigCoord.x);',
@@ -155,7 +142,7 @@
     stateKey:       '_demoState',
     exportKey:      '_demoExport',
     animateValues:  true,
-    instantKeys:    ['textX', 'textY', 'textFontSize', 'outlineWidth', 'u_opacity', 'u_pos_x', 'u_pos_y', 'u_scale', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
+    instantKeys:    ['textX', 'textY', 'textFontSize', 'outlineWidth', 'u_opacity', 'u_distress', 'u_distress_scale', 'u_grain_mode', 'u_distress_falloff', 'u_pos_x', 'u_pos_y', 'u_scale', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
     fragSrc:        fragSrc,
 
     setup: function (gl, program) {
@@ -190,8 +177,10 @@
         textY:               loc('u_text_y'),
         textTex:             loc('u_text_texture'),
         opacity:             loc('u_opacity'),
-        distress:            loc('u_distress'),
-        distressScale:       loc('u_distress_scale'),
+        distress:        loc('u_distress'),
+        distressScale:   loc('u_distress_scale'),
+        grainMode:       loc('u_grain_mode'),
+        distressFalloff: loc('u_distress_falloff'),
         posX:                loc('u_pos_x'),
         posY:                loc('u_pos_y'),
         scale:               loc('u_scale'),
@@ -215,7 +204,7 @@
       gl.uniform3fv(u.paletteB, v.u_palette_b || [0.5, 0.5, 0.5]);
       gl.uniform3fv(u.paletteC, v.u_palette_c || [1.0, 1.0, 1.0]);
       gl.uniform3fv(u.paletteD, v.u_palette_d || [0.0, 0.33, 0.67]);
-      gl.uniform1f(u.colorMode, v.u_color_mode != null ? v.u_color_mode : 0.0);
+      gl.uniform1f(u.colorMode, v.u_color_mode != null ? parseFloat(v.u_color_mode) : 0.0);
       gl.uniform3fv(u.color0,   v.u_color0 || [1.0, 0.2,  0.4]);
       gl.uniform3fv(u.color1,   v.u_color1 || [1.0, 0.8,  0.0]);
       gl.uniform3fv(u.color2,   v.u_color2 || [0.0, 0.8,  1.0]);
@@ -232,8 +221,10 @@
       gl.uniform1f(u.textX,        v.textX != null ? v.textX : 0.5);
       gl.uniform1f(u.textY,        v.textY != null ? v.textY : 0.5);
       gl.uniform1f(u.opacity,       v.u_opacity        != null ? v.u_opacity        : 1.0);
-      gl.uniform1f(u.distress,      v.u_distress       != null ? v.u_distress       : 0.0);
-      gl.uniform1f(u.distressScale, v.u_distress_scale != null ? v.u_distress_scale : 80.0);
+      gl.uniform1f(u.distress,         v.u_distress         != null ? v.u_distress         : 0.0);
+      gl.uniform1f(u.distressScale,    v.u_distress_scale   != null ? v.u_distress_scale   : 80.0);
+      gl.uniform1f(u.grainMode,        v.u_grain_mode       != null ? parseFloat(v.u_grain_mode) : 0.0);
+      gl.uniform1f(u.distressFalloff,  v.u_distress_falloff != null ? v.u_distress_falloff : 0.0);
       gl.uniform1f(u.posX,          v.u_pos_x          != null ? v.u_pos_x          : 0.0);
       gl.uniform1f(u.posY,          v.u_pos_y          != null ? v.u_pos_y          : 0.0);
       gl.uniform1f(u.scale,         v.u_scale          != null ? v.u_scale          : 1.0);
