@@ -103,7 +103,19 @@
     var revealed   = false;
     var lastT      = 0;
     var animVals   = null;
-    var exporting  = false; // true while _shaderExport is running; suppresses extra rAF
+    var exporting      = false; // true while _shaderExport is running; suppresses extra rAF
+    var paused         = false; // true when canvas is off-screen (Intersection Observer)
+    var idle           = false; // true when animVals have converged; triggers slow polling
+    var pendingTimeout = null;
+
+    function scheduleNextFrame() {
+      if (exporting || paused) return;
+      if (idle) {
+        pendingTimeout = setTimeout(function () { pendingTimeout = null; render(); }, 100);
+      } else {
+        requestAnimationFrame(render);
+      }
+    }
 
     function lerpVal(a, b, factor) {
       if (typeof b === 'number' && typeof a === 'number') {
@@ -116,6 +128,7 @@
     }
 
     function render() {
+      if (paused) return;
       var t = (performance.now() - start) / 1000.0;
       var v = (window[stateKey] && window[stateKey].values) || {};
       var w = canvas.width;
@@ -129,6 +142,7 @@
           var factor = 1 - Math.exp(-8 * dt);
           var instant = (opts.instantKeys || []);
           if (!animVals) { animVals = {}; }
+          var maxDiff = 0;
           Object.keys(v).forEach(function (k) {
             if (instant.indexOf(k) !== -1) {
               animVals[k] = v[k]; // bypass lerp — instant feedback
@@ -136,8 +150,20 @@
               animVals[k] = Array.isArray(v[k]) ? v[k].slice() : v[k];
             } else {
               animVals[k] = lerpVal(animVals[k], v[k], factor);
+              var av = animVals[k];
+              var tv = v[k];
+              if (typeof tv === 'number' && typeof av === 'number') {
+                var nd = Math.abs(tv - av);
+                if (nd > maxDiff) maxDiff = nd;
+              } else if (Array.isArray(tv) && Array.isArray(av)) {
+                for (var i = 0; i < tv.length; i++) {
+                  nd = Math.abs((tv[i] || 0) - (av[i] || 0));
+                  if (nd > maxDiff) maxDiff = nd;
+                }
+              }
             }
           });
+          idle = maxDiff < 0.001;
           renderV = animVals;
         }
 
@@ -166,7 +192,20 @@
       lastT = t;
       // Only schedule the next frame when not exporting; prevents an extra rAF
       // chain from accumulating each time _shaderExport calls render() directly.
-      if (!exporting) requestAnimationFrame(render);
+      if (!exporting) scheduleNextFrame();
+    }
+
+    if (window.IntersectionObserver) {
+      new IntersectionObserver(function (entries) {
+        var visible = entries[0].isIntersecting;
+        if (!visible) {
+          paused = true;
+          if (pendingTimeout) { clearTimeout(pendingTimeout); pendingTimeout = null; }
+        } else if (paused) {
+          paused = false;
+          scheduleNextFrame();
+        }
+      }, { threshold: 0 }).observe(canvas);
     }
 
     render();
