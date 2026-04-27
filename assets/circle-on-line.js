@@ -156,7 +156,7 @@
 
   window.ShaderBase.create({
     animateValues:  true,
-    instantKeys:    ['u_opacity', 'u_distress', 'u_distress_scale', 'u_grain_mode', 'u_distress_falloff', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
+    instantKeys:    ['u_opacity', 'u_distress_0', 'u_distress_scale_0', 'u_distress_1', 'u_distress_scale_1', 'u_distress_2', 'u_distress_scale_2', 'u_distress_3', 'u_distress_scale_3', 'u_grain_mode', 'u_distress_falloff', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
     fragSrc: fragSrc,
     setup: function (gl, program) {
       return {
@@ -233,8 +233,9 @@
       gl.uniform1f(u.centerCircleEnabled, v.u_center_circle_enabled != null ? v.u_center_circle_enabled : 1.0);
       gl.uniform1f(u.centerCircleRadius,  v.u_center_circle_radius  != null ? v.u_center_circle_radius  : 0.04);
       gl.uniform1f(u.opacity,      v.u_opacity              != null ? v.u_opacity              : 1.0);
-      gl.uniform1f(u.distress,         v.u_distress         != null ? v.u_distress         : 0.0);
-      gl.uniform1f(u.distressScale,    v.u_distress_scale   != null ? v.u_distress_scale   : 80.0);
+      var _gm = Math.round(v.u_grain_mode != null ? parseFloat(v.u_grain_mode) : 0);
+      gl.uniform1f(u.distress,      v['u_distress_' + _gm]       != null ? v['u_distress_' + _gm]       : (v.u_distress       != null ? v.u_distress       : 0.0));
+      gl.uniform1f(u.distressScale, v['u_distress_scale_' + _gm] != null ? v['u_distress_scale_' + _gm] : (v.u_distress_scale != null ? v.u_distress_scale : 80.0));
       gl.uniform1f(u.grainMode,        v.u_grain_mode       != null ? parseFloat(v.u_grain_mode) : 0.0);
       gl.uniform1f(u.distressFalloff,  v.u_distress_falloff != null ? v.u_distress_falloff : 0.0);
       gl.uniform1f(u.posX,        v.u_pos_x      != null ? v.u_pos_x      : 0.0);

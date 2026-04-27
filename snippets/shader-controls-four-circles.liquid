@@ -74,31 +74,7 @@ var controls = [
   { key: 'outlineEnabled',     label: 'Outline',        type: 'toggle', value: 0, textDirty: true, noRandomize: true, wordDependent: true },
   { key: 'outlineWidth',       label: 'Outline Width',  type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true, noRandomize: true, wordDependent: true },
   { key: 'u_outline_color',    label: 'Outline Color',  type: 'color',  value: '#000000', noRandomize: true, wordDependent: true },
-  // ── Finish ────────────────────────────────────────────────────────────────
-  { type: 'header', label: 'Finish' },
-  { key: 'u_opacity',        label: 'Opacity',  type: 'range', min: 0, max: 1,    step: 0.01, value: 1.0, noRandomize: true,
-    tip: 'Fades the entire design from fully visible to invisible.' },
-  { key: 'u_grain_mode', label: 'Grain Type', type: 'select', value: '0', noRandomize: true,
-    options: [
-      { label: 'Organic',    value: '0' },
-      { label: 'Blue Noise', value: '1' },
-      { label: 'Scratches',  value: '2' }
-    ],
-    tip: 'Organic = smooth blobs. Blue Noise = fine uniform stipple. Scratches = ink drag streaks.' },
-  { key: 'u_distress',       label: 'Distress',   type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0, noRandomize: true,
-    tip: 'Adds a worn, aged look by knocking out random ink spots.' },
-  { key: 'u_distress_scale', label: 'Grain Size', type: 'range', min: 10, max: 600, step: 1,    value: 80,  noRandomize: true,
-    tip: 'Size of the distress grain — lower = finer, higher = coarser.' },
-  { key: 'u_distress_falloff', label: 'Edge Falloff', type: 'range', min: 0, max: 1, step: 0.05, value: 0.0, noRandomize: true,
-    tip: 'At 0, distress is uniform. At 1, distress concentrates at edges and corners.' },
-  { key: 'u_vignette_top',    label: 'Vignette Top',    type: 'range', min: 0, max: 20, step: 0.05, value: 0, noRandomize: true },
-  { key: 'u_vignette_bottom', label: 'Vignette Bottom', type: 'range', min: 0, max: 20, step: 0.05, value: 0, noRandomize: true },
-  { key: 'u_vignette_left',   label: 'Vignette Left',   type: 'range', min: 0, max: 20, step: 0.05, value: 0, noRandomize: true },
-  { key: 'u_vignette_right',  label: 'Vignette Right',  type: 'range', min: 0, max: 20, step: 0.05, value: 0, noRandomize: true },
-  { key: 'u_pos_x',         label: 'Position X', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0, noRandomize: true },
-  { key: 'u_pos_y',         label: 'Position Y', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0, noRandomize: true },
-  { key: 'u_scale',         label: 'Scale',      type: 'range', min: 0.2,  max: 3.0,  step: 0.05, value: 1.0, noRandomize: true },
-];
+].concat(FINISH_CONTROLS);
 
 var customAfterBuild = function () {
   var cosineKeys = ['u_a', 'u_b', 'u_c', 'u_d'];

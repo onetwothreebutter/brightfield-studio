@@ -339,6 +339,17 @@
             </div>
           </div>
 
+          <!-- Grain Type -->
+          <div class="shader-control">
+            <label class="shader-control__label">Grain Type</label>
+            <select class="shader-control__select" id="demo-grain-mode">
+              <option value="0">Organic</option>
+              <option value="1">Blue Noise</option>
+              <option value="2">Scratches</option>
+              <option value="3">Crosshatch</option>
+            </select>
+          </div>
+
           <!-- Distress -->
           <div class="shader-control">
             <label class="shader-control__label">Distress</label>
@@ -350,9 +361,9 @@
 
           <!-- Grain -->
           <div class="shader-control">
-            <label class="shader-control__label">Grain</label>
+            <label class="shader-control__label">Grain Size</label>
             <div class="shader-control__range-wrap">
-              <input type="range" class="shader-control__range" id="demo-distress-scale" min="10" max="300" step="1" value="80">
+              <input type="range" class="shader-control__range" id="demo-distress-scale" min="10" max="600" step="1" value="80">
               <span class="shader-control__value" id="demo-distress-scale-display">80</span>
             </div>
           </div>
@@ -1065,6 +1076,7 @@
   // ── Finish controls ────────────────────────────────────────────────────────
   var opacityInput        = document.getElementById('demo-opacity');
   var opacityDisp         = document.getElementById('demo-opacity-display');
+  var grainModeSelect     = document.getElementById('demo-grain-mode');
   var distressInput       = document.getElementById('demo-distress');
   var distressDisp        = document.getElementById('demo-distress-display');
   var distressScaleInput  = document.getElementById('demo-distress-scale');
@@ -1089,6 +1101,11 @@
     var n = parseFloat(this.value);
     window._demoState.values.u_opacity = n;
     opacityDisp.textContent = n.toFixed(2);
+    window._demoState.dirty = true;
+  });
+  grainModeSelect.addEventListener('change', function () {
+    onUserInteract();
+    window._demoState.values.u_grain_mode = parseFloat(this.value);
     window._demoState.dirty = true;
   });
   distressInput.addEventListener('input', function () {
@@ -1457,6 +1474,7 @@
       if (outlineWidthInput)    { outlineWidthInput.value   = v.outlineWidth;           outlineWidthDisp.textContent     = v.outlineWidth; }
       if (outlineColorInput)      outlineColorInput.value   = rgbToHex(v.u_outline_color);
       if (opacityInput)         { opacityInput.value        = v.u_opacity;              opacityDisp.textContent          = parseFloat(v.u_opacity).toFixed(2); }
+      if (grainModeSelect)      { grainModeSelect.value      = v.u_grain_mode != null ? String(Math.round(v.u_grain_mode)) : '0'; }
       if (distressInput)        { distressInput.value       = v.u_distress;             distressDisp.textContent         = parseFloat(v.u_distress).toFixed(2); }
       if (distressScaleInput)   { distressScaleInput.value  = v.u_distress_scale;       distressScaleDisp.textContent    = v.u_distress_scale; }
       if (posXInput)            { posXInput.value           = v.u_pos_x      != null ? v.u_pos_x      : 0;   posXDisp.textContent       = parseFloat(posXInput.value).toFixed(2); }
