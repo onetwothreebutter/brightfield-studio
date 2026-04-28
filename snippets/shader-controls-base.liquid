@@ -54,3 +54,37 @@ function applyColors(keyValPairs) {
 SHADER_FONTS.forEach(function (f) {
   document.fonts.load('700 48px "' + f + '"');
 });
+
+var FINISH_CONTROLS_PRE = [
+  { type: 'header', label: 'Finish' },
+  { key: 'u_opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, value: 1.0, noRandomize: true,
+    tip: 'Fades the entire design from fully visible to invisible.' },
+  { key: 'u_grain_mode', label: 'Grain Type', type: 'select', value: '0', noRandomize: true,
+    options: [
+      { label: 'Organic',    value: '0' },
+      { label: 'Blue Noise', value: '1' },
+      { label: 'Scratches',  value: '2' },
+      { label: 'Crosshatch', value: '3' }
+    ],
+    tip: 'Organic = smooth blobs. Blue Noise = fine uniform stipple. Scratches = ink drag streaks. Crosshatch = diagonal etched lines.' },
+  { key: 'u_distress_0',       label: 'Amount',       type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0, noRandomize: true, grainDependent: 0 },
+  { key: 'u_distress_scale_0', label: 'Blob Size',    type: 'range', min: 10, max: 600, step: 1,    value: 80,  noRandomize: true, grainDependent: 0 },
+  { key: 'u_distress_1',       label: 'Amount',       type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0, noRandomize: true, grainDependent: 1 },
+  { key: 'u_distress_scale_1', label: 'Dot Size',     type: 'range', min: 10, max: 600, step: 1,    value: 80,  noRandomize: true, grainDependent: 1 },
+  { key: 'u_distress_2',       label: 'Amount',       type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0, noRandomize: true, grainDependent: 2 },
+  { key: 'u_distress_scale_2', label: 'Line Density', type: 'range', min: 10, max: 600, step: 1,    value: 80,  noRandomize: true, grainDependent: 2 },
+  { key: 'u_distress_3',       label: 'Amount',       type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0, noRandomize: true, grainDependent: 3 },
+  { key: 'u_distress_scale_3', label: 'Line Density', type: 'range', min: 10, max: 600, step: 1,    value: 80,  noRandomize: true, grainDependent: 3 },
+  { key: 'u_distress_falloff', label: 'Edge Falloff', type: 'range', min: 0, max: 1, step: 0.05, value: 0.0, noRandomize: true,
+    tip: 'At 0, distress is uniform. At 1, distress concentrates at edges and corners.' },
+];
+var FINISH_CONTROLS_POST = [
+  { key: 'u_vignette_top',    label: 'Vignette Top',    type: 'range', min: 0, max: 20, step: 0.05, value: 0, noRandomize: true },
+  { key: 'u_vignette_bottom', label: 'Vignette Bottom', type: 'range', min: 0, max: 20, step: 0.05, value: 0, noRandomize: true },
+  { key: 'u_vignette_left',   label: 'Vignette Left',   type: 'range', min: 0, max: 20, step: 0.05, value: 0, noRandomize: true },
+  { key: 'u_vignette_right',  label: 'Vignette Right',  type: 'range', min: 0, max: 20, step: 0.05, value: 0, noRandomize: true },
+  { key: 'u_pos_x', label: 'Position X', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0, noRandomize: true },
+  { key: 'u_pos_y', label: 'Position Y', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0, noRandomize: true },
+  { key: 'u_scale', label: 'Scale',      type: 'range', min: 0.2,  max: 3.0,  step: 0.05, value: 1.0, noRandomize: true },
+];
+var FINISH_CONTROLS = FINISH_CONTROLS_PRE.concat(FINISH_CONTROLS_POST);

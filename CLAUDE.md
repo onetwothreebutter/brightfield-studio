@@ -74,7 +74,7 @@ if (fSel) fSel.addEventListener('change', function () {
 ### Finish section — standard controls (every shader must include these)
 The Finish section is always the last section in the controls array and contains these controls in order:
 1. `u_opacity` — range 0–1, default 1.0, `noRandomize: true`
-2. `u_grain_mode` — select (Organic/Blue Noise/Scratches), default '0', `noRandomize: true`
+2. `u_grain_mode` — select (Organic/Blue Noise/Scratches/Crosshatch), default '0', `noRandomize: true`
 3. `u_distress` — range 0–0.85, default 0.0, `noRandomize: true`
 4. `u_distress_scale` — range 10–600, label 'Grain Size', default 80, `noRandomize: true`
 5. `u_distress_falloff` — range 0–1, step 0.05, default 0.0, `noRandomize: true`

@@ -427,6 +427,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   // Build controls
   var paletteDependentRows    = [];
   var stopDependentRows       = [];
+  var grainDependentRows      = [[], [], [], []];
   var oklchDependentRows      = [];
   var quadDependentRows       = [];
   var textColorDependentRows  = [];
@@ -435,6 +436,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   var perLetterSizeDependentRows  = [];
   var colorModeBtn     = null;
   var colorModeSel     = null;
+  var grainModeSel     = null;
   var useTextColorBtn  = null;
   var outlineToggleBtn        = null;
   var wordToggleBtn           = null;
@@ -575,6 +577,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       });
 
       if (ctrl.key === 'u_color_mode') colorModeSel = sel;
+      if (ctrl.key === 'u_grain_mode') grainModeSel = sel;
 
       row.appendChild(sel);
       controlEls.push({ ctrl: ctrl, el: sel });
@@ -582,6 +585,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
 
     if (ctrl.paletteDependent)   paletteDependentRows.push(row);
     if (ctrl.stopDependent)      stopDependentRows.push(row);
+    if (ctrl.grainDependent != null) grainDependentRows[ctrl.grainDependent].push(row);
     if (ctrl.oklchDependent)     oklchDependentRows.push(row);
     if (ctrl.quadDependent)      quadDependentRows.push(row);
     if (ctrl.textColorDependent) textColorDependentRows.push(row);
@@ -616,6 +620,15 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   if (colorModeBtn) colorModeBtn.addEventListener('click', applyPaletteVisibility);
   if (colorModeSel) colorModeSel.addEventListener('change', applyPaletteVisibility);
   applyPaletteVisibility();
+
+  function applyGrainVisibility() {
+    var mode = grainModeSel ? Math.round(parseFloat(grainModeSel.value)) : 0;
+    grainDependentRows.forEach(function (rows, i) {
+      rows.forEach(function (r) { r.style.display = i === mode ? '' : 'none'; });
+    });
+  }
+  if (grainModeSel) grainModeSel.addEventListener('change', applyGrainVisibility);
+  applyGrainVisibility();
 
   // Show/hide text-color row based on Custom Text Color toggle
   function applyTextColorVisibility() {

@@ -16,6 +16,8 @@ const ROOT = join(__dirname, '..');
 
 const REQUIRED_CONTROLS = ['u_pos_x', 'u_pos_y', 'u_scale'];
 
+const baseSrc = readFileSync(join(ROOT, 'snippets', 'shader-controls-base.liquid'), 'utf8');
+
 function getShaderNames() {
   return readdirSync(join(ROOT, 'snippets'))
     .filter(f => f.startsWith('shader-controls-') && f.endsWith('.liquid') && f !== 'shader-controls-base.liquid')
@@ -24,7 +26,14 @@ function getShaderNames() {
 
 function hasControlWithNoRandomize(src, key) {
   // Each control is typically one line; check that key and noRandomize appear together.
-  return src.split('\n').some(line => line.includes(`'${key}'`) && line.includes('noRandomize'));
+  if (src.split('\n').some(line => line.includes(`'${key}'`) && line.includes('noRandomize'))) {
+    return true;
+  }
+  // Controls may be delegated to FINISH_CONTROLS / FINISH_CONTROLS_POST in the base snippet.
+  if (src.includes('FINISH_CONTROLS')) {
+    return baseSrc.split('\n').some(line => line.includes(`'${key}'`) && line.includes('noRandomize'));
+  }
+  return false;
 }
 
 describe('Shader Finish section controls', () => {
