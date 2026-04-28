@@ -187,6 +187,7 @@
                 {%- for variant in product.variants -%}
                   <option
                     value="{{ variant.id }}"
+                    data-variant-title="{{ variant.title | escape }}"
                     {% if variant == product.selected_or_first_available_variant %}selected{% endif %}
                     {% unless variant.available %}disabled{% endunless %}
                   >
@@ -213,6 +214,36 @@
 
           {%- endform -%}
         </div>
+
+        {%- if product.variants.size > 1 -%}
+        <script>
+        (function () {
+          var form        = document.querySelector('#product-order-form form');
+          var variantSel  = form && form.querySelector('select.variant-select');
+          if (!form || !variantSel) return;
+
+          function syncVariant() {
+            var selectedOptions = [];
+            form.querySelectorAll('.variant-fieldset').forEach(function (fs) {
+              var checked = fs.querySelector('input[type="radio"]:checked');
+              if (checked) selectedOptions.push(checked.value);
+            });
+            var title = selectedOptions.join(' / ');
+            var options = variantSel.querySelectorAll('option');
+            for (var i = 0; i < options.length; i++) {
+              if (options[i].dataset.variantTitle === title) {
+                variantSel.value = options[i].value;
+                return;
+              }
+            }
+          }
+
+          form.querySelectorAll('input[type="radio"]').forEach(function (radio) {
+            radio.addEventListener('change', syncVariant);
+          });
+        })();
+        </script>
+        {%- endif -%}
 
         {%- if shader_file -%}
         <button class="product-customize-btn btn btn--secondary btn--lg btn--full" data-tab="shader">Design Yours</button>
