@@ -7,80 +7,19 @@
         <h1 class="about-story__heading">Hi, I'm Eric.</h1>
         <div class="about-story__body">
           <p>I make wearable art from shader code.</p>
-          <p>Brightfield began as an experiment with GLSL fragment shaders and a simple idea: the visuals I was discovering were too interesting to stay on a screen.</p>
-          <p>Our designs start as generative visuals — bold colors, shifting patterns, customizable text, and shader-based experiments that turn code into something you can wear. Some designs are ready to go. Others let you tweak the settings and make them your own.</p>
-          <p>Brightfield is for people who want something more interesting than a standard graphic tee: something creative, personal, and a little unexpected.</p>
-          <p>Every piece comes from a real shader program — not stock art, not a template, just code and experimentation.</p>
-          <p>You don't need to know anything about shaders to enjoy it. You just need to be curious. ✨</p>
+          <p>BrightField began when I started experimenting with GLSL fragment shaders and kept discovering visuals that felt too interesting to stay on a screen. I wanted to turn that process into something people could actually wear.</p>
+
+          <p>Every design here starts as a real shader program — not stock art, not a preset, not a filtered graphic. Designs are ready to go just as they are, but I invite you to jump in, tweak the settings, and make them your own. You can customize the parameters, generate a preview, and create something that feels personal, playful, and unexpected.</p>
+
+          <p>You don’t need to know anything about shaders or code to design your own shirt. You just need to be curious! ✨</p>
+
+<p>For information about printing, shipping, returns, etc, see our <a class="about-inline-link" href="/pages/faq">Frequently Asked Questions page</a>.</p>
+
         </div>
       </div>
     </div>
   </section>
 
-  <section class="about-process section-padding">
-    <div class="container">
-      <p class="about-eyebrow">How It Works</p>
-      <h2 class="about-section-heading">From fragment shader to front door.</h2>
-      <ol class="about-process__steps">
-        <li class="about-process__step">
-          <span class="about-process__number" aria-hidden="true">01</span>
-          <div class="about-process__content">
-            <h3 class="about-process__title">Write the shader</h3>
-            <p class="about-process__desc">A GLSL program runs on your GPU, blending geometry, color math, and live animation into a moving image.</p>
-          </div>
-        </li>
-        <li class="about-process__step">
-          <span class="about-process__number" aria-hidden="true">02</span>
-          <div class="about-process__content">
-            <h3 class="about-process__title">Configure &amp; generate</h3>
-            <p class="about-process__desc">Use the on-page GUI to dial in colors, speed, and text. Hit Generate Preview when it looks right.</p>
-          </div>
-        </li>
-        <li class="about-process__step">
-          <span class="about-process__number" aria-hidden="true">03</span>
-          <div class="about-process__content">
-            <h3 class="about-process__title">Share it (optional)</h3>
-            <p class="about-process__desc">Love how it turned out? Share your design with the Brightfield community — browse what others have made and get inspired.</p>
-          </div>
-        </li>
-        <li class="about-process__step">
-          <span class="about-process__number" aria-hidden="true">04</span>
-          <div class="about-process__content">
-            <h3 class="about-process__title">Print on demand</h3>
-            <p class="about-process__desc">Your design goes to Printful, gets printed on a quality garment, and ships directly to your door.</p>
-          </div>
-        </li>
-        <li class="about-process__step">
-          <span class="about-process__number" aria-hidden="true">05</span>
-          <div class="about-process__content">
-            <h3 class="about-process__title">Wear it</h3>
-            <p class="about-process__desc">Your shirt arrives. 🎉</p>
-          </div>
-        </li>
-      </ol>
-    </div>
-  </section>
-
-  <section class="about-values section-padding">
-    <div class="container">
-      <p class="about-eyebrow">What We're About</p>
-      <h2 class="about-section-heading">A few things we believe in.</h2>
-      <div class="about-values__grid">
-        <div class="about-values__card">
-          <h3 class="about-values__title">Generated, not drawn.</h3>
-          <p class="about-values__desc">The output comes from math. There's no Illustrator file behind it — just shader code and a seed.</p>
-        </div>
-        <div class="about-values__card">
-          <h3 class="about-values__title">Yours to configure.</h3>
-          <p class="about-values__desc">Dial in the colors, speed, and text until it feels right. The design you order is the one you built — not something picked from a catalog.</p>
-        </div>
-        <div class="about-values__card">
-          <h3 class="about-values__title">Made by someone who codes.</h3>
-          <p class="about-values__desc">Every shader is hand-crafted, tested, and iterated. Not stock art dressed up — actual GPU programs built to look good on fabric.</p>
-        </div>
-      </div>
-    </div>
-  </section>
 
 </div>
 
@@ -222,6 +161,11 @@
       grid-template-columns: 2.5rem 1fr;
       gap: 1rem;
     }
+  }
+
+  .about-inline-link {
+  color: var(--color-primary);
+    text-decoration: underline;
   }
 {% endstylesheet %}
 
