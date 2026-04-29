@@ -16,10 +16,14 @@
 
         <div class="cart-items">
           {%- for item in cart.items -%}
-            <div class="cart-item">
+            {%- assign mockup_url = item.properties['_mockup_url'] -%}
+            {%- if item.properties['_design_url'] != blank and item.properties['_source'] != 'inhouse' -%}
+              {%- assign is_custom = item.properties['_design_url'] -%}
+            {%- else -%}
+              {%- assign is_custom = '' -%}
+            {%- endif -%}
 
-              {%- assign mockup_url = item.properties['_mockup_url'] -%}
-              {%- assign is_custom = item.properties['_design_url'] | default: '' -%}
+            <div class="cart-item">
 
               <a href="{{ item.url }}" class="cart-item__image-link">
                 {%- if mockup_url != blank -%}
@@ -48,7 +52,7 @@
               <div class="cart-item__details">
                 <a href="{{ item.url }}" class="cart-item__title">
                   {{ item.product.title }}
-                  {%- if is_custom -%}
+                  {%- if is_custom != blank -%}
                     <span class="cart-item__custom-badge">Custom Design</span>
                   {%- endif -%}
                 </a>
