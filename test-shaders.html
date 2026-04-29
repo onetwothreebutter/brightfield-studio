@@ -989,8 +989,8 @@ SHADERS['four-circles'] = {
     { key: 'u_distress_scale_2', label: 'Line Density', type: 'range', min: 10, max: 600, step: 1,    value: 80,  noRandomize: true, grainDependent: 2 },
     { key: 'u_distress_3',       label: 'Amount',       type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0, noRandomize: true, grainDependent: 3 },
     { key: 'u_distress_scale_3', label: 'Line Density', type: 'range', min: 10, max: 600, step: 1,    value: 80,  noRandomize: true, grainDependent: 3 },
-    { key: 'u_distress_4',       label: 'Amount',       type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0, noRandomize: true, grainDependent: 4 },
-    { key: 'u_distress_scale_4', label: 'Dot Size',     type: 'range', min: 10, max: 600, step: 1,    value: 80,  noRandomize: true, grainDependent: 4 },
+    { key: 'u_distress_4',       label: 'Amount',       type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.42, noRandomize: true, grainDependent: 4 },
+    { key: 'u_distress_scale_4', label: 'Dot Size',     type: 'range', min: 10, max: 600, step: 1,    value: 91,  noRandomize: true, grainDependent: 4 },
     { key: 'u_halftone_angle',   label: 'Angle',        type: 'range', min: 0, max: 180,  step: 1,    value: 45,  noRandomize: true, grainDependent: 4 },
     { key: 'u_distress_falloff', label: 'Edge Falloff', type: 'range', min: 0, max: 1, step: 0.05, value: 0.0, noRandomize: true },
   ],
@@ -1160,8 +1160,8 @@ SHADERS['scaling-letters'] = {
     { key: 'u_distress_scale_2', label: 'Line Density', type: 'range', min: 10, max: 600, step: 1,    value: 80,  noRandomize: true, grainDependent: 2 },
     { key: 'u_distress_3',       label: 'Amount',       type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0, noRandomize: true, grainDependent: 3 },
     { key: 'u_distress_scale_3', label: 'Line Density', type: 'range', min: 10, max: 600, step: 1,    value: 80,  noRandomize: true, grainDependent: 3 },
-    { key: 'u_distress_4',       label: 'Amount',       type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0, noRandomize: true, grainDependent: 4 },
-    { key: 'u_distress_scale_4', label: 'Dot Size',     type: 'range', min: 10, max: 600, step: 1,    value: 80,  noRandomize: true, grainDependent: 4 },
+    { key: 'u_distress_4',       label: 'Amount',       type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.42, noRandomize: true, grainDependent: 4 },
+    { key: 'u_distress_scale_4', label: 'Dot Size',     type: 'range', min: 10, max: 600, step: 1,    value: 91,  noRandomize: true, grainDependent: 4 },
     { key: 'u_halftone_angle',   label: 'Angle',        type: 'range', min: 0, max: 180,  step: 1,    value: 45,  noRandomize: true, grainDependent: 4 },
     { key: 'u_distress_falloff', label: 'Edge Falloff', type: 'range', min: 0, max: 1, step: 0.05, value: 0.0, noRandomize: true },
   ],
@@ -1435,6 +1435,11 @@ function buildGUI(shader) {
     var on = wordToggleBtn && wordToggleBtn.dataset.on==='1';
     wordDependentRows.forEach(function(r){ r.style.display=on?'':'none'; });
   }
+  var grainModeDefaults = [[], [], [], [], []];
+  controlEls.forEach(function(item) {
+    if (item.ctrl.grainDependent != null) grainModeDefaults[item.ctrl.grainDependent].push(item);
+  });
+
   function applyGrainVisibility() {
     var mode = grainModeSel ? Math.round(parseFloat(grainModeSel.value)) : 0;
     grainDependentRows.forEach(function(rows, i) {
@@ -1443,7 +1448,14 @@ function buildGUI(shader) {
   }
   if (colorModeBtn) colorModeBtn.addEventListener('click', applyPaletteVisibility);
   if (colorModeSel) colorModeSel.addEventListener('change', applyPaletteVisibility);
-  if (grainModeSel) grainModeSel.addEventListener('change', applyGrainVisibility);
+  if (grainModeSel) grainModeSel.addEventListener('change', function() {
+    applyGrainVisibility();
+    var mode = Math.round(parseFloat(this.value));
+    grainModeDefaults[mode].forEach(function(item) {
+      item.el.value = item.ctrl.value;
+      item.el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
   applyPaletteVisibility();
   applyGrainVisibility();
   applyTextColorVisibility();

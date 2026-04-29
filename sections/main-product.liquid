@@ -652,13 +652,25 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   if (colorModeSel) colorModeSel.addEventListener('change', applyPaletteVisibility);
   applyPaletteVisibility();
 
+  var grainModeDefaults = [[], [], [], [], []];
+  controlEls.forEach(function (item) {
+    if (item.ctrl.grainDependent != null) grainModeDefaults[item.ctrl.grainDependent].push(item);
+  });
+
   function applyGrainVisibility() {
     var mode = grainModeSel ? Math.round(parseFloat(grainModeSel.value)) : 0;
     grainDependentRows.forEach(function (rows, i) {
       rows.forEach(function (r) { r.style.display = i === mode ? '' : 'none'; });
     });
   }
-  if (grainModeSel) grainModeSel.addEventListener('change', applyGrainVisibility);
+  if (grainModeSel) grainModeSel.addEventListener('change', function () {
+    applyGrainVisibility();
+    var mode = Math.round(parseFloat(this.value));
+    grainModeDefaults[mode].forEach(function (item) {
+      item.el.value = item.ctrl.value;
+      item.el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
   applyGrainVisibility();
 
   // Show/hide text-color row based on Custom Text Color toggle
