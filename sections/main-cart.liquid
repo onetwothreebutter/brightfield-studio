@@ -19,7 +19,11 @@
             <div class="cart-item">
 
               {%- assign mockup_url = item.properties['_mockup_url'] -%}
-              {%- assign is_custom = item.properties['_design_url'] | default: '' -%}
+              {%- if item.properties['_design_url'] != blank and item.properties['_source'] != 'inhouse' -%}
+                {%- assign is_custom = item.properties['_design_url'] -%}
+              {%- else -%}
+                {%- assign is_custom = '' -%}
+              {%- endif -%}
 
               <a href="{{ item.url }}" class="cart-item__image-link">
                 {%- if mockup_url != blank -%}

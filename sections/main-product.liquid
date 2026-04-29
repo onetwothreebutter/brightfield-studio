@@ -201,6 +201,9 @@
             {%- endif -%}
 
             <input type="hidden" name="quantity" value="1">
+            {%- if shader_file -%}
+            <input type="hidden" name="properties[_source]" value="inhouse">
+            {%- endif -%}
 
             <div class="product-actions">
               <button
