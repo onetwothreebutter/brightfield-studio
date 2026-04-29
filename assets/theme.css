@@ -2336,11 +2336,6 @@ h6 {
         transform 0.3s ease,
         opacity 0.3s ease;
 }
-.recent-designs__card-img-wrap {
-    position: relative;
-    overflow: hidden;
-    border-radius: var(--radius);
-}
 /*
  * Three-rule hover cascade: before | after | hovered
  *
@@ -2370,6 +2365,11 @@ h6 {
     opacity: 1;
     z-index: 1;
     position: relative;
+}
+.recent-designs__card-img-wrap {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius);
 }
 .recent-designs__card-img {
     width: 100%;
