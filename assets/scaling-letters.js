@@ -522,7 +522,7 @@
     '  alpha    *= 1.0 - smoothstep(-_aa, _aa, _d);',
     '',
     '  // ── Distress + finish ─────────────────────────────────────────────────────',
-    '  alpha = applyDistress(alpha, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff) * u_opacity;',
+    '  alpha = applyDistress(alpha, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff, dot(finalColor, vec3(0.299, 0.587, 0.114))) * u_opacity;',
     '',
     '  vec2 vigCoord = dUV - 0.5;',
     '  float vigL = max(0.0, -vigCoord.x);',
@@ -607,6 +607,7 @@
         vignetteRight:  gl.getUniformLocation(program, 'u_vignette_right'),
         grainMode:       gl.getUniformLocation(program, 'u_grain_mode'),
         distressFalloff: gl.getUniformLocation(program, 'u_distress_falloff'),
+        halftoneAngle:   gl.getUniformLocation(program, 'u_halftone_angle'),
         // Internal letter-texture state (not uniform locations).
         _texCanvases:    texCanvases,
         _texCtxs:        texCtxs,
@@ -703,6 +704,7 @@
       gl.uniform1f(u.vignetteRight,  v.u_vignette_right  != null ? v.u_vignette_right  : 0.0);
       gl.uniform1f(u.grainMode,       v.u_grain_mode       != null ? parseFloat(v.u_grain_mode) : 0.0);
       gl.uniform1f(u.distressFalloff, v.u_distress_falloff != null ? v.u_distress_falloff       : 0.0);
+      gl.uniform1f(u.halftoneAngle, (v.u_halftone_angle != null ? v.u_halftone_angle : 45.0) * Math.PI / 180.0);
     },
   });
 }());

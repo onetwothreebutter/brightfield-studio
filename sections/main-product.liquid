@@ -427,7 +427,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   // Build controls
   var paletteDependentRows    = [];
   var stopDependentRows       = [];
-  var grainDependentRows      = [[], [], [], []];
+  var grainDependentRows      = [[], [], [], [], []];
   var oklchDependentRows      = [];
   var quadDependentRows       = [];
   var textColorDependentRows  = [];
@@ -585,7 +585,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
 
     if (ctrl.paletteDependent)   paletteDependentRows.push(row);
     if (ctrl.stopDependent)      stopDependentRows.push(row);
-    if (ctrl.grainDependent != null) grainDependentRows[ctrl.grainDependent].push(row);
+    if (ctrl.grainDependent != null) { grainDependentRows[ctrl.grainDependent].push(row); row.classList.add('shader-control--indented'); }
     if (ctrl.oklchDependent)     oklchDependentRows.push(row);
     if (ctrl.quadDependent)      quadDependentRows.push(row);
     if (ctrl.textColorDependent) textColorDependentRows.push(row);

@@ -107,7 +107,7 @@
     '  float vignette = 1.0 - smoothstep(0.0, 1.0, vigVal);',
     '',
     '  vec3 encoded = pow(max(col, 0.0), vec3(1.0 / 2.2));',
-    '  float alpha = applyDistress(lineMask * vignette, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff) * u_opacity;',
+    '  float alpha = applyDistress(lineMask * vignette, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff, dot(col, vec3(0.299, 0.587, 0.114))) * u_opacity;',
     '  fragColor = vec4(encoded, alpha);',
     '}',
   ].join('\n');
@@ -143,6 +143,7 @@
         distressScale:   gl.getUniformLocation(program, 'u_distress_scale'),
         grainMode:       gl.getUniformLocation(program, 'u_grain_mode'),
         distressFalloff: gl.getUniformLocation(program, 'u_distress_falloff'),
+        halftoneAngle:   gl.getUniformLocation(program, 'u_halftone_angle'),
         capRadius:     gl.getUniformLocation(program, 'u_cap_radius'),
         texSize:       gl.getUniformLocation(program, 'u_text_tex_size'),
         posX:          gl.getUniformLocation(program, 'u_pos_x'),
@@ -176,6 +177,7 @@
       gl.uniform1f(u.distressScale, v['u_distress_scale_' + _gm] != null ? v['u_distress_scale_' + _gm] : (v.u_distress_scale != null ? v.u_distress_scale : 80.0));
       gl.uniform1f(u.grainMode,        v.u_grain_mode      != null ? parseFloat(v.u_grain_mode) : 0.0);
       gl.uniform1f(u.distressFalloff,  v.u_distress_falloff != null ? v.u_distress_falloff : 0.0);
+      gl.uniform1f(u.halftoneAngle, (v.u_halftone_angle != null ? v.u_halftone_angle : 45.0) * Math.PI / 180.0);
       gl.uniform1f(u.capRadius,     v.textCapRadius != null ? v.textCapRadius : 20.0);
       gl.uniform1f(u.texSize,       1024.0);
       gl.uniform1f(u.posX,         v.u_pos_x  != null ? v.u_pos_x  : 0.0);
