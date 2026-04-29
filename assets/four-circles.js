@@ -174,7 +174,7 @@
     '',
     '  // ── Distress + output ───────────────────────────────────────────────────',
     '  vec2  dUV = gl_FragCoord.xy / u_resolution;',
-    '  float dm  = applyDistress(1.0, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff);',
+    '  float dm  = applyDistress(1.0, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff, dot(finalColor, vec3(0.299, 0.587, 0.114)));',
     '',
     '  float baseAlpha  = shapeMask * dm * u_opacity;',
     '  float wordAlpha  = clamp(wordFill + wordStroke, 0.0, 1.0) * dm * u_opacity;',
@@ -236,6 +236,7 @@
         distressScale:   gl.getUniformLocation(program, 'u_distress_scale'),
         grainMode:       gl.getUniformLocation(program, 'u_grain_mode'),
         distressFalloff: gl.getUniformLocation(program, 'u_distress_falloff'),
+        halftoneAngle:   gl.getUniformLocation(program, 'u_halftone_angle'),
         posX:            gl.getUniformLocation(program, 'u_pos_x'),
         posY:          gl.getUniformLocation(program, 'u_pos_y'),
         scale:         gl.getUniformLocation(program, 'u_scale'),
@@ -315,6 +316,7 @@
       gl.uniform1f(u.distressScale, v['u_distress_scale_' + _gm] != null ? v['u_distress_scale_' + _gm] : (v.u_distress_scale != null ? v.u_distress_scale : 80.0));
       gl.uniform1f(u.grainMode,        v.u_grain_mode       != null ? parseFloat(v.u_grain_mode) : 0.0);
       gl.uniform1f(u.distressFalloff,  v.u_distress_falloff != null ? v.u_distress_falloff : 0.0);
+      gl.uniform1f(u.halftoneAngle, (v.u_halftone_angle != null ? v.u_halftone_angle : 45.0) * Math.PI / 180.0);
       gl.uniform1f(u.posX,             v.u_pos_x            != null ? v.u_pos_x            : 0.0);
       gl.uniform1f(u.posY,          v.u_pos_y          != null ? v.u_pos_y          : 0.0);
       gl.uniform1f(u.scale,         v.u_scale          != null ? v.u_scale          : 1.0);

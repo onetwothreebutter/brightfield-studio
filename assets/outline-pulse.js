@@ -161,7 +161,7 @@
     '  // Additive edge glow blended into the color (slight over-brightening is OK)',
     '  color = color + vec3(edgeGlow * 0.55);',
     '',
-    '  float distressMask = applyDistress(1.0, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff);',
+    '  float distressMask = applyDistress(1.0, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff, dot(color, vec3(0.299, 0.587, 0.114)));',
     '',
     '  // Vignette',
     '  vec2 vigCoord = dUV - 0.5;',
@@ -252,6 +252,7 @@
         distressScale:   gl.getUniformLocation(program, 'u_distress_scale'),
         grainMode:       gl.getUniformLocation(program, 'u_grain_mode'),
         distressFalloff: gl.getUniformLocation(program, 'u_distress_falloff'),
+        halftoneAngle:   gl.getUniformLocation(program, 'u_halftone_angle'),
         vignetteTop:    gl.getUniformLocation(program, 'u_vignette_top'),
         vignetteBottom: gl.getUniformLocation(program, 'u_vignette_bottom'),
         vignetteLeft:   gl.getUniformLocation(program, 'u_vignette_left'),
@@ -313,6 +314,7 @@
       gl.uniform1f(u.distressScale, v['u_distress_scale_' + _gm] != null ? v['u_distress_scale_' + _gm] : (v.u_distress_scale != null ? v.u_distress_scale : 80.0));
       gl.uniform1f(u.grainMode,        v.u_grain_mode       != null ? parseFloat(v.u_grain_mode) : 0.0);
       gl.uniform1f(u.distressFalloff,  v.u_distress_falloff != null ? v.u_distress_falloff : 0.0);
+      gl.uniform1f(u.halftoneAngle, (v.u_halftone_angle != null ? v.u_halftone_angle : 45.0) * Math.PI / 180.0);
       gl.uniform1f(u.vignetteTop,    v.u_vignette_top    != null ? v.u_vignette_top    : 0.0);
       gl.uniform1f(u.vignetteBottom, v.u_vignette_bottom != null ? v.u_vignette_bottom : 0.0);
       gl.uniform1f(u.vignetteLeft,   v.u_vignette_left   != null ? v.u_vignette_left   : 0.0);
