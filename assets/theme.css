@@ -475,6 +475,7 @@ h6 {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    cursor: pointer;
     transition:
         border-color var(--transition-base),
         box-shadow var(--transition-base);
