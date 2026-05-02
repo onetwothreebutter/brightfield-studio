@@ -49,6 +49,97 @@
       .catch(function () { return { ok: false }; });
   }
 
+  function formatShaderName(shader) {
+    return (shader || 'Unknown').replace(/-/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+
+  function buildGridCard(design) {
+    var card = document.createElement('article');
+    card.className = 'product-card recent-card';
+
+    var media = document.createElement('div');
+    media.className = 'product-card__media';
+
+    var img = document.createElement('img');
+    img.src = design.mockupUrl;
+    img.alt = design.shader + ' design';
+    img.className = 'product-card__image';
+    img.loading = 'lazy';
+
+    var glow = document.createElement('div');
+    glow.className = 'product-card__glow';
+    glow.setAttribute('aria-hidden', 'true');
+
+    var deleteBtn = document.createElement('button');
+    deleteBtn.className = 'recent-card__delete';
+    deleteBtn.setAttribute('aria-label', 'Delete design');
+    deleteBtn.textContent = '×';
+
+    media.appendChild(img);
+    media.appendChild(glow);
+    media.appendChild(deleteBtn);
+
+    var info = document.createElement('div');
+    info.className = 'product-card__info';
+
+    var metaEl = document.createElement('p');
+    metaEl.className = 'community-card__meta';
+    metaEl.textContent = timeAgo(design.timestamp);
+
+    info.appendChild(metaEl);
+    card.appendChild(media);
+    card.appendChild(info);
+
+    (function (d, c) {
+      deleteBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        deleteDesign(d.id).then(function (result) {
+          if (!result || !result.ok) return;
+          c.remove();
+        });
+      });
+
+      card.addEventListener('click', function () {
+        localStorage.setItem(RESTORE_KEY, JSON.stringify({ values: d.values, shader: d.shader }));
+        window.location.href = '/products/' + d.productHandle + '#shader';
+      });
+    }(design, card));
+
+    return card;
+  }
+
+  function renderGrid(container, designs) {
+    container.innerHTML = '';
+    if (!designs || !designs.length) return;
+
+    var groups = {};
+    var order = [];
+    designs.forEach(function (design) {
+      var key = design.shader || 'unknown';
+      if (!groups[key]) { groups[key] = []; order.push(key); }
+      groups[key].push(design);
+    });
+
+    order.forEach(function (shader) {
+      var group = document.createElement('div');
+      group.className = 'community-card-group';
+
+      var heading = document.createElement('h3');
+      heading.className = 'community-card-group__heading';
+      heading.textContent = formatShaderName(shader);
+      group.appendChild(heading);
+
+      var grid = document.createElement('div');
+      grid.className = 'product-grid';
+      groups[shader].forEach(function (design) {
+        grid.appendChild(buildGridCard(design));
+      });
+      group.appendChild(grid);
+
+      container.appendChild(group);
+    });
+  }
+
   function renderFilmstrip(container, designs, onCardClick) {
     container.innerHTML = '';
     if (!designs || !designs.length) {
@@ -138,6 +229,7 @@
     getDeviceId: getDeviceId,
     fetchDesigns: fetchDesigns,
     deleteDesign: deleteDesign,
-    renderFilmstrip: renderFilmstrip
+    renderFilmstrip: renderFilmstrip,
+    renderGrid: renderGrid,
   };
 }());

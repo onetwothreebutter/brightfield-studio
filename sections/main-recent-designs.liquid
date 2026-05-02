@@ -1,0 +1,31 @@
+<section class="recent-designs-page section-padding">
+  <div class="container">
+    <h1 class="recent-designs-page__heading">Your Recent Designs</h1>
+    <p class="recent-designs-page__sub">Designs you've created on this device.</p>
+    <div id="recent-page-loading" class="community-designs-page__loading">Loading&hellip;</div>
+    <div id="recent-page-empty" class="community-designs-page__empty" style="display:none">No designs yet &mdash; <a href="/collections/all">start creating!</a></div>
+    <div id="recent-page-container"></div>
+  </div>
+</section>
+
+<script src="{{ 'recent-designs.js' | asset_url }}" defer></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var container = document.getElementById('recent-page-container');
+    var loading   = document.getElementById('recent-page-loading');
+    var empty     = document.getElementById('recent-page-empty');
+    RecentDesigns.fetchDesigns().then(function (designs) {
+      loading.style.display = 'none';
+      if (!designs || !designs.length) { empty.style.display = ''; return; }
+      RecentDesigns.renderGrid(container, designs);
+    });
+  });
+</script>
+
+{% schema %}
+{
+  "name": "Recent Designs Page",
+  "settings": [],
+  "presets": [{ "name": "Recent Designs Page" }]
+}
+{% endschema %}
