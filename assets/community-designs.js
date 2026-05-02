@@ -85,6 +85,11 @@
       var variantId = sizeSelect.value;
       if (!variantId) { alert('Please select a size.'); return; }
 
+      var mockupUrl = _buyDesign.mockupUrl || _buyDesign.mockup_url || '';
+      if (!mockupUrl) {
+        console.error('[brightfield:buy] design missing mockupUrl:', _buyDesign);
+      }
+
       orderBtn.disabled    = true;
       orderBtn.textContent = 'Saving…';
 
@@ -95,8 +100,8 @@
           id:       Number(variantId),
           quantity: 1,
           properties: {
-            '_design_url':    _buyDesign.mockupUrl,
-            '_mockup_url':    _buyDesign.mockupUrl,
+            '_design_url':    mockupUrl,
+            '_mockup_url':    mockupUrl,
             'Customization':  'Community Design',
             'Design Type':    'Community Design',
             'Designer':       _buyDesign.creatorName || 'Anonymous'
@@ -111,6 +116,10 @@
             throw new Error(msg);
           });
         }
+        return r.json();
+      })
+      .then(function (item) {
+        console.log('[brightfield:buy] cart item added, _mockup_url:', item && item.properties && item.properties['_mockup_url']);
         window.location.href = '/cart';
       })
       .catch(function (err) {
@@ -281,7 +290,7 @@
     actions.className = 'product-card__actions';
 
     var buyBtn = document.createElement('a');
-    buyBtn.className = 'btn btn--primary btn--sm';
+    buyBtn.className = 'btn btn--primary btn--sm community-designs__buy-btn';
     buyBtn.textContent = 'Buy';
 
     var customizeBtn = document.createElement('a');
