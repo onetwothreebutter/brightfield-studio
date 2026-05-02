@@ -316,6 +316,7 @@ describe('buy button → cart add', () => {
     const body = JSON.parse(cartCall[1].body);
     expect(body.properties['_mockup_url']).toBe('https://r2.example.com/mockups/uuid.jpg');
     expect(body.properties['_design_url']).toBe('https://r2.example.com/mockups/uuid.jpg');
+    expect(body.properties['_design_id']).toBe('abc-123');
     expect(body.properties['Design Type']).toBe('Community Design');
 
     document.body.removeChild(container);
