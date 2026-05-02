@@ -53,7 +53,17 @@ describe('line-text.js', () => {
   beforeEach(() => {
     opts = null;
     mockDocumentCreateCanvas();
-    window.ShaderBase = { create: vi.fn((o) => { opts = o; }) };
+    window.ShaderBase = {
+      create: vi.fn((o) => { opts = o; }),
+      commonGLSL: [
+        'uniform float u_halftone_angle;',
+        'uniform float u_halftone_luma;',
+        'uniform float u_vignette_top;',
+        'uniform float u_vignette_bottom;',
+        'uniform float u_vignette_left;',
+        'uniform float u_vignette_right;',
+      ].join('\n'),
+    };
     new Function(src)(); // eslint-disable-line no-new-func
   });
 
