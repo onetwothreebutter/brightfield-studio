@@ -112,7 +112,8 @@
     '',
     '  // ── Distress ───────────────────────────────────────────────────────────',
     '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
-    '  alpha *= applyDistress(1.0, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff, dot(finalColor, vec3(0.299, 0.587, 0.114))) * u_opacity;',
+    '  float vigMask = computeVigMask(dUV);',
+    '  alpha *= applyDistress(1.0, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff, dot(finalColor, vec3(0.299, 0.587, 0.114)), vigMask) * u_opacity;',
     '',
     '  vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
     '  fragColor    = vec4(encoded, alpha);',
@@ -156,6 +157,7 @@
         grainMode:       gl.getUniformLocation(program, 'u_grain_mode'),
         distressFalloff: gl.getUniformLocation(program, 'u_distress_falloff'),
         halftoneAngle:   gl.getUniformLocation(program, 'u_halftone_angle'),
+        halftoneLuma:    gl.getUniformLocation(program, 'u_halftone_luma'),
       };
     },
 
@@ -193,6 +195,7 @@
       gl.uniform1f(u.grainMode,        v.u_grain_mode       != null ? parseFloat(v.u_grain_mode) : 0.0);
       gl.uniform1f(u.distressFalloff,  v.u_distress_falloff != null ? v.u_distress_falloff : 0.0);
       gl.uniform1f(u.halftoneAngle, (v.u_halftone_angle != null ? v.u_halftone_angle : 45.0) * Math.PI / 180.0);
+      gl.uniform1f(u.halftoneLuma,  v.u_halftone_luma  != null ? v.u_halftone_luma  : 1.0);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTex);

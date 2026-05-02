@@ -41,10 +41,6 @@
     'uniform float u_pos_x;',
     'uniform float u_pos_y;',
     'uniform float u_scale;',
-    'uniform float u_vignette_top;',
-    'uniform float u_vignette_bottom;',
-    'uniform float u_vignette_left;',
-    'uniform float u_vignette_right;',
     '',
     'out vec4 fragColor;',
     '',
@@ -117,15 +113,9 @@
     '  float textAlpha  = clamp(fillSample + outlineSample, 0.0, 1.0);',
     '  float finalAlpha = mix(mask, 1.0, textAlpha);',
     '  vec2  dUV  = gl_FragCoord.xy / u_resolution;',
-    '  float alpha = applyDistress(finalAlpha, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff, dot(finalColor, vec3(0.299, 0.587, 0.114))) * u_opacity;',
-    '  vec2 vigCoord = dUV - 0.5;',
-    '  float vigL = max(0.0, -vigCoord.x);',
-    '  float vigR = max(0.0,  vigCoord.x);',
-    '  float vigB = max(0.0, -vigCoord.y);',
-    '  float vigT = max(0.0,  vigCoord.y);',
-    '  float vigVal = vigL*vigL*u_vignette_left + vigR*vigR*u_vignette_right',
-    '               + vigB*vigB*u_vignette_bottom + vigT*vigT*u_vignette_top;',
-    '  alpha = alpha * (1.0 - smoothstep(0.0, 1.0, vigVal));',
+    '  float vigMask = computeVigMask(dUV);',
+    '  float alpha = applyDistress(finalAlpha, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff, dot(finalColor, vec3(0.299, 0.587, 0.114)), vigMask) * u_opacity;',
+    '  alpha = alpha * vigMask;',
     '  vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
     '  fragColor = vec4(encoded, alpha);',
     '}'
@@ -182,6 +172,7 @@
         grainMode:       loc('u_grain_mode'),
         distressFalloff: loc('u_distress_falloff'),
         halftoneAngle:   loc('u_halftone_angle'),
+        halftoneLuma:    loc('u_halftone_luma'),
         posX:                loc('u_pos_x'),
         posY:                loc('u_pos_y'),
         scale:               loc('u_scale'),
@@ -228,6 +219,7 @@
       gl.uniform1f(u.grainMode,        v.u_grain_mode       != null ? parseFloat(v.u_grain_mode) : 0.0);
       gl.uniform1f(u.distressFalloff,  v.u_distress_falloff != null ? v.u_distress_falloff : 0.0);
       gl.uniform1f(u.halftoneAngle, (v.u_halftone_angle != null ? v.u_halftone_angle : 45.0) * Math.PI / 180.0);
+      gl.uniform1f(u.halftoneLuma,  v.u_halftone_luma  != null ? v.u_halftone_luma  : 1.0);
       gl.uniform1f(u.posX,          v.u_pos_x          != null ? v.u_pos_x          : 0.0);
       gl.uniform1f(u.posY,          v.u_pos_y          != null ? v.u_pos_y          : 0.0);
       gl.uniform1f(u.scale,         v.u_scale          != null ? v.u_scale          : 1.0);
