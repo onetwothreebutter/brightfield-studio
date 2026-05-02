@@ -2607,6 +2607,41 @@ h6 {
     padding: 2rem 0;
 }
 
+/* Recent Designs page */
+.recent-designs-page__heading {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+}
+.recent-designs-page__sub {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    margin-bottom: 1.5rem;
+}
+.recent-card__delete {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 2;
+}
+.recent-card:hover .recent-card__delete,
+.recent-card:focus-within .recent-card__delete {
+    opacity: 1;
+}
+
 /* Product page community strip */
 .product-community-designs {
     margin-top: 24px;
