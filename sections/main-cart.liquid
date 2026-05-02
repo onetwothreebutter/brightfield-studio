@@ -22,10 +22,16 @@
             {%- else -%}
               {%- assign is_custom = '' -%}
             {%- endif -%}
+            {%- assign design_id = item.properties['_design_id'] -%}
+            {%- if item.properties['Design Type'] == 'Community Design' and design_id != blank -%}
+              {%- assign design_detail_url = '/pages/community-design?id=' | append: design_id -%}
+            {%- else -%}
+              {%- assign design_detail_url = '' -%}
+            {%- endif -%}
 
             <div class="cart-item">
 
-              <a href="{{ item.url }}" class="cart-item__image-link">
+              <a href="{{ design_detail_url | default: item.url }}" class="cart-item__image-link">
                 {%- if mockup_url != blank -%}
                   <img
                     src="{{ mockup_url }}"
@@ -50,7 +56,7 @@
               </a>
 
               <div class="cart-item__details">
-                <a href="{{ item.url }}" class="cart-item__title">
+                <a href="{{ design_detail_url | default: item.url }}" class="cart-item__title">
                   {{ item.product.title }}
                   {%- if is_custom != blank -%}
                     {%- if item.properties['Design Type'] == 'Community Design' -%}

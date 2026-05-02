@@ -102,6 +102,7 @@
           properties: {
             '_design_url':    mockupUrl,
             '_mockup_url':    mockupUrl,
+            '_design_id':     _buyDesign.id,
             'Design Type':    'Community Design',
             'Designer':       _buyDesign.creatorName || 'Anonymous'
           }
