@@ -50,7 +50,7 @@
       <div class="shader-control">
         <label class="shader-control__label">Lines</label>
         <div class="shader-control__range-wrap">
-          <input type="range" class="shader-control__range" id="demo-line-count" min="5" max="60" step="1" value="20">
+          <input type="range" class="shader-control__range" id="demo-line-count" min="2" max="80" step="1" value="20">
           <span class="shader-control__value" id="demo-line-count-display">20</span>
         </div>
       </div>
@@ -68,7 +68,7 @@
       <div class="shader-control">
         <label class="shader-control__label">Center Circle</label>
         <div class="shader-control__range-wrap">
-          <input type="range" class="shader-control__range" id="demo-center-circle" min="0.0" max="0.4" step="0.005" value="0.04">
+          <input type="range" class="shader-control__range" id="demo-center-circle" min="0.01" max="0.45" step="0.005" value="0.04">
           <span class="shader-control__value" id="demo-center-circle-display">0.04</span>
         </div>
       </div>
@@ -87,8 +87,8 @@
           <div class="shader-control">
             <label class="shader-control__label">Radius</label>
             <div class="shader-control__range-wrap">
-              <input type="range" class="shader-control__range" id="demo-radius" min="0.05" max="0.5" step="0.01" value="0.31">
-              <span class="shader-control__value" id="demo-radius-display">0.31</span>
+              <input type="range" class="shader-control__range" id="demo-radius" min="0.05" max="0.5" step="0.01" value="0.4">
+              <span class="shader-control__value" id="demo-radius-display">0.4</span>
             </div>
           </div>
 
@@ -257,14 +257,32 @@
           <div class="shader-control">
             <label class="shader-control__label">Font</label>
             <select class="shader-control__select" id="demo-text-font">
-              <option value="Oswald">Oswald</option>
+              <option value="Space Mono">Space Mono</option>
+              <option value="Roboto Mono">Roboto Mono</option>
+              <option value="Source Code Pro">Source Code Pro</option>
+              <option value="JetBrains Mono">JetBrains Mono</option>
+              <option value="IBM Plex Mono">IBM Plex Mono</option>
+              <option value="Fira Code">Fira Code</option>
+              <option value="Inconsolata">Inconsolata</option>
+              <option value="Courier Prime">Courier Prime</option>
+              <option value="Share Tech Mono">Share Tech Mono</option>
+              <option value="Cutive Mono">Cutive Mono</option>
+              <option value="DM Mono">DM Mono</option>
+              <option value="Fragment Mono">Fragment Mono</option>
+              <option value="Azeret Mono">Azeret Mono</option>
+              <option value="Spline Sans Mono">Spline Sans Mono</option>
+              <option value="Geist Mono">Geist Mono</option>
+              <option value="Syne">Syne</option>
               <option value="Unbounded">Unbounded</option>
               <option value="Bricolage Grotesque">Bricolage Grotesque</option>
-              <option value="DM Mono">DM Mono</option>
-              <option value="Righteous">Righteous</option>
-              <option value="Teko">Teko</option>
-              <option value="Big Shoulders Display">Big Shoulders Display</option>
+              <option value="Epilogue">Epilogue</option>
+              <option value="DM Sans">DM Sans</option>
+              <option value="Oswald" selected>Oswald</option>
+              <option value="Montserrat">Montserrat</option>
+              <option value="Bebas Neue">Bebas Neue</option>
+              <option value="Barlow Condensed">Barlow Condensed</option>
               <option value="Anton">Anton</option>
+              <option value="Fjalla One">Fjalla One</option>
             </select>
           </div>
 
@@ -281,8 +299,8 @@
           <div class="shader-control">
             <label class="shader-control__label">Text X</label>
             <div class="shader-control__range-wrap">
-              <input type="range" class="shader-control__range" id="demo-text-x" min="0" max="1" step="0.01" value="0.5">
-              <span class="shader-control__value" id="demo-text-x-display">0.5</span>
+              <input type="range" class="shader-control__range" id="demo-text-x" min="0" max="1" step="0.01" value="0.3">
+              <span class="shader-control__value" id="demo-text-x-display">0.3</span>
             </div>
           </div>
 
@@ -347,24 +365,110 @@
               <option value="1">Blue Noise</option>
               <option value="2">Scratches</option>
               <option value="3">Crosshatch</option>
+              <option value="4">Half-tone</option>
             </select>
           </div>
 
-          <!-- Distress -->
-          <div class="shader-control">
-            <label class="shader-control__label">Distress</label>
+          <!-- Grain 0: Organic -->
+          <div class="shader-control shader-control--indented demo-grain-row demo-grain-row--0">
+            <label class="shader-control__label">Amount</label>
             <div class="shader-control__range-wrap">
-              <input type="range" class="shader-control__range" id="demo-distress" min="0" max="0.85" step="0.01" value="0">
-              <span class="shader-control__value" id="demo-distress-display">0</span>
+              <input type="range" class="shader-control__range" id="demo-distress-0" min="0" max="0.85" step="0.01" value="0">
+              <span class="shader-control__value" id="demo-distress-0-display">0</span>
+            </div>
+          </div>
+          <div class="shader-control shader-control--indented demo-grain-row demo-grain-row--0">
+            <label class="shader-control__label">Blob Size</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-distress-scale-0" min="10" max="600" step="1" value="80">
+              <span class="shader-control__value" id="demo-distress-scale-0-display">80</span>
             </div>
           </div>
 
-          <!-- Grain -->
-          <div class="shader-control">
-            <label class="shader-control__label">Grain Size</label>
+          <!-- Grain 1: Blue Noise -->
+          <div class="shader-control shader-control--indented demo-grain-row demo-grain-row--1" style="display:none">
+            <label class="shader-control__label">Amount</label>
             <div class="shader-control__range-wrap">
-              <input type="range" class="shader-control__range" id="demo-distress-scale" min="10" max="600" step="1" value="80">
-              <span class="shader-control__value" id="demo-distress-scale-display">80</span>
+              <input type="range" class="shader-control__range" id="demo-distress-1" min="0" max="0.85" step="0.01" value="0">
+              <span class="shader-control__value" id="demo-distress-1-display">0</span>
+            </div>
+          </div>
+          <div class="shader-control shader-control--indented demo-grain-row demo-grain-row--1" style="display:none">
+            <label class="shader-control__label">Dot Size</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-distress-scale-1" min="10" max="600" step="1" value="80">
+              <span class="shader-control__value" id="demo-distress-scale-1-display">80</span>
+            </div>
+          </div>
+
+          <!-- Grain 2: Scratches -->
+          <div class="shader-control shader-control--indented demo-grain-row demo-grain-row--2" style="display:none">
+            <label class="shader-control__label">Amount</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-distress-2" min="0" max="0.85" step="0.01" value="0">
+              <span class="shader-control__value" id="demo-distress-2-display">0</span>
+            </div>
+          </div>
+          <div class="shader-control shader-control--indented demo-grain-row demo-grain-row--2" style="display:none">
+            <label class="shader-control__label">Line Density</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-distress-scale-2" min="10" max="600" step="1" value="80">
+              <span class="shader-control__value" id="demo-distress-scale-2-display">80</span>
+            </div>
+          </div>
+
+          <!-- Grain 3: Crosshatch -->
+          <div class="shader-control shader-control--indented demo-grain-row demo-grain-row--3" style="display:none">
+            <label class="shader-control__label">Amount</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-distress-3" min="0" max="0.85" step="0.01" value="0">
+              <span class="shader-control__value" id="demo-distress-3-display">0</span>
+            </div>
+          </div>
+          <div class="shader-control shader-control--indented demo-grain-row demo-grain-row--3" style="display:none">
+            <label class="shader-control__label">Line Density</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-distress-scale-3" min="10" max="600" step="1" value="80">
+              <span class="shader-control__value" id="demo-distress-scale-3-display">80</span>
+            </div>
+          </div>
+
+          <!-- Grain 4: Half-tone -->
+          <div class="shader-control shader-control--indented demo-grain-row demo-grain-row--4" style="display:none">
+            <label class="shader-control__label">Amount</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-distress-4" min="0" max="0.85" step="0.01" value="0.42">
+              <span class="shader-control__value" id="demo-distress-4-display">0.42</span>
+            </div>
+          </div>
+          <div class="shader-control shader-control--indented demo-grain-row demo-grain-row--4" style="display:none">
+            <label class="shader-control__label">Dot Size</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-distress-scale-4" min="10" max="600" step="1" value="91">
+              <span class="shader-control__value" id="demo-distress-scale-4-display">91</span>
+            </div>
+          </div>
+          <div class="shader-control shader-control--indented demo-grain-row demo-grain-row--4" style="display:none">
+            <label class="shader-control__label">Angle</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-halftone-angle" min="0" max="180" step="1" value="45">
+              <span class="shader-control__value" id="demo-halftone-angle-display">45</span>
+            </div>
+          </div>
+          <div class="shader-control shader-control--indented demo-grain-row demo-grain-row--4" style="display:none">
+            <label class="shader-control__label">Luma Drive</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-halftone-luma" min="0" max="1" step="0.01" value="1">
+              <span class="shader-control__value" id="demo-halftone-luma-display">1</span>
+            </div>
+          </div>
+
+          <!-- Edge Falloff -->
+          <div class="shader-control">
+            <label class="shader-control__label">Edge Falloff</label>
+            <div class="shader-control__range-wrap">
+              <input type="range" class="shader-control__range" id="demo-distress-falloff" min="0" max="1" step="0.05" value="0">
+              <span class="shader-control__value" id="demo-distress-falloff-display">0</span>
             </div>
           </div>
 
@@ -372,7 +476,7 @@
           <div class="shader-control">
             <label class="shader-control__label">Vignette Top</label>
             <div class="shader-control__range-wrap">
-              <input type="range" class="shader-control__range" id="demo-vignette-top" min="0" max="8" step="0.05" value="0">
+              <input type="range" class="shader-control__range" id="demo-vignette-top" min="0" max="20" step="0.05" value="0">
               <span class="shader-control__value" id="demo-vignette-top-display">0</span>
             </div>
           </div>
@@ -381,7 +485,7 @@
           <div class="shader-control">
             <label class="shader-control__label">Vignette Bottom</label>
             <div class="shader-control__range-wrap">
-              <input type="range" class="shader-control__range" id="demo-vignette-bottom" min="0" max="8" step="0.05" value="0">
+              <input type="range" class="shader-control__range" id="demo-vignette-bottom" min="0" max="20" step="0.05" value="0">
               <span class="shader-control__value" id="demo-vignette-bottom-display">0</span>
             </div>
           </div>
@@ -390,7 +494,7 @@
           <div class="shader-control">
             <label class="shader-control__label">Vignette Left</label>
             <div class="shader-control__range-wrap">
-              <input type="range" class="shader-control__range" id="demo-vignette-left" min="0" max="8" step="0.05" value="0">
+              <input type="range" class="shader-control__range" id="demo-vignette-left" min="0" max="20" step="0.05" value="0">
               <span class="shader-control__value" id="demo-vignette-left-display">0</span>
             </div>
           </div>
@@ -399,7 +503,7 @@
           <div class="shader-control">
             <label class="shader-control__label">Vignette Right</label>
             <div class="shader-control__range-wrap">
-              <input type="range" class="shader-control__range" id="demo-vignette-right" min="0" max="8" step="0.05" value="0">
+              <input type="range" class="shader-control__range" id="demo-vignette-right" min="0" max="20" step="0.05" value="0">
               <span class="shader-control__value" id="demo-vignette-right-display">0</span>
             </div>
           </div>
@@ -417,8 +521,8 @@
           <div class="shader-control">
             <label class="shader-control__label">Position Y</label>
             <div class="shader-control__range-wrap">
-              <input type="range" class="shader-control__range" id="demo-pos-y" min="-0.5" max="0.5" step="0.01" value="-0.08">
-              <span class="shader-control__value" id="demo-pos-y-display">-0.08</span>
+              <input type="range" class="shader-control__range" id="demo-pos-y" min="-0.5" max="0.5" step="0.01" value="0">
+              <span class="shader-control__value" id="demo-pos-y-display">0</span>
             </div>
           </div>
 
@@ -552,7 +656,7 @@
     values: {
       u_line_count:  20,
       u_power:       2.5,
-      u_radius:      0.31,
+      u_radius:      0.4,
       u_width_top:   0.05,
       u_width_bot:   0.75,
       u_color_mode:             0,
@@ -567,10 +671,16 @@
       u_color0: [1.0, 0.2, 0.4],   u_color1: [1.0, 0.8, 0.0],
       u_color2: [0.0, 0.8, 1.0],   u_color3: [0.667, 0.0, 1.0],
       text: '', textFont: 'Oswald', textFontSize: 69,
-      textX: 0.5, textY: 0.2,
+      textX: 0.3, textY: 0.2,
       u_use_text_color: 0, u_text_color: [1.0, 1.0, 1.0],
       outlineEnabled: false, outlineWidth: 8, u_outline_color: [0.0, 0.0, 0.0],
-      u_pos_x: 0.0, u_pos_y: -0.08, u_scale: 1.0,
+      u_distress_0: 0.0, u_distress_scale_0: 80,
+      u_distress_1: 0.0, u_distress_scale_1: 80,
+      u_distress_2: 0.0, u_distress_scale_2: 80,
+      u_distress_3: 0.0, u_distress_scale_3: 80,
+      u_distress_4: 0.42, u_distress_scale_4: 91, u_halftone_angle: 45, u_halftone_luma: 1.0,
+      u_distress_falloff: 0.0,
+      u_pos_x: 0.0, u_pos_y: 0.0, u_scale: 1.0,
       u_vignette_top: 0.0, u_vignette_bottom: 0.0, u_vignette_left: 0.0, u_vignette_right: 0.0,
     },
     dirty: true,
@@ -965,7 +1075,7 @@
     onUserInteract();
     var keys     = Object.keys(PRESETS);
     var name     = keys[Math.floor(Math.random() * keys.length)];
-    var lineCount = Math.floor(Math.random() * 56) + 5;  // 5–60
+    var lineCount = Math.floor(Math.random() * 79) + 2;  // 2–80
     var power     = parseFloat((Math.random() * 5.5 + 0.5).toFixed(1)); // 0.5–6.0
     var centerCircle = parseFloat((Math.random() * 0.25 + 0.01).toFixed(3)); // 0.01–0.26
     applyPreset(name);
@@ -1077,10 +1187,8 @@
   var opacityInput        = document.getElementById('demo-opacity');
   var opacityDisp         = document.getElementById('demo-opacity-display');
   var grainModeSelect     = document.getElementById('demo-grain-mode');
-  var distressInput       = document.getElementById('demo-distress');
-  var distressDisp        = document.getElementById('demo-distress-display');
-  var distressScaleInput  = document.getElementById('demo-distress-scale');
-  var distressScaleDisp   = document.getElementById('demo-distress-scale-display');
+  var distressFalloffInput = document.getElementById('demo-distress-falloff');
+  var distressFalloffDisp  = document.getElementById('demo-distress-falloff-display');
   var posXInput           = document.getElementById('demo-pos-x');
   var posXDisp            = document.getElementById('demo-pos-x-display');
   var posYInput           = document.getElementById('demo-pos-y');
@@ -1096,6 +1204,13 @@
   var vignetteRightInput  = document.getElementById('demo-vignette-right');
   var vignetteRightDisp   = document.getElementById('demo-vignette-right-display');
 
+  function applyGrainVisibility(mode) {
+    for (var g = 0; g <= 4; g++) {
+      var rows = document.querySelectorAll('.demo-grain-row--' + g);
+      rows.forEach(function (r) { r.style.display = (g === mode) ? '' : 'none'; });
+    }
+  }
+
   opacityInput.addEventListener('input', function () {
     onUserInteract();
     var n = parseFloat(this.value);
@@ -1105,23 +1220,80 @@
   });
   grainModeSelect.addEventListener('change', function () {
     onUserInteract();
-    window._demoState.values.u_grain_mode = parseFloat(this.value);
+    var mode = parseInt(this.value, 10);
+    window._demoState.values.u_grain_mode = mode;
+    applyGrainVisibility(mode);
     window._demoState.dirty = true;
   });
-  distressInput.addEventListener('input', function () {
+
+  // Per-grain-mode distress controls
+  [0, 1, 2, 3].forEach(function (g) {
+    var amtEl   = document.getElementById('demo-distress-' + g);
+    var amtDisp = document.getElementById('demo-distress-' + g + '-display');
+    var scaleEl   = document.getElementById('demo-distress-scale-' + g);
+    var scaleDisp = document.getElementById('demo-distress-scale-' + g + '-display');
+    if (amtEl) amtEl.addEventListener('input', function () {
+      onUserInteract();
+      var n = parseFloat(this.value);
+      window._demoState.values['u_distress_' + g] = n;
+      if (amtDisp) amtDisp.textContent = n.toFixed(2);
+      window._demoState.dirty = true;
+    });
+    if (scaleEl) scaleEl.addEventListener('input', function () {
+      onUserInteract();
+      var n = parseInt(this.value, 10);
+      window._demoState.values['u_distress_scale_' + g] = n;
+      if (scaleDisp) scaleDisp.textContent = n;
+      window._demoState.dirty = true;
+    });
+  });
+
+  // Halftone (grain 4)
+  var halftoneAmtEl      = document.getElementById('demo-distress-4');
+  var halftoneAmtDisp    = document.getElementById('demo-distress-4-display');
+  var halftoneSizeEl     = document.getElementById('demo-distress-scale-4');
+  var halftoneSizeDisp   = document.getElementById('demo-distress-scale-4-display');
+  var halftoneAngleEl    = document.getElementById('demo-halftone-angle');
+  var halftoneAngleDisp  = document.getElementById('demo-halftone-angle-display');
+  var halftoneLumaEl     = document.getElementById('demo-halftone-luma');
+  var halftoneLumaDisp   = document.getElementById('demo-halftone-luma-display');
+  if (halftoneAmtEl) halftoneAmtEl.addEventListener('input', function () {
     onUserInteract();
     var n = parseFloat(this.value);
-    window._demoState.values.u_distress = n;
-    distressDisp.textContent = n.toFixed(2);
+    window._demoState.values.u_distress_4 = n;
+    if (halftoneAmtDisp) halftoneAmtDisp.textContent = n.toFixed(2);
     window._demoState.dirty = true;
   });
-  distressScaleInput.addEventListener('input', function () {
+  if (halftoneSizeEl) halftoneSizeEl.addEventListener('input', function () {
     onUserInteract();
     var n = parseInt(this.value, 10);
-    window._demoState.values.u_distress_scale = n;
-    distressScaleDisp.textContent = n;
+    window._demoState.values.u_distress_scale_4 = n;
+    if (halftoneSizeDisp) halftoneSizeDisp.textContent = n;
     window._demoState.dirty = true;
   });
+  if (halftoneAngleEl) halftoneAngleEl.addEventListener('input', function () {
+    onUserInteract();
+    var n = parseInt(this.value, 10);
+    window._demoState.values.u_halftone_angle = n;
+    if (halftoneAngleDisp) halftoneAngleDisp.textContent = n;
+    window._demoState.dirty = true;
+  });
+  if (halftoneLumaEl) halftoneLumaEl.addEventListener('input', function () {
+    onUserInteract();
+    var n = parseFloat(this.value);
+    window._demoState.values.u_halftone_luma = n;
+    if (halftoneLumaDisp) halftoneLumaDisp.textContent = n.toFixed(2);
+    window._demoState.dirty = true;
+  });
+
+  if (distressFalloffInput) distressFalloffInput.addEventListener('input', function () {
+    onUserInteract();
+    var n = parseFloat(this.value);
+    window._demoState.values.u_distress_falloff = n;
+    if (distressFalloffDisp) distressFalloffDisp.textContent = n.toFixed(2);
+    window._demoState.dirty = true;
+  });
+
   posXInput.addEventListener('input', function () {
     onUserInteract();
     var n = parseFloat(this.value);
@@ -1474,9 +1646,20 @@
       if (outlineWidthInput)    { outlineWidthInput.value   = v.outlineWidth;           outlineWidthDisp.textContent     = v.outlineWidth; }
       if (outlineColorInput)      outlineColorInput.value   = rgbToHex(v.u_outline_color);
       if (opacityInput)         { opacityInput.value        = v.u_opacity;              opacityDisp.textContent          = parseFloat(v.u_opacity).toFixed(2); }
-      if (grainModeSelect)      { grainModeSelect.value      = v.u_grain_mode != null ? String(Math.round(v.u_grain_mode)) : '0'; }
-      if (distressInput)        { distressInput.value       = v.u_distress;             distressDisp.textContent         = parseFloat(v.u_distress).toFixed(2); }
-      if (distressScaleInput)   { distressScaleInput.value  = v.u_distress_scale;       distressScaleDisp.textContent    = v.u_distress_scale; }
+      if (grainModeSelect)      { var _gm = v.u_grain_mode != null ? Math.round(v.u_grain_mode) : 0; grainModeSelect.value = String(_gm); applyGrainVisibility(_gm); }
+      [0, 1, 2, 3].forEach(function (g) {
+        var ae = document.getElementById('demo-distress-' + g);
+        var ad = document.getElementById('demo-distress-' + g + '-display');
+        var se = document.getElementById('demo-distress-scale-' + g);
+        var sd = document.getElementById('demo-distress-scale-' + g + '-display');
+        if (ae && v['u_distress_' + g] != null) { ae.value = v['u_distress_' + g]; if (ad) ad.textContent = parseFloat(v['u_distress_' + g]).toFixed(2); }
+        if (se && v['u_distress_scale_' + g] != null) { se.value = v['u_distress_scale_' + g]; if (sd) sd.textContent = v['u_distress_scale_' + g]; }
+      });
+      if (halftoneAmtEl && v.u_distress_4 != null)   { halftoneAmtEl.value  = v.u_distress_4;   if (halftoneAmtDisp)  halftoneAmtDisp.textContent  = parseFloat(v.u_distress_4).toFixed(2); }
+      if (halftoneSizeEl && v.u_distress_scale_4 != null) { halftoneSizeEl.value = v.u_distress_scale_4; if (halftoneSizeDisp) halftoneSizeDisp.textContent = v.u_distress_scale_4; }
+      if (halftoneAngleEl && v.u_halftone_angle != null) { halftoneAngleEl.value = v.u_halftone_angle; if (halftoneAngleDisp) halftoneAngleDisp.textContent = v.u_halftone_angle; }
+      if (halftoneLumaEl && v.u_halftone_luma != null)   { halftoneLumaEl.value  = v.u_halftone_luma;  if (halftoneLumaDisp)  halftoneLumaDisp.textContent  = parseFloat(v.u_halftone_luma).toFixed(2); }
+      if (distressFalloffInput && v.u_distress_falloff != null) { distressFalloffInput.value = v.u_distress_falloff; if (distressFalloffDisp) distressFalloffDisp.textContent = parseFloat(v.u_distress_falloff).toFixed(2); }
       if (posXInput)            { posXInput.value           = v.u_pos_x      != null ? v.u_pos_x      : 0;   posXDisp.textContent       = parseFloat(posXInput.value).toFixed(2); }
       if (posYInput)            { posYInput.value           = v.u_pos_y      != null ? v.u_pos_y      : 0;   posYDisp.textContent       = parseFloat(posYInput.value).toFixed(2); }
       if (scaleInput)           { scaleInput.value          = v.u_scale      != null ? v.u_scale      : 1;   scaleDisp.textContent      = parseFloat(scaleInput.value).toFixed(2); }
