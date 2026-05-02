@@ -102,7 +102,6 @@
           properties: {
             '_design_url':    mockupUrl,
             '_mockup_url':    mockupUrl,
-            'Customization':  'Community Design',
             'Design Type':    'Community Design',
             'Designer':       _buyDesign.creatorName || 'Anonymous'
           }
@@ -384,13 +383,7 @@
         if (onCardClick) {
           onCardClick(d, card);
         } else {
-          var RESTORE_KEY = 'brightfield_restore';
-          localStorage.setItem(RESTORE_KEY, JSON.stringify({
-            values: d.values,
-            shader: d.shader,
-            creatorName: d.creatorName || null
-          }));
-          window.location.href = '/products/' + d.productHandle + '#shader';
+          window.location.href = '/pages/community-design?id=' + encodeURIComponent(d.id);
         }
       });
     }(design, likeBtn, likeCount, shareBtn, buyBtn, customizeBtn));
@@ -442,6 +435,10 @@
   window.CommunityDesigns = {
     fetchCommunityDesigns: fetchCommunityDesigns,
     toggleLike:            toggleLike,
-    renderStrip:           renderStrip
+    renderStrip:           renderStrip,
+    openBuyModal:          openBuyModal,
+    getLikedSet:           getLikedSet,
+    setLikedSet:           setLikedSet,
+    getDeviceId:           getDeviceId,
   };
 }());
