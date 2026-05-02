@@ -116,6 +116,7 @@
     'void main() {',
     '  vec2 uv = gl_FragCoord.xy / u_resolution;',
     '  uv = (uv - 0.5) / u_scale + 0.5 + vec2(u_pos_x, u_pos_y);',
+    '  float inDesign = step(0.0, uv.x) * (1.0 - step(1.0, uv.x)) * step(0.0, uv.y) * (1.0 - step(1.0, uv.y));',
     '',
     '  // Top margin — area above marginThreshold is collar / text zone',
     '  float marginThreshold = 1.0 - u_top_margin;',
@@ -175,7 +176,7 @@
     '  finalCol = finalCol * vigMask;',
     '  alpha = alpha * vigMask;',
     '  vec3 encoded   = pow(max(finalCol, 0.0), vec3(1.0 / 2.2));',
-    '  fragColor      = vec4(encoded, alpha);',
+    '  fragColor      = vec4(encoded, alpha * inDesign);',
     '}'
   ].join('\n');
 
