@@ -132,7 +132,7 @@
     stateKey:       '_demoState',
     exportKey:      '_demoExport',
     animateValues:  true,
-    instantKeys:    ['textX', 'textY', 'textFontSize', 'outlineWidth', 'u_opacity', 'u_distress_0', 'u_distress_scale_0', 'u_distress_1', 'u_distress_scale_1', 'u_distress_2', 'u_distress_scale_2', 'u_distress_3', 'u_distress_scale_3', 'u_grain_mode', 'u_distress_falloff', 'u_pos_x', 'u_pos_y', 'u_scale', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
+    instantKeys:    ['textX', 'textY', 'textFontSize', 'outlineWidth', 'u_opacity', 'u_distress_0', 'u_distress_scale_0', 'u_distress_1', 'u_distress_scale_1', 'u_distress_2', 'u_distress_scale_2', 'u_distress_3', 'u_distress_scale_3', 'u_distress_4', 'u_distress_scale_4', 'u_halftone_angle', 'u_halftone_luma', 'u_grain_mode', 'u_distress_falloff', 'u_pos_x', 'u_pos_y', 'u_scale', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
     fragSrc:        fragSrc,
 
     setup: function (gl, program) {
