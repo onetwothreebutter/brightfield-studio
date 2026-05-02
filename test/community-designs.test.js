@@ -270,3 +270,80 @@ describe('like button click', () => {
     expect(window.location.href).toBe('');
   });
 });
+
+// ── buy button → cart add ─────────────────────────────────────────────────────
+
+async function clickBuyAndOrder(container, mockFetch) {
+  container.querySelector('.community-designs__buy-btn').click();
+  // Wait for product variants fetch to resolve
+  await new Promise(resolve => setTimeout(resolve, 0));
+  // Find the visible (non-hidden) modal
+  const modals = document.querySelectorAll('.mockup-modal');
+  const modal = Array.from(modals).find(m => !m.classList.contains('mockup-modal--hidden'));
+  const orderBtn = modal && modal.querySelector('.btn--primary');
+  if (orderBtn) orderBtn.click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  return mockFetch.mock.calls.find(([url]) => url === '/cart/add.js');
+}
+
+describe('buy button → cart add', () => {
+  afterEach(() => {
+    // Remove any modals created during the test
+    document.querySelectorAll('.mockup-modal').forEach(el => el.remove());
+  });
+
+  it('sends _mockup_url from design.mockupUrl to /cart/add.js', async () => {
+    vi.stubGlobal('location', { href: '' });
+
+    const cartItem = { id: 42, properties: { '_mockup_url': 'https://r2.example.com/mockups/uuid.jpg' } };
+    const mockFetch = vi.fn(async (url) => {
+      if (url.includes('/products/')) {
+        return { json: async () => ({ variants: [{ id: 99, title: 'M', available: true }] }) };
+      }
+      if (url === '/cart/add.js') {
+        return { ok: true, json: async () => cartItem };
+      }
+      return { json: async () => ({}) };
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const design = makeDesign({ mockupUrl: 'https://r2.example.com/mockups/uuid.jpg', productHandle: 'rise-shirt' });
+    const container = document.createElement('div');
+    window.CommunityDesigns.renderStrip(container, [design]);
+    document.body.appendChild(container);
+
+    const cartCall = await clickBuyAndOrder(container, mockFetch);
+    expect(cartCall).toBeTruthy();
+    const body = JSON.parse(cartCall[1].body);
+    expect(body.properties['_mockup_url']).toBe('https://r2.example.com/mockups/uuid.jpg');
+    expect(body.properties['_design_url']).toBe('https://r2.example.com/mockups/uuid.jpg');
+    expect(body.properties['Customization']).toBe('Community Design');
+
+    document.body.removeChild(container);
+  });
+
+  it('falls back to mockup_url (snake_case) when mockupUrl is absent', async () => {
+    vi.stubGlobal('location', { href: '' });
+
+    const mockFetch = vi.fn(async (url) => {
+      if (url.includes('/products/')) {
+        return { json: async () => ({ variants: [{ id: 99, title: 'M', available: true }] }) };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    // Design with snake_case field only
+    const design = makeDesign({ mockupUrl: undefined, mockup_url: 'https://r2.example.com/mockups/snake.jpg' });
+    const container = document.createElement('div');
+    window.CommunityDesigns.renderStrip(container, [design]);
+    document.body.appendChild(container);
+
+    const cartCall = await clickBuyAndOrder(container, mockFetch);
+    expect(cartCall).toBeTruthy();
+    const body = JSON.parse(cartCall[1].body);
+    expect(body.properties['_mockup_url']).toBe('https://r2.example.com/mockups/snake.jpg');
+
+    document.body.removeChild(container);
+  });
+});
