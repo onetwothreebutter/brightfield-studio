@@ -53,7 +53,7 @@
                 <a href="{{ item.url }}" class="cart-item__title">
                   {{ item.product.title }}
                   {%- if is_custom != blank -%}
-                    {%- if item.properties['Customization'] == 'Community Design' -%}
+                    {%- if item.properties['Design Type'] == 'Community Design' -%}
                       <span class="cart-item__custom-badge">Community Design</span>
                     {%- else -%}
                       <span class="cart-item__custom-badge">Custom Design</span>

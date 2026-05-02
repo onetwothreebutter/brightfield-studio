@@ -1,0 +1,6 @@
+{
+  "sections": {
+    "main": { "type": "main-community-design", "settings": {} }
+  },
+  "order": ["main"]
+}

@@ -55,6 +55,7 @@ export default {
     if (method === 'GET'  && pathname === '/community/pending') return handleCommunityPending(request, env, origin);
     if (method === 'POST' && pathname === '/community/approve') return handleCommunityModerate(request, env, origin, 'approved');
     if (method === 'POST' && pathname === '/community/reject')  return handleCommunityModerate(request, env, origin, 'rejected');
+    if (method === 'GET'  && pathname.startsWith('/community/design/')) return handleCommunityDesign(request, env, origin, pathname.slice('/community/design/'.length));
 
     if (method === 'POST' && pathname === '/save-shader-state')           return handleSaveShaderState(request, env, origin);
     if (method === 'GET'  && pathname.startsWith('/get-shader-state/'))   return handleGetShaderState(request, env, origin);
@@ -544,6 +545,17 @@ async function handleCommunityModerate(request, env, origin, newStatus) {
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
 }
 
+// ── Community design by ID ───────────────────────────────────────────────────
+
+async function handleCommunityDesign(request, env, origin, id) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+  if (!id) return new Response('Not found', { status: 404, headers });
+  const sub = await readJson(env, `community/submissions/${id}.json`);
+  if (!sub || sub.status !== 'approved') return new Response('Not found', { status: 404, headers });
+  const { creatorEmail: _omit, ...sanitized } = sub;
+  return new Response(JSON.stringify(sanitized), { status: 200, headers });
+}
+
 // ── Share page ───────────────────────────────────────────────────────────────
 
 function escHtml(str) {
@@ -613,13 +625,7 @@ async function handleShare(request, env, id) {
   const desc       = escHtml('A custom ' + shaderLabel + ' design created on Brightfield Studio');
   const shareUrl   = escHtml('https://share.brightfield.studio/' + id);
   const mockupUrl  = escHtml(design.mockupUrl || '');
-  const restorePayload = btoa(JSON.stringify({
-    values: design.values,
-    shader: design.shader,
-    creatorName: design.creatorName || null,
-  }));
-  const productUrl = 'https://brightfield.studio/products/' + encodeURIComponent(design.productHandle || '')
-    + '?bfr=' + encodeURIComponent(restorePayload) + '#shader';
+  const productUrl = 'https://brightfield.studio/pages/community-design?id=' + encodeURIComponent(id);
 
   return new Response(buildShareHtml(title, desc, shareUrl, mockupUrl, productUrl), {
     status: 200,

@@ -180,23 +180,22 @@ describe('renderStrip()', () => {
 // ── card click (default navigation) ──────────────────────────────────────────
 
 describe('card click — default navigation', () => {
-  it('writes brightfield_restore to localStorage', () => {
+  it('navigates to /pages/community-design?id={id}', () => {
+    vi.stubGlobal('location', { href: '' });
+    const design = makeDesign({ id: 'abc-123' });
+    const container = document.createElement('div');
+    window.CommunityDesigns.renderStrip(container, [design]);
+    container.querySelector('.community-card').click();
+    expect(window.location.href).toBe('/pages/community-design?id=abc-123');
+  });
+
+  it('does not write brightfield_restore to localStorage', () => {
     vi.stubGlobal('location', { href: '' });
     const design = makeDesign({ shader: 'echo-text', values: { u_speed: 2 } });
     const container = document.createElement('div');
     window.CommunityDesigns.renderStrip(container, [design]);
     container.querySelector('.community-card').click();
-    const stored = JSON.parse(localStorage.getItem('brightfield_restore'));
-    expect(stored).toEqual({ values: design.values, shader: 'echo-text', creatorName: 'Jane' });
-  });
-
-  it('navigates to /products/{productHandle}#shader', () => {
-    vi.stubGlobal('location', { href: '' });
-    const design = makeDesign({ productHandle: 'echo-text-shirt' });
-    const container = document.createElement('div');
-    window.CommunityDesigns.renderStrip(container, [design]);
-    container.querySelector('.community-card').click();
-    expect(window.location.href).toBe('/products/echo-text-shirt#shader');
+    expect(localStorage.getItem('brightfield_restore')).toBeNull();
   });
 
   it('calls onCardClick instead of navigating when provided', () => {
@@ -317,7 +316,7 @@ describe('buy button → cart add', () => {
     const body = JSON.parse(cartCall[1].body);
     expect(body.properties['_mockup_url']).toBe('https://r2.example.com/mockups/uuid.jpg');
     expect(body.properties['_design_url']).toBe('https://r2.example.com/mockups/uuid.jpg');
-    expect(body.properties['Customization']).toBe('Community Design');
+    expect(body.properties['Design Type']).toBe('Community Design');
 
     document.body.removeChild(container);
   });
