@@ -95,9 +95,11 @@
           id:       Number(variantId),
           quantity: 1,
           properties: {
-            '_design_url':  _buyDesign.mockupUrl,
-            '_mockup_url':  _buyDesign.mockupUrl,
-            'Customization': 'Custom Shader Design'
+            '_design_url':    _buyDesign.mockupUrl,
+            '_mockup_url':    _buyDesign.mockupUrl,
+            'Customization':  'Community Design',
+            'Design Type':    'Community Design',
+            'Designer':       _buyDesign.creatorName || 'Anonymous'
           }
         })
       })
