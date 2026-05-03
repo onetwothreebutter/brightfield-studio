@@ -39,7 +39,11 @@
     "community-designs": {
       "type": "community-designs",
       "settings": {}
+    },
+    "newsletter": {
+      "type": "newsletter",
+      "settings": {}
     }
   },
-  "order": ["hero", "shader-demo", "designs-row", "featured-collection", "community-designs"]
+  "order": ["hero", "shader-demo", "designs-row", "featured-collection", "community-designs", "newsletter"]
 }

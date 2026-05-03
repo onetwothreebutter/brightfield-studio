@@ -1,0 +1,56 @@
+<section class="newsletter section-padding">
+  <canvas id="newsletter-shader-canvas" class="newsletter__canvas" aria-hidden="true"></canvas>
+  <div class="container">
+    <div class="newsletter__inner">
+      {%- if section.settings.eyebrow != blank -%}
+        <p class="newsletter__eyebrow">{{ section.settings.eyebrow | escape }}</p>
+      {%- endif -%}
+      <h2 class="newsletter__heading">{{ section.settings.heading | escape }}</h2>
+      {%- if section.settings.subheading != blank -%}
+        <p class="newsletter__subheading">{{ section.settings.subheading | escape }}</p>
+      {%- endif -%}
+
+      {%- form 'customer', id: 'newsletter-form', class: 'newsletter__form' -%}
+        <input type="hidden" name="contact[tags]" value="newsletter">
+        <div class="newsletter__row">
+          <label for="newsletter-email" class="visually-hidden">Email address</label>
+          <input
+            id="newsletter-email"
+            type="email"
+            name="contact[email]"
+            class="newsletter__input"
+            placeholder="{{ section.settings.placeholder | default: 'your@email.com' | escape }}"
+            autocomplete="email"
+            required
+          >
+          <button type="submit" class="btn btn--primary newsletter__btn">
+            {{ section.settings.button_label | default: 'Subscribe' | escape }}
+          </button>
+        </div>
+        {%- if form.posted_successfully? -%}
+          <p class="newsletter__success">{{ section.settings.success_message | default: "You're in. Talk soon." | escape }}</p>
+        {%- endif -%}
+        {%- if form.errors -%}
+          <p class="newsletter__error">{{ form.errors.translated_fields['email'] | capitalize }} {{ form.errors.messages['email'] }}</p>
+        {%- endif -%}
+      {%- endform -%}
+    </div>
+  </div>
+</section>
+
+<script src="{{ 'newsletter-shader.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Newsletter",
+  "settings": [
+    { "type": "text",     "id": "eyebrow",         "label": "Eyebrow text",    "default": "Stay in the Loop" },
+    { "type": "text",     "id": "heading",          "label": "Heading",         "default": "New drops. Shader experiments. No spam." },
+    { "type": "textarea", "id": "subheading",       "label": "Subheading" },
+    { "type": "text",     "id": "placeholder",      "label": "Input placeholder", "default": "your@email.com" },
+    { "type": "text",     "id": "button_label",     "label": "Button label",    "default": "Subscribe" },
+    { "type": "text",     "id": "success_message",  "label": "Success message", "default": "You're in. Talk soon." }
+  ],
+  "presets": [{ "name": "Newsletter" }]
+}
+{% endschema %}
