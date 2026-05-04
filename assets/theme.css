@@ -2763,3 +2763,42 @@ h6 {
     color: #e05;
     margin: 0;
 }
+/* ── Demo Video ── */
+.demo-video__eyebrow {
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--color-primary);
+    margin-bottom: 0.5rem;
+}
+
+.demo-video__heading {
+    font-family: var(--font-heading);
+    font-size: clamp(1.4rem, 4vw, 2.2rem);
+    color: var(--color-text);
+    margin: 0 0 0.75rem;
+}
+
+.demo-video__subheading {
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    margin: 0 0 2rem;
+    max-width: 600px;
+}
+
+.demo-video__player-wrapper {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 1.5rem;
+}
+
+.demo-video__video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}

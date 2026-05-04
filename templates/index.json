@@ -36,10 +36,18 @@
         "show_view_all": true
       }
     },
+    "demo-video": {
+      "type": "demo-video",
+      "settings": {
+        "eyebrow": "See It In Action",
+        "heading": "",
+        "subheading": ""
+      }
+    },
     "community-designs": {
       "type": "community-designs",
       "settings": {}
     }
   },
-  "order": ["hero", "shader-demo", "designs-row", "featured-collection", "community-designs"]
+  "order": ["hero", "shader-demo", "designs-row", "demo-video", "featured-collection", "community-designs"]
 }

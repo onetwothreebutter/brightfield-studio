@@ -1,0 +1,84 @@
+<section class="demo-video section-padding">
+  <div class="container">
+
+    {%- if section.settings.eyebrow != blank -%}
+      <p class="demo-video__eyebrow">{{ section.settings.eyebrow | escape }}</p>
+    {%- endif -%}
+
+    {%- if section.settings.heading != blank -%}
+      <h2 class="demo-video__heading">{{ section.settings.heading | escape }}</h2>
+    {%- endif -%}
+
+    {%- if section.settings.subheading != blank -%}
+      <p class="demo-video__subheading">{{ section.settings.subheading | escape }}</p>
+    {%- endif -%}
+
+    {%- if section.settings.video_url != blank -%}
+      <div class="demo-video__player-wrapper">
+        <video
+          class="demo-video__video"
+          src="{{ section.settings.video_url }}"
+          {%- if section.settings.poster_image != blank -%}
+            poster="{{ section.settings.poster_image | image_url: width: 1200 }}"
+          {%- endif -%}
+          controls
+          playsinline
+          {%- if section.settings.autoplay -%} autoplay muted{%- endif -%}
+          {%- if section.settings.loop -%} loop{%- endif -%}
+        ></video>
+      </div>
+    {%- endif -%}
+
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Demo Video",
+  "settings": [
+    {
+      "type": "text",
+      "id": "eyebrow",
+      "label": "Eyebrow text",
+      "default": "See It In Action"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading"
+    },
+    {
+      "type": "textarea",
+      "id": "subheading",
+      "label": "Subheading"
+    },
+    {
+      "type": "url",
+      "id": "video_url",
+      "label": "Video URL (MP4)"
+    },
+    {
+      "type": "image_picker",
+      "id": "poster_image",
+      "label": "Poster image"
+    },
+    {
+      "type": "checkbox",
+      "id": "autoplay",
+      "label": "Autoplay (mutes audio)",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "loop",
+      "label": "Loop",
+      "default": false
+    }
+  ],
+  "presets": [
+    {
+      "name": "Demo Video"
+    }
+  ]
+}
+{% endschema %}
