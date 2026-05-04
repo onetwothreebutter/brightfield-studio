@@ -2788,6 +2788,15 @@ h6 {
     z-index: 1;
 }
 
+.newsletter__inner::before {
+    content: '';
+    position: absolute;
+    inset: -6rem -8rem;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0.55) 0%, transparent 72%);
+    z-index: -1;
+    pointer-events: none;
+}
+
 .newsletter__eyebrow {
     font-size: 0.75rem;
     text-transform: uppercase;
