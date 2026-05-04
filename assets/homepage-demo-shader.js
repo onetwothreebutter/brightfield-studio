@@ -187,7 +187,7 @@
       var aspect = w / h;
       gl.uniform2f(u.res,       w, h);
       gl.uniform1f(u.aspect,    aspect);
-      gl.uniform1f(u.radius,    v.u_radius     != null ? v.u_radius     : 0.4);
+      gl.uniform1f(u.radius,    v.u_radius     != null ? v.u_radius     : 0.33);
       gl.uniform1f(u.lineCount, v.u_line_count != null ? v.u_line_count : 20);
       gl.uniform1f(u.power,     v.u_power      != null ? v.u_power      : 2.5);
       gl.uniform1f(u.widthTop,  v.u_width_top  != null ? v.u_width_top  : 0.05);
