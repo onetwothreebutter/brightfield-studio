@@ -29,11 +29,9 @@
   <meta name="viewport" content="width=device-width">
   <link rel="stylesheet" type="text/css" href="/assets/notifications/styles.css">
   <style>
-    .button__cell { background: #00ffff; }
-    .actions-buttons .button__cell--primary { background-color: #00ffff; }
+    .button__cell { background: {{ shop.email_accent_color }}; }
+    .actions-buttons .button__cell--primary { background-color: {{ shop.email_accent_color }}; }
     a, a:hover, a:active, a:visited { color: {{ shop.email_accent_color }}; }
-    .button__cell a, .button__cell a:hover, .button__cell a:active, .button__cell a:visited,
-    .button__text { color: #000000 !important; }
   </style>
 </head>
 
@@ -310,7 +308,7 @@
               {% else %}
                 <td class="order-list__image-cell">
                   {% if line_design_url %}
-                    <div style="background-color:#000000;display:inline-block;line-height:0;font-size:0;border-radius:8px;overflow:hidden;margin-right:10px;">
+                    <div style="background-color:#000000;display:inline-block;line-height:0;font-size:0;border-radius:8px;overflow:hidden;">
                       <img src="{{ line_design_url }}" align="left" width="60" style="border:none;margin:10px;" class="order-list__product-image"/>
                     </div>
                   {% elsif line.line_item.image %}
