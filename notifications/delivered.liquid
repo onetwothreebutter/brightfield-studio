@@ -1,25 +1,23 @@
 {% if fulfillment.item_count == item_count %}
-  {% capture email_title %}Your order is on the way{% endcapture %}
-  {% capture email_body %}Your order is on the way. Track your shipment to see the delivery status.{% endcapture %}
+  {% capture email_title %}Your order has been delivered{% endcapture %}
+  {% capture email_body %}Your order has been delivered. Track your shipment to see the delivery status.{% endcapture %}
 {% elsif fulfillment.item_count > 1 %}
   {% if fulfillment_status == 'fulfilled' %}
-    {% capture email_title %}The last items in your order are on the way{% endcapture %}
-    {% capture email_body %}The last items in your order are on the way. Track your shipment to see the delivery status.{% endcapture %}
+    {% capture email_title %}The last items in your order have been delivered{% endcapture %}
+    {% capture email_body %}The last items in your order have been delivered. Track your shipment to see the delivery status.{% endcapture %}
   {% else %}
-    {% capture email_title %}Some items in your order are on the way{% endcapture %}
-    {% capture email_body %}Some items in your order are on the way. Track your shipment to see the delivery status.{% endcapture %}
+    {% capture email_title %}Some items in your order have been delivered{% endcapture %}
+    {% capture email_body %}Some items in your order have been delivered. Track your shipment to see the delivery status.{% endcapture %}
   {% endif %}
 {% else %}
   {% if fulfillment_status == 'fulfilled' %}
-    {% capture email_title %}The last item in your order is on the way{% endcapture %}
-    {% capture email_body %}The last item in your order is on the way. Track your shipment to see the delivery status.{% endcapture %}
+    {% capture email_title %}The last item in your order has been delivered{% endcapture %}
+    {% capture email_body %}The last item in your order has been delivered. Track your shipment to see the delivery status.{% endcapture %}
   {% else %}
-    {% capture email_title %}One item in your order is on the way{% endcapture %}
-    {% capture email_body %}One item in your order is on the way. Track your shipment to see the delivery status.{% endcapture %}
+    {% capture email_title %}One item in your order has been delivered{% endcapture %}
+    {% capture email_body %}One item in your order has been delivered. Track your shipment to see the delivery status.{% endcapture %}
   {% endif %}
 {% endif %}
-
-{% capture email_emphasis %}Estimated delivery date: <strong>{{fulfillment.estimated_delivery_at | date: format: 'date'}}</strong>{% endcapture %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -38,7 +36,6 @@
 </head>
 
   <body>
-
     <table class="body">
       <tr>
         <td>
@@ -104,81 +101,16 @@
             <td>
 
             <h2>{{ email_title }}</h2>
-            <p>{{ email_body }}</p>
-            {% if fulfillment.estimated_delivery_at %}
-              <p>{{ email_emphasis }}</p>
-            {% endif %}
+            <table class="text-icon-container">
+              <tr class="text-icon-row">
+                <td class="text-icon"><img src="{{ 'notifications/question.png' | shopify_asset_url }}" class="text-icon__image"></td>
+                <td class="text">
+                  <p>Haven't received your package yet? <a href="mailto:{{ shop.email }}">Let us know</a></p>
+                </td>
+              </tr>
+            </table>
             {% if order_status_url %}
-              {% if shop_app_tracking_url and shop_app_tracking_button_variant_key %}
-                {% if shop_app_tracking_button_variant_key == "track_with_shop" %}
-                  <table class="row actions">
-  <tr>
-    <td class="empty-line">&nbsp;</td>
-  </tr>
-  <tr>
-    <td class="actions__cell">
-      {% capture shop_logo_img %}<img src="{{ 'mailer/shop_logo.png' | cdn_asset_url }}" alt="Shop" width="42" height="17" class="button__shop-logo">{% endcapture %}
-      <table class="actions-buttons" width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr>
-          <td class="button__cell button__cell--primary" width="50%">
-            <a href="{{ order_status_url }}" class="button__text">View your order</a>
-          </td>
-          <td class="button__cell--separator"></td>
-          <td class="button__cell button__cell--shop-app" width="50%">
-            <a href="{{ shop_app_tracking_url }}" class="button__text button__text--shop-app">Track order with {{ shop_logo_img }}</a>
-          </td>
-        </tr>
-      </table>
-        <div class="actions__group">
-        {% if shop.url %}
-    <table class="link secondary-action-cell">
-      <tr>
-        <td class="link__cell">or <a href="{{ shop.url }}">Visit our store</a></td>
-      </tr>
-    </table>
-{% endif %}
-
-        </div>
-    </td>
-  </tr>
-</table>
-
-                {% else %}
-                  <table class="row actions">
-  <tr>
-    <td class="empty-line">&nbsp;</td>
-  </tr>
-  <tr>
-    <td class="actions__cell">
-      {% capture shop_logo_img %}<img src="{{ 'mailer/shop_logo.png' | cdn_asset_url }}" alt="Shop" width="42" height="17" class="button__shop-logo">{% endcapture %}
-      <table class="actions-buttons" width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr>
-          <td class="button__cell button__cell--primary" width="50%">
-            <a href="{{ order_status_url }}" class="button__text">View your order</a>
-          </td>
-          <td class="button__cell--separator"></td>
-          <td class="button__cell button__cell--shop-app" width="50%">
-            <a href="{{ shop_app_tracking_url }}" class="button__text button__text--shop-app">Download to track with {{ shop_logo_img }}</a>
-          </td>
-        </tr>
-      </table>
-        <div class="actions__group">
-        {% if shop.url %}
-    <table class="link secondary-action-cell">
-      <tr>
-        <td class="link__cell">or <a href="{{ shop.url }}">Visit our store</a></td>
-      </tr>
-    </table>
-{% endif %}
-
-        </div>
-    </td>
-  </tr>
-</table>
-
-                {% endif %}
-              {% else %}
-                <table class="row actions">
+              <table class="row actions">
   <tr>
     <td class="empty-line">&nbsp;</td>
   </tr>
@@ -209,7 +141,6 @@
   </tr>
 </table>
 
-              {% endif %}
             {% else %}
               {% if shop.url %}
     <table class="row actions">
