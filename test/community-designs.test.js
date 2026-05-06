@@ -291,7 +291,7 @@ describe('buy button → cart add', () => {
     document.querySelectorAll('.mockup-modal').forEach(el => el.remove());
   });
 
-  it('sends _mockup_url from design.mockupUrl to /cart/add.js', async () => {
+  it('sends _mockup_url and _design_url separately to /cart/add.js', async () => {
     vi.stubGlobal('location', { href: '' });
 
     const cartItem = { id: 42, properties: { '_mockup_url': 'https://r2.example.com/mockups/uuid.jpg' } };
@@ -306,7 +306,11 @@ describe('buy button → cart add', () => {
     });
     vi.stubGlobal('fetch', mockFetch);
 
-    const design = makeDesign({ mockupUrl: 'https://r2.example.com/mockups/uuid.jpg', productHandle: 'rise-shirt' });
+    const design = makeDesign({
+      mockupUrl:  'https://r2.example.com/mockups/uuid.jpg',
+      designUrl:  'https://r2.example.com/designs/uuid.png',
+      productHandle: 'rise-shirt',
+    });
     const container = document.createElement('div');
     window.CommunityDesigns.renderStrip(container, [design]);
     document.body.appendChild(container);
@@ -315,7 +319,7 @@ describe('buy button → cart add', () => {
     expect(cartCall).toBeTruthy();
     const body = JSON.parse(cartCall[1].body);
     expect(body.properties['_mockup_url']).toBe('https://r2.example.com/mockups/uuid.jpg');
-    expect(body.properties['_design_url']).toBe('https://r2.example.com/mockups/uuid.jpg');
+    expect(body.properties['_design_url']).toBe('https://r2.example.com/designs/uuid.png');
     expect(body.properties['_design_id']).toBe('abc-123');
     expect(body.properties['Design Type']).toBe('Community Design');
 
