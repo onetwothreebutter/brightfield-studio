@@ -1495,6 +1495,7 @@
           currentDesignUrl = data.design_url;
           _lastMockupData = {
             mockupUrl:     data.mockup_url,
+            designUrl:     data.design_url,
             shader:        PRODUCT_HANDLE,
             productHandle: PRODUCT_HANDLE,
             values:        snapshotValues
@@ -1739,6 +1740,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mockupUrl:     _lastMockupData.mockupUrl,
+          designUrl:     _lastMockupData.designUrl,
           shader:        _lastMockupData.shader,
           productHandle: _lastMockupData.productHandle,
           values:        _lastMockupData.values,
