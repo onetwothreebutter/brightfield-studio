@@ -419,7 +419,7 @@ async function handleCommunitySubmit(request, env, origin) {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
   }
 
-  const { shader, productHandle, mockupUrl, values, creatorName, creatorEmail } = body;
+  const { shader, productHandle, designUrl, mockupUrl, values, creatorName, creatorEmail } = body;
   if (!mockupUrl || !creatorName || !shader) {
     return new Response(JSON.stringify({ error: 'Missing required fields: mockupUrl, creatorName, shader' }), { status: 400, headers });
   }
@@ -429,6 +429,7 @@ async function handleCommunitySubmit(request, env, origin) {
     id,
     shader,
     productHandle: productHandle || '',
+    designUrl:     designUrl || '',
     mockupUrl,
     values: values || {},
     timestamp: Math.floor(Date.now() / 1000),
