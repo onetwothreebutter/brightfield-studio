@@ -86,6 +86,7 @@
       if (!variantId) { alert('Please select a size.'); return; }
 
       var mockupUrl = _buyDesign.mockupUrl || _buyDesign.mockup_url || '';
+      var designUrl = _buyDesign.designUrl || _buyDesign.design_url || '';
       if (!mockupUrl) {
         console.error('[brightfield:buy] design missing mockupUrl:', _buyDesign);
       }
@@ -100,7 +101,7 @@
           id:       Number(variantId),
           quantity: 1,
           properties: {
-            '_design_url':    mockupUrl,
+            '_design_url':    designUrl,
             '_mockup_url':    mockupUrl,
             '_design_id':     _buyDesign.id,
             'Design Type':    'Community Design',
