@@ -347,7 +347,7 @@
       gl.uniform1f(u.grainMode,        v.u_grain_mode       != null ? parseFloat(v.u_grain_mode) : 0.0);
       gl.uniform1f(u.distressFalloff,  v.u_distress_falloff != null ? v.u_distress_falloff : 0.0);
       gl.uniform1f(u.halftoneAngle, (v.u_halftone_angle != null ? v.u_halftone_angle : 45.0) * Math.PI / 180.0);
-      gl.uniform1f(u.halftoneLuma,  v.u_halftone_luma  != null ? v.u_halftone_luma  : 1.0);
+      gl.uniform1f(u.halftoneLuma,  v.u_halftone_luma  != null ? v.u_halftone_luma  : 0.0);
       gl.uniform1f(u.posX,             v.u_pos_x            != null ? v.u_pos_x            : 0.0);
       gl.uniform1f(u.posY,         v.u_pos_y      != null ? v.u_pos_y      : 0.0);
       gl.uniform1f(u.scale,        v.u_scale      != null ? v.u_scale      : 1.0);
