@@ -19,6 +19,8 @@
             {%- assign mockup_url = item.properties['_mockup_url'] -%}
             {%- if item.properties['_design_url'] != blank and item.properties['_source'] != 'inhouse' -%}
               {%- assign is_custom = item.properties['_design_url'] -%}
+            {%- elsif item.properties['Design Type'] == 'Community Design' -%}
+              {%- assign is_custom = 'community' -%}
             {%- else -%}
               {%- assign is_custom = '' -%}
             {%- endif -%}
