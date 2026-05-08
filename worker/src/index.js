@@ -68,6 +68,9 @@ export default {
 
     if (method === 'GET'  && pathname === '/admin-ui') return handleAdminUI(request, env);
 
+    if (method === 'GET'  && pathname === '/admin/list-designs') return handleAdminListDesigns(request, env);
+    if (method === 'POST' && pathname === '/admin/patch-design-url') return handleAdminPatchDesignUrl(request, env);
+
     if (method === 'GET'  && pathname === '/download-mockup') return handleDownloadMockup(request, env, origin);
 
     if (method === 'POST' && pathname === '/remove-bg') return handleRemoveBg(request, env, origin);
@@ -269,24 +272,29 @@ async function handleSavePreview(request, env, origin) {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
   }
 
-  const { designImage, mockupImage, deviceId, shader, productHandle, values } = body;
+  const { designImage, checkoutImage, mockupImage, deviceId, shader, productHandle, values } = body;
   if (!designImage || !mockupImage) {
     return new Response(JSON.stringify({ error: 'Missing designImage or mockupImage' }), { status: 400, headers });
   }
 
-  const designKey = `designs/${crypto.randomUUID()}.png`;
-  const mockupKey = `mockups/${crypto.randomUUID()}.jpg`;
+  const designKey   = `designs/${crypto.randomUUID()}.png`;
+  const mockupKey   = `mockups/${crypto.randomUUID()}.jpg`;
+  const checkoutKey = checkoutImage ? `checkouts/${crypto.randomUUID()}.png` : null;
 
-  const designData = Uint8Array.from(atob(designImage), c => c.charCodeAt(0));
-  const mockupData = Uint8Array.from(atob(mockupImage), c => c.charCodeAt(0));
+  const designData   = Uint8Array.from(atob(designImage), c => c.charCodeAt(0));
+  const mockupData   = Uint8Array.from(atob(mockupImage), c => c.charCodeAt(0));
+  const checkoutData = checkoutImage ? Uint8Array.from(atob(checkoutImage), c => c.charCodeAt(0)) : null;
 
-  await Promise.all([
+  const uploads = [
     env.MOCKUP_STAGING.put(designKey, designData, { httpMetadata: { contentType: 'image/png' } }),
     env.MOCKUP_STAGING.put(mockupKey, mockupData, { httpMetadata: { contentType: 'image/jpeg' } }),
-  ]);
+  ];
+  if (checkoutKey) uploads.push(env.MOCKUP_STAGING.put(checkoutKey, checkoutData, { httpMetadata: { contentType: 'image/png' } }));
+  await Promise.all(uploads);
 
-  const designUrl = `https://${env.R2_PUBLIC_DOMAIN}/${designKey}`;
-  const mockupUrl = `https://${env.R2_PUBLIC_DOMAIN}/${mockupKey}`;
+  const designUrl       = `https://${env.R2_PUBLIC_DOMAIN}/${designKey}`;
+  const mockupUrl       = `https://${env.R2_PUBLIC_DOMAIN}/${mockupKey}`;
+  const checkoutImageUrl = checkoutKey ? `https://${env.R2_PUBLIC_DOMAIN}/${checkoutKey}` : null;
 
   let savedId = null;
   if (deviceId) {
@@ -303,7 +311,7 @@ async function handleSavePreview(request, env, origin) {
     await saveDesignEntry(env, deviceId, entry).catch(() => {});
   }
 
-  return new Response(JSON.stringify({ design_url: designUrl, mockup_url: mockupUrl, id: savedId }), { status: 200, headers });
+  return new Response(JSON.stringify({ design_url: designUrl, mockup_url: mockupUrl, checkout_image_url: checkoutImageUrl, id: savedId }), { status: 200, headers });
 }
 
 async function handleListDesigns(request, env, origin) {
@@ -635,6 +643,44 @@ async function handleShare(request, env, id) {
 }
 
 // ── Shopify Admin App UI ──────────────────────────────────────────────────────
+
+async function handleAdminPatchDesignUrl(request, env) {
+  const isAdmin = await requireAdmin(request, env);
+  if (!isAdmin) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+
+  let body;
+  try { body = await request.json(); } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+  }
+
+  const { id, designUrl } = body;
+  if (!id || !designUrl) return new Response(JSON.stringify({ error: 'Missing id or designUrl' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+
+  const submission = await readJson(env, `community/submissions/${id}.json`);
+  if (!submission) return new Response(JSON.stringify({ error: 'Submission not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+
+  submission.designUrl = designUrl;
+  await writeJson(env, `community/submissions/${id}.json`, submission);
+
+  return new Response(JSON.stringify({ ok: true, id, designUrl }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+}
+
+async function handleAdminListDesigns(request, env) {
+  const isAdmin = await requireAdmin(request, env);
+  if (!isAdmin) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+
+  const results = [];
+  let cursor;
+  do {
+    const page = await env.MOCKUP_STAGING.list({ prefix: 'designs/', cursor, limit: 1000 });
+    for (const obj of page.objects) {
+      results.push({ key: obj.key, uploaded: obj.uploaded, size: obj.size });
+    }
+    cursor = page.truncated ? page.cursor : null;
+  } while (cursor);
+
+  return new Response(JSON.stringify(results), { status: 200, headers: { 'Content-Type': 'application/json' } });
+}
 
 function handleAdminUI(request, env) {
   const clientId = env.SHOPIFY_APP_CLIENT_ID || '';

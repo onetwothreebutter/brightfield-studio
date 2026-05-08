@@ -1424,6 +1424,17 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           var compositeDataUrl = canvas.toDataURL('image/png');
           var snapshotValues = JSON.parse(JSON.stringify(window._shaderState ? window._shaderState.values : {}));
 
+          // Create checkout image at display resolution (600×800) — full print res is
+          // wasteful for a checkout thumbnail and allocates ~17 MB of bitmap memory.
+          var checkoutCanvas = document.createElement('canvas');
+          checkoutCanvas.width  = 600;
+          checkoutCanvas.height = 800;
+          var checkoutCtx = checkoutCanvas.getContext('2d');
+          checkoutCtx.fillStyle = '#000';
+          checkoutCtx.fillRect(0, 0, 600, 800);
+          checkoutCtx.drawImage(designImg, 0, 0, 600, 800);
+          var base64CheckoutPng = checkoutCanvas.toDataURL('image/png').split(',')[1];
+
           // Show modal immediately — no waiting for API
           modalImg.src = compositeDataUrl;
           modalDl.href = compositeDataUrl;
@@ -1456,6 +1467,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({
               designImage:   base64png,
+              checkoutImage: base64CheckoutPng,
               mockupImage:   compositeDataUrl.split(',')[1],
               deviceId:      window.RecentDesigns ? window.RecentDesigns.getDeviceId() : null,
               shader:        '{{ shader_file }}',
@@ -1530,8 +1542,9 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
             id:       Number(shopifyVariantId),
             quantity: 1,
             properties: {
-              '_design_url':  data.design_url,
-              '_mockup_url':  data.mockup_url,
+              '_design_url':     data.design_url,
+              '_mockup_url':     data.mockup_url,
+              '_checkout_image': data.checkout_image_url || data.design_url,
               'Customization': 'Custom Shader Design'
             }
           })
