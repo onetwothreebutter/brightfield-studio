@@ -1535,20 +1535,38 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
 
     _pendingDesign.uploadPromise
       .then(function (data) {
-        return fetch('/cart/add.js', {
+        modalOrder.textContent = 'Creating your design…';
+        return fetch(workerUrl + '/create-product', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            id:       Number(shopifyVariantId),
-            quantity: 1,
-            properties: {
-              '_design_url':     data.design_url,
-              '_mockup_url':     data.mockup_url,
-              '_checkout_image': data.checkout_image_url || data.design_url,
-              'Customization': 'Custom Shader Design',
-              'Design URL': data.checkout_image_url || data.design_url
-            }
+            designUrl:        data.design_url,
+            mockupUrl:        data.mockup_url,
+            checkoutImageUrl: data.checkout_image_url || data.design_url,
+            shader:           _pendingDesign.shader,
+            variantId:        shopifyVariantId
           })
+        })
+        .then(function (cpRes) {
+          return cpRes.json().then(function (cpData) {
+            var cartVariantId = (cpRes.ok && cpData.variantId) ? cpData.variantId : shopifyVariantId;
+            if (!cpRes.ok) console.error('[create-product] failed, falling back to original variant:', cpData);
+            return fetch('/cart/add.js', {
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id:       Number(cartVariantId),
+                quantity: 1,
+                properties: {
+                  '_design_url':     data.design_url,
+                  '_mockup_url':     data.mockup_url,
+                  '_checkout_image': data.checkout_image_url || data.design_url,
+                  'Customization': 'Custom Shader Design',
+                  'Design URL':      data.checkout_image_url || data.design_url
+                }
+              })
+            });
+          });
         });
       })
       .then(function (r) {
