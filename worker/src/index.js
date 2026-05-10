@@ -9,14 +9,39 @@ const PRODUCT_ID   = 71;
 const PRINT_WIDTH  = 1800;
 const PRINT_HEIGHT = 2400;
 
+let _shopifyToken = null;
+let _shopifyTokenExpiry = 0;
+
+async function getShopifyToken(env) {
+  if (_shopifyToken && Date.now() < _shopifyTokenExpiry) return _shopifyToken;
+  const res = await fetch(
+    `https://${env.SHOPIFY_STORE_DOMAIN}/admin/oauth/access_token`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id:     env.SHOPIFY_APP_CLIENT_ID,
+        client_secret: env.SHOPIFY_APP_CLIENT_SECRET,
+        grant_type:    'client_credentials',
+      }),
+    }
+  );
+  const data = await res.json();
+  if (!data.access_token) throw new Error('Failed to get Shopify token: ' + JSON.stringify(data));
+  _shopifyToken = data.access_token;
+  _shopifyTokenExpiry = Date.now() + ((data.expires_in || 3600) - 60) * 1000;
+  return _shopifyToken;
+}
+
 async function shopifyAdmin(env, query, variables) {
+  const token = await getShopifyToken(env);
   const res = await fetch(
     `https://${env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-01/graphql.json`,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Shopify-Access-Token': env.SHOPIFY_ADMIN_API_TOKEN,
+        'X-Shopify-Access-Token': token,
       },
       body: JSON.stringify({ query, variables }),
     }
