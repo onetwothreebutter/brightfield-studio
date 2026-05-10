@@ -3,13 +3,13 @@ main = "src/index.js"
 compatibility_date = "2025-01-01"
 workers_dev = true
 
-[observability.logs]
-enabled = true
-invocation_logs = true
-
 routes = [
   { pattern = "share.brightfield.studio", custom_domain = true }
 ]
+
+[observability.logs]
+enabled = true
+invocation_logs = true
 
 [images]
 binding = "IMAGES"
@@ -26,3 +26,5 @@ bucket_name = "mockup-staging"
 #   SHOPIFY_APP_CLIENT_ID      - from Shopify custom app (Settings → Apps → Develop apps)
 #   SHOPIFY_APP_CLIENT_SECRET  - from Shopify custom app (used to verify App Bridge JWTs)
 #   SHOPIFY_STORE_DOMAIN       - e.g. brightfield-2.myshopify.com
+#   SHOPIFY_CUSTOM_DESIGN_CLIENT_ID     - custom-design app client ID (for Admin API product creation)
+#   SHOPIFY_CUSTOM_DESIGN_CLIENT_SECRET - custom-design app client secret (for Admin API product creation)

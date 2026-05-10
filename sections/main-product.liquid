@@ -1533,54 +1533,90 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     modalOrder.disabled    = true;
     modalOrder.textContent = 'Saving…';
 
+    console.log('[add-to-cart] starting — shopifyVariantId:', shopifyVariantId);
+
     _pendingDesign.uploadPromise
       .then(function (data) {
+        console.log('[add-to-cart] upload resolved:', { design_url: data.design_url, mockup_url: data.mockup_url, checkout_image_url: data.checkout_image_url });
         modalOrder.textContent = 'Creating your design…';
+        var cpBody = {
+          designUrl:        data.design_url,
+          mockupUrl:        data.mockup_url,
+          checkoutImageUrl: data.checkout_image_url || data.design_url,
+          shader:           _pendingDesign.shader,
+          variantId:        shopifyVariantId
+        };
+        console.log('[create-product] POST', cpBody);
         return fetch(workerUrl + '/create-product', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            designUrl:        data.design_url,
-            mockupUrl:        data.mockup_url,
-            checkoutImageUrl: data.checkout_image_url || data.design_url,
-            shader:           _pendingDesign.shader,
-            variantId:        shopifyVariantId
-          })
+          body: JSON.stringify(cpBody)
         })
         .then(function (cpRes) {
           return cpRes.json().then(function (cpData) {
+            console.log('[create-product] response', cpRes.status, cpData);
             var cartVariantId = (cpRes.ok && cpData.variantId) ? cpData.variantId : shopifyVariantId;
             if (!cpRes.ok) console.error('[create-product] failed, falling back to original variant:', cpData);
-            return fetch('/cart/add.js', {
-              method:  'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                id:       Number(cartVariantId),
-                quantity: 1,
-                properties: {
-                  '_design_url':     data.design_url,
-                  '_mockup_url':     data.mockup_url,
-                  '_checkout_image': data.checkout_image_url || data.design_url,
-                  'Customization': 'Custom Shader Design',
-                  'Design URL':      data.checkout_image_url || data.design_url
-                }
-              })
+            console.log('[add-to-cart] using cartVariantId:', cartVariantId);
+            var cartPayload = JSON.stringify({
+              id:       Number(cartVariantId),
+              quantity: 1,
+              properties: {
+                '_design_url':     data.design_url,
+                '_mockup_url':     data.mockup_url,
+                '_checkout_image': data.checkout_image_url || data.design_url,
+                'Customization': 'Custom Shader Design',
+                'Design URL':      data.checkout_image_url || data.design_url
+              }
             });
+            // Shopify needs a moment to index a brand-new variant before /cart/add.js
+            // can find it. Retry up to 4 times with exponential backoff.
+            function addToCartWithRetry(attempt) {
+              console.log('[add-to-cart] attempt', attempt, 'variantId:', cartVariantId);
+              return fetch('/cart/add.js', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: cartPayload
+              }).then(function (r) {
+                if (!r.ok && attempt < 4) {
+                  return r.text().then(function (text) {
+                    var desc = '';
+                    try { desc = JSON.parse(text).description || ''; } catch (e) {}
+                    console.warn('[add-to-cart] attempt', attempt, 'failed — status:', r.status, 'desc:', desc);
+                    if (desc.toLowerCase().indexOf('cannot find variant') !== -1 ||
+                        desc.toLowerCase().indexOf('cannot find') !== -1) {
+                      var delay = 1500 * attempt;
+                      console.log('[add-to-cart] variant not indexed yet, retrying in', delay, 'ms');
+                      return new Promise(function (resolve) {
+                        setTimeout(function () { resolve(addToCartWithRetry(attempt + 1)); }, delay);
+                      });
+                    }
+                    // Different error — reconstruct a Response-like object to pass along
+                    return new Response(text, { status: r.status, headers: { 'Content-Type': 'application/json' } });
+                  });
+                }
+                console.log('[add-to-cart] attempt', attempt, 'result — status:', r.status);
+                return r;
+              });
+            }
+            return addToCartWithRetry(1);
           });
         });
       })
       .then(function (r) {
         if (!r.ok) {
           return r.text().then(function (text) {
-            console.error('Cart add failed', r.status, text);
+            console.error('[add-to-cart] final failure — status:', r.status, 'body:', text);
             var msg = 'Cart error (' + r.status + ')';
             try { msg = JSON.parse(text).description || msg; } catch (e) {}
             throw new Error(msg);
           });
         }
+        console.log('[add-to-cart] success, redirecting to /cart');
         window.location.href = '/cart';
       })
       .catch(function (err) {
+        console.error('[add-to-cart] caught error:', err);
         alert('Could not add to cart: ' + err.message);
         modalOrder.disabled    = false;
         modalOrder.textContent = 'Order This Design';
