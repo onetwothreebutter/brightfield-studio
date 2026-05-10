@@ -9,6 +9,63 @@ const PRODUCT_ID   = 71;
 const PRINT_WIDTH  = 1800;
 const PRINT_HEIGHT = 2400;
 
+let _shopifyToken = null;
+let _shopifyTokenExpiry = 0;
+let _onlineStorePublicationId = null;
+
+async function getShopifyToken(env) {
+  if (_shopifyToken && Date.now() < _shopifyTokenExpiry) return _shopifyToken;
+  const tokenUrl = `https://${env.SHOPIFY_STORE_DOMAIN}/admin/oauth/access_token`;
+  console.log('[getShopifyToken] POST', tokenUrl);
+  console.log('[getShopifyToken] client_id present:', !!env.SHOPIFY_CUSTOM_DESIGN_CLIENT_ID);
+  console.log('[getShopifyToken] client_secret present:', !!env.SHOPIFY_CUSTOM_DESIGN_CLIENT_SECRET);
+  const res = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id:     env.SHOPIFY_CUSTOM_DESIGN_CLIENT_ID,
+      client_secret: env.SHOPIFY_CUSTOM_DESIGN_CLIENT_SECRET,
+      grant_type:    'client_credentials',
+    }),
+  });
+  const rawText = await res.text();
+  console.log('[getShopifyToken] status:', res.status);
+  console.log('[getShopifyToken] response (first 500 chars):', rawText.slice(0, 500));
+  let data;
+  try { data = JSON.parse(rawText); }
+  catch { throw new Error(`Token endpoint returned non-JSON (status ${res.status}): ${rawText.slice(0, 200)}`); }
+  if (!data.access_token) throw new Error('Failed to get Shopify token: ' + JSON.stringify(data));
+  _shopifyToken = data.access_token;
+  _shopifyTokenExpiry = Date.now() + ((data.expires_in || 3600) - 60) * 1000;
+  return _shopifyToken;
+}
+
+async function shopifyAdmin(env, query, variables) {
+  const token = await getShopifyToken(env);
+  const res = await fetch(
+    `https://${env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-01/graphql.json`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': token,
+      },
+      body: JSON.stringify({ query, variables }),
+    }
+  );
+  return res.json();
+}
+
+async function getOnlineStorePublicationId(env) {
+  if (_onlineStorePublicationId) return _onlineStorePublicationId;
+  const data = await shopifyAdmin(env, `query { publications(first: 20) { edges { node { id name } } } }`);
+  const edges = data?.data?.publications?.edges || [];
+  console.log('[publications] available:', edges.map(e => e.node.name));
+  const match = edges.find(e => e.node.name === 'Online Store');
+  if (match) _onlineStorePublicationId = match.node.id;
+  return _onlineStorePublicationId;
+}
+
 function isAllowedOrigin(origin) {
   if (ALLOWED_ORIGINS.has(origin)) return true;
   try { const u = new URL(origin); return u.hostname === '127.0.0.1' || u.hostname === 'localhost'; }
@@ -75,7 +132,8 @@ export default {
 
     if (method === 'POST' && pathname === '/remove-bg') return handleRemoveBg(request, env, origin);
 
-    if (method === 'POST' && pathname === '/save-preview') return handleSavePreview(request, env, origin);
+    if (method === 'POST' && pathname === '/save-preview')    return handleSavePreview(request, env, origin);
+    if (method === 'POST' && pathname === '/create-product')  return handleCreateProduct(request, env, origin);
 
     return new Response('Not found', { status: 404 });
   }
@@ -312,6 +370,197 @@ async function handleSavePreview(request, env, origin) {
   }
 
   return new Response(JSON.stringify({ design_url: designUrl, mockup_url: mockupUrl, checkout_image_url: checkoutImageUrl, id: savedId }), { status: 200, headers });
+}
+
+async function handleCreateProduct(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
+  }
+
+  const { designUrl, mockupUrl, checkoutImageUrl, shader, variantId } = body;
+  if (!designUrl || !mockupUrl || !variantId) {
+    return new Response(JSON.stringify({ error: 'Missing designUrl, mockupUrl, or variantId' }), { status: 400, headers });
+  }
+
+  console.log('[create-product] variantId:', variantId, 'shader:', shader);
+  const gid = `gid://shopify/ProductVariant/${variantId}`;
+
+  // Fetch original variant price + title (size name) + parent product title
+  const variantData = await shopifyAdmin(env,
+    `query GetVariant($id: ID!) {
+      node(id: $id) {
+        ... on ProductVariant {
+          title
+          price
+          product { title }
+        }
+      }
+    }`,
+    { id: gid }
+  );
+
+  const variant = variantData?.data?.node;
+  if (!variant) {
+    console.error('[create-product] variant lookup failed:', JSON.stringify(variantData));
+    return new Response(JSON.stringify({ error: 'Could not look up variant' }), { status: 502, headers });
+  }
+
+  console.log('[create-product] source variant:', { title: variant.title, price: variant.price, product: variant.product?.title });
+  const productTitle = `Custom ${variant.product?.title || 'Design'}`;
+  const variantTitle = variant.title || 'Default Title';
+  const price        = variant.price || '0.00';
+
+  // Resize the mockup to ≤2000px wide so it stays under Shopify's 25 MP limit
+  let shopifyImageUrl = null;
+  if (env.IMAGES) {
+    try {
+      const imgRes = await fetch(mockupUrl);
+      if (imgRes.ok) {
+        const imgBuf   = await imgRes.arrayBuffer();
+        const resized  = await env.IMAGES
+          .input(imgBuf)
+          .transform({ width: 2000, fit: 'scale-down' })
+          .output({ format: 'image/jpeg', quality: 85 });
+        const resizedBuf = await resized.response().arrayBuffer();
+        const imgKey     = `product-images/${crypto.randomUUID()}.jpg`;
+        await env.MOCKUP_STAGING.put(imgKey, resizedBuf, {
+          httpMetadata: { contentType: 'image/jpeg' },
+        });
+        shopifyImageUrl = `https://${env.R2_PUBLIC_DOMAIN}/${imgKey}`;
+      }
+    } catch (err) {
+      console.warn('[create-product] image resize failed, skipping media:', err.message);
+    }
+  }
+
+  // Step 1: create the product (variants not accepted in ProductInput in 2025-01+)
+  const createData = await shopifyAdmin(env,
+    `mutation CreateProduct($input: ProductInput!, $media: [CreateMediaInput!]) {
+      productCreate(input: $input, media: $media) {
+        product {
+          id
+          variants(first: 1) { edges { node { id } } }
+        }
+        userErrors { field message }
+      }
+    }`,
+    {
+      input: {
+        title:  productTitle,
+        status: 'ACTIVE',
+        vendor: 'Brightfield Studio',
+        tags:   ['custom-design', `shader-${shader || 'unknown'}`],
+        metafields: [
+          { namespace: 'custom', key: 'design_url',  type: 'url',                     value: designUrl },
+          { namespace: 'custom', key: 'mockup_url',  type: 'url',                     value: mockupUrl },
+          { namespace: 'custom', key: 'shader',      type: 'single_line_text_field',  value: shader || '' },
+        ],
+      },
+      media: shopifyImageUrl
+        ? [{ originalSource: shopifyImageUrl, mediaContentType: 'IMAGE' }]
+        : [],
+    }
+  );
+
+  const userErrors = createData?.data?.productCreate?.userErrors;
+  if (userErrors?.length) {
+    console.error('[create-product] userErrors:', JSON.stringify(userErrors));
+    return new Response(JSON.stringify({ error: userErrors[0].message }), { status: 422, headers });
+  }
+
+  const newProductGid  = createData?.data?.productCreate?.product?.id;
+  const newVariantGid  = createData?.data?.productCreate?.product?.variants?.edges?.[0]?.node?.id;
+  if (!newVariantGid) {
+    console.error('[create-product] no variant returned:', JSON.stringify(createData));
+    return new Response(JSON.stringify({ error: 'Product created but no variant returned' }), { status: 502, headers });
+  }
+
+  // Step 2: set price (and size title via option) on the auto-created default variant
+  const updateData = await shopifyAdmin(env,
+    `mutation UpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+        productVariants { id }
+        userErrors { field message }
+      }
+    }`,
+    {
+      productId: newProductGid,
+      variants: [{ id: newVariantGid, price }],
+    }
+  );
+
+  const updateErrors = updateData?.data?.productVariantsBulkUpdate?.userErrors;
+  if (updateErrors?.length) {
+    console.error('[create-product] variant update errors:', JSON.stringify(updateErrors));
+    // Non-fatal: product exists, just price may be wrong
+  }
+
+  // Strip GID prefix → numeric ID for Shopify storefront use
+  const newVariantId = newVariantGid.replace('gid://shopify/ProductVariant/', '');
+  const newProductId = newProductGid.replace('gid://shopify/Product/', '');
+
+  console.log('[create-product] new product:', newProductId, 'new variant:', newVariantId);
+
+  // Step 3: publish to Online Store so /cart/add.js can find the variant.
+  // Try GraphQL publishablePublish first (more reliable), fall back to REST.
+  let published = false;
+  try {
+    const publicationId = await getOnlineStorePublicationId(env);
+    console.log('[create-product] Online Store publicationId:', publicationId);
+    if (publicationId) {
+      const pubData = await shopifyAdmin(env,
+        `mutation Publish($id: ID!, $input: [PublicationInput!]!) {
+          publishablePublish(id: $id, input: $input) {
+            publishable { ... on Product { id status } }
+            userErrors { field message }
+          }
+        }`,
+        { id: newProductGid, input: [{ publicationId }] }
+      );
+      const userErrors = pubData?.data?.publishablePublish?.userErrors;
+      const result     = pubData?.data?.publishablePublish?.publishable;
+      console.log('[create-product] publishablePublish result:', JSON.stringify({ result, userErrors }));
+      if (!userErrors?.length) published = true;
+    }
+  } catch (err) {
+    console.warn('[create-product] publishablePublish error:', err.message);
+  }
+
+  if (!published) {
+    // REST fallback
+    try {
+      console.log('[create-product] falling back to REST publish for product', newProductId);
+      const pubRes = await fetch(
+        `https://${env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-01/products/${newProductId}.json`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Shopify-Access-Token': await getShopifyToken(env),
+          },
+          body: JSON.stringify({ product: { id: Number(newProductId), published: true } }),
+        }
+      );
+      const pubText = await pubRes.text();
+      if (!pubRes.ok) {
+        console.warn('[create-product] REST publish failed:', pubRes.status, pubText.slice(0, 300));
+      } else {
+        let pubData;
+        try { pubData = JSON.parse(pubText); } catch { pubData = null; }
+        console.log('[create-product] REST publish ok — published_at:', pubData?.product?.published_at, 'status:', pubData?.product?.status);
+      }
+    } catch (err) {
+      console.warn('[create-product] REST publish error:', err.message);
+    }
+  }
+
+  console.log('[create-product] returning variantId:', newVariantId);
+  return new Response(JSON.stringify({ variantId: newVariantId, productId: newProductId }), { status: 200, headers });
 }
 
 async function handleListDesigns(request, env, origin) {
