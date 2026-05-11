@@ -372,48 +372,10 @@ async function handleSavePreview(request, env, origin) {
   return new Response(JSON.stringify({ design_url: designUrl, mockup_url: mockupUrl, checkout_image_url: checkoutImageUrl, id: savedId }), { status: 200, headers });
 }
 
-async function handleCreateProduct(request, env, origin) {
-  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
-
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
-
-  const { designUrl, mockupUrl, checkoutImageUrl, shader, variantId } = body;
-  if (!designUrl || !mockupUrl || !variantId) {
-    return new Response(JSON.stringify({ error: 'Missing designUrl, mockupUrl, or variantId' }), { status: 400, headers });
-  }
-
-  console.log('[create-product] variantId:', variantId, 'shader:', shader);
-  const gid = `gid://shopify/ProductVariant/${variantId}`;
-
-  // Fetch original variant price + title (size name) + parent product title
-  const variantData = await shopifyAdmin(env,
-    `query GetVariant($id: ID!) {
-      node(id: $id) {
-        ... on ProductVariant {
-          title
-          price
-          product { title }
-        }
-      }
-    }`,
-    { id: gid }
-  );
-
-  const variant = variantData?.data?.node;
-  if (!variant) {
-    console.error('[create-product] variant lookup failed:', JSON.stringify(variantData));
-    return new Response(JSON.stringify({ error: 'Could not look up variant' }), { status: 502, headers });
-  }
-
-  console.log('[create-product] source variant:', { title: variant.title, price: variant.price, product: variant.product?.title });
-  const productTitle = `Custom ${variant.product?.title || 'Design'}`;
-  const variantTitle = variant.title || 'Default Title';
-  const price        = variant.price || '0.00';
+// Shared helper: creates a Shopify product, sets variant price, and publishes to Online Store.
+// Returns { newProductId, newVariantId } (numeric strings).
+async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUrl, shader, productTitle, price, tags }) {
+  const logPrefix = '[createShopifyProduct]';
 
   // Resize the mockup to ≤2000px wide so it stays under Shopify's 25 MP limit
   let shopifyImageUrl = null;
@@ -434,7 +396,7 @@ async function handleCreateProduct(request, env, origin) {
         shopifyImageUrl = `https://${env.R2_PUBLIC_DOMAIN}/${imgKey}`;
       }
     } catch (err) {
-      console.warn('[create-product] image resize failed, skipping media:', err.message);
+      console.warn(logPrefix, 'image resize failed, skipping media:', err.message);
     }
   }
 
@@ -454,7 +416,8 @@ async function handleCreateProduct(request, env, origin) {
         title:  productTitle,
         status: 'ACTIVE',
         vendor: 'Brightfield Studio',
-        tags:   ['custom-design', `shader-${shader || 'unknown'}`],
+        tags,
+        descriptionHtml: `<p>Design URL: <a href="${designUrl}">${designUrl}</a></p>`,
         metafields: [
           { namespace: 'custom', key: 'design_url',  type: 'url',                     value: designUrl },
           { namespace: 'custom', key: 'mockup_url',  type: 'url',                     value: mockupUrl },
@@ -469,18 +432,18 @@ async function handleCreateProduct(request, env, origin) {
 
   const userErrors = createData?.data?.productCreate?.userErrors;
   if (userErrors?.length) {
-    console.error('[create-product] userErrors:', JSON.stringify(userErrors));
-    return new Response(JSON.stringify({ error: userErrors[0].message }), { status: 422, headers });
+    console.error(logPrefix, 'userErrors:', JSON.stringify(userErrors));
+    throw new Error(userErrors[0].message);
   }
 
-  const newProductGid  = createData?.data?.productCreate?.product?.id;
-  const newVariantGid  = createData?.data?.productCreate?.product?.variants?.edges?.[0]?.node?.id;
+  const newProductGid = createData?.data?.productCreate?.product?.id;
+  const newVariantGid = createData?.data?.productCreate?.product?.variants?.edges?.[0]?.node?.id;
   if (!newVariantGid) {
-    console.error('[create-product] no variant returned:', JSON.stringify(createData));
-    return new Response(JSON.stringify({ error: 'Product created but no variant returned' }), { status: 502, headers });
+    console.error(logPrefix, 'no variant returned:', JSON.stringify(createData));
+    throw new Error('Product created but no variant returned');
   }
 
-  // Step 2: set price (and size title via option) on the auto-created default variant
+  // Step 2: set price on the auto-created default variant
   const updateData = await shopifyAdmin(env,
     `mutation UpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
       productVariantsBulkUpdate(productId: $productId, variants: $variants) {
@@ -496,22 +459,20 @@ async function handleCreateProduct(request, env, origin) {
 
   const updateErrors = updateData?.data?.productVariantsBulkUpdate?.userErrors;
   if (updateErrors?.length) {
-    console.error('[create-product] variant update errors:', JSON.stringify(updateErrors));
+    console.error(logPrefix, 'variant update errors:', JSON.stringify(updateErrors));
     // Non-fatal: product exists, just price may be wrong
   }
 
-  // Strip GID prefix → numeric ID for Shopify storefront use
   const newVariantId = newVariantGid.replace('gid://shopify/ProductVariant/', '');
   const newProductId = newProductGid.replace('gid://shopify/Product/', '');
 
-  console.log('[create-product] new product:', newProductId, 'new variant:', newVariantId);
+  console.log(logPrefix, 'new product:', newProductId, 'new variant:', newVariantId);
 
-  // Step 3: publish to Online Store so /cart/add.js can find the variant.
-  // Try GraphQL publishablePublish first (more reliable), fall back to REST.
+  // Step 3: publish to Online Store. Try GraphQL first, fall back to REST.
   let published = false;
   try {
     const publicationId = await getOnlineStorePublicationId(env);
-    console.log('[create-product] Online Store publicationId:', publicationId);
+    console.log(logPrefix, 'Online Store publicationId:', publicationId);
     if (publicationId) {
       const pubData = await shopifyAdmin(env,
         `mutation Publish($id: ID!, $input: [PublicationInput!]!) {
@@ -522,19 +483,18 @@ async function handleCreateProduct(request, env, origin) {
         }`,
         { id: newProductGid, input: [{ publicationId }] }
       );
-      const userErrors = pubData?.data?.publishablePublish?.userErrors;
-      const result     = pubData?.data?.publishablePublish?.publishable;
-      console.log('[create-product] publishablePublish result:', JSON.stringify({ result, userErrors }));
-      if (!userErrors?.length) published = true;
+      const pubErrors = pubData?.data?.publishablePublish?.userErrors;
+      const result    = pubData?.data?.publishablePublish?.publishable;
+      console.log(logPrefix, 'publishablePublish result:', JSON.stringify({ result, pubErrors }));
+      if (!pubErrors?.length) published = true;
     }
   } catch (err) {
-    console.warn('[create-product] publishablePublish error:', err.message);
+    console.warn(logPrefix, 'publishablePublish error:', err.message);
   }
 
   if (!published) {
-    // REST fallback
     try {
-      console.log('[create-product] falling back to REST publish for product', newProductId);
+      console.log(logPrefix, 'falling back to REST publish for product', newProductId);
       const pubRes = await fetch(
         `https://${env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-01/products/${newProductId}.json`,
         {
@@ -548,19 +508,100 @@ async function handleCreateProduct(request, env, origin) {
       );
       const pubText = await pubRes.text();
       if (!pubRes.ok) {
-        console.warn('[create-product] REST publish failed:', pubRes.status, pubText.slice(0, 300));
+        console.warn(logPrefix, 'REST publish failed:', pubRes.status, pubText.slice(0, 300));
       } else {
         let pubData;
         try { pubData = JSON.parse(pubText); } catch { pubData = null; }
-        console.log('[create-product] REST publish ok — published_at:', pubData?.product?.published_at, 'status:', pubData?.product?.status);
+        console.log(logPrefix, 'REST publish ok — published_at:', pubData?.product?.published_at);
       }
     } catch (err) {
-      console.warn('[create-product] REST publish error:', err.message);
+      console.warn(logPrefix, 'REST publish error:', err.message);
     }
   }
 
-  console.log('[create-product] returning variantId:', newVariantId);
-  return new Response(JSON.stringify({ variantId: newVariantId, productId: newProductId }), { status: 200, headers });
+  return { newProductId, newVariantId };
+}
+
+// Looks up the first variant of a product by handle. Returns { variantId, price, productTitle }.
+async function getDefaultVariantForHandle(env, handle) {
+  const data = await shopifyAdmin(env,
+    `query GetProductByHandle($handle: String!) {
+      productByHandle(handle: $handle) {
+        title
+        variants(first: 1) { edges { node { id price } } }
+      }
+    }`,
+    { handle }
+  );
+  const product = data?.data?.productByHandle;
+  if (!product) return null;
+  const variantNode = product.variants?.edges?.[0]?.node;
+  if (!variantNode) return null;
+  return {
+    variantId:    variantNode.id.replace('gid://shopify/ProductVariant/', ''),
+    price:        variantNode.price || '0.00',
+    productTitle: product.title || 'Design',
+  };
+}
+
+async function handleCreateProduct(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
+  }
+
+  const { designUrl, mockupUrl, checkoutImageUrl, shader, variantId } = body;
+  if (!designUrl || !mockupUrl || !variantId) {
+    return new Response(JSON.stringify({ error: 'Missing designUrl, mockupUrl, or variantId' }), { status: 400, headers });
+  }
+
+  console.log('[create-product] variantId:', variantId, 'shader:', shader);
+  const gid = `gid://shopify/ProductVariant/${variantId}`;
+
+  // Fetch original variant price + parent product title
+  const variantData = await shopifyAdmin(env,
+    `query GetVariant($id: ID!) {
+      node(id: $id) {
+        ... on ProductVariant {
+          title
+          price
+          product { title }
+        }
+      }
+    }`,
+    { id: gid }
+  );
+
+  const variant = variantData?.data?.node;
+  if (!variant) {
+    console.error('[create-product] variant lookup failed:', JSON.stringify(variantData));
+    return new Response(JSON.stringify({ error: 'Could not look up variant' }), { status: 502, headers });
+  }
+
+  console.log('[create-product] source variant:', { title: variant.title, price: variant.price, product: variant.product?.title });
+  const price = variant.price || '0.00';
+
+  let result;
+  try {
+    result = await createShopifyProduct(env, {
+      designUrl,
+      mockupUrl,
+      checkoutImageUrl,
+      shader,
+      productTitle: `Custom ${variant.product?.title || 'Design'}`,
+      price,
+      tags: ['custom-design', `shader-${shader || 'unknown'}`],
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 422, headers });
+  }
+
+  console.log('[create-product] returning variantId:', result.newVariantId);
+  return new Response(JSON.stringify({ variantId: result.newVariantId, productId: result.newProductId }), { status: 200, headers });
 }
 
 async function handleListDesigns(request, env, origin) {
@@ -799,6 +840,30 @@ async function handleCommunityModerate(request, env, origin, newStatus) {
   }
 
   submission.status = newStatus;
+
+  if (newStatus === 'approved' && submission.productHandle) {
+    try {
+      const sourceVariant = await getDefaultVariantForHandle(env, submission.productHandle);
+      if (sourceVariant) {
+        const result = await createShopifyProduct(env, {
+          designUrl:  submission.designUrl,
+          mockupUrl:  submission.mockupUrl,
+          shader:     submission.shader,
+          productTitle: `Community ${sourceVariant.productTitle}`,
+          price:      sourceVariant.price,
+          tags:       ['community-design', `shader-${submission.shader || 'unknown'}`],
+        });
+        submission.shopifyProductId = result.newProductId;
+        submission.shopifyVariantId = result.newVariantId;
+        console.log('[community/approve] created product', result.newProductId, 'for submission', id);
+      } else {
+        console.warn('[community/approve] could not resolve product handle:', submission.productHandle);
+      }
+    } catch (err) {
+      console.error('[community/approve] product creation failed (non-fatal):', err.message);
+    }
+  }
+
   await writeJson(env, `community/submissions/${id}.json`, submission);
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
 }
