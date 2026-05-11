@@ -419,7 +419,7 @@ async function handleCreateProduct(request, env, origin) {
   let shopifyImageUrl = null;
   if (env.IMAGES) {
     try {
-      const imgRes = await fetch(mockupUrl);
+      const imgRes = await fetch(checkoutImageUrl || mockupUrl);
       if (imgRes.ok) {
         const imgBuf   = await imgRes.arrayBuffer();
         const resized  = await env.IMAGES
