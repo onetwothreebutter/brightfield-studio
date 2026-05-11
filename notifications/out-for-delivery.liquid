@@ -221,7 +221,7 @@
     {% assign css_order_list_parent_image_cell_nested_line_parent_class = 'order-list__nested-parent-image-cell' %}
   {% endif %}
 
-  {% assign line_design_url = line.line_item.properties['_design_url'] %}
+  {% assign line_design_url = line.line_item.properties['_checkout_image'] | default: line.line_item.properties['_design_url'] %}
   <tr class="order-list__item">
     <td class="order-list__item__cell {{ css_order_list_cell_nested_line_parent_class }}">
       <table height="100%">
