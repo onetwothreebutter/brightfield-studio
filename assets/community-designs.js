@@ -94,20 +94,31 @@
       orderBtn.disabled    = true;
       orderBtn.textContent = 'Saving…';
 
+      // If the community design has its own Shopify product (created on approval),
+      // add that variant so the checkout thumbnail shows the design image rather
+      // than the in-house shirt. The user-selected size is passed as a property.
+      var cartVariantId = Number(variantId);
+      var properties = {
+        '_design_url':     designUrl,
+        '_mockup_url':     mockupUrl,
+        '_checkout_image': _buyDesign.checkoutImageUrl || _buyDesign.checkout_image_url || designUrl,
+        '_design_id':      _buyDesign.id,
+        'Design Type':     'Community Design',
+        'Designer':        _buyDesign.creatorName || 'Anonymous'
+      };
+      if (_buyDesign.shopifyVariantId) {
+        cartVariantId = Number(_buyDesign.shopifyVariantId);
+        var selectedOpt = sizeSelect.options[sizeSelect.selectedIndex];
+        if (selectedOpt) properties['Size'] = selectedOpt.text;
+      }
+
       fetch('/cart/add.js', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id:       Number(variantId),
+          id:       cartVariantId,
           quantity: 1,
-          properties: {
-            '_design_url':     designUrl,
-            '_mockup_url':     mockupUrl,
-            '_checkout_image': _buyDesign.checkoutImageUrl || _buyDesign.checkout_image_url || designUrl,
-            '_design_id':      _buyDesign.id,
-            'Design Type':     'Community Design',
-            'Designer':        _buyDesign.creatorName || 'Anonymous'
-          }
+          properties: properties
         })
       })
       .then(function (r) {
