@@ -469,6 +469,7 @@ h6 {
 
 /* ─── Product Card ───────────────────────────────────────── */
 .product-card {
+    position: relative;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
@@ -490,6 +491,22 @@ h6 {
 
 .product-card__link {
     display: contents;
+}
+
+.product-card__glow {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        135deg,
+        rgba(0, 255, 255, 0.07) 0%,
+        rgba(255, 0, 255, 0.07) 100%
+    );
+    opacity: 0;
+    transition: opacity var(--transition-base);
+    pointer-events: none;
+}
+.product-card:hover .product-card__glow {
+    opacity: 1;
 }
 
 .product-card__media {
@@ -515,21 +532,6 @@ h6 {
     height: 100%;
 }
 
-.product-card__glow {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-        135deg,
-        rgba(0, 255, 255, 0.07) 0%,
-        rgba(255, 0, 255, 0.07) 100%
-    );
-    opacity: 0;
-    transition: opacity var(--transition-base);
-    pointer-events: none;
-}
-.product-card:hover .product-card__glow {
-    opacity: 1;
-}
 
 .product-card__info {
     padding: 1.125rem 1.25rem 0.625rem;

@@ -8,6 +8,7 @@
 {% enddoc %}
 
 <article class="product-card">
+  <div class="product-card__glow" aria-hidden="true"></div>
   <a href="{{ product.url }}" class="product-card__link" aria-label="{{ product.title | escape }}">
     <div class="product-card__media">
       {%- if product.featured_image -%}
@@ -24,7 +25,6 @@
       {%- else -%}
         <div class="product-card__image product-card__image--placeholder"></div>
       {%- endif -%}
-      <div class="product-card__glow" aria-hidden="true"></div>
     </div>
 
     <div class="product-card__info">
