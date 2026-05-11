@@ -1424,15 +1424,22 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           var compositeDataUrl = canvas.toDataURL('image/png');
           var snapshotValues = JSON.parse(JSON.stringify(window._shaderState ? window._shaderState.values : {}));
 
-          // Create checkout image at display resolution (600×800) — full print res is
+          // Create checkout image at display resolution (600×600) — full print res is
           // wasteful for a checkout thumbnail and allocates ~17 MB of bitmap memory.
           var checkoutCanvas = document.createElement('canvas');
           checkoutCanvas.width  = 600;
-          checkoutCanvas.height = 800;
+          checkoutCanvas.height = 600;
           var checkoutCtx = checkoutCanvas.getContext('2d');
           checkoutCtx.fillStyle = '#000';
-          checkoutCtx.fillRect(0, 0, 600, 800);
-          checkoutCtx.drawImage(designImg, 0, 0, 600, 800);
+          checkoutCtx.fillRect(0, 0, 600, 600);
+          var coAspect = designImg.naturalWidth / designImg.naturalHeight;
+          var coW, coH, coX, coY;
+          if (coAspect > 1) {
+            coW = 600; coH = Math.round(600 / coAspect); coX = 0; coY = Math.round((600 - coH) / 2);
+          } else {
+            coH = 600; coW = Math.round(600 * coAspect); coX = Math.round((600 - coW) / 2); coY = 0;
+          }
+          checkoutCtx.drawImage(designImg, coX, coY, coW, coH);
           var base64CheckoutPng = checkoutCanvas.toDataURL('image/png').split(',')[1];
 
           // Show modal immediately — no waiting for API
