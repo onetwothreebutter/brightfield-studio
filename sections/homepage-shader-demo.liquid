@@ -1520,8 +1520,8 @@
         alert('Generate a preview first.');
         return;
       }
-      var variantId = mockupSizeEl ? mockupSizeEl.value : null;
-      if (!variantId) {
+      var shopifyVariantId = mockupSizeEl ? mockupSizeEl.value : null;
+      if (!shopifyVariantId) {
         alert('Could not determine variant. Please select a size and try again.');
         return;
       }
@@ -1530,19 +1530,57 @@
 
       _pendingDesign.uploadPromise
         .then(function (data) {
-          return fetch('/cart/add.js', {
+          mockupOrder.textContent = 'Creating your design\u2026';
+          var cpBody = {
+            designUrl:        data.design_url,
+            mockupUrl:        data.mockup_url,
+            checkoutImageUrl: data.checkout_image_url || data.design_url,
+            shader:           PRODUCT_HANDLE,
+            variantId:        shopifyVariantId
+          };
+          return fetch(WORKER_BASE_URL + '/create-product', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id:       Number(variantId),
-              quantity: 1,
-              properties: {
-                '_design_url':   data.design_url,
-                '_mockup_url':   data.mockup_url,
-                'Customization': 'Custom Shader Design',
-                'Design URL':    data.design_url
+            body:    JSON.stringify(cpBody)
+          })
+          .then(function (cpRes) {
+            return cpRes.json().then(function (cpData) {
+              var cartVariantId = (cpRes.ok && cpData.variantId) ? cpData.variantId : shopifyVariantId;
+              var cartPayload = JSON.stringify({
+                id:       Number(cartVariantId),
+                quantity: 1,
+                properties: {
+                  '_design_url':     data.design_url,
+                  '_mockup_url':     data.mockup_url,
+                  '_checkout_image': data.checkout_image_url || data.design_url,
+                  'Customization':   'Custom Shader Design'
+                }
+              });
+              function addToCartWithRetry(attempt) {
+                return fetch('/cart/add.js', {
+                  method:  'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body:    cartPayload
+                }).then(function (r) {
+                  if (!r.ok && attempt < 4) {
+                    return r.text().then(function (text) {
+                      var desc = '';
+                      try { desc = JSON.parse(text).description || ''; } catch (e) {}
+                      if (desc.toLowerCase().indexOf('cannot find variant') !== -1 ||
+                          desc.toLowerCase().indexOf('cannot find') !== -1) {
+                        var delay = 1500 * attempt;
+                        return new Promise(function (resolve) {
+                          setTimeout(function () { resolve(addToCartWithRetry(attempt + 1)); }, delay);
+                        });
+                      }
+                      return new Response(text, { status: r.status, headers: { 'Content-Type': 'application/json' } });
+                    });
+                  }
+                  return r;
+                });
               }
-            })
+              return addToCartWithRetry(1);
+            });
           });
         })
         .then(function (r) {
