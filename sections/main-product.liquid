@@ -1701,13 +1701,14 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({
-              shader:        _pendingDesign.shader,
-              productHandle: _pendingDesign.productHandle,
-              designUrl:     data.design_url,
-              mockupUrl:     data.mockup_url,
-              values:        _pendingDesign.values,
-              creatorName:   name,
-              creatorEmail:  email
+              shader:           _pendingDesign.shader,
+              productHandle:    _pendingDesign.productHandle,
+              designUrl:        data.design_url,
+              mockupUrl:        data.mockup_url,
+              checkoutImageUrl: data.checkout_image_url,
+              values:           _pendingDesign.values,
+              creatorName:      name,
+              creatorEmail:     email
             })
           });
         })

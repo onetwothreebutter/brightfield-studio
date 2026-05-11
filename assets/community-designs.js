@@ -101,11 +101,12 @@
           id:       Number(variantId),
           quantity: 1,
           properties: {
-            '_design_url':    designUrl,
-            '_mockup_url':    mockupUrl,
-            '_design_id':     _buyDesign.id,
-            'Design Type':    'Community Design',
-            'Designer':       _buyDesign.creatorName || 'Anonymous'
+            '_design_url':     designUrl,
+            '_mockup_url':     mockupUrl,
+            '_checkout_image': _buyDesign.checkoutImageUrl || _buyDesign.checkout_image_url || designUrl,
+            '_design_id':      _buyDesign.id,
+            'Design Type':     'Community Design',
+            'Designer':        _buyDesign.creatorName || 'Anonymous'
           }
         })
       })

@@ -1494,11 +1494,12 @@
           if (!data.design_url) throw new Error(data.error || 'Upload failed');
           currentDesignUrl = data.design_url;
           _lastMockupData = {
-            mockupUrl:     data.mockup_url,
-            designUrl:     data.design_url,
-            shader:        PRODUCT_HANDLE,
-            productHandle: PRODUCT_HANDLE,
-            values:        snapshotValues
+            mockupUrl:        data.mockup_url,
+            designUrl:        data.design_url,
+            checkoutImageUrl: data.checkout_image_url,
+            shader:           PRODUCT_HANDLE,
+            productHandle:    PRODUCT_HANDLE,
+            values:           snapshotValues
           };
           // Upgrade "Yours" download link to stable hosted URL
           if (mockupDownload) mockupDownload.href = data.mockup_url;
@@ -1778,13 +1779,14 @@
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mockupUrl:     _lastMockupData.mockupUrl,
-          designUrl:     _lastMockupData.designUrl,
-          shader:        _lastMockupData.shader,
-          productHandle: _lastMockupData.productHandle,
-          values:        _lastMockupData.values,
-          creatorName:   name,
-          creatorEmail:  email,
+          mockupUrl:        _lastMockupData.mockupUrl,
+          designUrl:        _lastMockupData.designUrl,
+          checkoutImageUrl: _lastMockupData.checkoutImageUrl,
+          shader:           _lastMockupData.shader,
+          productHandle:    _lastMockupData.productHandle,
+          values:           _lastMockupData.values,
+          creatorName:      name,
+          creatorEmail:     email,
         })
       })
       .then(function (r) {

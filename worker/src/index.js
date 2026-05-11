@@ -717,7 +717,7 @@ async function handleCommunitySubmit(request, env, origin) {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
   }
 
-  const { shader, productHandle, designUrl, mockupUrl, values, creatorName, creatorEmail } = body;
+  const { shader, productHandle, designUrl, mockupUrl, checkoutImageUrl, values, creatorName, creatorEmail } = body;
   if (!mockupUrl || !creatorName || !shader) {
     return new Response(JSON.stringify({ error: 'Missing required fields: mockupUrl, creatorName, shader' }), { status: 400, headers });
   }
@@ -726,15 +726,16 @@ async function handleCommunitySubmit(request, env, origin) {
   const submission = {
     id,
     shader,
-    productHandle: productHandle || '',
-    designUrl:     designUrl || '',
+    productHandle:    productHandle || '',
+    designUrl:        designUrl || '',
     mockupUrl,
-    values: values || {},
-    timestamp: Math.floor(Date.now() / 1000),
-    status: 'pending',
+    checkoutImageUrl: checkoutImageUrl || '',
+    values:           values || {},
+    timestamp:        Math.floor(Date.now() / 1000),
+    status:           'pending',
     creatorName,
-    creatorEmail: creatorEmail || '',
-    likes: 0,
+    creatorEmail:     creatorEmail || '',
+    likes:            0,
   };
 
   await writeJson(env, `community/submissions/${id}.json`, submission);
@@ -846,12 +847,13 @@ async function handleCommunityModerate(request, env, origin, newStatus) {
       const sourceVariant = await getDefaultVariantForHandle(env, submission.productHandle);
       if (sourceVariant) {
         const result = await createShopifyProduct(env, {
-          designUrl:  submission.designUrl,
-          mockupUrl:  submission.mockupUrl,
-          shader:     submission.shader,
-          productTitle: `Community ${sourceVariant.productTitle}`,
-          price:      sourceVariant.price,
-          tags:       ['community-design', `shader-${submission.shader || 'unknown'}`],
+          designUrl:        submission.designUrl,
+          mockupUrl:        submission.mockupUrl,
+          checkoutImageUrl: submission.checkoutImageUrl || '',
+          shader:           submission.shader,
+          productTitle:     `Community ${sourceVariant.productTitle}`,
+          price:            sourceVariant.price,
+          tags:             ['community-design', `shader-${submission.shader || 'unknown'}`],
         });
         submission.shopifyProductId = result.newProductId;
         submission.shopifyVariantId = result.newVariantId;
