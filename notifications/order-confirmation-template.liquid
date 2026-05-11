@@ -376,7 +376,7 @@
                 </td>
               {% else %}
                   <td class="order-list__image-cell">
-                    {% assign line_design_url = line.properties['_design_url'] %}
+                    {% assign line_design_url = line.properties['_checkout_image'] | default: line.properties['_design_url'] %}
                     {% if line_design_url %}
                       <div style="background-color:#000000;display:inline-block;line-height:0;font-size:0;border-radius:8px;overflow:hidden;margin-right:10px;">
                         <img src="{{ line_design_url }}" align="left" width="60" style="border:none;margin:10px;" class="order-list__product-image"/>
@@ -1077,7 +1077,7 @@
                 </td>
               {% else %}
                   <td class="order-list__image-cell">
-                    {% assign line_design_url = line.properties['_design_url'] %}
+                    {% assign line_design_url = line.properties['_checkout_image'] | default: line.properties['_design_url'] %}
                     {% if line_design_url %}
                       <div style="background-color:#000000;display:inline-block;line-height:0;font-size:0;border-radius:8px;overflow:hidden;margin-right:10px;">
                         <img src="{{ line_design_url }}" align="left" width="60" style="border:none;margin:10px;" class="order-list__product-image"/>
@@ -2072,7 +2072,7 @@
                 </td>
               {% else %}
                   <td class="order-list__image-cell">
-                    {% assign line_design_url = line.properties['_design_url'] %}
+                    {% assign line_design_url = line.properties['_checkout_image'] | default: line.properties['_design_url'] %}
                     {% if line_design_url %}
                       <div style="background-color:#000000;display:inline-block;line-height:0;font-size:0;border-radius:8px;overflow:hidden;margin-right:10px;">
                         <img src="{{ line_design_url }}" align="left" width="60" style="border:none;margin:10px;" class="order-list__product-image"/>
@@ -2404,7 +2404,7 @@
                 </td>
               {% else %}
                   <td class="order-list__image-cell">
-                    {% assign line_design_url = line.properties['_design_url'] %}
+                    {% assign line_design_url = line.properties['_checkout_image'] | default: line.properties['_design_url'] %}
                     {% if line_design_url %}
                       <div style="background-color:#000000;display:inline-block;line-height:0;font-size:0;border-radius:8px;overflow:hidden;margin-right:10px;">
                         <img src="{{ line_design_url }}" align="left" width="60" style="border:none;margin:10px;" class="order-list__product-image"/>
