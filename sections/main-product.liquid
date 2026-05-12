@@ -1565,15 +1565,20 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
             var cartVariantId = (cpRes.ok && cpData.variantId) ? cpData.variantId : shopifyVariantId;
             if (!cpRes.ok) console.error('[create-product] failed, falling back to original variant:', cpData);
             console.log('[add-to-cart] using cartVariantId:', cartVariantId);
+            var cartProps = {
+              '_design_url':     data.design_url,
+              '_mockup_url':     data.mockup_url,
+              '_checkout_image': data.checkout_image_url || data.design_url,
+              'Customization': 'Custom Shader Design'
+            };
+            if (sizeSelect) {
+              var selectedSizeOpt = sizeSelect.options[sizeSelect.selectedIndex];
+              if (selectedSizeOpt) cartProps['Size'] = selectedSizeOpt.text;
+            }
             var cartPayload = JSON.stringify({
               id:       Number(cartVariantId),
               quantity: 1,
-              properties: {
-                '_design_url':     data.design_url,
-                '_mockup_url':     data.mockup_url,
-                '_checkout_image': data.checkout_image_url || data.design_url,
-                'Customization': 'Custom Shader Design'
-              }
+              properties: cartProps
             });
             // Shopify needs a moment to index a brand-new variant before /cart/add.js
             // can find it. Retry up to 4 times with exponential backoff.
