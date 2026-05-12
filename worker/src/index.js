@@ -54,7 +54,9 @@ async function shopifyAdmin(env, query, variables) {
       body: JSON.stringify({ query, variables }),
     }
   );
-  return res.json();
+  const data = await res.json();
+  if (data?.errors) console.error('[shopifyAdmin] errors:', JSON.stringify(data.errors));
+  return data;
 }
 
 async function getOnlineStorePublicationId(env) {
