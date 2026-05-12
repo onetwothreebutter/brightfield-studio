@@ -12,6 +12,7 @@ const PRINT_HEIGHT = 2400;
 let _shopifyToken = null;
 let _shopifyTokenExpiry = 0;
 let _onlineStorePublicationId = null;
+let _printfulFulfillmentServiceId = null;
 
 async function getShopifyToken(env) {
   if (_shopifyToken && Date.now() < _shopifyTokenExpiry) return _shopifyToken;
@@ -64,6 +65,16 @@ async function getOnlineStorePublicationId(env) {
   const match = edges.find(e => e.node.name === 'Online Store');
   if (match) _onlineStorePublicationId = match.node.id;
   return _onlineStorePublicationId;
+}
+
+async function getPrintfulFulfillmentServiceId(env) {
+  if (_printfulFulfillmentServiceId) return _printfulFulfillmentServiceId;
+  const data = await shopifyAdmin(env, `query { fulfillmentServices { id serviceName handle } }`);
+  const services = data?.data?.fulfillmentServices || [];
+  console.log('[fulfillmentServices] available:', services.map(s => s.handle));
+  const match = services.find(s => s.handle?.toLowerCase().includes('printful') || s.serviceName?.toLowerCase().includes('printful'));
+  if (match) _printfulFulfillmentServiceId = match.id;
+  return _printfulFulfillmentServiceId;
 }
 
 function isAllowedOrigin(origin) {
@@ -443,7 +454,14 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     throw new Error('Product created but no variant returned');
   }
 
-  // Step 2: set price on the auto-created default variant
+  // Step 2: set price + Printful fulfillment service on the auto-created default variant
+  const printfulServiceId = await getPrintfulFulfillmentServiceId(env);
+  console.log(logPrefix, 'Printful fulfillment service ID:', printfulServiceId);
+  const variantInput = { id: newVariantGid, price };
+  if (printfulServiceId) {
+    variantInput.fulfillmentServiceId = printfulServiceId;
+    variantInput.inventoryManagement = 'FULFILLMENT_SERVICE';
+  }
   const updateData = await shopifyAdmin(env,
     `mutation UpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
       productVariantsBulkUpdate(productId: $productId, variants: $variants) {
@@ -453,7 +471,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     }`,
     {
       productId: newProductGid,
-      variants: [{ id: newVariantGid, price }],
+      variants: [variantInput],
     }
   );
 
