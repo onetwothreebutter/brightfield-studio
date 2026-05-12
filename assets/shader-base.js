@@ -284,6 +284,9 @@
       if (window[stateKey]) {
         window[stateKey].textDirty = true;
       }
+      exporting = true;
+      render(); // redraw at display size immediately so canvas doesn't flash black
+      exporting = false;
 
       callback(dataUrl.split(',')[1]); // base64 only
     };
