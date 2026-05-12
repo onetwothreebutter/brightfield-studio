@@ -71,8 +71,8 @@ async function getOnlineStorePublicationId(env) {
 
 async function getPrintfulFulfillmentServiceId(env) {
   if (_printfulFulfillmentServiceId) return _printfulFulfillmentServiceId;
-  const data = await shopifyAdmin(env, `query { fulfillmentServices { id serviceName handle } }`);
-  const services = data?.data?.fulfillmentServices || [];
+  const data = await shopifyAdmin(env, `query { shop { fulfillmentServices { id serviceName handle } } }`);
+  const services = data?.data?.shop?.fulfillmentServices || [];
   console.log('[fulfillmentServices] available:', services.map(s => s.handle));
   const match = services.find(s => s.handle?.toLowerCase().includes('printful') || s.serviceName?.toLowerCase().includes('printful'));
   if (match) _printfulFulfillmentServiceId = match.id;
