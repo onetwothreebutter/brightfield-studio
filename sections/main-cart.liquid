@@ -68,9 +68,11 @@
                     {%- endif -%}
                   {%- endif -%}
                 </a>
-                {%- unless item.variant.title == 'Default Title' -%}
+                {%- if item.properties['Size'] != blank -%}
+                  <p class="cart-item__variant">{{ item.properties['Size'] }}</p>
+                {%- elsif item.variant.title != 'Default Title' -%}
                   <p class="cart-item__variant">{{ item.variant.title }}</p>
-                {%- endunless -%}
+                {%- endif -%}
                 <p class="cart-item__price">{{ item.final_line_price | money }}</p>
 
                 <div class="cart-item__qty">
