@@ -1401,6 +1401,24 @@ h6 {
         display: block;
     }
 }
+
+/* On desktop, constrain the info column so the Preview button is always in-viewport */
+@media (min-width: 901px) {
+    .product-layout.shader-mode .product-info {
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100vh - var(--header-height) - 3rem);
+    }
+    .product-layout.shader-mode .shader-gui {
+        flex: 1;
+        max-height: none;
+        min-height: 0;
+    }
+    .product-layout.shader-mode .shader-gui__preview {
+        flex-shrink: 0;
+    }
+}
+
 .shader-gui__body {
     padding: 0.25rem 0;
 }
