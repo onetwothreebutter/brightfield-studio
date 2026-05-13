@@ -411,7 +411,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
         console.log(logPrefix, 'IMAGES resize succeeded');
       }
     } catch (err) {
-      console.warn(logPrefix, 'IMAGES resize failed, trying cf.image fallback:', err.message);
+      console.warn(logPrefix, 'IMAGES resize failed, trying cf.image fallback:', err.message, err.toString());
     }
   }
 
@@ -438,7 +438,9 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     shopifyImageUrl = `https://${env.R2_PUBLIC_DOMAIN}/${imgKey}`;
     console.log(logPrefix, 'media uploaded to R2:', shopifyImageUrl);
   } else {
-    console.warn(logPrefix, 'all resize methods failed — product will be created without media');
+    // Both resize methods failed — use the original R2 URL directly since it's already public
+    shopifyImageUrl = mediaSource;
+    console.warn(logPrefix, 'all resize methods failed — using original URL as product image:', shopifyImageUrl);
   }
 
   // Step 1: create the product (variants not accepted in ProductInput in 2025-01+)
