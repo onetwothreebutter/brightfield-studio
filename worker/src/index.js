@@ -392,7 +392,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
 
   // Resize the mockup to ≤2000px wide so it stays under Shopify's 25 MP limit
   let shopifyImageUrl = null;
-  const mediaSource = checkoutImageUrl || mockupUrl;
+  const mediaSource = checkoutImageUrl || designUrl || mockupUrl;
   console.log(logPrefix, 'media source URL:', mediaSource);
 
   // Try IMAGES binding first; fall back to cf.image fetch; skip if both fail
