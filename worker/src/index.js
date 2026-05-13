@@ -468,7 +468,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     }`,
     {
       productId: newProductGid,
-      variants: [{ id: newVariantGid, price }],
+      variants: [{ id: newVariantGid, price, sku: `CUSTOM-${Date.now()}` }],
     }
   );
 
