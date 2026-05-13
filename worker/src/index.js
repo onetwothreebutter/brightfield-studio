@@ -415,10 +415,12 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
         console.warn(logPrefix, 'media fetch failed, skipping media:', imgRes.status, imgRes.statusText);
       }
     } catch (err) {
-      console.warn(logPrefix, 'image resize failed, skipping media:', err.message);
+      console.warn(logPrefix, 'image resize failed, falling back to original URL:', err.message);
+      shopifyImageUrl = mediaSource;
     }
   } else {
-    console.warn(logPrefix, 'IMAGES binding not available, skipping media');
+    console.warn(logPrefix, 'IMAGES binding not available, using original URL');
+    shopifyImageUrl = mediaSource;
   }
 
   // Step 1: create the product (variants not accepted in ProductInput in 2025-01+)
