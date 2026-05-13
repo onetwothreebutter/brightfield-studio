@@ -468,7 +468,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     }`,
     {
       productId: newProductGid,
-      variants: [{ id: newVariantGid, price, sku: `${tags?.includes('community-design') ? 'COMMUNITY' : 'CUSTOM'}-${Date.now()}` }],
+      variants: [{ id: newVariantGid, price }],
     }
   );
 
@@ -478,7 +478,24 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     // Non-fatal: product exists, just price may be wrong
   }
 
-  // Step 2b: activate inventory at the Printful fulfillment service location
+  // Step 2b: set SKU on the inventory item (required by Printful before inventoryActivate)
+  if (inventoryItemGid) {
+    const skuPrefix = tags?.includes('community-design') ? 'COMMUNITY' : 'CUSTOM';
+    const skuData = await shopifyAdmin(env,
+      `mutation UpdateInventoryItem($id: ID!, $input: InventoryItemInput!) {
+        inventoryItemUpdate(id: $id, input: $input) {
+          inventoryItem { id sku }
+          userErrors { field message }
+        }
+      }`,
+      { id: inventoryItemGid, input: { sku: `${skuPrefix}-${Date.now()}` } }
+    );
+    const skuErrors = skuData?.data?.inventoryItemUpdate?.userErrors;
+    if (skuErrors?.length) console.error(logPrefix, 'SKU update errors:', JSON.stringify(skuErrors));
+    else console.log(logPrefix, 'SKU set:', skuData?.data?.inventoryItemUpdate?.inventoryItem?.sku);
+  }
+
+  // Step 2c: activate inventory at the Printful fulfillment service location
   const printfulLocationId = await getPrintfulLocationId(env);
   console.log(logPrefix, 'Printful location ID:', printfulLocationId);
   if (printfulLocationId && inventoryItemGid) {
