@@ -392,9 +392,12 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
 
   // Resize the mockup to ≤2000px wide so it stays under Shopify's 25 MP limit
   let shopifyImageUrl = null;
+  const mediaSource = checkoutImageUrl || mockupUrl;
+  console.log(logPrefix, 'media source URL:', mediaSource);
   if (env.IMAGES) {
     try {
-      const imgRes = await fetch(checkoutImageUrl || mockupUrl);
+      const imgRes = await fetch(mediaSource);
+      console.log(logPrefix, 'media fetch status:', imgRes.status);
       if (imgRes.ok) {
         const imgBuf   = await imgRes.arrayBuffer();
         const resized  = await env.IMAGES
@@ -407,10 +410,15 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
           httpMetadata: { contentType: 'image/jpeg' },
         });
         shopifyImageUrl = `https://${env.R2_PUBLIC_DOMAIN}/${imgKey}`;
+        console.log(logPrefix, 'media uploaded to R2:', shopifyImageUrl);
+      } else {
+        console.warn(logPrefix, 'media fetch failed, skipping media:', imgRes.status, imgRes.statusText);
       }
     } catch (err) {
       console.warn(logPrefix, 'image resize failed, skipping media:', err.message);
     }
+  } else {
+    console.warn(logPrefix, 'IMAGES binding not available, skipping media');
   }
 
   // Step 1: create the product (variants not accepted in ProductInput in 2025-01+)
