@@ -394,33 +394,51 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
   let shopifyImageUrl = null;
   const mediaSource = checkoutImageUrl || mockupUrl;
   console.log(logPrefix, 'media source URL:', mediaSource);
+
+  // Try IMAGES binding first; fall back to cf.image fetch; skip if both fail
+  let resizedBuf = null;
   if (env.IMAGES) {
     try {
       const imgRes = await fetch(mediaSource);
-      console.log(logPrefix, 'media fetch status:', imgRes.status);
+      console.log(logPrefix, 'media fetch status (IMAGES path):', imgRes.status);
       if (imgRes.ok) {
-        const imgBuf   = await imgRes.arrayBuffer();
-        const resized  = await env.IMAGES
+        const imgBuf = await imgRes.arrayBuffer();
+        const resized = await env.IMAGES
           .input(imgBuf)
           .transform({ width: 2000, fit: 'scale-down' })
           .output({ format: 'image/jpeg', quality: 85 });
-        const resizedBuf = await resized.response().arrayBuffer();
-        const imgKey     = `product-images/${crypto.randomUUID()}.jpg`;
-        await env.MOCKUP_STAGING.put(imgKey, resizedBuf, {
-          httpMetadata: { contentType: 'image/jpeg' },
-        });
-        shopifyImageUrl = `https://${env.R2_PUBLIC_DOMAIN}/${imgKey}`;
-        console.log(logPrefix, 'media uploaded to R2:', shopifyImageUrl);
-      } else {
-        console.warn(logPrefix, 'media fetch failed, skipping media:', imgRes.status, imgRes.statusText);
+        resizedBuf = await resized.response().arrayBuffer();
+        console.log(logPrefix, 'IMAGES resize succeeded');
       }
     } catch (err) {
-      console.warn(logPrefix, 'image resize failed, falling back to original URL:', err.message);
-      shopifyImageUrl = mediaSource;
+      console.warn(logPrefix, 'IMAGES resize failed, trying cf.image fallback:', err.message);
     }
+  }
+
+  if (!resizedBuf) {
+    try {
+      const cfRes = await fetch(mediaSource, {
+        cf: { image: { width: 2000, fit: 'scale-down', format: 'jpeg', quality: 85 } },
+      });
+      console.log(logPrefix, 'cf.image fetch status:', cfRes.status);
+      if (cfRes.ok) {
+        resizedBuf = await cfRes.arrayBuffer();
+        console.log(logPrefix, 'cf.image resize succeeded');
+      }
+    } catch (err) {
+      console.warn(logPrefix, 'cf.image resize failed, skipping media:', err.message);
+    }
+  }
+
+  if (resizedBuf) {
+    const imgKey = `product-images/${crypto.randomUUID()}.jpg`;
+    await env.MOCKUP_STAGING.put(imgKey, resizedBuf, {
+      httpMetadata: { contentType: 'image/jpeg' },
+    });
+    shopifyImageUrl = `https://${env.R2_PUBLIC_DOMAIN}/${imgKey}`;
+    console.log(logPrefix, 'media uploaded to R2:', shopifyImageUrl);
   } else {
-    console.warn(logPrefix, 'IMAGES binding not available, using original URL');
-    shopifyImageUrl = mediaSource;
+    console.warn(logPrefix, 'all resize methods failed — product will be created without media');
   }
 
   // Step 1: create the product (variants not accepted in ProductInput in 2025-01+)
