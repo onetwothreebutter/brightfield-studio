@@ -1475,6 +1475,23 @@
         if (dCommunityError)   dCommunityError.style.display = 'none';
         if (dCommunitySubmit)  { dCommunitySubmit.disabled = false; dCommunitySubmit.textContent = 'Submit Design'; }
 
+        // Create checkout thumbnail (600×600, black background) for cart/checkout display
+        var checkoutCanvas = document.createElement('canvas');
+        checkoutCanvas.width  = 600;
+        checkoutCanvas.height = 600;
+        var checkoutCtx = checkoutCanvas.getContext('2d');
+        checkoutCtx.fillStyle = '#000';
+        checkoutCtx.fillRect(0, 0, 600, 600);
+        var coAspect = designImg.naturalWidth / designImg.naturalHeight;
+        var coW, coH, coX, coY;
+        if (coAspect > 1) {
+          coW = 600; coH = Math.round(600 / coAspect); coX = 0; coY = Math.round((600 - coH) / 2);
+        } else {
+          coH = 600; coW = Math.round(600 * coAspect); coX = Math.round((600 - coW) / 2); coY = 0;
+        }
+        checkoutCtx.drawImage(designImg, coX, coY, coW, coH);
+        var base64CheckoutPng = checkoutCanvas.toDataURL('image/png').split(',')[1];
+
         // Upload design + composite to R2 in the background for stable URLs (order/community)
         var snapshotValues = JSON.parse(JSON.stringify(window._demoState ? window._demoState.values : {}));
         var uploadPromise = fetch(WORKER_BASE_URL + '/save-preview', {
@@ -1482,6 +1499,7 @@
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({
             designImage:   base64png,
+            checkoutImage: base64CheckoutPng,
             mockupImage:   compositeDataUrl.split(',')[1],
             deviceId:      window.RecentDesigns ? window.RecentDesigns.getDeviceId() : null,
             shader:        PRODUCT_HANDLE,
