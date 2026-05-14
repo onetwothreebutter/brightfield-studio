@@ -387,7 +387,7 @@ async function handleSavePreview(request, env, origin) {
 
 // Shared helper: creates a Shopify product, sets variant price, and publishes to Online Store.
 // Returns { newProductId, newVariantId } (numeric strings).
-async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUrl, shader, productTitle, price, tags }) {
+async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUrl, shader, productTitle, price, tags, creatorName, values, submissionId, sourceProductHandle }) {
   const logPrefix = '[createShopifyProduct]';
 
   // Resize the mockup to ≤2000px wide so it stays under Shopify's 25 MP limit
@@ -449,6 +449,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
       productCreate(input: $input, media: $media) {
         product {
           id
+          handle
           variants(first: 1) { edges { node { id inventoryItem { id } } } }
         }
         userErrors { field message }
@@ -462,9 +463,13 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
         tags,
         descriptionHtml: `<p>Design URL: <a href="${designUrl}">${designUrl}</a></p>`,
         metafields: [
-          { namespace: 'custom', key: 'design_url',  type: 'url',                     value: designUrl },
-          { namespace: 'custom', key: 'mockup_url',  type: 'url',                     value: mockupUrl },
-          { namespace: 'custom', key: 'shader',      type: 'single_line_text_field',  value: shader || '' },
+          { namespace: 'custom', key: 'design_url',             type: 'url',                    value: designUrl },
+          { namespace: 'custom', key: 'mockup_url',             type: 'url',                    value: mockupUrl },
+          { namespace: 'custom', key: 'shader',                 type: 'single_line_text_field', value: shader || '' },
+          { namespace: 'custom', key: 'creator_name',           type: 'single_line_text_field', value: creatorName || '' },
+          { namespace: 'custom', key: 'shader_values',          type: 'json',                   value: JSON.stringify(values || {}) },
+          { namespace: 'custom', key: 'submission_id',          type: 'single_line_text_field', value: submissionId || '' },
+          { namespace: 'custom', key: 'source_product_handle',  type: 'single_line_text_field', value: sourceProductHandle || '' },
         ],
       },
       media: shopifyImageUrl
@@ -479,8 +484,9 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     throw new Error(userErrors[0].message);
   }
 
-  const newProductGid = createData?.data?.productCreate?.product?.id;
-  const newVariantNode = createData?.data?.productCreate?.product?.variants?.edges?.[0]?.node;
+  const newProductGid    = createData?.data?.productCreate?.product?.id;
+  const newProductHandle = createData?.data?.productCreate?.product?.handle;
+  const newVariantNode   = createData?.data?.productCreate?.product?.variants?.edges?.[0]?.node;
   const newVariantGid = newVariantNode?.id;
   const inventoryItemGid = newVariantNode?.inventoryItem?.id;
   if (!newVariantGid) {
@@ -604,7 +610,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     }
   }
 
-  return { newProductId, newVariantId };
+  return { newProductId, newVariantId, newProductHandle };
 }
 
 // Looks up the first variant of a product by handle. Returns { variantId, price, productTitle }.
@@ -932,17 +938,22 @@ async function handleCommunityModerate(request, env, origin, newStatus) {
       const sourceVariant = await getDefaultVariantForHandle(env, submission.productHandle);
       if (sourceVariant) {
         const result = await createShopifyProduct(env, {
-          designUrl:        submission.designUrl,
-          mockupUrl:        submission.mockupUrl,
-          checkoutImageUrl: submission.checkoutImageUrl || '',
-          shader:           submission.shader,
-          productTitle:     `Community ${sourceVariant.productTitle}`,
-          price:            sourceVariant.price,
-          tags:             ['community-design', `shader-${submission.shader || 'unknown'}`],
+          designUrl:           submission.designUrl,
+          mockupUrl:           submission.mockupUrl,
+          checkoutImageUrl:    submission.checkoutImageUrl || '',
+          shader:              submission.shader,
+          productTitle:        `Community ${sourceVariant.productTitle}`,
+          price:               sourceVariant.price,
+          tags:                ['community-design', `shader-${submission.shader || 'unknown'}`],
+          creatorName:         submission.creatorName,
+          values:              submission.values,
+          submissionId:        id,
+          sourceProductHandle: submission.productHandle,
         });
-        submission.shopifyProductId = result.newProductId;
-        submission.shopifyVariantId = result.newVariantId;
-        console.log('[community/approve] created product', result.newProductId, 'for submission', id);
+        submission.shopifyProductId     = result.newProductId;
+        submission.shopifyVariantId     = result.newVariantId;
+        submission.shopifyProductHandle = result.newProductHandle;
+        console.log('[community/approve] created product', result.newProductId, 'handle', result.newProductHandle, 'for submission', id);
       } else {
         console.warn('[community/approve] could not resolve product handle:', submission.productHandle);
       }
@@ -1035,7 +1046,9 @@ async function handleShare(request, env, id) {
   const desc       = escHtml('A custom ' + shaderLabel + ' design created on Brightfield Studio');
   const shareUrl   = escHtml('https://share.brightfield.studio/' + id);
   const mockupUrl  = escHtml(design.mockupUrl || '');
-  const productUrl = 'https://brightfield.studio/pages/community-design?id=' + encodeURIComponent(id);
+  const productUrl = design.shopifyProductHandle
+    ? 'https://brightfield.studio/products/' + encodeURIComponent(design.shopifyProductHandle)
+    : 'https://brightfield.studio/pages/community-design?id=' + encodeURIComponent(id);
 
   return new Response(buildShareHtml(title, desc, shareUrl, mockupUrl, productUrl), {
     status: 200,

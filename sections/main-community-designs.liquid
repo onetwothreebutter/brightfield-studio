@@ -1,28 +1,36 @@
+{%- assign community_col = collections['community-designs'] -%}
+{%- paginate community_col.products by 24 -%}
+
 <section class="community-designs-page section-padding">
   <div class="container">
     <h1 class="community-designs-page__heading">Community Designs</h1>
     <p class="community-designs-page__sub">Designs created and shared by the Brightfield community.</p>
-    <div id="community-page-loading" class="community-designs-page__loading">Loading&hellip;</div>
-    <div id="community-page-empty" class="community-designs-page__empty" style="display:none">No designs yet &mdash; be the first to share one!</div>
-    <div id="community-page-container"></div>
+
+    {%- if community_col.products.size == 0 -%}
+      <p class="community-designs-page__empty">No designs yet &mdash; be the first to share one!</p>
+    {%- else -%}
+      <div id="community-page-container" class="product-grid">
+        {%- for product in community_col.products -%}
+          {%- render 'community-card', product: product -%}
+        {%- endfor -%}
+      </div>
+
+      {%- if paginate.pages > 1 -%}
+        <nav class="pagination" aria-label="Pagination">{{ paginate | default_pagination }}</nav>
+      {%- endif -%}
+    {%- endif -%}
   </div>
 </section>
 
-<script src="{{ 'recent-designs.js' | asset_url }}" defer></script>
+{%- endpaginate -%}
+
 <script src="{{ 'community-designs.js' | asset_url }}" defer></script>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    var container = document.getElementById('community-page-container');
-    var loading   = document.getElementById('community-page-loading');
-    var empty     = document.getElementById('community-page-empty');
-    CommunityDesigns.fetchCommunityDesigns().then(function (designs) {
-      loading.style.display = 'none';
-      if (!designs || !designs.length) { empty.style.display = ''; return; }
-      CommunityDesigns.renderStrip(container, designs, {
-        getDeviceId: window.RecentDesigns && window.RecentDesigns.getDeviceId,
-        grid: true,
-      });
-    });
+    if (window.CommunityDesigns) {
+      CommunityDesigns.groupByShader(document.getElementById('community-page-container'));
+      CommunityDesigns.hydrateInteractions();
+    }
   });
 </script>
 
