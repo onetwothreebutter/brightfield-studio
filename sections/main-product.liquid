@@ -1551,6 +1551,8 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           mockupUrl:        data.mockup_url,
           checkoutImageUrl: data.checkout_image_url || data.design_url,
           shader:           _pendingDesign.shader,
+          productHandle:    _pendingDesign.productHandle,
+          values:           _pendingDesign.values,
           variantId:        shopifyVariantId
         };
         console.log('[create-product] POST', cpBody);

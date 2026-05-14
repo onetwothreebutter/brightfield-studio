@@ -1555,6 +1555,8 @@
             mockupUrl:        data.mockup_url,
             checkoutImageUrl: data.checkout_image_url || data.design_url,
             shader:           PRODUCT_HANDLE,
+            productHandle:    PRODUCT_HANDLE,
+            values:           _lastMockupData ? _lastMockupData.values : {},
             variantId:        shopifyVariantId
           };
           return fetch(WORKER_BASE_URL + '/create-product', {

@@ -671,7 +671,7 @@ async function handleCreateProduct(request, env, origin) {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
   }
 
-  const { designUrl, mockupUrl, checkoutImageUrl, shader, variantId } = body;
+  const { designUrl, mockupUrl, checkoutImageUrl, shader, productHandle, values, variantId } = body;
   if (!designUrl || !mockupUrl || !variantId) {
     return new Response(JSON.stringify({ error: 'Missing designUrl, mockupUrl, or variantId' }), { status: 400, headers });
   }
@@ -712,6 +712,8 @@ async function handleCreateProduct(request, env, origin) {
       productTitle: `Custom ${variant.product?.title || 'Design'}`,
       price,
       tags: ['custom-design', `shader-${shader || 'unknown'}`],
+      values,
+      sourceProductHandle: productHandle,
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 422, headers });
