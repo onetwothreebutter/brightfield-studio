@@ -636,6 +636,13 @@ h6 {
     margin-bottom: 1rem;
 }
 
+.product-creator {
+    font-size: 0.8rem;
+    color: var(--color-secondary);
+    margin-top: -0.5rem;
+    margin-bottom: 1rem;
+}
+
 .product-price {
     font-size: 1.4rem;
     font-weight: 700;
