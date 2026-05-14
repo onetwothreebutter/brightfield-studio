@@ -461,7 +461,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
         status: 'ACTIVE',
         vendor: 'Brightfield Studio',
         tags,
-        descriptionHtml: `<p>Design URL: <a href="${designUrl}">${designUrl}</a></p>`,
+        descriptionHtml: '',
         metafields: [
           { namespace: 'custom', key: 'design_url',             type: 'url',                    value: designUrl },
           { namespace: 'custom', key: 'mockup_url',             type: 'url',                    value: mockupUrl },
