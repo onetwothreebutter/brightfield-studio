@@ -1,4 +1,5 @@
 {%- assign shader_file = nil -%}
+{%- assign is_community_design = false -%}
 {%- for tag in product.tags -%}
   {%- assign tag_prefix = tag | slice: 0, 7 -%}
   {%- if tag_prefix == 'shader-' -%}
@@ -6,6 +7,9 @@
     {%- break -%}
   {%- endif -%}
 {%- endfor -%}
+{%- if product.tags contains 'community-design' -%}
+  {%- assign is_community_design = true -%}
+{%- endif -%}
 
 {%- if shader_file -%}
 <style>
@@ -203,6 +207,13 @@
             <input type="hidden" name="quantity" value="1">
             {%- if shader_file -%}
             <input type="hidden" name="properties[_source]" value="inhouse">
+            {%- endif -%}
+            {%- if is_community_design -%}
+            <input type="hidden" name="properties[Design Type]" value="Community Design">
+            {%- assign submission_id = product.metafields.custom.submission_id | default: '' -%}
+            {%- if submission_id != blank -%}
+            <input type="hidden" name="properties[_design_id]" value="{{ submission_id | escape }}">
+            {%- endif -%}
             {%- endif -%}
 
             <div class="product-actions">
