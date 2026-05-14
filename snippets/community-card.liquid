@@ -13,6 +13,7 @@
 {%- assign submission_id = product.metafields.custom.submission_id | default: '' -%}
 {%- assign source_handle = product.metafields.custom.source_product_handle | default: '' -%}
 {%- assign creator = product.metafields.custom.creator_name | default: 'Anonymous' -%}
+{%- assign shader_values = product.metafields.custom.shader_values | default: '{}' -%}
 
 <article
   class="product-card community-card"
@@ -49,7 +50,7 @@
         class="btn btn--outline btn--sm community-card__customize-btn"
         data-source-handle="{{ source_handle | escape }}"
         data-shader="{{ product.metafields.custom.shader | escape }}"
-        data-values="{{ product.metafields.custom.shader_values | default: '{}' | escape }}"
+        data-values="{{ shader_values | escape }}"
       >Customize</button>
     {%- endif -%}
 
