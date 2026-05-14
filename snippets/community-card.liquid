@@ -1,0 +1,73 @@
+{% doc %}
+  Renders a community design card. Reads creator name, shader, likes, customize data, and share
+  URL from product metafields. A JS layer (community-designs.js) hydrates like counts and wires
+  button interactions after render.
+
+  @param {product} product - A community design product (tagged community-design)
+
+  @example
+  {% render 'community-card', product: product %}
+{% enddoc %}
+
+{%- assign shader_label = product.metafields.custom.shader | default: '' | replace: '-', ' ' | capitalize -%}
+{%- assign submission_id = product.metafields.custom.submission_id | default: '' -%}
+{%- assign source_handle = product.metafields.custom.source_product_handle | default: '' -%}
+{%- assign creator = product.metafields.custom.creator_name | default: 'Anonymous' -%}
+
+<article
+  class="product-card community-card"
+  data-shader="{{ product.metafields.custom.shader | escape }}"
+>
+  <a href="{{ product.url }}" class="product-card__link" aria-label="{{ product.title | escape }}">
+    <div class="product-card__media">
+      {%- if product.featured_image -%}
+        {{
+          product.featured_image
+          | image_url: width: 600
+          | image_tag:
+            class: 'product-card__image',
+            loading: 'lazy',
+            width: 600,
+            height: 600
+        }}
+      {%- else -%}
+        <div class="product-card__image product-card__image--placeholder"></div>
+      {%- endif -%}
+      <div class="product-card__glow" aria-hidden="true"></div>
+    </div>
+    <div class="product-card__info">
+      <h3 class="product-card__title">{{ creator | escape }}</h3>
+      <p class="community-card__meta">{{ shader_label | escape }}</p>
+    </div>
+  </a>
+
+  <div class="product-card__actions">
+    <a href="{{ product.url }}" class="btn btn--primary btn--sm">Buy</a>
+
+    {%- if source_handle != blank -%}
+      <button
+        class="btn btn--outline btn--sm community-card__customize-btn"
+        data-source-handle="{{ source_handle | escape }}"
+        data-shader="{{ product.metafields.custom.shader | escape }}"
+        data-values="{{ product.metafields.custom.shader_values | default: '{}' | escape }}"
+      >Customize</button>
+    {%- endif -%}
+
+    {%- if submission_id != blank -%}
+      <button
+        class="btn btn--outline btn--sm community-designs__like-btn"
+        data-submission-id="{{ submission_id | escape }}"
+        aria-label="Like"
+      >
+        <span class="community-designs__like-icon">&#x2665;</span>
+        <span class="community-designs__like-count">&#8211;</span>
+      </button>
+
+      <button
+        class="btn btn--outline btn--sm community-designs__share-btn"
+        data-share-url="https://share.brightfield.studio/{{ submission_id | escape }}"
+        aria-label="Copy share link"
+      >&#x1F517;</button>
+    {%- endif -%}
+  </div>
+</article>

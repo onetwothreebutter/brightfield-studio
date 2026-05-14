@@ -1,3 +1,5 @@
+{%- assign community_col = collections['community-designs'] -%}
+
 <section class="community-designs-section section-padding">
   <div class="container">
 
@@ -10,48 +12,25 @@
       </h2>
     </div>
 
-    <div id="community-designs-container">
-      <div class="product-grid">
-        {%- for i in (1..4) -%}
-          <div class="product-card product-card--placeholder">
-            <div class="product-card__media">
-              <div class="product-card__image product-card__image--placeholder"></div>
-            </div>
-            <div class="product-card__info">
-              <div class="placeholder-line placeholder-line--title"></div>
-              <div class="placeholder-line placeholder-line--price"></div>
-            </div>
-          </div>
+    {%- if community_col.products.size > 0 -%}
+      <div id="community-designs-container" class="product-grid">
+        {%- for product in community_col.products limit: 6 -%}
+          {%- render 'community-card', product: product -%}
         {%- endfor -%}
       </div>
-    </div>
 
-    <div class="section-footer" id="community-designs-footer" style="display:none">
-      <a href="{{ pages['community-designs'].url }}" class="btn btn--outline">See All</a>
-    </div>
+      <div class="section-footer">
+        <a href="{{ pages['community-designs'].url }}" class="btn btn--outline">See All</a>
+      </div>
+    {%- endif -%}
 
   </div>
 </section>
 
-<script src="{{ 'recent-designs.js' | asset_url }}" defer></script>
 <script src="{{ 'community-designs.js' | asset_url }}" defer></script>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    var container = document.getElementById('community-designs-container');
-    var footer = document.getElementById('community-designs-footer');
-    var SEE_ALL_MAX = 15;
-    if (!container || !window.CommunityDesigns) return;
-    CommunityDesigns.fetchCommunityDesigns().then(function (designs) {
-      if (!designs || !designs.length) {
-        container.innerHTML = '<p class="community-designs__empty-msg">No community designs yet — be the first to share one!</p>';
-        return;
-      }
-      var hasMore = designs.length > SEE_ALL_MAX;
-      CommunityDesigns.renderStrip(container, hasMore ? designs.slice(0, SEE_ALL_MAX) : designs, {
-        getDeviceId: window.RecentDesigns && window.RecentDesigns.getDeviceId
-      });
-      if (hasMore && footer) footer.style.display = '';
-    });
+    if (window.CommunityDesigns) CommunityDesigns.hydrateInteractions();
   });
 </script>
 

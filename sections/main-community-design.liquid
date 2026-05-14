@@ -1,218 +1,28 @@
-<style>
-  .community-design-page__back {
-    display: inline-block;
-    margin-bottom: 2rem;
-    font-size: 0.875rem;
-    opacity: 0.7;
-    text-decoration: none;
-  }
-  .community-design-page__back:hover { opacity: 1; }
-
-  .community-design-page__content {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 3rem;
-    align-items: start;
-  }
-  @media (max-width: 768px) {
-    .community-design-page__content { grid-template-columns: 1fr; }
-  }
-
-  .community-design-page__img {
-    width: 100%;
-    border-radius: 8px;
-    display: block;
-  }
-
-  .community-design-page__shader {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    opacity: 0.6;
-    margin-bottom: 0.5rem;
-  }
-
-  .community-design-page__title {
-    font-size: 1.75rem;
-    margin: 0 0 0.5rem;
-  }
-
-  .community-design-page__date {
-    font-size: 0.875rem;
-    opacity: 0.6;
-    margin: 0 0 2rem;
-  }
-
-  .community-design-page__actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    align-items: center;
-  }
-
-  .community-design-page__loading,
-  .community-design-page__error {
-    padding: 2rem 0;
-    opacity: 0.6;
-  }
-</style>
-
 <section class="community-designs-page section-padding">
   <div class="container">
-    <a href="/pages/community-designs" class="community-design-page__back">&larr; Community Designs</a>
-    <div id="cd-loading" class="community-design-page__loading">Loading&hellip;</div>
-    <div id="cd-error" class="community-design-page__error" style="display:none">Design not found.</div>
-    <div id="cd-content" class="community-design-page__content" style="display:none">
-      <div class="community-design-page__media">
-        <img id="cd-img" class="community-design-page__img" alt="Community design" />
-      </div>
-      <div class="community-design-page__meta">
-        <p id="cd-shader" class="community-design-page__shader"></p>
-        <h1 id="cd-title" class="community-design-page__title"></h1>
-        <p id="cd-date" class="community-design-page__date"></p>
-        <div class="community-design-page__actions">
-          <button id="cd-buy" class="btn btn--primary community-designs__buy-btn">Buy</button>
-          <button id="cd-customize" class="btn btn--outline">Customize</button>
-          <button id="cd-like" class="btn btn--outline community-designs__like-btn" aria-label="Like">
-            <span class="community-designs__like-icon">&#x2665;</span>
-            <span id="cd-like-count" class="community-designs__like-count">0</span>
-          </button>
-          <button id="cd-share" class="btn btn--outline community-designs__share-btn" aria-label="Copy share link">&#x1F517;</button>
-        </div>
-      </div>
-    </div>
+    <p id="cd-redirecting">Loading design&hellip;</p>
   </div>
 </section>
 
-<script src="{{ 'recent-designs.js' | asset_url }}" defer></script>
-<script src="{{ 'community-designs.js' | asset_url }}" defer></script>
 <script>
-(function () {
-  var WORKER_URL  = 'https://brightfield-mockup-worker.eric-d-johnson.workers.dev';
-  var LIKED_KEY   = 'brightfield_liked';
-  var RESTORE_KEY = 'brightfield_restore';
-
-  function timeAgo(timestamp) {
-    var diff = Math.floor((Date.now() - timestamp * 1000) / 1000);
-    if (diff < 60)    return diff + 's ago';
-    if (diff < 3600)  return Math.floor(diff / 60) + 'm ago';
-    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-    return Math.floor(diff / 86400) + 'd ago';
-  }
-
-  function formatShaderName(shader) {
-    return (shader || 'Unknown').replace(/-/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
-  }
-
-  function fallbackCopy(text, onSuccess) {
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.cssText = 'position:fixed;opacity:0';
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); onSuccess(); } catch (e) {}
-    document.body.removeChild(ta);
-  }
-
-  document.addEventListener('DOMContentLoaded', function () {
-    var params = new URLSearchParams(window.location.search);
-    var id     = params.get('id');
-
-    var loading  = document.getElementById('cd-loading');
-    var error    = document.getElementById('cd-error');
-    var content  = document.getElementById('cd-content');
-    var img      = document.getElementById('cd-img');
-    var shaderEl = document.getElementById('cd-shader');
-    var titleEl  = document.getElementById('cd-title');
-    var dateEl   = document.getElementById('cd-date');
-    var likeBtn  = document.getElementById('cd-like');
-    var likeCount = document.getElementById('cd-like-count');
-    var buyBtn   = document.getElementById('cd-buy');
-    var custBtn  = document.getElementById('cd-customize');
-    var shareBtn = document.getElementById('cd-share');
-
+  (function () {
+    var WORKER = 'https://brightfield-mockup-worker.eric-d-johnson.workers.dev';
+    var id = new URLSearchParams(window.location.search).get('id');
     if (!id) {
-      loading.style.display = 'none';
-      error.style.display   = '';
+      window.location.replace('/collections/community-designs');
       return;
     }
-
-    fetch(WORKER_URL + '/community/design/' + encodeURIComponent(id))
-      .then(function (r) {
-        if (!r.ok) throw new Error('not found');
-        return r.json();
+    fetch(WORKER + '/community/design/' + encodeURIComponent(id))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (d && d.shopifyProductHandle) {
+          window.location.replace('/products/' + encodeURIComponent(d.shopifyProductHandle));
+        } else {
+          window.location.replace('/collections/community-designs');
+        }
       })
-      .then(function (design) {
-        loading.style.display = 'none';
-
-        img.src        = design.mockupUrl;
-        img.alt        = (design.creatorName || 'Community') + ' design';
-        shaderEl.textContent = formatShaderName(design.shader);
-        titleEl.textContent  = 'by ' + (design.creatorName || 'Anonymous');
-        dateEl.textContent   = timeAgo(design.timestamp);
-        likeCount.textContent = design.likes || 0;
-
-        // Like state
-        var liked = false;
-        try {
-          var set = JSON.parse(localStorage.getItem(LIKED_KEY) || '{}');
-          liked = !!set[design.id];
-        } catch (e) {}
-        if (liked) likeBtn.classList.add('community-designs__like-btn--liked');
-
-        likeBtn.addEventListener('click', function () {
-          var deviceId = (window.RecentDesigns && window.RecentDesigns.getDeviceId)
-            ? window.RecentDesigns.getDeviceId()
-            : (window.CommunityDesigns && window.CommunityDesigns.getDeviceId
-                ? window.CommunityDesigns.getDeviceId() : 'unknown');
-          window.CommunityDesigns.toggleLike(design.id, deviceId).then(function (result) {
-            if (!result) return;
-            likeCount.textContent = result.likes;
-            likeBtn.classList.toggle('community-designs__like-btn--liked', result.liked);
-            try {
-              var s = JSON.parse(localStorage.getItem(LIKED_KEY) || '{}');
-              if (result.liked) { s[design.id] = 1; } else { delete s[design.id]; }
-              localStorage.setItem(LIKED_KEY, JSON.stringify(s));
-            } catch (e) {}
-          });
-        });
-
-        buyBtn.addEventListener('click', function () {
-          window.CommunityDesigns.openBuyModal(design);
-        });
-
-        custBtn.addEventListener('click', function () {
-          localStorage.setItem(RESTORE_KEY, JSON.stringify({
-            values:      design.values,
-            shader:      design.shader,
-            creatorName: design.creatorName || null,
-          }));
-          window.location.href = '/products/' + design.productHandle + '#shader';
-        });
-
-        shareBtn.addEventListener('click', function () {
-          var shareUrl = 'https://share.brightfield.studio/' + design.id;
-          function showCopied() {
-            shareBtn.textContent = '✓';
-            setTimeout(function () { shareBtn.textContent = '🔗'; }, 1500);
-          }
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(shareUrl).then(showCopied).catch(function () {
-              fallbackCopy(shareUrl, showCopied);
-            });
-          } else {
-            fallbackCopy(shareUrl, showCopied);
-          }
-        });
-
-        content.style.display = '';
-      })
-      .catch(function () {
-        loading.style.display = 'none';
-        error.style.display   = '';
-      });
-  });
-}());
+      .catch(function () { window.location.replace('/collections/community-designs'); });
+  }());
 </script>
 
 {% schema %}
