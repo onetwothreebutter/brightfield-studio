@@ -98,7 +98,6 @@
     .actions-buttons .button__cell--primary { background-color: #00ffff; }
     a, a:hover, a:active, a:visited { color: {{ shop.email_accent_color }}; }
     .button__cell a, .button__cell a:hover, .button__cell a:active, .button__cell a:visited,
-    .button__text { color: #000000 !important; }
     .button__text--shop-app { color: #ffffff !important; }
   </style>
 </head>
@@ -212,7 +211,7 @@
           </td>
           <td class="button__cell--separator"></td>
           <td class="button__cell button__cell--shop-app" width="50%">
-            <a href="{{ shop_app_tracking_url }}" class="button__text button__text--shop-app">Track order with {{ shop_logo_img }}</a>
+            <a href="{{ shop_app_tracking_url }}" class="button__text button__text--shop-app" style="color: #ffffff !important;">Track order with {{ shop_logo_img }}</a>
           </td>
         </tr>
       </table>
@@ -245,7 +244,7 @@
           </td>
           <td class="button__cell--separator"></td>
           <td class="button__cell button__cell--shop-app" width="50%">
-            <a href="{{ shop_app_tracking_url }}" class="button__text button__text--shop-app">Download to track with {{ shop_logo_img }}</a>
+            <a href="{{ shop_app_tracking_url }}" class="button__text button__text--shop-app" style="color: #ffffff !important;">Download to track with {{ shop_logo_img }}</a>
           </td>
         </tr>
       </table>
