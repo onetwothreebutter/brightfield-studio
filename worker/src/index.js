@@ -970,7 +970,7 @@ async function handleCommunityModerate(request, env, origin, newStatus) {
           mockupUrl:           submission.mockupUrl,
           checkoutImageUrl:    submission.checkoutImageUrl || '',
           shader:              submission.shader,
-          productTitle:        `Community ${sourceVariant.productTitle}`,
+          productTitle:        `Community ${sourceVariant.productTitle.replace(/^Community\s+/, '')}`,
           price:               sourceVariant.price,
           tags:                ['community-design', `shader-${submission.shader || 'unknown'}`],
           creatorName:         submission.creatorName,
