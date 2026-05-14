@@ -13,6 +13,7 @@ let _shopifyToken = null;
 let _shopifyTokenExpiry = 0;
 let _onlineStorePublicationId = null;
 let _printfulLocationId = null;
+let _printfulSizes = null;
 
 async function getShopifyToken(env) {
   if (_shopifyToken && Date.now() < _shopifyTokenExpiry) return _shopifyToken;
@@ -77,6 +78,37 @@ async function getPrintfulLocationId(env) {
   const match = services.find(s => s.handle?.toLowerCase().includes('printful') || s.serviceName?.toLowerCase().includes('printful'));
   if (match?.location?.id) _printfulLocationId = match.location.id;
   return _printfulLocationId;
+}
+
+async function getPrintfulSizes(env) {
+  if (_printfulSizes) return _printfulSizes;
+  try {
+    const res = await fetch(`${PRINTFUL_API}/products/${PRODUCT_ID}`, {
+      headers: env.PRINTFUL_API_KEY ? { 'Authorization': `Bearer ${env.PRINTFUL_API_KEY}` } : {},
+    });
+    if (!res.ok) {
+      console.warn('[getPrintfulSizes] non-OK response:', res.status);
+      return null;
+    }
+    const data = await res.json();
+    const variants = data?.result?.variants || [];
+    const seen = new Set();
+    const sizes = [];
+    for (const v of variants) {
+      if (v.size && !seen.has(v.size)) {
+        seen.add(v.size);
+        sizes.push(v.size);
+      }
+    }
+    if (sizes.length) {
+      _printfulSizes = sizes;
+      console.log('[getPrintfulSizes] sizes from Printful:', sizes);
+    }
+    return _printfulSizes;
+  } catch (err) {
+    console.warn('[getPrintfulSizes] error (non-fatal):', err.message);
+    return null;
+  }
 }
 
 function isAllowedOrigin(origin) {
@@ -494,9 +526,49 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     throw new Error('Product created but no variant returned');
   }
 
-  // Step 2: set price on the auto-created default variant
+  // Step 2: add Size option, which auto-creates one variant per size and removes the default Title variant
+  const printfulSizes = await getPrintfulSizes(env);
+  const SIZES = printfulSizes || ['S', 'M', 'L', 'XL', '2XL', '3XL'];
+  console.log(logPrefix, 'using sizes:', SIZES);
+  let sizeVariants = [];
+  try {
+    const optData = await shopifyAdmin(env,
+      `mutation CreateOptions($productId: ID!, $options: [OptionCreateInput!]!, $variantStrategy: ProductOptionCreateVariantStrategy) {
+        productOptionsCreate(productId: $productId, options: $options, variantStrategy: $variantStrategy) {
+          product {
+            variants(first: 20) { edges { node { id inventoryItem { id } selectedOptions { name value } } } }
+          }
+          userErrors { field message }
+        }
+      }`,
+      {
+        productId: newProductGid,
+        options: [{ name: 'Size', values: SIZES.map(s => ({ name: s })) }],
+        variantStrategy: 'CREATE',
+      }
+    );
+    const optErrors = optData?.data?.productOptionsCreate?.userErrors;
+    if (optErrors?.length) {
+      console.warn(logPrefix, 'productOptionsCreate errors (non-fatal):', JSON.stringify(optErrors));
+    }
+    sizeVariants = (optData?.data?.productOptionsCreate?.product?.variants?.edges || [])
+      .map(e => e.node)
+      .filter(v => v.selectedOptions?.some(o => o.name === 'Size'));
+    console.log(logPrefix, 'size variants created:', sizeVariants.length);
+  } catch (err) {
+    console.warn(logPrefix, 'productOptionsCreate failed (non-fatal):', err.message);
+  }
+
+  // Fall back to the original default variant if option creation failed
+  if (!sizeVariants.length) {
+    sizeVariants = [{ id: newVariantGid, inventoryItem: inventoryItemGid ? { id: inventoryItemGid } : null, selectedOptions: [] }];
+  }
+
+  const firstSizeVariantGid = sizeVariants[0].id;
+
+  // Step 2a: set price on all size variants
   const updateData = await shopifyAdmin(env,
-    `mutation UpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+    `mutation UpdateVariants($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
       productVariantsBulkUpdate(productId: $productId, variants: $variants) {
         productVariants { id }
         userErrors { field message }
@@ -504,7 +576,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     }`,
     {
       productId: newProductGid,
-      variants: [{ id: newVariantGid, price }],
+      variants: sizeVariants.map(v => ({ id: v.id, price })),
     }
   );
 
@@ -514,9 +586,13 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     // Non-fatal: product exists, just price may be wrong
   }
 
-  // Step 2b: set SKU on the inventory item (required by Printful before inventoryActivate)
-  if (inventoryItemGid) {
-    const skuPrefix = tags?.includes('community-design') ? 'COMMUNITY' : 'CUSTOM';
+  // Step 2b: set SKU on each inventory item (required by Printful before inventoryActivate)
+  const skuPrefix = tags?.includes('community-design') ? 'COMMUNITY' : 'CUSTOM';
+  const baseTimestamp = Date.now();
+  for (const sv of sizeVariants) {
+    const invGid = sv.inventoryItem?.id;
+    if (!invGid) continue;
+    const sizeLabel = sv.selectedOptions?.find(o => o.name === 'Size')?.value || 'ONE';
     const skuData = await shopifyAdmin(env,
       `mutation UpdateInventoryItem($id: ID!, $input: InventoryItemInput!) {
         inventoryItemUpdate(id: $id, input: $input) {
@@ -524,37 +600,41 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
           userErrors { field message }
         }
       }`,
-      { id: inventoryItemGid, input: { sku: `${skuPrefix}-${Date.now()}` } }
+      { id: invGid, input: { sku: `${skuPrefix}-${baseTimestamp}-${sizeLabel}` } }
     );
     const skuErrors = skuData?.data?.inventoryItemUpdate?.userErrors;
-    if (skuErrors?.length) console.error(logPrefix, 'SKU update errors:', JSON.stringify(skuErrors));
+    if (skuErrors?.length) console.error(logPrefix, 'SKU update errors for', sizeLabel, ':', JSON.stringify(skuErrors));
     else console.log(logPrefix, 'SKU set:', skuData?.data?.inventoryItemUpdate?.inventoryItem?.sku);
   }
 
-  // Step 2c: activate inventory at the Printful fulfillment service location
+  // Step 2c: activate inventory at the Printful fulfillment service location for each size variant
   const printfulLocationId = await getPrintfulLocationId(env);
   console.log(logPrefix, 'Printful location ID:', printfulLocationId);
-  if (printfulLocationId && inventoryItemGid) {
-    const activateData = await shopifyAdmin(env,
-      `mutation ActivateInventory($inventoryItemId: ID!, $locationId: ID!) {
-        inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId) {
-          inventoryLevel { id }
-          userErrors { field message }
-        }
-      }`,
-      { inventoryItemId: inventoryItemGid, locationId: printfulLocationId }
-    );
-    const activateErrors = activateData?.data?.inventoryActivate?.userErrors;
-    if (activateErrors?.length) {
-      console.error(logPrefix, 'inventoryActivate errors:', JSON.stringify(activateErrors));
-    } else {
-      console.log(logPrefix, 'inventory activated at Printful location');
+  if (printfulLocationId) {
+    for (const sv of sizeVariants) {
+      const invGid = sv.inventoryItem?.id;
+      if (!invGid) continue;
+      const activateData = await shopifyAdmin(env,
+        `mutation ActivateInventory($inventoryItemId: ID!, $locationId: ID!) {
+          inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId) {
+            inventoryLevel { id }
+            userErrors { field message }
+          }
+        }`,
+        { inventoryItemId: invGid, locationId: printfulLocationId }
+      );
+      const activateErrors = activateData?.data?.inventoryActivate?.userErrors;
+      if (activateErrors?.length) {
+        console.error(logPrefix, 'inventoryActivate errors:', JSON.stringify(activateErrors));
+      } else {
+        console.log(logPrefix, 'inventory activated at Printful location for variant', sv.id);
+      }
     }
   } else {
-    console.warn(logPrefix, 'skipping inventoryActivate — missing locationId or inventoryItemId');
+    console.warn(logPrefix, 'skipping inventoryActivate — missing locationId');
   }
 
-  const newVariantId = newVariantGid.replace('gid://shopify/ProductVariant/', '');
+  const newVariantId = firstSizeVariantGid.replace('gid://shopify/ProductVariant/', '');
   const newProductId = newProductGid.replace('gid://shopify/Product/', '');
 
   console.log(logPrefix, 'new product:', newProductId, 'new variant:', newVariantId);
@@ -623,7 +703,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
       }`,
       {
         profileId: profileGid,
-        variantsToAssociate: [newVariantGid],
+        variantsToAssociate: sizeVariants.map(v => v.id),
       }
     );
     const spErrors = spData?.data?.deliveryProfileUpdate?.userErrors;
