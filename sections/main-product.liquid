@@ -50,6 +50,10 @@
         >
           {{ product.title | escape }}
         </h1>
+        {%- assign creator_name = product.metafields.custom.creator_name -%}
+        {%- if creator_name != blank -%}
+          <p class="product-creator">Designed by {{ creator_name | escape }}</p>
+        {%- endif -%}
       </div>
 
       <!-- Media -->
@@ -152,6 +156,11 @@
         >
           {{ product.title | escape }}
         </h1>
+
+        {%- assign creator_name = product.metafields.custom.creator_name -%}
+        {%- if creator_name != blank -%}
+          <p class="product-creator">Designed by {{ creator_name | escape }}</p>
+        {%- endif -%}
 
         <p class="product-price">
           {%- if product.compare_at_price > product.price -%}
