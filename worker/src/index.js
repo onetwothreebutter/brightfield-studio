@@ -610,6 +610,32 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     }
   }
 
+  // Step 4: assign to the Printful shipping profile ("US Flat Rate") so checkout
+  // uses the correct shipping rate instead of the default "Standard" profile.
+  try {
+    const profileGid = 'gid://shopify/DeliveryProfile/94986600563';
+    const spData = await shopifyAdmin(env,
+      `mutation AssignShippingProfile($profileId: ID!, $variantsToAssociate: [ID!]!) {
+        deliveryProfileUpdate(id: $profileId, profile: { variantsToAssociate: $variantsToAssociate }) {
+          profile { id name }
+          userErrors { field message }
+        }
+      }`,
+      {
+        profileId: profileGid,
+        variantsToAssociate: [newVariantGid],
+      }
+    );
+    const spErrors = spData?.data?.deliveryProfileUpdate?.userErrors;
+    if (spErrors?.length) {
+      console.warn(logPrefix, 'shipping profile assign errors:', JSON.stringify(spErrors));
+    } else {
+      console.log(logPrefix, 'assigned to shipping profile:', spData?.data?.deliveryProfileUpdate?.profile?.name);
+    }
+  } catch (err) {
+    console.warn(logPrefix, 'shipping profile assign error:', err.message);
+  }
+
   return { newProductId, newVariantId, newProductHandle };
 }
 
