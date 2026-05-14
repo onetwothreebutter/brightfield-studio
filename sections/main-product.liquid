@@ -57,6 +57,7 @@
       </div>
 
       <!-- Media -->
+      {%- assign mockup_url = product.metafields.custom.mockup_url | default: '' -%}
       <div class="product-media">
 
         <div class="media-tabs"></div>
@@ -74,7 +75,7 @@
               >
             {%- endif -%}
           </div>
-          {%- if product.images.size > 1 -%}
+          {%- if product.images.size > 1 or mockup_url != blank -%}
             <div class="product-media__thumbs">
               {%- for image in product.images -%}
                 <img
@@ -87,6 +88,17 @@
                   height="150"
                 >
               {%- endfor -%}
+              {%- if mockup_url != blank -%}
+                <img
+                  src="{{ mockup_url }}"
+                  alt="Shirt preview"
+                  class="product-thumb"
+                  data-full="{{ mockup_url }}"
+                  loading="lazy"
+                  width="150"
+                  height="150"
+                >
+              {%- endif -%}
             </div>
           {%- endif -%}
         </div>
