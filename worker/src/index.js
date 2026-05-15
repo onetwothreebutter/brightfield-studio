@@ -951,7 +951,8 @@ async function handleCommunitySubmit(request, env, origin) {
 async function handleCommunityList(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
   const url = new URL(request.url);
-  const shaderFilter = url.searchParams.get('shader');
+  const shaderFilter        = url.searchParams.get('shader');
+  const productHandleFilter = url.searchParams.get('productHandle');
 
   const list = (await readJson(env, 'community/list.json')) || [];
   const ids = list.slice(0, 100);
@@ -960,9 +961,11 @@ async function handleCommunityList(request, env, origin) {
     await Promise.all(ids.map(id => readJson(env, `community/submissions/${id}.json`)))
   ).filter(s => s && s.status === 'approved');
 
-  const filtered = shaderFilter
-    ? submissions.filter(s => s.shader === shaderFilter)
-    : submissions;
+  const filtered = submissions.filter(s => {
+    if (shaderFilter        && s.shader        !== shaderFilter)        return false;
+    if (productHandleFilter && s.productHandle !== productHandleFilter) return false;
+    return true;
+  });
 
   const sanitized = filtered.map(({ creatorEmail: _omit, ...rest }) => rest);
   return new Response(JSON.stringify(sanitized), { status: 200, headers });

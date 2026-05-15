@@ -110,8 +110,11 @@
 
   // ── Fetch ────────────────────────────────────────────────────────────────────
 
-  function fetchCommunityDesigns(shader) {
-    var url = WORKER_URL + '/community/list' + (shader ? '?shader=' + encodeURIComponent(shader) : '');
+  function fetchCommunityDesigns(shader, productHandle) {
+    var params = [];
+    if (shader)        params.push('shader='        + encodeURIComponent(shader));
+    if (productHandle) params.push('productHandle=' + encodeURIComponent(productHandle));
+    var url = WORKER_URL + '/community/list' + (params.length ? '?' + params.join('&') : '');
     return fetch(url)
       .then(function (r) { return r.json(); })
       .catch(function () { return []; });

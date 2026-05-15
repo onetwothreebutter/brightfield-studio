@@ -167,6 +167,18 @@ describe('GET /community/list', () => {
     const res = await worker.fetch(get('/community/list?shader=other'), env);
     expect(await res.json()).toEqual([]);
   });
+
+  it('filters by ?productHandle= when provided', async () => {
+    const { id: id1 } = await submitDesign(env, { shader: 'rise-shirt', productHandle: 'product-a' });
+    const { id: id2 } = await submitDesign(env, { shader: 'rise-shirt', productHandle: 'product-b' });
+    await worker.fetch(post('/community/approve', { id: id1 }, adminHeaders()), env);
+    await worker.fetch(post('/community/approve', { id: id2 }, adminHeaders()), env);
+
+    const res = await worker.fetch(get('/community/list?shader=rise-shirt&productHandle=product-a'), env);
+    const results = await res.json();
+    expect(results).toHaveLength(1);
+    expect(results[0].productHandle).toBe('product-a');
+  });
 });
 
 // ── /community/like ───────────────────────────────────────────────────────────
