@@ -954,7 +954,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     var communityContainer = document.getElementById('product-community-designs-container');
     var communitySection   = document.getElementById('product-community-designs');
     if (communityContainer && window.CommunityDesigns) {
-      CommunityDesigns.fetchCommunityDesigns('{{ shader_file }}').then(function (designs) {
+      CommunityDesigns.fetchCommunityDesigns('{{ shader_file }}', '{{ product.handle }}').then(function (designs) {
         if (!designs || !designs.length) return;
         communitySection.style.display = '';
         CommunityDesigns.renderStrip(communityContainer, designs, {
