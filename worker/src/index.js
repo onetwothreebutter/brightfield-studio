@@ -80,6 +80,8 @@ async function getPrintfulLocationId(env) {
   return _printfulLocationId;
 }
 
+const CANONICAL_SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
+
 async function getPrintfulSizes(env) {
   if (_printfulSizes) return _printfulSizes;
   try {
@@ -93,16 +95,16 @@ async function getPrintfulSizes(env) {
     const data = await res.json();
     const variants = data?.result?.variants || [];
     const seen = new Set();
-    const sizes = [];
     for (const v of variants) {
-      if (v.size && !seen.has(v.size)) {
-        seen.add(v.size);
-        sizes.push(v.size);
-      }
+      if (v.size) seen.add(v.size);
     }
+    // Sort by canonical garment order; unknown sizes appended at end
+    const known = CANONICAL_SIZE_ORDER.filter(s => seen.has(s));
+    const unknown = [...seen].filter(s => !CANONICAL_SIZE_ORDER.includes(s));
+    const sizes = [...known, ...unknown];
     if (sizes.length) {
       _printfulSizes = sizes;
-      console.log('[getPrintfulSizes] sizes from Printful:', sizes);
+      console.log('[getPrintfulSizes] sizes from Printful (sorted):', sizes);
     }
     return _printfulSizes;
   } catch (err) {
@@ -528,7 +530,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
 
   // Step 2: add Size option, which auto-creates one variant per size and removes the default Title variant
   const printfulSizes = await getPrintfulSizes(env);
-  const SIZES = printfulSizes || ['S', 'M', 'L', 'XL', '2XL', '3XL'];
+  const SIZES = printfulSizes || CANONICAL_SIZE_ORDER;
   console.log(logPrefix, 'using sizes:', SIZES);
   let sizeVariants = [];
   try {
