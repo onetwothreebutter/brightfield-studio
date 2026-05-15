@@ -443,14 +443,15 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     console.warn(logPrefix, 'all resize methods failed — using original URL as product image:', shopifyImageUrl);
   }
 
-  // Step 1: create the product (variants not accepted in ProductInput in 2025-01+)
+  const SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
+
+  // Step 1: create the product with Size option pre-defined in correct order
   const createData = await shopifyAdmin(env,
     `mutation CreateProduct($input: ProductInput!, $media: [CreateMediaInput!]) {
       productCreate(input: $input, media: $media) {
         product {
           id
           handle
-          variants(first: 1) { edges { node { id inventoryItem { id } } } }
         }
         userErrors { field message }
       }
@@ -462,6 +463,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
         vendor: 'Brightfield Studio',
         tags,
         descriptionHtml: '',
+        productOptions: [{ name: 'Size', values: SIZES.map(s => ({ name: s })) }],
         metafields: [
           { namespace: 'custom', key: 'design_url',             type: 'url',                    value: designUrl },
           { namespace: 'custom', key: 'mockup_url',             type: 'url',                    value: mockupUrl },
@@ -486,72 +488,70 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
 
   const newProductGid    = createData?.data?.productCreate?.product?.id;
   const newProductHandle = createData?.data?.productCreate?.product?.handle;
-  const newVariantNode   = createData?.data?.productCreate?.product?.variants?.edges?.[0]?.node;
-  const newVariantGid = newVariantNode?.id;
-  const inventoryItemGid = newVariantNode?.inventoryItem?.id;
-  if (!newVariantGid) {
-    console.error(logPrefix, 'no variant returned:', JSON.stringify(createData));
-    throw new Error('Product created but no variant returned');
+  if (!newProductGid) {
+    console.error(logPrefix, 'no product returned:', JSON.stringify(createData));
+    throw new Error('Product creation failed');
   }
 
-  // Step 2: set price on the auto-created default variant
-  const updateData = await shopifyAdmin(env,
-    `mutation UpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants { id }
+  // Step 2: create size variants in correct order with price and SKU
+  const skuPrefix = tags?.includes('community-design') ? 'COMMUNITY' : 'CUSTOM';
+  const skuBase   = `${skuPrefix}-${Date.now()}`;
+  const bulkCreateData = await shopifyAdmin(env,
+    `mutation BulkCreateVariants($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+      productVariantsBulkCreate(productId: $productId, variants: $variants) {
+        productVariants {
+          id
+          inventoryItem { id }
+        }
         userErrors { field message }
       }
     }`,
     {
       productId: newProductGid,
-      variants: [{ id: newVariantGid, price }],
+      variants: SIZES.map(size => ({
+        optionValues: [{ optionName: 'Size', name: size }],
+        price,
+        inventoryItem: { sku: `${skuBase}-${size}` },
+      })),
     }
   );
 
-  const updateErrors = updateData?.data?.productVariantsBulkUpdate?.userErrors;
-  if (updateErrors?.length) {
-    console.error(logPrefix, 'variant update errors:', JSON.stringify(updateErrors));
-    // Non-fatal: product exists, just price may be wrong
+  const bulkErrors = bulkCreateData?.data?.productVariantsBulkCreate?.userErrors;
+  if (bulkErrors?.length) {
+    console.error(logPrefix, 'bulk variant create errors:', JSON.stringify(bulkErrors));
   }
 
-  // Step 2b: set SKU on the inventory item (required by Printful before inventoryActivate)
-  if (inventoryItemGid) {
-    const skuPrefix = tags?.includes('community-design') ? 'COMMUNITY' : 'CUSTOM';
-    const skuData = await shopifyAdmin(env,
-      `mutation UpdateInventoryItem($id: ID!, $input: InventoryItemInput!) {
-        inventoryItemUpdate(id: $id, input: $input) {
-          inventoryItem { id sku }
-          userErrors { field message }
-        }
-      }`,
-      { id: inventoryItemGid, input: { sku: `${skuPrefix}-${Date.now()}` } }
-    );
-    const skuErrors = skuData?.data?.inventoryItemUpdate?.userErrors;
-    if (skuErrors?.length) console.error(logPrefix, 'SKU update errors:', JSON.stringify(skuErrors));
-    else console.log(logPrefix, 'SKU set:', skuData?.data?.inventoryItemUpdate?.inventoryItem?.sku);
+  const sizeVariants   = bulkCreateData?.data?.productVariantsBulkCreate?.productVariants || [];
+  const newVariantGid  = sizeVariants[0]?.id;
+  const allVariantGids = sizeVariants.map(v => v.id);
+  const allInvItemGids = sizeVariants.map(v => v.inventoryItem?.id).filter(Boolean);
+
+  if (!newVariantGid) {
+    console.error(logPrefix, 'no size variants created:', JSON.stringify(bulkCreateData));
+    throw new Error('Product created but no variants created');
   }
 
-  // Step 2c: activate inventory at the Printful fulfillment service location
+  // Step 2b: activate inventory at Printful for all size variants
   const printfulLocationId = await getPrintfulLocationId(env);
   console.log(logPrefix, 'Printful location ID:', printfulLocationId);
-  if (printfulLocationId && inventoryItemGid) {
-    const activateData = await shopifyAdmin(env,
-      `mutation ActivateInventory($inventoryItemId: ID!, $locationId: ID!) {
-        inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId) {
-          inventoryLevel { id }
-          userErrors { field message }
-        }
-      }`,
-      { inventoryItemId: inventoryItemGid, locationId: printfulLocationId }
-    );
-    const activateErrors = activateData?.data?.inventoryActivate?.userErrors;
-    if (activateErrors?.length) {
-      console.error(logPrefix, 'inventoryActivate errors:', JSON.stringify(activateErrors));
-    } else {
-      console.log(logPrefix, 'inventory activated at Printful location');
-    }
+  if (printfulLocationId && allInvItemGids.length) {
+    await Promise.all(allInvItemGids.map(invItemGid =>
+      shopifyAdmin(env,
+        `mutation ActivateInventory($inventoryItemId: ID!, $locationId: ID!) {
+          inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId) {
+            inventoryLevel { id }
+            userErrors { field message }
+          }
+        }`,
+        { inventoryItemId: invItemGid, locationId: printfulLocationId }
+      ).then(d => {
+        const errs = d?.data?.inventoryActivate?.userErrors;
+        if (errs?.length) console.error(logPrefix, 'inventoryActivate errors for', invItemGid, ':', JSON.stringify(errs));
+      })
+    ));
+    console.log(logPrefix, 'inventory activated at Printful for', allInvItemGids.length, 'variants');
   } else {
-    console.warn(logPrefix, 'skipping inventoryActivate — missing locationId or inventoryItemId');
+    console.warn(logPrefix, 'skipping inventoryActivate — missing locationId or inventory items');
   }
 
   const newVariantId = newVariantGid.replace('gid://shopify/ProductVariant/', '');
@@ -623,7 +623,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
       }`,
       {
         profileId: profileGid,
-        variantsToAssociate: [newVariantGid],
+        variantsToAssociate: allVariantGids,
       }
     );
     const spErrors = spData?.data?.deliveryProfileUpdate?.userErrors;
