@@ -739,57 +739,68 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   applyPerLetterSizeVisibility();
   if (typeof customAfterBuild === 'function') customAfterBuild();
 
-  // Auto-restore community design values when landing directly on #shader
+  // Auto-restore community design values — runs on load (if #shader) or when shader tab first opens
   (function () {
     var submissionId = '{{ submission_id }}';
     if (!submissionId) return;
-    if (localStorage.getItem('brightfield_restore')) return;
-    var h = window.location.hash;
-    if (h !== '#shader' && h.indexOf('#s=') !== 0 && h.indexOf('#share=') !== 0) return;
 
-    var ctrlByKey = {};
-    controls.forEach(function (c) { if (c.key) ctrlByKey[c.key] = c; });
+    var restored = false;
 
-    fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/community/design/' + encodeURIComponent(submissionId))
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (data) {
-        if (!data || !data.values || !window._shaderState) {
-          if (window._shaderState) window._shaderState.holdReveal = false;
-          return;
-        }
-        var colorPairs = [];
-        Object.keys(data.values).forEach(function (k) {
-          if (!(k in window._shaderState.values)) return;
-          var val = data.values[k];
-          if (Array.isArray(val)) {
-            colorPairs.push([k, val]);
+    function tryRestore() {
+      if (restored) return;
+      if (localStorage.getItem('brightfield_restore')) return;
+      restored = true;
+
+      var ctrlByKey = {};
+      controls.forEach(function (c) { if (c.key) ctrlByKey[c.key] = c; });
+
+      fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/community/design/' + encodeURIComponent(submissionId))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data || !data.values || !window._shaderState) {
+            if (window._shaderState) window._shaderState.holdReveal = false;
             return;
           }
-          window._shaderState.values[k] = val;
-          var inp = document.querySelector('[data-param-key="' + k + '"]');
-          if (!inp) return;
-          var ctrl = ctrlByKey[k];
-          if (inp.type === 'range') {
-            if (ctrl && ctrl.toRadians) return; // stored in radians; skip slider UI to avoid display mismatch
-            inp.value = val;
-            var disp = inp.parentNode && inp.parentNode.querySelector('.shader-control__value');
-            if (disp) disp.textContent = parseFloat(val).toFixed(
-              (inp.step || '1').indexOf('.') !== -1 ? (inp.step || '1').split('.')[1].length : 0
-            );
-          } else if (inp.classList.contains('shader-control__toggle')) {
-            inp.dataset.on = val === 1 ? '1' : '0';
-            inp.textContent = val === 1 ? 'On' : 'Off';
-          } else if (inp.tagName === 'SELECT') {
-            inp.value = val;
-            inp.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-        });
-        if (colorPairs.length) applyColors(colorPairs);
-        window._shaderState.snapValues = true;
-        window._shaderState.holdReveal = false;
-        window._shaderState.textDirty = true;
-      })
-      .catch(function () { if (window._shaderState) window._shaderState.holdReveal = false; });
+          var colorPairs = [];
+          Object.keys(data.values).forEach(function (k) {
+            if (!(k in window._shaderState.values)) return;
+            var val = data.values[k];
+            if (Array.isArray(val)) {
+              colorPairs.push([k, val]);
+              return;
+            }
+            window._shaderState.values[k] = val;
+            var inp = document.querySelector('[data-param-key="' + k + '"]');
+            if (!inp) return;
+            var ctrl = ctrlByKey[k];
+            if (inp.type === 'range') {
+              if (ctrl && ctrl.toRadians) return; // stored in radians; skip slider UI to avoid display mismatch
+              inp.value = val;
+              var disp = inp.parentNode && inp.parentNode.querySelector('.shader-control__value');
+              if (disp) disp.textContent = parseFloat(val).toFixed(
+                (inp.step || '1').indexOf('.') !== -1 ? (inp.step || '1').split('.')[1].length : 0
+              );
+            } else if (inp.classList.contains('shader-control__toggle')) {
+              inp.dataset.on = val === 1 ? '1' : '0';
+              inp.textContent = val === 1 ? 'On' : 'Off';
+            } else if (inp.tagName === 'SELECT') {
+              inp.value = val;
+              inp.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          });
+          if (colorPairs.length) applyColors(colorPairs);
+          window._shaderState.snapValues = true;
+          window._shaderState.holdReveal = false;
+          window._shaderState.textDirty = true;
+        })
+        .catch(function () { if (window._shaderState) window._shaderState.holdReveal = false; });
+    }
+
+    var h = window.location.hash;
+    if (h === '#shader' || h.indexOf('#s=') === 0 || h.indexOf('#share=') === 0) {
+      tryRestore();
+    }
+    window.addEventListener('product-shader-mode', function () { tryRestore(); });
   }());
 
   // Animation settings (exposed for browser debugging)
