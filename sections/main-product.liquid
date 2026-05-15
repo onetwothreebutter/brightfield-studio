@@ -110,7 +110,7 @@
         <!-- Shader panel — only shown when product has a shader-[file] tag -->
         {%- if shader_file -%}
         <div class="media-panel" data-panel="shader">
-          <canvas id="shader-canvas" class="product-shader__canvas{% if shader_file == 'stacked-gradient' %} product-shader__canvas--square{% endif %}"></canvas>
+          <canvas id="shader-canvas" class="product-shader__canvas{% if shader_file == 'stacked-gradient' %} product-shader__canvas--square{% endif %}"{% if is_community_design and submission_id != blank %} style="opacity:0"{% endif %}></canvas>
           <!-- Mockup modal -->
           <div id="mockup-modal" class="mockup-modal mockup-modal--hidden">
             <div class="mockup-modal__backdrop"></div>
@@ -425,7 +425,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     if (!c.key) return;
     values[c.key] = c.type === 'color' ? hexToRgb(c.value) : (c.toRadians ? c.value * Math.PI / 180 : c.value);
   });
-  window._shaderState = { values: values, textDirty: true };
+  window._shaderState = { values: values, textDirty: true{% if is_community_design and submission_id != blank %}, holdReveal: true{% endif %} };
 
   // Pre-populate restore key from ?bfr= share param (set by Worker share page)
   (function () {
@@ -753,7 +753,10 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/community/design/' + encodeURIComponent(submissionId))
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
-        if (!data || !data.values || !window._shaderState) return;
+        if (!data || !data.values || !window._shaderState) {
+          if (window._shaderState) window._shaderState.holdReveal = false;
+          return;
+        }
         var colorPairs = [];
         Object.keys(data.values).forEach(function (k) {
           if (!(k in window._shaderState.values)) return;
@@ -783,9 +786,10 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         });
         if (colorPairs.length) applyColors(colorPairs);
         window._shaderState.snapValues = true;
+        window._shaderState.holdReveal = false;
         window._shaderState.textDirty = true;
       })
-      .catch(function () {});
+      .catch(function () { if (window._shaderState) window._shaderState.holdReveal = false; });
   }());
 
   // Animation settings (exposed for browser debugging)

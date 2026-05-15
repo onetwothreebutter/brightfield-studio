@@ -185,7 +185,7 @@
 
         opts.render(gl, uniforms, renderV, w, h, t, textTex || null);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        if (!revealed) {
+        if (!revealed && !(window[stateKey] && window[stateKey].holdReveal)) {
           canvas.style.opacity = '1';
           revealed = true;
         }
