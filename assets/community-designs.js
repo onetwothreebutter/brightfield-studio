@@ -120,6 +120,167 @@
       .catch(function () { return []; });
   }
 
+  // ── Shared card actions builder ───────────────────────────────────────────────
+
+  function buildCardActions(design, opts) {
+    var likedSet    = getLikedSet();
+    var productUrl  = design.shopifyProductHandle ? '/products/' + design.shopifyProductHandle : '#';
+
+    var actions = document.createElement('div');
+    actions.className = 'product-card__actions';
+
+    var buyLink = document.createElement('a');
+    buyLink.href = productUrl;
+    buyLink.className = 'btn btn--primary btn--sm';
+    buyLink.textContent = 'Buy';
+    buyLink.addEventListener('click', function (e) { e.stopPropagation(); });
+    actions.appendChild(buyLink);
+
+    if (design.productHandle) {
+      var customizeBtn = document.createElement('button');
+      customizeBtn.className = 'btn btn--outline btn--sm community-card__customize-btn';
+      customizeBtn.setAttribute('data-source-handle', design.productHandle);
+      customizeBtn.setAttribute('data-shader', design.shader || '');
+      customizeBtn.setAttribute('data-values', JSON.stringify(design.values || {}));
+      customizeBtn.textContent = 'Customize';
+      customizeBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var values;
+        try { values = JSON.parse(customizeBtn.getAttribute('data-values') || '{}'); } catch (err) { values = {}; }
+        localStorage.setItem(RESTORE_KEY, JSON.stringify({ values: values, shader: design.shader }));
+        window.location.href = '/products/' + encodeURIComponent(design.productHandle) + '#shader';
+      });
+      actions.appendChild(customizeBtn);
+    }
+
+    var likeBtn = document.createElement('button');
+    likeBtn.className = 'btn btn--outline btn--sm community-designs__like-btn';
+    likeBtn.setAttribute('data-submission-id', design.id);
+    likeBtn.setAttribute('aria-label', 'Like');
+    if (likedSet[design.id]) likeBtn.classList.add('community-designs__like-btn--liked');
+
+    var likeIcon = document.createElement('span');
+    likeIcon.className = 'community-designs__like-icon';
+    likeIcon.innerHTML = '&#x2665;';
+
+    var likeCount = document.createElement('span');
+    likeCount.className = 'community-designs__like-count';
+    likeCount.textContent = design.likes != null ? String(design.likes) : '–';
+
+    likeBtn.appendChild(likeIcon);
+    likeBtn.appendChild(likeCount);
+
+    (function (d, btn, countEl) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var deviceId = opts && opts.getDeviceId ? opts.getDeviceId() : getDeviceId();
+        toggleLike(d.id, deviceId).then(function (result) {
+          if (!result) return;
+          countEl.textContent = String(result.likes);
+          btn.classList.toggle('community-designs__like-btn--liked', result.liked);
+          var set = getLikedSet();
+          if (result.liked) { set[d.id] = 1; } else { delete set[d.id]; }
+          setLikedSet(set);
+        });
+      });
+    }(design, likeBtn, likeCount));
+
+    actions.appendChild(likeBtn);
+
+    var shareBtn = document.createElement('button');
+    shareBtn.className = 'btn btn--outline btn--sm community-designs__share-btn';
+    var shareUrl = 'https://share.brightfield.studio/' + design.id;
+    shareBtn.setAttribute('data-share-url', shareUrl);
+    shareBtn.setAttribute('aria-label', 'Copy share link');
+    shareBtn.innerHTML = '&#x1F517;';
+
+    (function (btn, url) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        function showCopied() {
+          btn.textContent = '✓';
+          setTimeout(function () { btn.innerHTML = '&#x1F517;'; }, 1500);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(showCopied).catch(function () {
+            fallbackCopy(url, showCopied);
+          });
+        } else {
+          fallbackCopy(url, showCopied);
+        }
+      });
+    }(shareBtn, shareUrl));
+
+    actions.appendChild(shareBtn);
+    return actions;
+  }
+
+  // ── Grid render ───────────────────────────────────────────────────────────────
+  // Builds community design cards as full product-card grid items.
+  // opts: { getDeviceId }
+
+  function renderGrid(container, designs, opts) {
+    container.innerHTML = '';
+    if (!designs || !designs.length) return;
+
+    opts = opts || {};
+
+    var grid = document.createElement('div');
+    grid.className = 'product-grid';
+
+    designs.forEach(function (design) {
+      var shaderLabel = (design.shader || '').replace(/-/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+      var productUrl  = design.shopifyProductHandle ? '/products/' + design.shopifyProductHandle : '#';
+      var creatorName = design.creatorName || 'Anonymous';
+
+      var card = document.createElement('article');
+      card.className = 'product-card community-card';
+      card.setAttribute('data-shader', design.shader || '');
+
+      var link = document.createElement('a');
+      link.href = productUrl;
+      link.className = 'product-card__link';
+      link.setAttribute('aria-label', shaderLabel + ' by ' + creatorName);
+
+      var media = document.createElement('div');
+      media.className = 'product-card__media';
+
+      var img = document.createElement('img');
+      img.src = design.mockupUrl || '';
+      img.alt = shaderLabel + ' by ' + creatorName;
+      img.className = 'product-card__image';
+      img.loading = 'lazy';
+      media.appendChild(img);
+
+      var glow = document.createElement('div');
+      glow.className = 'product-card__glow';
+      glow.setAttribute('aria-hidden', 'true');
+      media.appendChild(glow);
+
+      var info = document.createElement('div');
+      info.className = 'product-card__info';
+
+      var title = document.createElement('h3');
+      title.className = 'product-card__title';
+      title.textContent = creatorName;
+      info.appendChild(title);
+
+      var meta = document.createElement('p');
+      meta.className = 'community-card__meta';
+      meta.textContent = shaderLabel;
+      info.appendChild(meta);
+
+      link.appendChild(media);
+      link.appendChild(info);
+      card.appendChild(link);
+      card.appendChild(buildCardActions(design, opts));
+
+      grid.appendChild(card);
+    });
+
+    container.appendChild(grid);
+  }
+
   // ── Filmstrip render ─────────────────────────────────────────────────────────
   // Dynamically builds community design cards into a horizontal filmstrip.
   // opts: { getDeviceId, onCardClick }
@@ -129,14 +290,12 @@
     if (!designs || !designs.length) return;
 
     opts = opts || {};
-    var likedSet = getLikedSet();
 
     var strip = document.createElement('div');
     strip.className = 'recent-designs__strip';
 
     designs.forEach(function (design) {
       var shaderLabel = (design.shader || '').replace(/-/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
-      var productUrl  = design.shopifyProductHandle ? '/products/' + design.shopifyProductHandle : '#';
 
       var card = document.createElement('article');
       card.className = 'product-card community-card recent-designs__card';
@@ -159,96 +318,9 @@
       nameEl.textContent = design.creatorName || 'Anonymous';
       label.appendChild(nameEl);
 
-      var actions = document.createElement('div');
-      actions.className = 'product-card__actions';
-
-      var buyLink = document.createElement('a');
-      buyLink.href = productUrl;
-      buyLink.className = 'btn btn--primary btn--sm';
-      buyLink.textContent = 'Buy';
-      buyLink.addEventListener('click', function (e) { e.stopPropagation(); });
-      actions.appendChild(buyLink);
-
-      if (design.productHandle) {
-        var customizeBtn = document.createElement('button');
-        customizeBtn.className = 'btn btn--outline btn--sm community-card__customize-btn';
-        customizeBtn.setAttribute('data-source-handle', design.productHandle);
-        customizeBtn.setAttribute('data-shader', design.shader || '');
-        customizeBtn.setAttribute('data-values', JSON.stringify(design.values || {}));
-        customizeBtn.textContent = 'Customize';
-        customizeBtn.addEventListener('click', function (e) {
-          e.stopPropagation();
-          var values;
-          try { values = JSON.parse(customizeBtn.getAttribute('data-values') || '{}'); } catch (err) { values = {}; }
-          localStorage.setItem(RESTORE_KEY, JSON.stringify({ values: values, shader: design.shader }));
-          window.location.href = '/products/' + encodeURIComponent(design.productHandle) + '#shader';
-        });
-        actions.appendChild(customizeBtn);
-      }
-
-      var likeBtn = document.createElement('button');
-      likeBtn.className = 'btn btn--outline btn--sm community-designs__like-btn';
-      likeBtn.setAttribute('data-submission-id', design.id);
-      likeBtn.setAttribute('aria-label', 'Like');
-      if (likedSet[design.id]) likeBtn.classList.add('community-designs__like-btn--liked');
-
-      var likeIcon = document.createElement('span');
-      likeIcon.className = 'community-designs__like-icon';
-      likeIcon.innerHTML = '&#x2665;';
-
-      var likeCount = document.createElement('span');
-      likeCount.className = 'community-designs__like-count';
-      likeCount.textContent = design.likes != null ? String(design.likes) : '–';
-
-      likeBtn.appendChild(likeIcon);
-      likeBtn.appendChild(likeCount);
-
-      (function (d, btn, countEl) {
-        btn.addEventListener('click', function (e) {
-          e.stopPropagation();
-          var deviceId = opts.getDeviceId ? opts.getDeviceId() : getDeviceId();
-          toggleLike(d.id, deviceId).then(function (result) {
-            if (!result) return;
-            countEl.textContent = String(result.likes);
-            btn.classList.toggle('community-designs__like-btn--liked', result.liked);
-            var set = getLikedSet();
-            if (result.liked) { set[d.id] = 1; } else { delete set[d.id]; }
-            setLikedSet(set);
-          });
-        });
-      }(design, likeBtn, likeCount));
-
-      actions.appendChild(likeBtn);
-
-      var shareBtn = document.createElement('button');
-      shareBtn.className = 'btn btn--outline btn--sm community-designs__share-btn';
-      var shareUrl = 'https://share.brightfield.studio/' + design.id;
-      shareBtn.setAttribute('data-share-url', shareUrl);
-      shareBtn.setAttribute('aria-label', 'Copy share link');
-      shareBtn.innerHTML = '&#x1F517;';
-
-      (function (btn, url) {
-        btn.addEventListener('click', function (e) {
-          e.stopPropagation();
-          function showCopied() {
-            btn.textContent = '✓';
-            setTimeout(function () { btn.innerHTML = '&#x1F517;'; }, 1500);
-          }
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(url).then(showCopied).catch(function () {
-              fallbackCopy(url, showCopied);
-            });
-          } else {
-            fallbackCopy(url, showCopied);
-          }
-        });
-      }(shareBtn, shareUrl));
-
-      actions.appendChild(shareBtn);
-
       card.appendChild(imgWrap);
       card.appendChild(label);
-      card.appendChild(actions);
+      card.appendChild(buildCardActions(design, opts));
 
       card.addEventListener('click', function () {
         if (opts.onCardClick) opts.onCardClick(design);
@@ -337,6 +409,7 @@
 
   window.CommunityDesigns = {
     fetchCommunityDesigns: fetchCommunityDesigns,
+    renderGrid:            renderGrid,
     renderStrip:           renderStrip,
     hydrateInteractions:   hydrateInteractions,
     groupByShader:         groupByShader,
