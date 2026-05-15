@@ -739,6 +739,50 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   applyPerLetterSizeVisibility();
   if (typeof customAfterBuild === 'function') customAfterBuild();
 
+  // Apply stored product shader values so "Design Yours" starts from this design
+  {%- assign product_shader_values = product.metafields.custom.shader_values -%}
+  {%- if product_shader_values != blank -%}
+  (function () {
+    // Skip if a gallery/share restore is already pending — it takes priority
+    if (localStorage.getItem('brightfield_restore')) return;
+    try {
+      var pv = {{ product_shader_values | json }};
+      if (!pv || typeof pv !== 'object') return;
+      Object.keys(pv).forEach(function (k) {
+        var val = pv[k];
+        if (!(k in window._shaderState.values)) return;
+        window._shaderState.values[k] = val;
+        // Also update the visible control element
+        var input = document.querySelector('[data-param-key="' + k + '"]');
+        if (!input) return;
+        if (input.type === 'range') {
+          input.value = val;
+          var disp = input.parentNode.querySelector('.shader-control__value');
+          if (disp) disp.textContent = val;
+        } else if (input.tagName === 'SELECT') {
+          input.value = val;
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        } else if (input.classList.contains('shader-control__toggle')) {
+          var isOn = val === 1;
+          input.dataset.on = isOn ? '1' : '0';
+          input.textContent = isOn ? 'On' : 'Off';
+          input.classList.toggle('is-on', isOn);
+        } else if (input.classList.contains('shader-control__color')) {
+          var hex = '#' + val.map(function (c) {
+            var s = Math.round(c * 255).toString(16);
+            return s.length === 1 ? '0' + s : s;
+          }).join('');
+          input.value = hex;
+        } else if (input.classList.contains('shader-control__text-input')) {
+          input.value = val;
+          window._shaderState.textDirty = true;
+        }
+      });
+      window._shaderState.textDirty = true;
+    } catch (e) {}
+  }());
+  {%- endif -%}
+
   // Animation settings (exposed for browser debugging)
   window._animationSettings = {
     tweenDuration: 900,
