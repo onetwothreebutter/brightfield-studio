@@ -189,8 +189,8 @@ describe('GET /community/list', () => {
   it('filters by ?productHandle= when provided', async () => {
     const { id: id1 } = await submitDesign(env, { shader: 'rise-shirt', productHandle: 'product-a' });
     const { id: id2 } = await submitDesign(env, { shader: 'rise-shirt', productHandle: 'product-b' });
-    await worker.fetch(post('/community/approve', { id: id1 }, adminHeaders()), env);
-    await worker.fetch(post('/community/approve', { id: id2 }, adminHeaders()), env);
+    await approveDesign(env, id1, 'community-product-a');
+    await approveDesign(env, id2, 'community-product-b');
 
     const res = await worker.fetch(get('/community/list?shader=rise-shirt&productHandle=product-a'), env);
     const results = await res.json();
