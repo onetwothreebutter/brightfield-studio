@@ -1366,8 +1366,14 @@
       .then(function (product) {
         var sel = document.getElementById('demo-mockup-size');
         if (!sel) return;
+        var sizeOrder = ['XS','S','M','L','XL','2XL','3XL','4XL','5XL'];
+        var sorted = product.variants.slice().sort(function (a, b) {
+          var ai = sizeOrder.indexOf(a.title); var bi = sizeOrder.indexOf(b.title);
+          if (ai === -1) ai = 999; if (bi === -1) bi = 999;
+          return ai - bi;
+        });
         sel.innerHTML = '';
-        product.variants.forEach(function (v) {
+        sorted.forEach(function (v) {
           var opt       = document.createElement('option');
           opt.value     = v.id;
           opt.textContent = v.title;
