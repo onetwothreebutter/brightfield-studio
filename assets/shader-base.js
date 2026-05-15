@@ -142,10 +142,12 @@
           var factor = 1 - Math.exp(-8 * dt);
           var instant = (opts.instantKeys || []);
           if (!animVals) { animVals = {}; }
+          var snap = window[stateKey] && window[stateKey].snapValues;
+          if (snap) { window[stateKey].snapValues = false; }
           var maxDiff = 0;
           Object.keys(v).forEach(function (k) {
-            if (instant.indexOf(k) !== -1) {
-              animVals[k] = v[k]; // bypass lerp — instant feedback
+            if (snap || instant.indexOf(k) !== -1) {
+              animVals[k] = Array.isArray(v[k]) ? v[k].slice() : v[k];
             } else if (animVals[k] === undefined) {
               animVals[k] = Array.isArray(v[k]) ? v[k].slice() : v[k];
             } else {
@@ -183,7 +185,7 @@
 
         opts.render(gl, uniforms, renderV, w, h, t, textTex || null);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        if (!revealed) {
+        if (!revealed && !(window[stateKey] && window[stateKey].holdReveal)) {
           canvas.style.opacity = '1';
           revealed = true;
         }

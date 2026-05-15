@@ -58,6 +58,16 @@ async function submitDesign(env, overrides = {}) {
   return res.json();
 }
 
+// Approves a submission and sets shopifyProductHandle (Shopify API unavailable in tests).
+async function approveDesign(env, id, handle = 'test-product') {
+  await worker.fetch(post('/community/approve', { id }, adminHeaders()), env);
+  const key = `community/submissions/${id}.json`;
+  const raw = await env.MOCKUP_STAGING.get(key);
+  const sub = JSON.parse(await raw.text());
+  sub.shopifyProductHandle = handle;
+  await env.MOCKUP_STAGING.put(key, JSON.stringify(sub));
+}
+
 // ── /community/submit ─────────────────────────────────────────────────────────
 
 describe('POST /community/submit', () => {
@@ -135,15 +145,23 @@ describe('GET /community/list', () => {
     let res = await worker.fetch(get('/community/list'), env);
     expect(await res.json()).toHaveLength(0);
 
-    // approve it
-    await worker.fetch(post('/community/approve', { id }, adminHeaders()), env);
+    // approve it and set shopifyProductHandle
+    await approveDesign(env, id);
     res = await worker.fetch(get('/community/list'), env);
     expect(await res.json()).toHaveLength(1);
   });
 
-  it('strips creatorEmail from results', async () => {
+  it('omits approved submissions without a shopifyProductHandle', async () => {
     const { id } = await submitDesign(env);
     await worker.fetch(post('/community/approve', { id }, adminHeaders()), env);
+    // shopifyProductHandle not set (Shopify product creation failed)
+    const res = await worker.fetch(get('/community/list'), env);
+    expect(await res.json()).toHaveLength(0);
+  });
+
+  it('strips creatorEmail from results', async () => {
+    const { id } = await submitDesign(env);
+    await approveDesign(env, id);
     const [design] = await (await worker.fetch(get('/community/list'), env)).json();
     expect(design.creatorEmail).toBeUndefined();
     expect(design.creatorName).toBe('Jane');
@@ -152,8 +170,8 @@ describe('GET /community/list', () => {
   it('filters by ?shader= when provided', async () => {
     const { id: id1 } = await submitDesign(env, { shader: 'rise-shirt' });
     const { id: id2 } = await submitDesign(env, { shader: 'echo-text' });
-    await worker.fetch(post('/community/approve', { id: id1 }, adminHeaders()), env);
-    await worker.fetch(post('/community/approve', { id: id2 }, adminHeaders()), env);
+    await approveDesign(env, id1, 'rise-shirt-community');
+    await approveDesign(env, id2, 'echo-text-community');
 
     const res = await worker.fetch(get('/community/list?shader=rise-shirt'), env);
     const results = await res.json();
@@ -163,7 +181,7 @@ describe('GET /community/list', () => {
 
   it('returns [] when ?shader= matches nothing', async () => {
     const { id } = await submitDesign(env, { shader: 'rise-shirt' });
-    await worker.fetch(post('/community/approve', { id }, adminHeaders()), env);
+    await approveDesign(env, id, 'rise-shirt-community');
     const res = await worker.fetch(get('/community/list?shader=other'), env);
     expect(await res.json()).toEqual([]);
   });

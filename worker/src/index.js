@@ -959,7 +959,7 @@ async function handleCommunityList(request, env, origin) {
 
   const submissions = (
     await Promise.all(ids.map(id => readJson(env, `community/submissions/${id}.json`)))
-  ).filter(s => s && s.status === 'approved');
+  ).filter(s => s && s.status === 'approved' && s.shopifyProductHandle);
 
   const filtered = submissions.filter(s => {
     if (shaderFilter        && s.shader        !== shaderFilter)        return false;
