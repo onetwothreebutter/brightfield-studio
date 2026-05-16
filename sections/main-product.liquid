@@ -155,6 +155,32 @@
               </div>
             </div>
           </div>
+          <!-- In-house design assistant (shown when ?new-inhouse-design param is present) -->
+          <div id="inhouse-assistant" class="inhouse-assistant inhouse-assistant--hidden">
+            <div class="inhouse-assistant__box">
+              <div class="inhouse-assistant__header">
+                <span class="inhouse-assistant__title">In-House Design</span>
+                <button class="inhouse-assistant__close" id="inhouse-assistant-close" aria-label="Close">&times;</button>
+              </div>
+              <div class="inhouse-assistant__body">
+                <ol class="inhouse-assistant__steps">
+                  <li>Tune the shader using the controls panel</li>
+                  <li>Click <strong>Copy</strong> below and paste into<br><code>snippets/shader-controls-{{ shader_file }}.liquid</code></li>
+                  <li>Replace each control's <code>value:</code> field with the copied values</li>
+                  <li>Run <code>npm run push</code> to deploy</li>
+                  <li>Verify on the live page (no <code>?new-inhouse-design</code>)</li>
+                </ol>
+                <div class="inhouse-assistant__values-header">
+                  <span class="inhouse-assistant__values-label">Current values</span>
+                  <button id="inhouse-copy-btn" class="btn btn--outline btn--sm">Copy</button>
+                </div>
+                <pre id="inhouse-values" class="inhouse-assistant__values"></pre>
+              </div>
+            </div>
+          </div>
+          <button id="inhouse-reopen-btn" class="inhouse-assistant__reopen inhouse-assistant__reopen--hidden" aria-label="Reopen design assistant">
+            Design Assistant
+          </button>
         </div>
         {%- endif -%}
 
@@ -1826,6 +1852,68 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         });
     });
   }
+}());
+
+// ── In-house design assistant ─────────────────────────────────────────────────
+(function () {
+  if (!new URLSearchParams(location.search).has('new-inhouse-design')) return;
+
+  var modal     = document.getElementById('inhouse-assistant');
+  var reopenBtn = document.getElementById('inhouse-reopen-btn');
+  var closeBtn  = document.getElementById('inhouse-assistant-close');
+  var valuesEl  = document.getElementById('inhouse-values');
+  var copyBtn   = document.getElementById('inhouse-copy-btn');
+  if (!modal) return;
+
+  function rgbToHex(v) {
+    return '#' + v.map(function (c) {
+      return Math.round(Math.max(0, Math.min(1, c)) * 255).toString(16).padStart(2, '0');
+    }).join('');
+  }
+
+  function getFormattedValues() {
+    if (!window._shaderState) return '// shader not loaded yet';
+    var vals = window._shaderState.values;
+    return Object.keys(vals).map(function (k) {
+      var v = vals[k];
+      var display = Array.isArray(v) ? ("'" + rgbToHex(v) + "'")
+                  : typeof v === 'string' ? ("'" + v + "'")
+                  : v;
+      return k + ': ' + display;
+    }).join('\n');
+  }
+
+  function refresh() {
+    if (valuesEl) valuesEl.textContent = getFormattedValues();
+  }
+
+  function open() {
+    refresh();
+    modal.classList.remove('inhouse-assistant--hidden');
+    reopenBtn.classList.add('inhouse-assistant__reopen--hidden');
+  }
+
+  function close() {
+    modal.classList.add('inhouse-assistant--hidden');
+    reopenBtn.classList.remove('inhouse-assistant__reopen--hidden');
+  }
+
+  closeBtn.addEventListener('click', close);
+  reopenBtn.addEventListener('click', open);
+
+  copyBtn.addEventListener('click', function () {
+    if (!valuesEl) return;
+    navigator.clipboard.writeText(valuesEl.textContent).then(function () {
+      copyBtn.textContent = 'Copied!';
+      setTimeout(function () { copyBtn.textContent = 'Copy'; }, 2000);
+    });
+  });
+
+  setInterval(function () {
+    if (!modal.classList.contains('inhouse-assistant--hidden')) refresh();
+  }, 1000);
+
+  open();
 }());
 
 // ── Desktop: scroll shadows on shader-gui ─────────────────────────────────────

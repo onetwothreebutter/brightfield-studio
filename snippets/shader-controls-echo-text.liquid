@@ -1,7 +1,7 @@
 var controls = [
   // ── Text ──────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Text' },
-  { key: 'text',         label: 'Text',      type: 'text',   textDirty: true, value: 'ECHO' },
+  { key: 'text',         label: 'Text',      type: 'text',   textDirty: true, value: 'VIBES' },
   { key: 'textFont',     label: 'Font',      type: 'select', textDirty: true, value: 'Montserrat',
     options: [
       { label: 'Montserrat',          value: 'Montserrat'          },
@@ -28,7 +28,7 @@ var controls = [
   { key: 'u_text_color', label: 'Text Color', type: 'color', value: '#ffffff' },
   // ── Palette ───────────────────────────────────────────────────────────────
   { type: 'header', label: 'Palette' },
-  { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '0',
+  { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '1',
     options: [
       { label: 'Flat',   value: '0' },
       { label: '4-Stop', value: '1' },
@@ -39,7 +39,7 @@ var controls = [
   { key: '_et_palette_preset', label: 'Preset', type: 'select', value: 'Rainbow',
     options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
-  { key: 'u_a', label: 'Palette A', type: 'color', value: '#808080',
+  { key: 'u_a', label: 'Palette A', type: 'color', value: '#ad6da7',
     tip: 'Offset — base brightness per channel.' },
   { key: 'u_b', label: 'Palette B', type: 'color', value: '#808080',
     tip: 'Amplitude — color swing range per channel.' },
@@ -87,7 +87,10 @@ var controls = [
   { key: 'u_outline_enabled', label: 'Outline',       type: 'toggle', textDirty: true, value: 0, noRandomize: true },
   { key: 'u_outline_width',   label: 'Outline Width', type: 'range',  textDirty: true, min: 1, max: 60, step: 1, value: 8, noRandomize: true },
   { key: 'u_outline_color',   label: 'Outline Color', type: 'color',  value: '#000000', noRandomize: true },
-].concat(FINISH_CONTROLS);
+].concat(FINISH_CONTROLS).map(function (c) {
+  if (c.key === 'u_pos_y') return Object.assign({}, c, { value: -0.17 });
+  return c;
+});
 
 var customAfterBuild = function () {
   var presets = COSINE_PRESETS;
