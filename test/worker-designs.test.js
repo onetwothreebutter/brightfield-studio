@@ -150,7 +150,7 @@ describe('POST /generate-mockup — design saving', () => {
     expect(saved[1].shader).toBe('circle-on-line');  // old entry preserved
   });
 
-  it('trims stored designs to a maximum of 20', async () => {
+  it('keeps all designs without trimming', async () => {
     const r2 = makeR2();
     const existing = Array.from({ length: 20 }, (_, i) => ({ id: String(i), shader: 'old' }));
     r2._store.set('device-designs/dev-3.json', JSON.stringify(existing));
@@ -165,7 +165,7 @@ describe('POST /generate-mockup — design saving', () => {
     }), makeEnv(r2));
 
     const saveCall = r2.put.mock.calls.find(([k]) => k === 'device-designs/dev-3.json');
-    expect(JSON.parse(saveCall[1])).toHaveLength(20);
+    expect(JSON.parse(saveCall[1])).toHaveLength(21);
   });
 
   it('still returns mockup_url and design_url on success', async () => {
