@@ -1567,7 +1567,6 @@ async function saveDesignEntry(env, deviceId, entry) {
     }
   } catch { designs = []; }
   designs.unshift(entry);
-  if (designs.length > 20) designs = designs.slice(0, 20);
   await env.MOCKUP_STAGING.put(key, JSON.stringify(designs), {
     httpMetadata: { contentType: 'application/json' },
   });
