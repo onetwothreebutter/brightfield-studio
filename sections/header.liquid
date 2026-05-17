@@ -39,10 +39,74 @@
           <span class="cart-count" aria-hidden="true">{{ cart.item_count }}</span>
         {%- endif -%}
       </a>
+      <button
+        class="mobile-nav-toggle"
+        id="mobile-nav-toggle"
+        aria-expanded="false"
+        aria-controls="mobile-nav-dialog"
+        aria-label="Open menu"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
     </div>
 
   </div>
 </header>
+
+<dialog class="mobile-nav" id="mobile-nav-dialog" aria-label="Main navigation">
+  <div class="mobile-nav__inner">
+    <button class="mobile-nav__close" id="mobile-nav-close" aria-label="Close menu">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+    <nav aria-label="Mobile navigation">
+      <ul class="mobile-nav__list">
+        {%- for link in linklists.main-menu.links -%}
+          <li class="mobile-nav__item">
+            <a
+              href="{{ link.url }}"
+              class="mobile-nav__link{% if link.active %} is-active{% endif %}"
+            >{{ link.title }}</a>
+          </li>
+        {%- endfor -%}
+      </ul>
+    </nav>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  var toggle = document.getElementById('mobile-nav-toggle');
+  var dialog = document.getElementById('mobile-nav-dialog');
+  var closeBtn = document.getElementById('mobile-nav-close');
+
+  function openMenu() {
+    dialog.showModal();
+    toggle.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeMenu() {
+    dialog.close();
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.focus();
+  }
+
+  toggle.addEventListener('click', openMenu);
+  closeBtn.addEventListener('click', closeMenu);
+
+  dialog.addEventListener('click', function (e) {
+    if (e.target === dialog) closeMenu();
+  });
+})();
+</script>
 
 
 {% schema %}

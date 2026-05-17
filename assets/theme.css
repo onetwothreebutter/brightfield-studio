@@ -1115,7 +1115,105 @@ h6 {
     }
 }
 
+/* ── Mobile nav drawer ──────────────────────────────────────── */
+
+.mobile-nav-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    padding: 0.25rem;
+    cursor: pointer;
+    color: var(--color-text);
+    transition: color var(--transition-fast);
+}
+.mobile-nav-toggle:hover { color: var(--color-primary); }
+
+dialog.mobile-nav {
+    position: fixed;
+    inset: 0 0 0 auto;
+    margin: 0;
+    padding: 0;
+    width: min(300px, 80vw);
+    height: 100dvh;
+    max-height: none;
+    background: var(--color-surface);
+    border: none;
+    border-left: 1px solid var(--color-border);
+    translate: 100% 0;
+    transition: translate 0.28s ease, display 0.28s ease allow-discrete;
+    overflow-y: auto;
+}
+dialog.mobile-nav[open] {
+    translate: 0 0;
+}
+dialog.mobile-nav::backdrop {
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    transition: opacity 0.28s ease, display 0.28s ease allow-discrete;
+}
+dialog.mobile-nav[open]::backdrop {
+    opacity: 1;
+}
+@starting-style {
+    dialog.mobile-nav[open] { translate: 100% 0; }
+    dialog.mobile-nav[open]::backdrop { opacity: 0; }
+}
+
+.mobile-nav__inner {
+    display: flex;
+    flex-direction: column;
+    padding: 1.25rem 1.5rem 2rem;
+    min-height: 100%;
+}
+
+.mobile-nav__close {
+    align-self: flex-end;
+    background: none;
+    border: none;
+    padding: 0.25rem;
+    cursor: pointer;
+    color: var(--color-text-muted);
+    transition: color var(--transition-fast);
+    margin-bottom: 2rem;
+}
+.mobile-nav__close:hover { color: var(--color-primary); }
+
+.mobile-nav__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.mobile-nav__link {
+    display: block;
+    padding: 0.9rem 0;
+    border-bottom: 1px solid var(--color-border);
+    font-size: 0.85rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--color-text);
+    transition: color var(--transition-fast);
+}
+.mobile-nav__link:hover,
+.mobile-nav__link.is-active {
+    color: var(--color-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    dialog.mobile-nav,
+    dialog.mobile-nav::backdrop {
+        transition: none;
+    }
+}
+
 @media (max-width: 768px) {
+    .mobile-nav-toggle { display: flex; }
     .site-nav {
         display: none;
     }
