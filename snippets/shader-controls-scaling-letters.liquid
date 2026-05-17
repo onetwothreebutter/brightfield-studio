@@ -23,7 +23,7 @@ var controls = [
   { key: 'centerLetters', label: 'Center in Cell', type: 'toggle', value: 1, textDirty: true,
     tip: 'Centers each letter using its actual glyph bounding box instead of the typographic em-box.' },
   { key: 'u_text_color',   label: 'Text Color',    type: 'color',  value: '#ffffff' },
-  { key: 'u_invert',       label: 'Invert Colors', type: 'toggle', value: 0,
+  { key: 'u_invert',       label: 'Invert Colors', type: 'toggle', value: 1,
     tip: 'Colors the cell background instead of the letter (text becomes a cutout).' },
   { key: 'outlineEnabled', label: 'Outline',       type: 'toggle', value: 0, noRandomize: true },
   { key: 'outlineWidth',   label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 12, noRandomize: true },
@@ -40,20 +40,20 @@ var controls = [
     tip: 'Width-to-height ratio of the letter grid (e.g. 0.8 = 4:5 portrait, 1.0 = square).' },
   // ── Palette ───────────────────────────────────────────────────────────────
   { type: 'header', label: 'Palette' },
-  { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '0',
+  { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '1',
     options: [
       { label: 'Flat',   value: '0' },
       { label: '4-Stop', value: '1' },
     ]
   },
   // 4-stop colors (shown/hidden by customAfterBuild)
-  { key: '_sl_4color_preset', label: 'Preset', type: 'select', value: 'Neon',
+  { key: '_sl_4color_preset', label: 'Preset', type: 'select', value: 'Aurora',
     options: Object.keys(FOUR_STOP_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
-  { key: 'u_color0', label: 'Color 1 (Left)',  type: 'color', value: '#ff3366' },
-  { key: 'u_color1', label: 'Color 2',         type: 'color', value: '#ffcc00' },
-  { key: 'u_color2', label: 'Color 3',         type: 'color', value: '#00ccff' },
-  { key: 'u_color3', label: 'Color 4 (Right)', type: 'color', value: '#aa00ff' },
+  { key: 'u_color0', label: 'Color 1 (Left)',  type: 'color', value: '#00ff88' },
+  { key: 'u_color1', label: 'Color 2',         type: 'color', value: '#00e5ff' },
+  { key: 'u_color2', label: 'Color 3',         type: 'color', value: '#7c4dff' },
+  { key: 'u_color3', label: 'Color 4 (Right)', type: 'color', value: '#e040fb' },
 ].concat(FINISH_CONTROLS);
 
 var customAfterBuild = function () {
