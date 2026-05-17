@@ -175,6 +175,9 @@
                   <button id="inhouse-copy-btn" class="btn btn--outline btn--sm">Copy</button>
                 </div>
                 <pre id="inhouse-values" class="inhouse-assistant__values"></pre>
+                <div class="inhouse-assistant__footer">
+                  <button id="inhouse-turnoff-btn" class="btn btn--outline btn--sm inhouse-assistant__turnoff">Turn off Design Assistant</button>
+                </div>
               </div>
             </div>
           </div>
@@ -1856,13 +1859,18 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
 
 // ── In-house design assistant ─────────────────────────────────────────────────
 (function () {
-  if (!new URLSearchParams(location.search).has('new-inhouse-design')) return;
+  var LS_KEY = 'inhouse-design-assistant-enabled';
+  if (new URLSearchParams(location.search).has('new-inhouse-design')) {
+    localStorage.setItem(LS_KEY, '1');
+  }
+  if (!localStorage.getItem(LS_KEY)) return;
 
-  var modal     = document.getElementById('inhouse-assistant');
-  var reopenBtn = document.getElementById('inhouse-reopen-btn');
-  var closeBtn  = document.getElementById('inhouse-assistant-close');
-  var valuesEl  = document.getElementById('inhouse-values');
-  var copyBtn   = document.getElementById('inhouse-copy-btn');
+  var modal      = document.getElementById('inhouse-assistant');
+  var reopenBtn  = document.getElementById('inhouse-reopen-btn');
+  var closeBtn   = document.getElementById('inhouse-assistant-close');
+  var valuesEl   = document.getElementById('inhouse-values');
+  var copyBtn    = document.getElementById('inhouse-copy-btn');
+  var turnoffBtn = document.getElementById('inhouse-turnoff-btn');
   if (!modal) return;
 
   function rgbToHex(v) {
@@ -1898,8 +1906,15 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     reopenBtn.classList.remove('inhouse-assistant__reopen--hidden');
   }
 
+  function turnOff() {
+    localStorage.removeItem(LS_KEY);
+    modal.classList.add('inhouse-assistant--hidden');
+    reopenBtn.classList.add('inhouse-assistant__reopen--hidden');
+  }
+
   closeBtn.addEventListener('click', close);
   reopenBtn.addEventListener('click', open);
+  if (turnoffBtn) turnoffBtn.addEventListener('click', turnOff);
 
   copyBtn.addEventListener('click', function () {
     if (!valuesEl) return;
