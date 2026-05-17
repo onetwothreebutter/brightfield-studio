@@ -18,7 +18,7 @@ var controls = [
     tip: 'Amplitude — color swing range per channel. Higher = more vivid, saturated output.' },
   { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff',
     tip: 'Frequency — how many times the palette cycles across the gradient per channel.' },
-  { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#436a8e',
+  { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab',
     tip: 'Phase — shifts the starting hue of the color cycle. Rotates the overall color mood.' },
   // 4-stop color controls
   { key: 'u_color0', label: 'Color 1', type: 'color', stopDependent: true, value: '#ff3366' },
@@ -63,7 +63,7 @@ var controls = [
   { key: 'u_top_margin',     label: 'Top Margin',    type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 0.31, noRandomize: true },
   // ── Text overlay ──────────────────────────────────────────────────────────
   { type: 'header', label: 'Text Overlay' },
-  { key: 'text',             label: 'Text',          type: 'text',                           value: 'GLOW', textDirty: true },
+  { key: 'text',             label: 'Text',          type: 'text',                           value: '',     textDirty: true },
   { key: 'textFont',         label: 'Font',          type: 'select', textDirty: true, value: 'IBM Plex Mono',
     options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
   },
@@ -78,7 +78,15 @@ var controls = [
     tip: 'On = text shows inverted palette color. Off = text matches the palette.' },
   { key: 'u_text_radius',    label: 'Text Dot Size', type: 'range',  min: 0.01, max: 1.5,  step: 0.01, value: 0.33 },
   { key: 'u_text_blend',     label: 'Text Blend',    type: 'range',  min: 0,    max: 1.0,  step: 0.01, value: 1.0  },
-].concat(FINISH_CONTROLS);
+].concat(FINISH_CONTROLS_PRE).concat([
+  { key: 'u_vignette_top',    label: 'Vignette Top',    type: 'range', min: 0, max: 20, step: 0.05, value: 0,    noRandomize: true },
+  { key: 'u_vignette_bottom', label: 'Vignette Bottom', type: 'range', min: 0, max: 20, step: 0.05, value: 2.65, noRandomize: true },
+  { key: 'u_vignette_left',   label: 'Vignette Left',   type: 'range', min: 0, max: 20, step: 0.05, value: 4.6,  noRandomize: true },
+  { key: 'u_vignette_right',  label: 'Vignette Right',  type: 'range', min: 0, max: 20, step: 0.05, value: 2.9,  noRandomize: true },
+  { key: 'u_pos_x', label: 'Position X', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0,   noRandomize: true },
+  { key: 'u_pos_y', label: 'Position Y', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: -0.21, noRandomize: true },
+  { key: 'u_scale', label: 'Scale',      type: 'range', min: 0.2,  max: 3.0,  step: 0.05, value: 1.0,  noRandomize: true },
+]);
 
 var customAfterBuild = function () {
   // Cosine preset wiring
