@@ -118,9 +118,6 @@
     'uniform float     u_invert;',
     'uniform float     u_corner_radius;',
     'uniform float     u_grid_aspect;',
-    'uniform float     u_design_scale;',
-    'uniform float     u_offset_x;',
-    'uniform float     u_offset_y;',
     'uniform float     u_opacity;',
     'uniform float     u_distress;',
     'uniform float     u_distress_scale;',
@@ -148,10 +145,10 @@
     '  const float ROW_4A  = 0.70;',
     '  const float ROW_4B  = 0.43;',
     '  const float ROW_4C  = 0.20;',
-    '  float scaleX  = min(1.0, GRID_ASPECT / u_aspect) * u_design_scale;',
-    '  float scaleY  = min(1.0, u_aspect / GRID_ASPECT) * u_design_scale;',
-    '  float marginX = (1.0 - scaleX) * 0.5 + u_offset_x;',
-    '  float marginY = (1.0 - scaleY) * 0.5 + u_offset_y;',
+    '  float scaleX  = min(1.0, GRID_ASPECT / u_aspect);',
+    '  float scaleY  = min(1.0, u_aspect / GRID_ASPECT);',
+    '  float marginX = (1.0 - scaleX) * 0.5;',
+    '  float marginY = (1.0 - scaleY) * 0.5;',
     '  if (uvCoord.x < marginX || uvCoord.x > marginX + scaleX ||',
     '      uvCoord.y < marginY || uvCoord.y > marginY + scaleY) {',
     '    fragColor = vec4(0.0); return;',
@@ -562,9 +559,6 @@
         textEnabled:  gl.getUniformLocation(program, 'u_text_enabled'),
         outerBorder:  gl.getUniformLocation(program, 'u_outer_border'),
         gridAspect:   gl.getUniformLocation(program, 'u_grid_aspect'),
-        designScale:  gl.getUniformLocation(program, 'u_design_scale'),
-        offsetX:      gl.getUniformLocation(program, 'u_offset_x'),
-        offsetY:      gl.getUniformLocation(program, 'u_offset_y'),
         textColor:    gl.getUniformLocation(program, 'u_text_color'),
         colorMode:    gl.getUniformLocation(program, 'u_color_mode'),
         color0:       gl.getUniformLocation(program, 'u_color0'),
@@ -667,9 +661,6 @@
       gl.uniform3fv(u.borderColor, borderColor);
       gl.uniform1f(u.outerBorder,  outerBorder);
       gl.uniform1f(u.gridAspect,   GRID_ASPECT);
-      gl.uniform1f(u.designScale,  v.u_design_scale != null ? v.u_design_scale : 1.0);
-      gl.uniform1f(u.offsetX,      v.u_offset_x     != null ? v.u_offset_x     : 0.0);
-      gl.uniform1f(u.offsetY,      v.u_offset_y     != null ? v.u_offset_y     : 0.0);
       gl.uniform3fv(u.outlineColor, outlineColor);
       gl.uniform1f(u.textEnabled,  textEnabled);
       var colorMode = v.u_color_mode != null ? parseFloat(v.u_color_mode) : 0.0;
