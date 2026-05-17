@@ -78,8 +78,8 @@ The Finish section is always the last section in the controls array and contains
 3. `u_distress` — range 0–0.85, default 0.0, `noRandomize: true`
 4. `u_distress_scale` — range 10–600, label 'Grain Size', default 80, `noRandomize: true`
 5. `u_distress_falloff` — range 0–1, step 0.05, default 0.0, `noRandomize: true`
-6. `u_vignette_top` — range 0–60, step 0.05, default 0, `noRandomize: true`
-7. `u_vignette_bottom` — range 0–60, step 0.05, default 0, `noRandomize: true`
+6. `u_vignette_top` — range 0–20, step 0.05, default 0, `noRandomize: true`
+7. `u_vignette_bottom` — range 0–20, step 0.05, default 0, `noRandomize: true`
 8. `u_vignette_left` — range 0–20, step 0.05, default 0, `noRandomize: true`
 9. `u_vignette_right` — range 0–20, step 0.05, default 0, `noRandomize: true`
 10. `u_pos_x` — range -0.5–0.5, default 0.0, `noRandomize: true`
