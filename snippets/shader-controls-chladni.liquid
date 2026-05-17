@@ -35,7 +35,15 @@ var controls = [
   { key: 'outlineEnabled',  label: 'Outline',       type: 'toggle', value: 0, textDirty: true, noRandomize: true },
   { key: 'outlineWidth',    label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true, outlineDependent: true, noRandomize: true },
   { key: 'u_outline_color', label: 'Outline Color', type: 'color',  value: '#000000', outlineDependent: true, noRandomize: true },
-].concat(FINISH_CONTROLS);
+].concat(FINISH_CONTROLS_PRE).concat([
+  { key: 'u_vignette_top',    label: 'Vignette Top',    type: 'range', min: 0, max: 20, step: 0.05, value: 3.6,  noRandomize: true },
+  { key: 'u_vignette_bottom', label: 'Vignette Bottom', type: 'range', min: 0, max: 20, step: 0.05, value: 3.55, noRandomize: true },
+  { key: 'u_vignette_left',   label: 'Vignette Left',   type: 'range', min: 0, max: 20, step: 0.05, value: 3.35, noRandomize: true },
+  { key: 'u_vignette_right',  label: 'Vignette Right',  type: 'range', min: 0, max: 20, step: 0.05, value: 3.2,  noRandomize: true },
+  { key: 'u_pos_x', label: 'Position X', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0, noRandomize: true },
+  { key: 'u_pos_y', label: 'Position Y', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0, noRandomize: true },
+  { key: 'u_scale', label: 'Scale',      type: 'range', min: 0.2,  max: 3.0,  step: 0.05, value: 1.0, noRandomize: true },
+]);
 
 // ── Randomize button ─────────────────────────────────────────────────────────
 (function () {
