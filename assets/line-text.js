@@ -102,7 +102,7 @@
 
   window.ShaderBase.create({
     animateValues:  true,
-    instantKeys:    ['u_opacity', 'u_distress_0', 'u_distress_scale_0', 'u_distress_1', 'u_distress_scale_1', 'u_distress_2', 'u_distress_scale_2', 'u_distress_3', 'u_distress_scale_3', 'u_grain_mode', 'u_distress_falloff', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
+    instantKeys:    ['u_opacity', 'u_distress_0', 'u_distress_scale_0', 'u_distress_1', 'u_distress_scale_1', 'u_distress_2', 'u_distress_scale_2', 'u_distress_3', 'u_distress_scale_3', 'u_grain_mode', 'u_distress_falloff', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right', 'u_vignette_anchor_x', 'u_vignette_anchor_y'],
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
@@ -126,6 +126,8 @@
         vignetteBottom:  gl.getUniformLocation(program, 'u_vignette_bottom'),
         vignetteLeft:    gl.getUniformLocation(program, 'u_vignette_left'),
         vignetteRight:   gl.getUniformLocation(program, 'u_vignette_right'),
+        vignetteAnchorX:     gl.getUniformLocation(program, 'u_vignette_anchor_x'),
+        vignetteAnchorY:     gl.getUniformLocation(program, 'u_vignette_anchor_y'),
         opacity:         gl.getUniformLocation(program, 'u_opacity'),
         distress:        gl.getUniformLocation(program, 'u_distress'),
         distressScale:   gl.getUniformLocation(program, 'u_distress_scale'),

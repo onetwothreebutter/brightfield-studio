@@ -142,6 +142,8 @@
         vignetteBottom: gl.getUniformLocation(program, 'u_vignette_bottom'),
         vignetteLeft:   gl.getUniformLocation(program, 'u_vignette_left'),
         vignetteRight:  gl.getUniformLocation(program, 'u_vignette_right'),
+        vignetteAnchorX:     gl.getUniformLocation(program, 'u_vignette_anchor_x'),
+        vignetteAnchorY:     gl.getUniformLocation(program, 'u_vignette_anchor_y'),
         aspect:        gl.getUniformLocation(program, 'u_aspect'),
         textColor:     gl.getUniformLocation(program, 'u_text_color'),
         useTextColor:  gl.getUniformLocation(program, 'u_use_text_color'),
@@ -180,6 +182,8 @@
       gl.uniform1f(u.vignetteBottom, v.u_vignette_bottom != null ? v.u_vignette_bottom : 0.0);
       gl.uniform1f(u.vignetteLeft,   v.u_vignette_left   != null ? v.u_vignette_left   : 0.0);
       gl.uniform1f(u.vignetteRight,  v.u_vignette_right  != null ? v.u_vignette_right  : 0.0);
+      gl.uniform1f(u.vignetteAnchorX, v.u_vignette_anchor_x != null ? v.u_vignette_anchor_x : 0.5);
+      gl.uniform1f(u.vignetteAnchorY, v.u_vignette_anchor_y != null ? v.u_vignette_anchor_y : 0.5);
       gl.uniform1f(u.aspect,        w / h);
       gl.uniform3fv(u.textColor,    v.u_text_color    || [1.0, 1.0, 1.0]);
       gl.uniform1f(u.useTextColor,  v.u_use_text_color != null ? v.u_use_text_color : 0.0);

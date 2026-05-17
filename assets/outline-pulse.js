@@ -178,7 +178,7 @@
   var sdfTex = null;
 
   window.ShaderBase.create({
-    instantKeys:    ['u_opacity', 'u_distress_0', 'u_distress_scale_0', 'u_distress_1', 'u_distress_scale_1', 'u_distress_2', 'u_distress_scale_2', 'u_distress_3', 'u_distress_scale_3', 'u_grain_mode', 'u_distress_falloff', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right'],
+    instantKeys:    ['u_opacity', 'u_distress_0', 'u_distress_scale_0', 'u_distress_1', 'u_distress_scale_1', 'u_distress_2', 'u_distress_scale_2', 'u_distress_3', 'u_distress_scale_3', 'u_grain_mode', 'u_distress_falloff', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right', 'u_vignette_anchor_x', 'u_vignette_anchor_y'],
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
@@ -245,6 +245,8 @@
         vignetteBottom: gl.getUniformLocation(program, 'u_vignette_bottom'),
         vignetteLeft:   gl.getUniformLocation(program, 'u_vignette_left'),
         vignetteRight:  gl.getUniformLocation(program, 'u_vignette_right'),
+        vignetteAnchorX:     gl.getUniformLocation(program, 'u_vignette_anchor_x'),
+        vignetteAnchorY:     gl.getUniformLocation(program, 'u_vignette_anchor_y'),
         posX:          gl.getUniformLocation(program, 'u_pos_x'),
         posY:          gl.getUniformLocation(program, 'u_pos_y'),
         scale:         gl.getUniformLocation(program, 'u_scale'),
@@ -308,6 +310,8 @@
       gl.uniform1f(u.vignetteBottom, v.u_vignette_bottom != null ? v.u_vignette_bottom : 0.0);
       gl.uniform1f(u.vignetteLeft,   v.u_vignette_left   != null ? v.u_vignette_left   : 0.0);
       gl.uniform1f(u.vignetteRight,  v.u_vignette_right  != null ? v.u_vignette_right  : 0.0);
+      gl.uniform1f(u.vignetteAnchorX, v.u_vignette_anchor_x != null ? v.u_vignette_anchor_x : 0.5);
+      gl.uniform1f(u.vignetteAnchorY, v.u_vignette_anchor_y != null ? v.u_vignette_anchor_y : 0.5);
       gl.uniform1f(u.posX,          v.u_pos_x          != null ? v.u_pos_x          : 0.0);
       gl.uniform1f(u.posY,          v.u_pos_y          != null ? v.u_pos_y          : 0.0);
       gl.uniform1f(u.scale,         v.u_scale          != null ? v.u_scale          : 1.0);
