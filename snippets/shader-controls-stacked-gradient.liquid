@@ -19,9 +19,9 @@ var controls = [
     tip: 'Width of the soft fade at each strip edge.' },
   { key: 'u_tilt',       label: 'Tilt (°)',     type: 'range',  min: -45,  max: 45,   step: 1,     value: -5,  noRandomize: true,
     tip: 'Angle of the gradient strips.' },
-  { key: 'u_width',      label: 'Strip Width',  type: 'range',  min: 0.05, max: 1.5,  step: 0.01,  value: 0.5,   gaussian: true, randomMin: 0.3,  randomMax: 1.1,
+  { key: 'u_width',      label: 'Strip Width',  type: 'range',  min: 0.05, max: 1.5,  step: 0.01,  value: 0.33,  gaussian: true, randomMin: 0.3,  randomMax: 1.1,
     tip: 'Width of each gradient strip relative to its available span.' },
-  { key: 'u_offset_x',  label: 'Shift X',      type: 'range',  min: -0.5, max: 0.5,  step: 0.01,  value: 0.0,   gaussian: true,
+  { key: 'u_offset_x',  label: 'Shift X',      type: 'range',  min: -0.5, max: 0.5,  step: 0.01,  value: 0.1,   gaussian: true,
     tip: 'Horizontal offset applied to all strips.' },
   { key: 'u_offset_y',  label: 'Shift Y',      type: 'range',  min: -0.5, max: 0.5,  step: 0.01,  value: 0.0,   gaussian: true,
     tip: 'Vertical offset applied to all strips. Wraps seamlessly.' },
@@ -90,12 +90,12 @@ var controls = [
   { key: 'u_oklch_dH', label: 'H Phase',         type: 'range', min: 0,    max: 1,    step: 0.01, value: 0.0,  oklchDependent: true, noRandomize: true },
   // ── Text Overlay ───────────────────────────────────────────────────────────
   { type: 'header', label: 'Text Overlay' },
-  { key: 'u_text_enabled',   label: 'Text Overlay',      type: 'toggle', value: 0,             textDirty: true, noRandomize: true },
-  { key: 'text',             label: 'Text',              type: 'text',   value: '{{ "now" | date: "%Y" }}', textDirty: true },
+  { key: 'u_text_enabled',   label: 'Text Overlay',      type: 'toggle', value: 1,             textDirty: true, noRandomize: true },
+  { key: 'text',             label: 'Text',              type: 'text',   value: 'PEACE',       textDirty: true },
   { key: 'textFont',         label: 'Font',              type: 'select', value: 'Montserrat',  textDirty: true,
     options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
   },
-  { key: 'textFontSize',     label: 'Font Size',         type: 'range',  min: 8, max: 750, step: 1,    value: 180,  textDirty: true, noRandomize: true },
+  { key: 'textFontSize',     label: 'Font Size',         type: 'range',  min: 8, max: 750, step: 1,    value: 293,  textDirty: true, noRandomize: true },
   { key: 'u_text_rotation',  label: 'Rotation (°)',      type: 'range',  min: -180, max: 180, step: 1, value: -90,  textDirty: true, noRandomize: true,
     tip: '90° = vertical text. 0° = horizontal.' },
   { key: 'textX',            label: 'Text X',            type: 'range',  min: 0, max: 1.0, step: 0.01, value: 0.5,  textDirty: true },
@@ -107,7 +107,17 @@ var controls = [
   { key: 'outlineEnabled',   label: 'Outline',           type: 'toggle', value: 0,            textDirty: true, noRandomize: true },
   { key: 'outlineWidth',     label: 'Outline Width',     type: 'range',  min: 1, max: 60, step: 1, value: 8, textDirty: true, outlineDependent: true, noRandomize: true },
   { key: 'u_outline_color',  label: 'Outline Color',     type: 'color',  value: '#000000', outlineDependent: true, noRandomize: true },
-].concat(FINISH_CONTROLS);
+].concat(FINISH_CONTROLS_PRE).concat([
+  { key: 'u_vignette_top',      label: 'Vignette Top',      type: 'range', min: 0,   max: 20,  step: 0.05, value: 0,    noRandomize: true },
+  { key: 'u_vignette_bottom',   label: 'Vignette Bottom',   type: 'range', min: 0,   max: 20,  step: 0.05, value: 0,    noRandomize: true },
+  { key: 'u_vignette_left',     label: 'Vignette Left',     type: 'range', min: 0,   max: 20,  step: 0.05, value: 0,    noRandomize: true },
+  { key: 'u_vignette_right',    label: 'Vignette Right',    type: 'range', min: 0,   max: 20,  step: 0.05, value: 0,    noRandomize: true },
+  { key: 'u_vignette_anchor_x', label: 'Vignette Anchor X', type: 'range', min: 0,   max: 1,   step: 0.01, value: 0.5,  noRandomize: true },
+  { key: 'u_vignette_anchor_y', label: 'Vignette Anchor Y', type: 'range', min: 0,   max: 1,   step: 0.01, value: 0.5,  noRandomize: true },
+  { key: 'u_pos_x', label: 'Position X', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: -0.13, noRandomize: true },
+  { key: 'u_pos_y', label: 'Position Y', type: 'range', min: -0.5, max: 0.5, step: 0.01, value:  0.0,  noRandomize: true },
+  { key: 'u_scale', label: 'Scale',      type: 'range', min: 0.2,  max: 3.0,  step: 0.05, value:  0.8,  noRandomize: true },
+]);
 
 var customAfterBuild = function () {
   var cosineKeys = ['u_a', 'u_b', 'u_c', 'u_d'];

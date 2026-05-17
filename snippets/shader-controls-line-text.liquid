@@ -1,49 +1,49 @@
 var controls = [
   // ── Lines ─────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Lines' },
-  { key: 'u_rows',           label: 'Row Count',       type: 'range', min: 5,     max: 150,  step: 1,     value: 80   },
-  { key: 'u_base_thickness', label: 'Base Thickness',  type: 'range', min: 0.001, max: 0.2,  step: 0.001, value: 0.02 },
-  { key: 'u_text_thickness', label: 'Text Thickness',  type: 'range', min: 0,     max: 0.5,  step: 0.01,  value: 0.4  },
-  { key: 'textCapRadius', label: 'Cap Radius', type: 'range', min: 0,  max: 100, step: 1,  value: 20,  textDirty: true,
+  { key: 'u_rows',           label: 'Row Count',       type: 'range', min: 5,     max: 150,  step: 1,     value: 62    },
+  { key: 'u_base_thickness', label: 'Base Thickness',  type: 'range', min: 0.001, max: 0.2,  step: 0.001, value: 0.033 },
+  { key: 'u_text_thickness', label: 'Text Thickness',  type: 'range', min: 0,     max: 0.5,  step: 0.01,  value: 0.24  },
+  { key: 'textCapRadius', label: 'Cap Radius', type: 'range', min: 0,  max: 100, step: 1,  value: 10,  textDirty: true,
     tip: 'Blur radius applied to line ends — higher values give softer, more rounded caps.' },
   // ── Text ──────────────────────────────────────────────────────────────────
   { type: 'header', label: 'Text' },
-  { key: 'text',         label: 'Text',       type: 'text',   value: 'HELLO',       textDirty: true,
+  { key: 'text',         label: 'Text',       type: 'text',   value: 'GLOW',        textDirty: true,
     randomOptions: ['HELLO', 'PIZZA', 'FRESH', 'ALMOST', 'LOVE', 'VIBE'] },
   { key: 'textFont',     label: 'Font',       type: 'select', value: 'Montserrat',  textDirty: true,
     options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
   },
-  { key: 'textFontSize', label: 'Font Size',  type: 'range', min: 50,  max: 950, step: 1,    value: 202, textDirty: true, noRandomize: true },
-  { key: 'textY',        label: 'Text Y',     type: 'range', min: 0,   max: 1,   step: 0.01, value: 0.5, textDirty: true, noRandomize: true },
+  { key: 'textFontSize', label: 'Font Size',  type: 'range', min: 50,  max: 950, step: 1,    value: 268, textDirty: true, noRandomize: true },
+  { key: 'textY',        label: 'Text Y',     type: 'range', min: 0,   max: 1,   step: 0.01, value: 0.74, textDirty: true, noRandomize: true },
   // ── Color Palette ──────────────────────────────────────────────────────────
   { type: 'header', label: 'Color Palette' },
-  { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
+  { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 1,
     tip: 'Off = cosine palette. On = 4-stop linear gradient from left to right.' },
-  { key: '_lt_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, noRandomize: true, value: 'Rainbow',
+  { key: '_lt_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, noRandomize: true, value: 'Cyberpunk',
     options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
   { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
     tip: 'Offset — base brightness per channel. Sets the center point colors oscillate around.' },
   { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080',
     tip: 'Amplitude — color swing range per channel. Higher = more vivid, saturated output.' },
-  { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff',
+  { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffff00',
     tip: 'Frequency — how many times the palette cycles per channel.' },
-  { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab',
+  { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#803340',
     tip: 'Phase — shifts the starting hue of the color cycle.' },
-  { key: '_lt_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
+  { key: '_lt_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Mexican',
     options: Object.keys(FOUR_STOP_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
-  { key: 'u_color0', label: 'Color 1 (Left)',  type: 'color', stopDependent: true, value: '#ff3366' },
-  { key: 'u_color1', label: 'Color 2',         type: 'color', stopDependent: true, value: '#ffcc00' },
-  { key: 'u_color2', label: 'Color 3',         type: 'color', stopDependent: true, value: '#00ccff' },
-  { key: 'u_color3', label: 'Color 4 (Right)', type: 'color', stopDependent: true, value: '#aa00ff' },
+  { key: 'u_color0', label: 'Color 1 (Left)',  type: 'color', stopDependent: true, value: '#e4007c' },
+  { key: 'u_color1', label: 'Color 2',         type: 'color', stopDependent: true, value: '#ff6b00' },
+  { key: 'u_color2', label: 'Color 3',         type: 'color', stopDependent: true, value: '#00c5cd' },
+  { key: 'u_color3', label: 'Color 4 (Right)', type: 'color', stopDependent: true, value: '#8b1a8b' },
 ].concat(FINISH_CONTROLS_PRE).concat([
-  { key: 'u_vignette_top',    label: 'Vignette Top',    type: 'range', min: 0, max: 20, step: 0.05, value: 2, randomMin: 0, randomMax: 8 },
-  { key: 'u_vignette_bottom', label: 'Vignette Bottom', type: 'range', min: 0, max: 20, step: 0.05, value: 2, randomMin: 0, randomMax: 8 },
-  { key: 'u_vignette_left',   label: 'Vignette Left',   type: 'range', min: 0, max: 20, step: 0.05, value: 2, randomMin: 0, randomMax: 4 },
-  { key: 'u_vignette_right',    label: 'Vignette Right',    type: 'range', min: 0,   max: 20,  step: 0.05, value: 2,   randomMin: 0, randomMax: 4 },
-  { key: 'u_vignette_anchor_x', label: 'Vignette Anchor X', type: 'range', min: 0,   max: 1,   step: 0.01, value: 0.5, noRandomize: true },
-  { key: 'u_vignette_anchor_y', label: 'Vignette Anchor Y', type: 'range', min: 0,   max: 1,   step: 0.01, value: 0.5, noRandomize: true },
+  { key: 'u_vignette_top',    label: 'Vignette Top',    type: 'range', min: 0, max: 20, step: 0.05, value: 18.15, randomMin: 0, randomMax: 8 },
+  { key: 'u_vignette_bottom', label: 'Vignette Bottom', type: 'range', min: 0, max: 20, step: 0.05, value: 20,    randomMin: 0, randomMax: 8 },
+  { key: 'u_vignette_left',   label: 'Vignette Left',   type: 'range', min: 0, max: 20, step: 0.05, value: 2.55,  randomMin: 0, randomMax: 4 },
+  { key: 'u_vignette_right',    label: 'Vignette Right',    type: 'range', min: 0,   max: 20,  step: 0.05, value: 2.55, randomMin: 0, randomMax: 4 },
+  { key: 'u_vignette_anchor_x', label: 'Vignette Anchor X', type: 'range', min: 0,   max: 1,   step: 0.01, value: 0.5,  noRandomize: true },
+  { key: 'u_vignette_anchor_y', label: 'Vignette Anchor Y', type: 'range', min: 0,   max: 1,   step: 0.01, value: 0.75, noRandomize: true },
   { key: 'u_pos_x', label: 'Position X', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0, noRandomize: true },
   { key: 'u_pos_y', label: 'Position Y', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: 0.0, noRandomize: true },
   { key: 'u_scale', label: 'Scale',      type: 'range', min: 0.2,  max: 3.0,  step: 0.05, value: 1.0, noRandomize: true },
@@ -68,7 +68,7 @@ var customAfterBuild = function () {
   }
 
   // Sync pickers to default preset on load
-  applyCosinePreset(COSINE_PRESETS['Rainbow']);
+  applyCosinePreset(COSINE_PRESETS['Cyberpunk']);
 
   var cosinePresetSel = document.querySelector('[data-param-key="_lt_palette_preset"]');
   if (cosinePresetSel) {
