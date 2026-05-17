@@ -1,19 +1,19 @@
 var controls = [
   // ── Squares ───────────────────────────────────────────────────────────────
   { type: 'header', label: 'Squares' },
-  { key: 'u_square_count', label: 'Count',           type: 'range', min: 2,    max: 4,    step: 1,    value: 3,
+  { key: 'u_square_count', label: 'Count',           type: 'range', min: 2,    max: 4,    step: 1,    value: 4,
     tip: 'Number of squares arranged diagonally.' },
-  { key: 'u_fill',         label: 'Fill',            type: 'range', min: 0.1,  max: 1.0,  step: 0.01, value: 0.85,
+  { key: 'u_fill',         label: 'Fill',            type: 'range', min: 0.1,  max: 1.0,  step: 0.01, value: 1.0,
     tip: 'How much of the available space each square occupies.' },
-  { key: 'u_offset',       label: 'Diagonal Offset', type: 'range', min: 0.0,  max: 0.23, step: 0.01, value: 0.2,
+  { key: 'u_offset',       label: 'Diagonal Offset', type: 'range', min: 0.0,  max: 0.23, step: 0.01, value: 0.13,
     tip: 'Distance between square centers along the diagonal.' },
-  { key: 'u_density',      label: 'Column Density',  type: 'range', min: 2,    max: 40,   step: 1,    value: 10,
+  { key: 'u_density',      label: 'Column Density',  type: 'range', min: 2,    max: 40,   step: 1,    value: 26,
     tip: 'Number of vertical columns across each square.' },
-  { key: 'u_col_width',    label: 'Column Width',    type: 'range', min: 0.05, max: 0.49, step: 0.01, value: 0.35,
+  { key: 'u_col_width',    label: 'Column Width',    type: 'range', min: 0.05, max: 0.49, step: 0.01, value: 0.1,
     tip: 'Half-width of each column in background areas.' },
   // ── Palette ───────────────────────────────────────────────────────────────
   { type: 'header', label: 'Palette' },
-  { key: 'u_color_mode',     label: '4-Stop Mode',     type: 'toggle', value: 0,
+  { key: 'u_color_mode',     label: '4-Stop Mode',     type: 'toggle', value: 1,
     tip: 'Off = cosine palette. On = 4-stop linear gradient.' },
   { key: 'u_global_gradient', label: 'Global Gradient', type: 'toggle', value: 0,
     tip: 'Off = each square has its own gradient. On = gradient spans all squares.' },
@@ -30,22 +30,22 @@ var controls = [
   { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab',
     tip: 'Phase — shifts the starting hue of the color cycle.' },
   // 4-stop color controls (hidden when cosine/palette mode is on)
-  { key: '_ts_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
+  { key: '_ts_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Retro',
     options: Object.keys(FOUR_STOP_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
-  { key: 'u_color0', label: 'Color 1', type: 'color', stopDependent: true, value: '#ff3366' },
-  { key: 'u_color1', label: 'Color 2', type: 'color', stopDependent: true, value: '#ffcc00' },
-  { key: 'u_color2', label: 'Color 3', type: 'color', stopDependent: true, value: '#00ccff' },
-  { key: 'u_color3', label: 'Color 4', type: 'color', stopDependent: true, value: '#aa00ff' },
+  { key: 'u_color0', label: 'Color 1', type: 'color', stopDependent: true, value: '#e8491d' },
+  { key: 'u_color1', label: 'Color 2', type: 'color', stopDependent: true, value: '#c9a030' },
+  { key: 'u_color2', label: 'Color 3', type: 'color', stopDependent: true, value: '#2d8a5e' },
+  { key: 'u_color3', label: 'Color 4', type: 'color', stopDependent: true, value: '#1a2744' },
   // ── Letters ───────────────────────────────────────────────────────────────
   { type: 'header', label: 'Letters' },
   { key: 'u_letters_enabled', label: 'Show Letters', type: 'toggle', value: 1 },
-  { key: 'u_letter1', label: 'Letter 1', type: 'text', value: 'A' },
-  { key: 'u_letter2', label: 'Letter 2', type: 'text', value: 'B' },
-  { key: 'u_letter3', label: 'Letter 3', type: 'text', value: 'C' },
-  { key: 'u_letter4', label: 'Letter 4', type: 'text', value: 'D',
+  { key: 'u_letter1', label: 'Letter 1', type: 'text', value: '1' },
+  { key: 'u_letter2', label: 'Letter 2', type: 'text', value: '9' },
+  { key: 'u_letter3', label: 'Letter 3', type: 'text', value: '8' },
+  { key: 'u_letter4', label: 'Letter 4', type: 'text', value: '1',
     tip: 'Only visible when Square Count is 4.' },
-  { key: 'u_font_family', label: 'Font', type: 'select', value: 'Montserrat',
+  { key: 'u_font_family', label: 'Font', type: 'select', value: 'Oswald',
     options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
   },
   { key: 'u_font_size',      label: 'Font Size',             type: 'range',  min: 50, max: 500, step: 10, value: 300 },
@@ -54,7 +54,17 @@ var controls = [
   { key: 'outlineEnabled', label: 'Outline',       type: 'toggle', value: 0, noRandomize: true },
   { key: 'outlineWidth',   label: 'Outline Width', type: 'range',  min: 1, max: 60, step: 1, value: 12, noRandomize: true },
   { key: 'u_outline_color', label: 'Outline Color', type: 'color',  value: '#000000', noRandomize: true },
-].concat(FINISH_CONTROLS);
+].concat(FINISH_CONTROLS_PRE).concat([
+  { key: 'u_vignette_top',      label: 'Vignette Top',      type: 'range', min: 0,   max: 20,  step: 0.05, value: 0,    noRandomize: true },
+  { key: 'u_vignette_bottom',   label: 'Vignette Bottom',   type: 'range', min: 0,   max: 20,  step: 0.05, value: 0,    noRandomize: true },
+  { key: 'u_vignette_left',     label: 'Vignette Left',     type: 'range', min: 0,   max: 20,  step: 0.05, value: 0,    noRandomize: true },
+  { key: 'u_vignette_right',    label: 'Vignette Right',    type: 'range', min: 0,   max: 20,  step: 0.05, value: 0,    noRandomize: true },
+  { key: 'u_vignette_anchor_x', label: 'Vignette Anchor X', type: 'range', min: 0,   max: 1,   step: 0.01, value: 0.5,  noRandomize: true },
+  { key: 'u_vignette_anchor_y', label: 'Vignette Anchor Y', type: 'range', min: 0,   max: 1,   step: 0.01, value: 0.5,  noRandomize: true },
+  { key: 'u_pos_x', label: 'Position X', type: 'range', min: -0.5, max: 0.5, step: 0.01, value:  0.0,  noRandomize: true },
+  { key: 'u_pos_y', label: 'Position Y', type: 'range', min: -0.5, max: 0.5, step: 0.01, value: -0.07, noRandomize: true },
+  { key: 'u_scale', label: 'Scale',      type: 'range', min: 0.2,  max: 3.0,  step: 0.05, value:  0.95, noRandomize: true },
+]);
 
 var customAfterBuild = function () {
   var cosineKeys = ['u_a', 'u_b', 'u_c', 'u_d'];
@@ -76,6 +86,7 @@ var customAfterBuild = function () {
 
   // Apply default on load so shader matches pickers.
   applyCosinePreset(COSINE_PRESETS['Rainbow']);
+  apply4ColorPreset(FOUR_STOP_PRESETS['Retro']);
 
   var presetSel = document.querySelector('[data-param-key="_palette_preset"]');
   if (presetSel) {
