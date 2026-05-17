@@ -1,0 +1,144 @@
+{%- paginate search.results by 12 -%}
+
+<div class="search-page section-padding">
+  <div class="container">
+
+    <div class="collection-header">
+      <h1 class="collection-title glitch" data-text="Search">Search</h1>
+    </div>
+
+    <form class="search-form" action="{{ routes.search_url }}" method="get" role="search">
+      <div class="search-form__field">
+        <label for="search-input" class="search-form__label">Search products</label>
+        <div class="search-form__row">
+          <input
+            id="search-input"
+            class="search-form__input"
+            type="search"
+            name="q"
+            value="{{ search.terms | escape }}"
+            placeholder="Type to search…"
+            aria-label="Search"
+            autocomplete="off"
+          >
+          <input type="hidden" name="type" value="product">
+          <button type="submit" class="search-form__btn" aria-label="Submit search">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </form>
+
+    {%- if search.performed -%}
+      {%- if search.results_count == 0 -%}
+        <p class="empty-state">No results for &ldquo;{{ search.terms | escape }}&rdquo;.</p>
+      {%- else -%}
+        <p class="search-page__count">
+          {{ search.results_count }} result{%- if search.results_count != 1 -%}s{%- endif -%}
+          for &ldquo;{{ search.terms | escape }}&rdquo;
+        </p>
+        <div class="product-grid">
+          {%- for item in search.results -%}
+            {%- if item.object_type == 'product' -%}
+              {% render 'product-card', product: item %}
+            {%- endif -%}
+          {%- endfor -%}
+        </div>
+        {%- if paginate.pages > 1 -%}
+          <nav class="pagination" aria-label="Pagination">
+            {{ paginate | default_pagination }}
+          </nav>
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+
+  </div>
+</div>
+
+{%- endpaginate -%}
+
+{% stylesheet %}
+.search-page {
+  padding-top: 3rem;
+}
+
+.search-form {
+  max-width: 560px;
+  margin: 0 auto 3rem;
+}
+
+.search-form__label {
+  display: block;
+  font-size: 0.7rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.search-form__row {
+  display: flex;
+  gap: 0;
+}
+
+.search-form__input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-right: none;
+  border-radius: var(--radius) 0 0 var(--radius);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  transition: border-color var(--transition-fast);
+}
+
+.search-form__input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+.search-form__input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.search-form__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  background: var(--color-primary-dim);
+  border: 1px solid var(--color-border);
+  border-left: none;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.search-form__btn:hover {
+  background: var(--color-primary);
+  color: var(--color-bg);
+}
+
+.search-page__count {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin-bottom: 2rem;
+  letter-spacing: 0.05em;
+}
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Search",
+  "settings": []
+}
+{% endschema %}
