@@ -2983,6 +2983,18 @@ dialog.mobile-nav[open]::backdrop {
     max-height: 220px;
     overflow-y: auto;
 }
+.inhouse-assistant__footer {
+    margin-top: 0.75rem;
+    display: flex;
+    justify-content: center;
+}
+.inhouse-assistant__turnoff {
+    font-size: 0.65rem;
+    opacity: 0.6;
+}
+.inhouse-assistant__turnoff:hover {
+    opacity: 1;
+}
 .inhouse-assistant__reopen {
     position: fixed;
     bottom: 1.5rem;
