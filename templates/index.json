@@ -5,7 +5,7 @@
       "settings": {
         "eyebrow": "Wearable Shader Art",
         "heading": "",
-        "subheading": "T-shirts generated from GLSL fragment shaders. Every design is a living program.",
+        "subheading": "T-shirts generated from WebGL fragment shaders. Every design is a living program.",
         "cta_label": "Shop the Collection",
         "cta_url": "/collections/all",
         "cta2_label": "Make it Yours",
