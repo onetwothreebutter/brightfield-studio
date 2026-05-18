@@ -358,12 +358,21 @@ h6 {
     overflow: hidden;
 }
 
-.hero__canvas {
+.hero__canvas,
+.hero__poster {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     opacity: 0.55; /* overrideable via settings_data if wired up */
+}
+
+.hero__poster {
+    object-fit: cover;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hero__canvas { display: none; }
 }
 
 .hero__content {
