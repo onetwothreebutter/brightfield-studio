@@ -178,7 +178,7 @@
     '  float alpha      = max(baseAlpha, wordAlpha);',
     '  alpha = alpha * vigMask;',
     '  vec3  encoded    = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
-    '  fragColor = vec4(encoded, alpha);',
+    '  fragColor = vec4(encoded * alpha, alpha);',
     '}',
   ].join('\n');
 

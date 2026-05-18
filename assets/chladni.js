@@ -105,7 +105,7 @@
     '  float textAlpha    = clamp(fillSample + outlineSample, 0.0, 1.0);',
     '  alpha = mix(alpha, 1.0, textAlpha);',
     '  vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
-    '  fragColor = vec4(encoded, alpha);',
+    '  fragColor = vec4(encoded * alpha, alpha);',
     '}'
   ].join('\n');
 

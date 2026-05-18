@@ -125,7 +125,7 @@
     '  float vigMask = computeVigMask(dUV);',
     '  alpha = applyDistress(alpha, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff, dot(color, vec3(0.299, 0.587, 0.114)), vigMask) * u_opacity;',
     '  alpha = alpha * vigMask;',
-    '  fragColor   = vec4(color, alpha);',
+    '  fragColor   = vec4(color * alpha, alpha);',
     '}'
   ].join('\n');
 
