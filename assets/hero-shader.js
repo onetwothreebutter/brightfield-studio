@@ -106,6 +106,8 @@
   window.addEventListener('resize', resize);
   resize();
 
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
   var start = performance.now();
 
   function render() {
