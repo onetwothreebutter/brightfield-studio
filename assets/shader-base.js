@@ -8,7 +8,7 @@
     var canvas = document.getElementById(canvasId);
     if (!canvas) return;
 
-    var glOpts = { preserveDrawingBuffer: true, alpha: true, antialias: true, premultipliedAlpha: false };
+    var glOpts = { preserveDrawingBuffer: true, alpha: true, antialias: true, premultipliedAlpha: true };
     var gl = canvas.getContext('webgl2', glOpts);
     if (!gl) { canvas.style.display = 'none'; return; }
 
@@ -269,6 +269,16 @@
         var rowBytes = targetW * 4;
         for (var row = 0; row < targetH; row++) {
           flipped.set(pixels.subarray((targetH - 1 - row) * rowBytes, (targetH - row) * rowBytes), row * rowBytes);
+        }
+        // readPixels gives premultiplied bytes (premultipliedAlpha: true); putImageData
+        // expects straight alpha, so un-premultiply before handing off to Canvas 2D.
+        for (var pi = 0; pi < flipped.length; pi += 4) {
+          var pa = flipped[pi + 3];
+          if (pa > 0 && pa < 255) {
+            flipped[pi]     = Math.min(255, Math.round(flipped[pi]     * 255 / pa));
+            flipped[pi + 1] = Math.min(255, Math.round(flipped[pi + 1] * 255 / pa));
+            flipped[pi + 2] = Math.min(255, Math.round(flipped[pi + 2] * 255 / pa));
+          }
         }
         var offscreen = document.createElement('canvas');
         offscreen.width  = targetW;

@@ -165,7 +165,7 @@
     '  finalCol = finalCol * vigMask;',
     '  alpha = alpha * vigMask;',
     '  vec3 encoded   = pow(max(finalCol, 0.0), vec3(1.0 / 2.2));',
-    '  fragColor      = vec4(encoded, alpha * inDesign);',
+    '  fragColor      = vec4(encoded * alpha * inDesign, alpha * inDesign);',
     '}'
   ].join('\n');
 
