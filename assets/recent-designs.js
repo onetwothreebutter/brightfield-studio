@@ -143,7 +143,7 @@
   function renderFilmstrip(container, designs, onCardClick) {
     container.innerHTML = '';
     if (!designs || !designs.length) {
-      var section = container.closest('.recent-designs-section');
+      var section = container.closest('.designs-row-section');
       if (section) section.style.display = 'none';
       return;
     }
@@ -197,7 +197,7 @@
             if (!result || !result.ok) return;
             c.remove();
             if (!strip.querySelector('.recent-designs__card')) {
-              var section = container.closest('.recent-designs-section');
+              var section = container.closest('.designs-row-section');
               if (section) section.style.display = 'none';
             }
           });

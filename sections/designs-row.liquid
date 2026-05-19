@@ -43,7 +43,8 @@
     if (recentContainer && window.RecentDesigns) {
       RecentDesigns.fetchDesigns().then(function (designs) {
         if (!designs || !designs.length) {
-          recentContainer.innerHTML = emptyState('No saved designs yet');
+          var section = recentContainer.closest('.designs-row-section');
+          if (section) section.style.display = 'none';
           return;
         }
         var hasMore = designs.length > SEE_ALL_MAX;
