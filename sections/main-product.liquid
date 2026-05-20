@@ -136,7 +136,6 @@
                   </div>
                 {%- endif -%}
                 <div class="mockup-modal__footer-actions">
-                  <a id="mockup-modal-download" class="btn btn--outline btn--sm" download="your-design.png">Download</a>
                   <button id="mockup-modal-order" class="btn btn--primary btn--sm">Order This Design</button>
                 </div>
                 <div class="mockup-modal__community">
@@ -1461,7 +1460,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   var btn           = document.getElementById('shader-preview-btn');
   var modal         = document.getElementById('mockup-modal');
   var modalImg      = document.getElementById('mockup-modal-img');
-  var modalDl       = document.getElementById('mockup-modal-download');
   var modalOrder    = document.getElementById('mockup-modal-order');
   var closeBtn      = document.getElementById('mockup-modal-close');
   var backdrop      = modal.querySelector('.mockup-modal__backdrop');
@@ -1568,7 +1566,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
 
           // Show modal immediately — no waiting for API
           modalImg.src = compositeDataUrl;
-          modalDl.href = compositeDataUrl;
           modal.classList.remove('mockup-modal--hidden');
           document.body.style.overflow = 'hidden';
 
@@ -1609,8 +1606,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           .then(function (r) { return r.json(); })
           .then(function (data) {
             if (!data.design_url) throw new Error(data.error || 'Upload failed');
-            // Upgrade download link to stable hosted URL
-            modalDl.href = data.mockup_url;
             // Upgrade the strip card: swap data URL → stable R2 URL, enable delete
             pendingDetail.id = data.id || null;
             pendingDetail.mockupUrl = data.mockup_url;
@@ -1770,22 +1765,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeModal();
   });
-
-  // Download — append local datetime before following the link so the filename
-  // reflects the user's timezone rather than UTC.
-  if (modalDl) {
-    modalDl.addEventListener('click', function (e) {
-      if (!this.href || this.href === window.location.href) { e.preventDefault(); return; }
-      var now = new Date();
-      var h   = now.getHours() % 12 || 12;
-      var mm  = String(now.getMinutes()).padStart(2, '0');
-      var dt  = now.getFullYear() + '-' +
-                String(now.getMonth() + 1).padStart(2, '0') + '-' +
-                String(now.getDate()).padStart(2, '0') + '-' +
-                h + mm + (now.getHours() >= 12 ? 'pm' : 'am');
-      this.href = this.href.split('&dt=')[0] + '&dt=' + encodeURIComponent(dt);
-    });
-  }
 
   // Reset modal state when page is restored from bfcache (browser back/forward)
   // to prevent a stale preview image from showing on the next "Preview on Shirt" click.
