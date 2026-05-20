@@ -131,76 +131,6 @@ h6 {
     position: relative;
 }
 
-.glitch::before,
-.glitch::after {
-    content: attr(data-text);
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: transparent;
-}
-
-.glitch::before {
-    color: var(--color-primary);
-    clip-path: polygon(0 0, 100% 0, 100% 33%, 0 33%);
-    transform: translate(-2px, 0);
-    animation: glitch-top 5s infinite;
-}
-
-.glitch::after {
-    color: var(--color-secondary);
-    clip-path: polygon(0 67%, 100% 67%, 100% 100%, 0 100%);
-    transform: translate(2px, 0);
-    animation: glitch-bot 5s infinite;
-}
-
-@keyframes glitch-top {
-    0%,
-    88%,
-    100% {
-        transform: translate(-2px, 0);
-        opacity: 0;
-    }
-    89% {
-        transform: translate(-5px, -2px) scaleX(1.02);
-        opacity: 0.85;
-    }
-    91% {
-        transform: translate(4px, 0) scaleX(0.98);
-        opacity: 0.5;
-    }
-    93% {
-        transform: translate(-2px, 1px);
-        opacity: 0.75;
-    }
-    95% {
-        transform: translate(0, 0);
-        opacity: 0;
-    }
-}
-
-@keyframes glitch-bot {
-    0%,
-    86%,
-    100% {
-        transform: translate(2px, 0);
-        opacity: 0;
-    }
-    87% {
-        transform: translate(6px, 1px) scaleX(1.03);
-        opacity: 0.7;
-    }
-    90% {
-        transform: translate(-4px, -1px) scaleX(0.97);
-        opacity: 0.55;
-    }
-    94% {
-        transform: translate(2px, 0);
-        opacity: 0;
-    }
-}
 
 /* ─── Buttons ────────────────────────────────────────────── */
 .btn {
@@ -266,9 +196,7 @@ h6 {
 .site-header {
     position: static;
     height: var(--header-height);
-    background: rgba(8, 8, 8, 0.82);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    background: var(--color-bg);
     border-bottom: 1px solid var(--color-border);
     transform: translateY(0);
     transition: transform 0.3s ease;
@@ -2559,6 +2487,10 @@ dialog.mobile-nav[open]::backdrop {
 }
 
 /* ─── Community Designs ──────────────────────────────────── */
+.community-designs-page .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(270px, 270px));
+    justify-content: start;
+}
 .community-card-group {
     margin-bottom: 3rem;
 }

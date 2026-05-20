@@ -1,6 +1,8 @@
 {%- assign community_col = collections['community-designs'] -%}
 {%- paginate community_col.products by 24 -%}
 
+{%- assign shader_defs = 'rise-shirt:Rise Shirt,stacked-gradient:Stacked Gradient,four-circles:Four Circles,echo-text:Echo Text,three-square:Three Square,line-text:Line Text,line-circle:Line Circle,scaling-letters:Scaling Letters,chladni:Chladni,outline-pulse:Outline Pulse,circle-on-line:Circle on Line' | split: ',' -%}
+
 <section class="community-designs-page section-padding">
   <div class="container">
     <h1 class="community-designs-page__heading">Community Designs</h1>
@@ -9,9 +11,29 @@
     {%- if community_col.products.size == 0 -%}
       <p class="community-designs-page__empty">No designs yet &mdash; be the first to share one!</p>
     {%- else -%}
-      <div id="community-page-container" class="product-grid">
-        {%- for product in community_col.products -%}
-          {%- render 'community-card', product: product -%}
+      <div id="community-page-container">
+        {%- for shader_def in shader_defs -%}
+          {%- assign parts = shader_def | split: ':' -%}
+          {%- assign shader_slug = parts[0] -%}
+          {%- assign shader_label = parts[1] -%}
+          {%- assign has_designs = false -%}
+          {%- for product in community_col.products -%}
+            {%- if product.metafields.custom.shader == shader_slug -%}
+              {%- assign has_designs = true -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {%- if has_designs -%}
+            <div class="community-card-group">
+              <h3 class="community-card-group__heading">{{ shader_label }}</h3>
+              <div class="product-grid">
+                {%- for product in community_col.products -%}
+                  {%- if product.metafields.custom.shader == shader_slug -%}
+                    {%- render 'community-card', product: product -%}
+                  {%- endif -%}
+                {%- endfor -%}
+              </div>
+            </div>
+          {%- endif -%}
         {%- endfor -%}
       </div>
 
@@ -28,7 +50,6 @@
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     if (window.CommunityDesigns) {
-      CommunityDesigns.groupByShader(document.getElementById('community-page-container'));
       CommunityDesigns.hydrateInteractions();
     }
   });
