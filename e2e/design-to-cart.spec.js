@@ -1,0 +1,48 @@
+import { test, expect } from '@playwright/test';
+
+const PRODUCT_PATH = '/products/dot-rise';
+
+test.describe('Custom design add-to-cart flow', () => {
+  test('can create a custom shader design and add it to cart', async ({ page }) => {
+    test.setTimeout(120000);
+
+    // Tag products created during E2E tests so they can be bulk-deleted later
+    // (Shopify admin → Products → filter by tag "e2e-test")
+    await page.route('**/create-product', async route => {
+      const req = route.request();
+      const body = JSON.parse(req.postData() || '{}');
+      body.extraTags = ['e2e-test'];
+      await route.continue({ postData: JSON.stringify(body), headers: req.headers() });
+    });
+
+    await page.goto(PRODUCT_PATH);
+
+    // Switch to shader tab
+    await page.locator('.product-customize-btn[data-tab="shader"]').click();
+
+    // Wait for shader controls to appear
+    await page.locator('#shader-gui-body').waitFor();
+
+    // Give the WebGL canvas time to render before exporting
+    await page.locator('#shader-canvas').waitFor({ state: 'visible' });
+    await page.waitForTimeout(1000);
+
+    // Click "Preview on Shirt"
+    await page.locator('#shader-preview-btn').click();
+
+    // Wait for mockup modal — save-preview + compositing can take several seconds
+    await page.locator('#mockup-modal').waitFor({ state: 'visible', timeout: 30000 });
+
+    // Select the first available size
+    await page.locator('#mockup-size-select').selectOption({ index: 0 });
+
+    // Place the order — triggers real /create-product worker call + /cart/add.js
+    await page.locator('#mockup-modal-order').click();
+
+    // Should redirect to /cart (allow extra time for variant creation + indexing)
+    await page.waitForURL('**/cart', { timeout: 60000 });
+
+    // Cart item should show the "Custom Design" badge
+    await expect(page.locator('.cart-item__custom-badge')).toBeVisible();
+  });
+});
