@@ -578,7 +578,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     }`,
     {
       productId: newProductGid,
-      variants: sizeVariants.map(v => ({ id: v.id, price })),
+      variants: sizeVariants.map(v => ({ id: v.id, price, inventoryPolicy: 'CONTINUE' })),
     }
   );
 
