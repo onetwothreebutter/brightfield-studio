@@ -12,7 +12,7 @@ test.describe('Custom design add-to-cart flow', () => {
       const req = route.request();
       const body = JSON.parse(req.postData() || '{}');
       body.extraTags = ['e2e-test'];
-      await route.continue({ postData: JSON.stringify(body), headers: req.headers() });
+      await route.continue({ postData: JSON.stringify(body) });
     });
 
     await page.goto(PRODUCT_PATH);

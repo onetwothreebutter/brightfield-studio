@@ -1715,10 +1715,13 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
                     var desc = '';
                     try { desc = JSON.parse(text).description || ''; } catch (e) {}
                     console.warn('[add-to-cart] attempt', attempt, 'failed — status:', r.status, 'desc:', desc);
-                    if (desc.toLowerCase().indexOf('cannot find variant') !== -1 ||
-                        desc.toLowerCase().indexOf('cannot find') !== -1) {
+                    var d = desc.toLowerCase();
+                    if (d.indexOf('cannot find variant') !== -1 ||
+                        d.indexOf('cannot find') !== -1 ||
+                        d.indexOf('sold out') !== -1 ||
+                        d.indexOf('already sold out') !== -1) {
                       var delay = 1500 * attempt;
-                      console.log('[add-to-cart] variant not indexed yet, retrying in', delay, 'ms');
+                      console.log('[add-to-cart] variant not ready yet, retrying in', delay, 'ms');
                       return new Promise(function (resolve) {
                         setTimeout(function () { resolve(addToCartWithRetry(attempt + 1)); }, delay);
                       });
