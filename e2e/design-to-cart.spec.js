@@ -4,7 +4,7 @@ const PRODUCT_PATH = '/products/dot-rise';
 
 test.describe('Custom design add-to-cart flow', () => {
   test('can create a custom shader design and add it to cart', async ({ page }) => {
-    test.setTimeout(120000);
+    test.setTimeout(180000);
 
     // Tag products created during E2E tests so they can be bulk-deleted later
     // (Shopify admin → Products → filter by tag "e2e-test")
@@ -39,8 +39,9 @@ test.describe('Custom design add-to-cart flow', () => {
     // Place the order — triggers real /create-product worker call + /cart/add.js
     await page.locator('#mockup-modal-order').click();
 
-    // Should redirect to /cart (allow extra time for variant creation + indexing)
-    await page.waitForURL('**/cart', { timeout: 60000 });
+    // /create-product does multiple sequential Shopify API calls; allow extra time
+    // for CI environments where Shopify API latency can be higher than local
+    await page.waitForURL('**/cart', { timeout: 120000 });
 
     // Cart item should show the "Custom Design" badge
     await expect(page.locator('.cart-item__custom-badge')).toBeVisible();
