@@ -2789,9 +2789,7 @@ dialog.mobile-nav[open]::backdrop {
 
 /* ─── Mockup modal community form ────────────────────────── */
 .mockup-modal__community {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--color-border);
+    margin-top: 0.5rem;
 }
 .mockup-modal__community-form {
     display: flex;
