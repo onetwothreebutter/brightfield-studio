@@ -1640,6 +1640,16 @@ dialog.mobile-nav[open]::backdrop {
     justify-content: flex-end;
     gap: 0.5rem;
 }
+
+@media (max-width: 400px) {
+    .mockup-modal__footer-actions {
+        flex-direction: column;
+    }
+    .mockup-modal__footer-actions .btn {
+        width: 100%;
+        text-align: center;
+    }
+}
 .shader-gui__body.is-hidden {
     display: none;
 }
