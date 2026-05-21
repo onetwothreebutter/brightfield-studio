@@ -346,10 +346,12 @@
     </div>
 
     {%- if shader_file -%}
+    {%- unless product.tags contains 'community-design' -%}
     <div class="product-recent-designs" id="product-recent-designs" style="display:none">
       <h3 class="product-recent-designs__heading">Your Recent Designs</h3>
       <div id="product-recent-designs-container"></div>
     </div>
+    {%- endunless -%}
     <div class="product-community-designs" id="product-community-designs" style="display:none">
       <h3 class="product-recent-designs__heading">Community Designs</h3>
       <div id="product-community-designs-container"></div>
