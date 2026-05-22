@@ -657,6 +657,40 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     console.log(logPrefix, 'inventoryPolicy re-applied:', policies);
   }
 
+  // Step 2e: set inventory quantity to 9999 at the Printful location so the storefront
+  // never shows "sold out" due to 0-quantity stock, regardless of policy propagation lag.
+  if (printfulLocationId) {
+    const inventoryItemIds = sizeVariants.map(v => v.inventoryItem?.id).filter(Boolean);
+    if (inventoryItemIds.length) {
+      const qtyData = await shopifyAdmin(env,
+        `mutation SetInventoryQty($input: InventorySetQuantitiesInput!) {
+          inventorySetQuantities(input: $input) {
+            inventoryAdjustmentGroup { id }
+            userErrors { field message }
+          }
+        }`,
+        {
+          input: {
+            name: 'on_hand',
+            reason: 'correction',
+            ignoreCompareQuantity: true,
+            quantities: inventoryItemIds.map(id => ({
+              inventoryItemId: id,
+              locationId: printfulLocationId,
+              quantity: 9999,
+            })),
+          },
+        }
+      );
+      const qtyErrors = qtyData?.data?.inventorySetQuantities?.userErrors;
+      if (qtyErrors?.length) {
+        console.error(logPrefix, 'inventorySetQuantities errors:', JSON.stringify(qtyErrors));
+      } else {
+        console.log(logPrefix, 'inventory set to 9999 at Printful location for', inventoryItemIds.length, 'variants');
+      }
+    }
+  }
+
   const newVariantId = firstSizeVariantGid.replace('gid://shopify/ProductVariant/', '');
   const newProductId = newProductGid.replace('gid://shopify/Product/', '');
 
