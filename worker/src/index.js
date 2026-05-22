@@ -636,6 +636,27 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     console.warn(logPrefix, 'skipping inventoryActivate — missing locationId');
   }
 
+  // Step 2d: re-apply inventoryPolicy:CONTINUE after inventoryActivate, which resets it to DENY
+  const policyData = await shopifyAdmin(env,
+    `mutation ResetInventoryPolicy($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+        productVariants { id inventoryPolicy }
+        userErrors { field message }
+      }
+    }`,
+    {
+      productId: newProductGid,
+      variants: sizeVariants.map(v => ({ id: v.id, inventoryPolicy: 'CONTINUE' })),
+    }
+  );
+  const policyErrors = policyData?.data?.productVariantsBulkUpdate?.userErrors;
+  if (policyErrors?.length) {
+    console.error(logPrefix, 'inventoryPolicy re-apply errors:', JSON.stringify(policyErrors));
+  } else {
+    const policies = policyData?.data?.productVariantsBulkUpdate?.productVariants?.map(v => v.inventoryPolicy);
+    console.log(logPrefix, 'inventoryPolicy re-applied:', policies);
+  }
+
   const newVariantId = firstSizeVariantGid.replace('gid://shopify/ProductVariant/', '');
   const newProductId = newProductGid.replace('gid://shopify/Product/', '');
 
