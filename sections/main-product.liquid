@@ -141,9 +141,10 @@
                 </div>
                 <div class="mockup-modal__community">
                   <div class="mockup-modal__community-form" id="community-form" style="display:none">
+                    <p class="mockup-modal__community-note">Share this design to the community gallery so others can get inspired by it.</p>
                     <input type="text" id="community-name" class="mockup-modal__community-input" placeholder="Your name (displayed publicly)">
                     <input type="email" id="community-email" class="mockup-modal__community-input" placeholder="Email (kept private)">
-                    <button class="btn btn--primary btn--sm" id="community-submit">Submit Design</button>
+                    <button class="btn btn--primary btn--sm" id="community-submit">Submit</button>
                     <p class="mockup-modal__community-error" id="community-error" style="display:none">Submission failed. Please try again.</p>
                     <p class="mockup-modal__community-note">Designs are reviewed before appearing publicly.</p>
                   </div>
@@ -1578,7 +1579,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           if (communityForm)    communityForm.style.display = 'none';
           if (communitySuccess) communitySuccess.style.display = 'none';
           if (communityError)   communityError.style.display = 'none';
-          if (communitySubmit)  { communitySubmit.disabled = false; communitySubmit.textContent = 'Submit Design'; }
+          if (communitySubmit)  { communitySubmit.disabled = false; communitySubmit.textContent = 'Submit'; }
 
           // Immediately add to Recent Designs strip — id filled in after upload
           var pendingDetail = {
@@ -1834,7 +1835,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         })
         .catch(function () {
           communitySubmit.disabled    = false;
-          communitySubmit.textContent = 'Submit Design';
+          communitySubmit.textContent = 'Submit';
           if (communityError) communityError.style.display = '';
         });
     });
