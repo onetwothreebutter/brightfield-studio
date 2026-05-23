@@ -606,9 +606,10 @@
       <div class="mockup-modal__community" id="demo-community-wrap">
         <button class="btn btn--ghost btn--sm" id="demo-community-toggle">Submit Design</button>
         <div class="mockup-modal__community-form" id="demo-community-form" style="display:none">
+          <p class="mockup-modal__community-note">Share this design to the community gallery so others can get inspired by it.</p>
           <input type="text" id="demo-community-name" class="mockup-modal__community-input" placeholder="Your name (displayed publicly)">
           <input type="email" id="demo-community-email" class="mockup-modal__community-input" placeholder="Email (kept private)">
-          <button class="btn btn--primary btn--sm" id="demo-community-submit">Submit Design</button>
+          <button class="btn btn--primary btn--sm" id="demo-community-submit">Submit</button>
           <p class="mockup-modal__community-error" id="demo-community-error" style="display:none">Submission failed. Please try again.</p>
           <p class="mockup-modal__community-note">Designs are reviewed before appearing publicly.</p>
         </div>
@@ -1476,7 +1477,7 @@
         if (dCommunityForm)    dCommunityForm.style.display = 'none';
         if (dCommunitySuccess) dCommunitySuccess.style.display = 'none';
         if (dCommunityError)   dCommunityError.style.display = 'none';
-        if (dCommunitySubmit)  { dCommunitySubmit.disabled = false; dCommunitySubmit.textContent = 'Submit Design'; }
+        if (dCommunitySubmit)  { dCommunitySubmit.disabled = false; dCommunitySubmit.textContent = 'Submit'; }
 
         // Create checkout thumbnail (600×600, black background) for cart/checkout display
         var checkoutCanvas = document.createElement('canvas');
@@ -1801,7 +1802,7 @@
       })
       .catch(function () {
         demoCommunitySubmit.disabled    = false;
-        demoCommunitySubmit.textContent = 'Submit Design';
+        demoCommunitySubmit.textContent = 'Submit';
         if (demoCommunityError) demoCommunityError.style.display = '';
       });
     });
