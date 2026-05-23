@@ -601,10 +601,10 @@
         </select>
       </div>
       <div class="mockup-modal__footer-actions">
-        <button id="demo-mockup-order" class="btn btn--primary btn--sm">Order This Design</button>
+        <button id="demo-mockup-order" class="btn btn--primary btn--sm">Add to Cart</button>
       </div>
       <div class="mockup-modal__community" id="demo-community-wrap">
-        <button class="btn btn--ghost btn--sm" id="demo-community-toggle">Share with Community</button>
+        <button class="btn btn--ghost btn--sm" id="demo-community-toggle">Submit Design</button>
         <div class="mockup-modal__community-form" id="demo-community-form" style="display:none">
           <input type="text" id="demo-community-name" class="mockup-modal__community-input" placeholder="Your name (displayed publicly)">
           <input type="email" id="demo-community-email" class="mockup-modal__community-input" placeholder="Email (kept private)">
@@ -1616,7 +1616,7 @@
         .catch(function (err) {
           alert('Could not add to cart: ' + err.message);
           mockupOrder.disabled    = false;
-          mockupOrder.textContent = 'Order This Design';
+          mockupOrder.textContent = 'Add to Cart';
         });
     });
   }

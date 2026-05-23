@@ -136,8 +136,8 @@
                   </div>
                 {%- endif -%}
                 <div class="mockup-modal__footer-actions">
-                  <button id="mockup-modal-order" class="btn btn--primary btn--sm">Order This Design</button>
-                  <button class="btn btn--ghost btn--sm" id="community-toggle">Share with Community</button>
+                  <button id="mockup-modal-order" class="btn btn--primary btn--sm">Add to Cart</button>
+                  <button class="btn btn--ghost btn--sm" id="community-toggle">Submit Design</button>
                 </div>
                 <div class="mockup-modal__community">
                   <div class="mockup-modal__community-form" id="community-form" style="display:none">
@@ -1756,7 +1756,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         console.error('[add-to-cart] caught error:', err);
         alert('Could not add to cart: ' + err.message);
         modalOrder.disabled    = false;
-        modalOrder.textContent = 'Order This Design';
+        modalOrder.textContent = 'Add to Cart';
       });
   });
 
