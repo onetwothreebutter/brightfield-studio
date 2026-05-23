@@ -601,7 +601,6 @@
         </select>
       </div>
       <div class="mockup-modal__footer-actions">
-        <a id="demo-mockup-download" class="btn btn--outline btn--sm" download="your-design.png">Download</a>
         <button id="demo-mockup-order" class="btn btn--primary btn--sm">Order This Design</button>
       </div>
       <div class="mockup-modal__community" id="demo-community-wrap">
@@ -755,7 +754,6 @@
   var mockupClose         = document.getElementById('demo-mockup-close');
   var mockupImg           = document.getElementById('demo-mockup-img');
   var mockupSizeEl        = document.getElementById('demo-mockup-size');
-  var mockupDownload      = document.getElementById('demo-mockup-download');
   var mockupOrder         = document.getElementById('demo-mockup-order');
 
   // ── Cycle dots ─────────────────────────────────────────────────────────────
@@ -1468,7 +1466,6 @@
 
         // Show modal immediately — no waiting for API
         mockupImg.src = compositeDataUrl;
-        if (mockupDownload) mockupDownload.href = compositeDataUrl;
         openMockupModal();
 
         // Reset community form
@@ -1525,8 +1522,6 @@
             productHandle:    PRODUCT_HANDLE,
             values:           snapshotValues
           };
-          // Upgrade "Yours" download link to stable hosted URL
-          if (mockupDownload) mockupDownload.href = data.mockup_url;
           return data;
         });
 
@@ -1623,22 +1618,6 @@
           mockupOrder.disabled    = false;
           mockupOrder.textContent = 'Order This Design';
         });
-    });
-  }
-
-  // Download — append local datetime before following the link so the filename
-  // reflects the user's timezone rather than UTC.
-  if (mockupDownload) {
-    mockupDownload.addEventListener('click', function (e) {
-      if (!this.href || this.href === window.location.href) { e.preventDefault(); return; }
-      var now = new Date();
-      var h   = now.getHours() % 12 || 12;
-      var mm  = String(now.getMinutes()).padStart(2, '0');
-      var dt  = now.getFullYear() + '-' +
-                String(now.getMonth() + 1).padStart(2, '0') + '-' +
-                String(now.getDate()).padStart(2, '0') + '-' +
-                h + mm + (now.getHours() >= 12 ? 'pm' : 'am');
-      this.href = this.href.split('&dt=')[0] + '&dt=' + encodeURIComponent(dt);
     });
   }
 
