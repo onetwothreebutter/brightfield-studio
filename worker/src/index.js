@@ -657,37 +657,27 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     console.log(logPrefix, 'inventoryPolicy re-applied:', policies);
   }
 
-  // Step 2e: set inventory quantity to 9999 at the Printful location so the storefront
-  // never shows "sold out" due to 0-quantity stock, regardless of policy propagation lag.
-  if (printfulLocationId) {
-    const inventoryItemIds = sizeVariants.map(v => v.inventoryItem?.id).filter(Boolean);
-    if (inventoryItemIds.length) {
-      const qtyData = await shopifyAdmin(env,
-        `mutation SetInventoryQty($input: InventorySetQuantitiesInput!) {
-          inventorySetQuantities(input: $input) {
-            inventoryAdjustmentGroup { id }
-            userErrors { field message }
-          }
-        }`,
-        {
-          input: {
-            name: 'on_hand',
-            reason: 'correction',
-            ignoreCompareQuantity: true,
-            quantities: inventoryItemIds.map(id => ({
-              inventoryItemId: id,
-              locationId: printfulLocationId,
-              quantity: 9999,
-            })),
-          },
+  // Step 2e: set tracked:false on each inventory item so the storefront never shows
+  // "sold out". Printful-managed locations reject manual quantity edits, so setting
+  // quantities is unreliable; untracked items are always purchasable regardless of policy.
+  // Printful fulfillment relies on order webhooks, not Shopify inventory levels.
+  for (const sv of sizeVariants) {
+    const invGid = sv.inventoryItem?.id;
+    if (!invGid) continue;
+    const trackData = await shopifyAdmin(env,
+      `mutation UntrackInventoryItem($id: ID!, $input: InventoryItemInput!) {
+        inventoryItemUpdate(id: $id, input: $input) {
+          inventoryItem { id tracked }
+          userErrors { field message }
         }
-      );
-      const qtyErrors = qtyData?.data?.inventorySetQuantities?.userErrors;
-      if (qtyErrors?.length) {
-        console.error(logPrefix, 'inventorySetQuantities errors:', JSON.stringify(qtyErrors));
-      } else {
-        console.log(logPrefix, 'inventory set to 9999 at Printful location for', inventoryItemIds.length, 'variants');
-      }
+      }`,
+      { id: invGid, input: { tracked: false } }
+    );
+    const trackErrors = trackData?.data?.inventoryItemUpdate?.userErrors;
+    if (trackErrors?.length) {
+      console.error(logPrefix, 'inventoryItemUpdate tracked:false errors:', JSON.stringify(trackErrors));
+    } else {
+      console.log(logPrefix, 'inventory untracked for item', invGid);
     }
   }
 
