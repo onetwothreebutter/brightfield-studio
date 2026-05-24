@@ -2024,6 +2024,71 @@ dialog.mobile-nav[open]::backdrop {
     color: var(--color-primary);
 }
 
+/* ── Delete confirmation modal ── */
+.delete-confirm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.delete-confirm-modal--hidden {
+    display: none;
+}
+.delete-confirm-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+}
+.delete-confirm-modal__box {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 2rem 2rem 1.5rem;
+    width: min(340px, 90vw);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow:
+        0 0 0 1px rgba(0, 255, 255, 0.06),
+        0 8px 32px rgba(0, 0, 0, 0.6);
+    animation: modal-in 200ms var(--ease-out) both;
+}
+.delete-confirm-modal__title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: center;
+    color: var(--color-text);
+}
+.delete-confirm-modal__actions {
+    display: flex;
+    gap: 0.75rem;
+    width: 100%;
+}
+.delete-confirm-modal__actions .btn {
+    flex: 1;
+}
+.btn--ghost {
+    background: transparent;
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+}
+.btn--ghost:hover {
+    background: rgba(255, 255, 255, 0.07);
+}
+.btn--danger {
+    background: #c0392b;
+    color: #fff;
+}
+.btn--danger:hover {
+    background: #e74c3c;
+}
+
 /* ── Cosine help modal ── */
 .shader-demo__help-modal {
     position: fixed;
