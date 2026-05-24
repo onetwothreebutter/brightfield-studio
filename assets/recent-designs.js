@@ -3,6 +3,72 @@
   var DEVICE_KEY = 'brightfield_device_id';
   var RESTORE_KEY = 'brightfield_restore';
 
+  var _confirmModal = null;
+  var _confirmCallback = null;
+
+  function getConfirmModal() {
+    if (_confirmModal) return _confirmModal;
+
+    var modal = document.createElement('div');
+    modal.className = 'delete-confirm-modal delete-confirm-modal--hidden';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'delete-confirm-title');
+
+    var backdrop = document.createElement('div');
+    backdrop.className = 'delete-confirm-modal__backdrop';
+
+    var box = document.createElement('div');
+    box.className = 'delete-confirm-modal__box';
+
+    var title = document.createElement('p');
+    title.id = 'delete-confirm-title';
+    title.className = 'delete-confirm-modal__title';
+    title.textContent = 'Delete this design?';
+
+    var actions = document.createElement('div');
+    actions.className = 'delete-confirm-modal__actions';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn btn--ghost';
+    cancelBtn.textContent = 'Cancel';
+
+    var deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn btn--danger';
+    deleteBtn.textContent = 'Delete';
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(deleteBtn);
+    box.appendChild(title);
+    box.appendChild(actions);
+    modal.appendChild(backdrop);
+    modal.appendChild(box);
+    document.body.appendChild(modal);
+
+    function close() {
+      modal.classList.add('delete-confirm-modal--hidden');
+      _confirmCallback = null;
+    }
+
+    backdrop.addEventListener('click', close);
+    cancelBtn.addEventListener('click', close);
+    deleteBtn.addEventListener('click', function () {
+      if (_confirmCallback) _confirmCallback();
+      close();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.classList.contains('delete-confirm-modal--hidden')) close();
+    });
+
+    _confirmModal = modal;
+    return modal;
+  }
+
+  function showDeleteConfirm(onConfirm) {
+    _confirmCallback = onConfirm;
+    getConfirmModal().classList.remove('delete-confirm-modal--hidden');
+  }
+
   function getDeviceId() {
     var id = localStorage.getItem(DEVICE_KEY);
     if (!id) {
@@ -93,9 +159,11 @@
     (function (d, c) {
       deleteBtn.addEventListener('click', function (e) {
         e.stopPropagation();
-        deleteDesign(d.id).then(function (result) {
-          if (!result || !result.ok) return;
-          c.remove();
+        showDeleteConfirm(function () {
+          deleteDesign(d.id).then(function (result) {
+            if (!result || !result.ok) return;
+            c.remove();
+          });
         });
       });
 
@@ -193,13 +261,15 @@
       (function (d, c) {
         deleteBtn.addEventListener('click', function (e) {
           e.stopPropagation();
-          deleteDesign(d.id).then(function (result) {
-            if (!result || !result.ok) return;
-            c.remove();
-            if (!strip.querySelector('.recent-designs__card')) {
-              var section = container.closest('.recent-designs-section');
-              if (section) section.style.display = 'none';
-            }
+          showDeleteConfirm(function () {
+            deleteDesign(d.id).then(function (result) {
+              if (!result || !result.ok) return;
+              c.remove();
+              if (!strip.querySelector('.recent-designs__card')) {
+                var section = container.closest('.recent-designs-section');
+                if (section) section.style.display = 'none';
+              }
+            });
           });
         });
 
