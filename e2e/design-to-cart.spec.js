@@ -6,6 +6,19 @@ test.describe('Custom design add-to-cart flow', () => {
   test('can create a custom shader design and add it to cart', async ({ page }) => {
     test.setTimeout(180000);
 
+    // Fail fast if the page shows an alert — without this, alert() is auto-dismissed
+    // and waitForURL silently times out with no indication of what went wrong.
+    page.on('dialog', async dialog => {
+      const msg = dialog.message();
+      await dialog.dismiss();
+      throw new Error(`Unexpected alert: "${msg}"`);
+    });
+
+    // Surface browser console errors in the test output for easier debugging.
+    page.on('console', msg => {
+      if (msg.type() === 'error') console.error('[browser]', msg.text());
+    });
+
     // Tag products created during E2E tests so they can be bulk-deleted later
     // (Shopify admin → Products → filter by tag "e2e-test")
     await page.route('**/create-product', async route => {
@@ -33,8 +46,11 @@ test.describe('Custom design add-to-cart flow', () => {
     // Wait for mockup modal — save-preview + compositing can take several seconds
     await page.locator('#mockup-modal').waitFor({ state: 'visible', timeout: 30000 });
 
-    // Select the first available size
-    await page.locator('#mockup-size-select').selectOption({ index: 0 });
+    // Select the first available (non-disabled) size option.
+    // index:0 may be a sold-out variant; selecting it would cause /cart/add.js
+    // to fail with a "sold out" error after all retries.
+    const firstEnabledValue = await page.locator('#mockup-size-select option:not([disabled])').first().getAttribute('value');
+    await page.locator('#mockup-size-select').selectOption(firstEnabledValue);
 
     // Place the order — triggers real /create-product worker call + /cart/add.js
     await page.locator('#mockup-modal-order').click();
