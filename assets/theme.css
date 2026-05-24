@@ -2412,35 +2412,37 @@ dialog.mobile-nav[open]::backdrop {
 @media (max-width: 600px) {
     .recent-designs__card { width: 240px; }
 }
-/*
- * Three-rule hover cascade: before | after | hovered
- *
- * Rule 1 — catches ALL cards when any card is hovered (specificity 0,4,0).
- * This covers cards BEFORE the hovered one (the ~ combinator can't reach those).
- */
-.recent-designs__strip:has(.recent-designs__card:hover) .recent-designs__card {
-    transform: scale(0.8) translateX(-30%);
-    opacity: 0.7;
-}
+@media (hover: hover) {
+    /*
+     * Three-rule hover cascade: before | after | hovered
+     *
+     * Rule 1 — catches ALL cards when any card is hovered (specificity 0,4,0).
+     * This covers cards BEFORE the hovered one (the ~ combinator can't reach those).
+     */
+    .recent-designs__strip:has(.recent-designs__card:hover) .recent-designs__card {
+        transform: scale(0.8) translateX(-30%);
+        opacity: 0.7;
+    }
 
-/*
- * Rule 2 — overrides Rule 1 for cards AFTER the hovered one using the general
- * sibling combinator (~). Prefixed with .recent-designs__strip to match Rule 1's
- * specificity (0,4,0) so source order decides — this rule wins because it comes last.
- */
-.recent-designs__strip .recent-designs__card:hover ~ .recent-designs__card {
-    transform: scale(0.8) translateX(30%);
-}
+    /*
+     * Rule 2 — overrides Rule 1 for cards AFTER the hovered one using the general
+     * sibling combinator (~). Prefixed with .recent-designs__strip to match Rule 1's
+     * specificity (0,4,0) so source order decides — this rule wins because it comes last.
+     */
+    .recent-designs__strip .recent-designs__card:hover ~ .recent-designs__card {
+        transform: scale(0.8) translateX(30%);
+    }
 
-/*
- * Rule 3 — overrides both rules above for the hovered card itself.
- */
-.recent-designs__strip:has(.recent-designs__card:hover)
-    .recent-designs__card:hover {
-    transform: scale(1.5);
-    opacity: 1;
-    z-index: 1;
-    position: relative;
+    /*
+     * Rule 3 — overrides both rules above for the hovered card itself.
+     */
+    .recent-designs__strip:has(.recent-designs__card:hover)
+        .recent-designs__card:hover {
+        transform: scale(1.5);
+        opacity: 1;
+        z-index: 1;
+        position: relative;
+    }
 }
 .recent-designs__card-img-wrap {
     position: relative;
@@ -2474,8 +2476,10 @@ dialog.mobile-nav[open]::backdrop {
     opacity: 0;
     transition: opacity 0.15s;
 }
-.recent-designs__card:hover .recent-designs__card-delete {
-    opacity: 1;
+@media (hover: hover) {
+    .recent-designs__card:hover .recent-designs__card-delete {
+        opacity: 1;
+    }
 }
 .recent-designs__card-label {
     padding: 5px 0;
