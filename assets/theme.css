@@ -2389,11 +2389,11 @@ dialog.mobile-nav[open]::backdrop {
 }
 .recent-designs__scroll {
     overflow-x: auto;
-    /* padding expands the clip boundary so scaled cards aren't clipped on any side;
+    /* padding expands the clip boundary so scaled cards aren't clipped vertically;
        negative margin compensates so no extra whitespace appears in the layout.
-       .container has no overflow:hidden so the scroll wrapper can bleed beyond it horizontally. */
-    padding: 80px;
-    margin: -80px;
+       Horizontal padding is omitted — the scroll container contains horizontal overflow. */
+    padding: 80px 0;
+    margin: -80px 0;
     scrollbar-width: thin;
     scrollbar-color: var(--color-border) transparent;
 }
