@@ -1311,8 +1311,9 @@ dialog.mobile-nav[open]::backdrop {
 }
 
 .product-customize-hint {
-    display: none;
-    margin-bottom: 0.75rem;
+    display: block;
+    margin: 0;
+    padding: 0.75rem 1.25rem;
     font-size: 0.85rem;
     color: var(--color-text, #fff);
     line-height: 1.5;
