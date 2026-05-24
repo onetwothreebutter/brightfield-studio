@@ -2436,7 +2436,7 @@ dialog.mobile-nav[open]::backdrop {
     .shader-control__text-input {
         padding: 0.45rem 0.4rem;
         min-height: 2.75rem;
-        font-size: 0.75rem;
+        font-size: 16px; /* prevents iOS auto-zoom on focus */
     }
 }
 
