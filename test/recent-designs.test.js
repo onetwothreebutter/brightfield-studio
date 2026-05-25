@@ -191,6 +191,7 @@ describe('delete button', () => {
     window.RecentDesigns.renderFilmstrip(container, [makeDesign({ id: 'abc' }), makeDesign({ id: 'def' })]);
 
     container.querySelectorAll('.recent-designs__card-delete')[0].click();
+    document.querySelector('.delete-confirm-modal:not(.delete-confirm-modal--hidden) .btn--danger').click();
     await new Promise(r => setTimeout(r, 0)); // flush microtasks
 
     expect(container.querySelectorAll('.recent-designs__card')).toHaveLength(1);
@@ -208,6 +209,7 @@ describe('delete button', () => {
 
     window.RecentDesigns.renderFilmstrip(container, [makeDesign({ id: 'only' })]);
     container.querySelector('.recent-designs__card-delete').click();
+    document.querySelector('.delete-confirm-modal:not(.delete-confirm-modal--hidden) .btn--danger').click();
     await new Promise(r => setTimeout(r, 0));
 
     expect(section.style.display).toBe('none');
