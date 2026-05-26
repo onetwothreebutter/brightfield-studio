@@ -1319,8 +1319,31 @@ dialog.mobile-nav[open]::backdrop {
     line-height: 1.5;
 }
 
+.shader-secondary-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+}
+
 .shader-back-btn {
-    margin-top: 10px;
+    flex: 1;
+    font-family: var(--font-body);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: transparent;
+    color: var(--color-text-muted, #aaa);
+    border: 1px solid var(--color-border, #444);
+    border-radius: var(--radius);
+    padding: 0.45rem 0.6rem;
+    cursor: pointer;
+    transition:
+        color var(--transition-fast),
+        border-color var(--transition-fast);
+}
+.shader-back-btn:hover {
+    color: var(--color-text, #fff);
+    border-color: var(--color-text-muted, #aaa);
 }
 
 /* ─── Media Panels ───────────────────────────────────────── */
@@ -1783,19 +1806,17 @@ dialog.mobile-nav[open]::backdrop {
     background: var(--color-secondary-dim, rgba(255, 0, 255, 0.1));
 }
 .shader-control__share-btn {
-    display: block;
-    width: 100%;
+    flex: 1;
     font-family: var(--font-body);
     font-size: 0.65rem;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     background: transparent;
     color: var(--color-secondary);
     border: 1px solid var(--color-secondary);
     border-radius: var(--radius);
-    padding: 0.5rem 0.75rem;
+    padding: 0.45rem 0.6rem;
     cursor: pointer;
-    margin-bottom: 0.75rem;
     transition:
         color var(--transition-fast),
         background var(--transition-fast),
