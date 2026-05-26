@@ -331,7 +331,9 @@
             data-shirt-template="{{ 'shirt-template.png' | asset_url }}"
             data-print-area="0.30,0.165,0.40,0.45"
           >Preview on Shirt</button>
-          <button class="btn btn--secondary btn--lg btn--full shader-back-btn" data-tab="photo">← Back to Product</button>
+          <div class="shader-secondary-actions">
+            <button class="shader-back-btn" data-tab="photo">← Back</button>
+          </div>
           <p class="product-customize-actions__note">You'll select your size when you order.</p>
         </div>
         {%- endif -%}
@@ -1224,7 +1226,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   var shareBtn = document.createElement('button');
   shareBtn.type = 'button';
   shareBtn.className = 'shader-control__share-btn';
-  shareBtn.textContent = 'Share Your Creation';
+  shareBtn.textContent = '↑ Share';
   shareBtn.addEventListener('click', function () {
     var self = this;
     var canvas = document.getElementById('shader-canvas');
@@ -1238,12 +1240,12 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     function showConfirm() {
       self.textContent = 'Copied!';
       self.disabled = false;
-      setTimeout(function () { self.textContent = 'Share Your Creation'; }, 1800);
+      setTimeout(function () { self.textContent = '↑ Share'; }, 1800);
     }
     function onError() {
       self.textContent = 'Failed';
       self.disabled = false;
-      setTimeout(function () { self.textContent = 'Share Your Creation'; }, 1800);
+      setTimeout(function () { self.textContent = '↑ Share'; }, 1800);
     }
 
     var urlPromise = fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/create-share', {
@@ -1289,7 +1291,12 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         .catch(onError);
     }
   });
-  randomizeBtn.insertAdjacentElement('afterend', shareBtn);
+  var secondaryActions = document.querySelector('.shader-secondary-actions');
+  if (secondaryActions) {
+    secondaryActions.appendChild(shareBtn);
+  } else {
+    randomizeBtn.insertAdjacentElement('afterend', shareBtn);
+  }
 
   // Desktop popout — draggable floating panel (desktop only)
   var popoutBtn   = document.getElementById('shader-gui-popout');
