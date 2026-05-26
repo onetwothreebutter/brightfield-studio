@@ -1418,6 +1418,19 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     settleTimer = setTimeout(applyFade, 150);
   }
 
+  // iOS momentum scroll can coast for ~1.5 s after touchend without firing
+  // reliable scroll events. Poll via rAF so fade clears as the page settles.
+  var pollRaf = null;
+  document.addEventListener('touchend', function () {
+    if (pollRaf) cancelAnimationFrame(pollRaf);
+    var deadline = Date.now() + 1500;
+    function poll() {
+      applyFade();
+      if (Date.now() < deadline) pollRaf = requestAnimationFrame(poll);
+    }
+    pollRaf = requestAnimationFrame(poll);
+  }, { passive: true });
+
   document.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', applyFade);
   // Wait for DOM reflow before evaluating positions after tab switch
