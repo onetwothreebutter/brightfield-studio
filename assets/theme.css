@@ -1783,6 +1783,12 @@ dialog.mobile-nav[open]::backdrop {
 .shader-control__randomize-btn:hover {
     background: var(--color-primary-dim, rgba(0, 255, 136, 0.1));
 }
+.shader-control__randomize-btn:active {
+    background: var(--color-primary);
+    color: var(--color-background, #000);
+    transform: scale(0.96);
+    transition: none;
+}
 .shader-control__copy-link-btn {
     display: block;
     width: 100%;
@@ -2286,6 +2292,11 @@ dialog.mobile-nav[open]::backdrop {
 }
 .is-scrollable-bottom:not(.has-scrolled) > .scroll-shadow--bottom::after {
     opacity: 1;
+    color: rgba(0, 255, 255, 0.9);
+    font-size: 1.7rem;
+}
+.is-scrollable-bottom.has-scrolled > .scroll-shadow--bottom::after {
+    opacity: 0.4;
 }
 @keyframes scroll-hint-bounce {
     0%,
