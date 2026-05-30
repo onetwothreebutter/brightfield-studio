@@ -1674,6 +1674,28 @@ dialog.mobile-nav[open]::backdrop {
         text-align: center;
     }
 }
+@keyframes btn-spin {
+    to { transform: rotate(360deg); }
+}
+.btn-spinner {
+    display: inline-block;
+    width: 0.9em;
+    height: 0.9em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: btn-spin 0.6s linear infinite;
+    flex-shrink: 0;
+}
+.mockup-modal__order-status {
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: var(--color-text-muted);
+    text-align: center;
+    margin: 0;
+    font-family: var(--font-body);
+}
+
 .shader-gui__body.is-hidden {
     display: none;
 }
