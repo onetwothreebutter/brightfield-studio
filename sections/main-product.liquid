@@ -1665,7 +1665,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   });
 
   modalOrder.addEventListener('click', function () {
-    console.log("[order] click fired — _pendingDesign:", _pendingDesign, "orderStatus el:", orderStatus);
     if (!_pendingDesign) {
       alert('Generate a preview first.');
       return;
@@ -1686,7 +1685,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     sp.className = 'btn-spinner';
     sp.setAttribute('aria-hidden', 'true');
     modalOrder.appendChild(sp);
-    console.log('[spinner] appended', sp, 'button children:', modalOrder.childNodes, 'animation:', window.getComputedStyle(sp).animationName);
     if (orderStatus) { orderStatus.textContent = 'Creating your design…'; orderStatus.style.display = ''; }
 
     console.log('[add-to-cart] starting — shopifyVariantId:', shopifyVariantId);
