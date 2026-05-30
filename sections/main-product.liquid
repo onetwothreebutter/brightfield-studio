@@ -139,6 +139,7 @@
                   <button id="mockup-modal-order" class="btn btn--primary btn--sm">Add to Cart</button>
                   <button class="btn btn--ghost btn--sm" id="community-toggle">Submit for Gallery</button>
                 </div>
+                <p class="mockup-modal__order-status" id="mockup-order-status" style="display:none"></p>
                 <div class="mockup-modal__community">
                   <div class="mockup-modal__community-form" id="community-form" style="display:none">
                     <p class="mockup-modal__community-note">Share this design to the community gallery so others can get inspired by it.</p>
@@ -1482,6 +1483,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   var modal         = document.getElementById('mockup-modal');
   var modalImg      = document.getElementById('mockup-modal-img');
   var modalOrder    = document.getElementById('mockup-modal-order');
+  var orderStatus   = document.getElementById('mockup-order-status');
   var closeBtn      = document.getElementById('mockup-modal-close');
   var backdrop      = modal.querySelector('.mockup-modal__backdrop');
   if (!btn) return;
@@ -1663,6 +1665,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   });
 
   modalOrder.addEventListener('click', function () {
+    console.log("[order] click fired — _pendingDesign:", _pendingDesign, "orderStatus el:", orderStatus);
     if (!_pendingDesign) {
       alert('Generate a preview first.');
       return;
@@ -1677,15 +1680,21 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       return;
     }
 
-    modalOrder.disabled    = true;
-    modalOrder.textContent = 'Saving…';
+    modalOrder.disabled = true;
+    modalOrder.textContent = 'Saving… ';
+    var sp = document.createElement('span');
+    sp.className = 'btn-spinner';
+    sp.setAttribute('aria-hidden', 'true');
+    modalOrder.appendChild(sp);
+    console.log('[spinner] appended', sp, 'button children:', modalOrder.childNodes, 'animation:', window.getComputedStyle(sp).animationName);
+    if (orderStatus) { orderStatus.textContent = 'Creating your design…'; orderStatus.style.display = ''; }
 
     console.log('[add-to-cart] starting — shopifyVariantId:', shopifyVariantId);
 
     _pendingDesign.uploadPromise
       .then(function (data) {
         console.log('[add-to-cart] upload resolved:', { design_url: data.design_url, mockup_url: data.mockup_url, checkout_image_url: data.checkout_image_url });
-        modalOrder.textContent = 'Creating your design…';
+        if (orderStatus) orderStatus.textContent = 'Creating your design…';
         var cpBody = {
           designUrl:        data.design_url,
           mockupUrl:        data.mockup_url,
@@ -1774,8 +1783,9 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       .catch(function (err) {
         console.error('[add-to-cart] caught error:', err);
         alert('Could not add to cart: ' + err.message);
-        modalOrder.disabled    = false;
+        modalOrder.disabled = false;
         modalOrder.textContent = 'Add to Cart';
+        if (orderStatus) { orderStatus.textContent = ''; orderStatus.style.display = 'none'; }
       });
   });
 
