@@ -1680,19 +1680,19 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     }
 
     modalOrder.disabled = true;
-    modalOrder.textContent = 'Saving… ';
+    modalOrder.textContent = 'Adding… ';
     var sp = document.createElement('span');
     sp.className = 'btn-spinner';
     sp.setAttribute('aria-hidden', 'true');
     modalOrder.appendChild(sp);
-    if (orderStatus) { orderStatus.textContent = 'Creating your design…'; orderStatus.style.display = ''; }
+    if (orderStatus) { orderStatus.textContent = 'Uploading your design…'; orderStatus.style.display = ''; }
 
     console.log('[add-to-cart] starting — shopifyVariantId:', shopifyVariantId);
 
     _pendingDesign.uploadPromise
       .then(function (data) {
         console.log('[add-to-cart] upload resolved:', { design_url: data.design_url, mockup_url: data.mockup_url, checkout_image_url: data.checkout_image_url });
-        if (orderStatus) orderStatus.textContent = 'Creating your design…';
+        if (orderStatus) orderStatus.textContent = 'Creating your product…';
         var cpBody = {
           designUrl:        data.design_url,
           mockupUrl:        data.mockup_url,
@@ -1751,6 +1751,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
                       var delay = 1500 * attempt;
                       console.log('[add-to-cart] variant not ready yet, retrying in', delay, 'ms');
                       return new Promise(function (resolve) {
+                        if (orderStatus) orderStatus.textContent = 'Finalizing your order…';
                         setTimeout(function () { resolve(addToCartWithRetry(attempt + 1)); }, delay);
                       });
                     }
@@ -1762,6 +1763,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
                 return r;
               });
             }
+            if (orderStatus) orderStatus.textContent = 'Adding to cart…';
             return addToCartWithRetry(1);
           });
         });
