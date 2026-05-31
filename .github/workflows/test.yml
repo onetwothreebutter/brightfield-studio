@@ -83,3 +83,4 @@ jobs:
       - run: npm run test:e2e
         env:
           BASE_URL: https://brightfield.studio
+          E2E_TOKEN: ${{ secrets.E2E_TOKEN }}
