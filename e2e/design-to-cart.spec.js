@@ -28,6 +28,16 @@ test.describe('Custom design add-to-cart flow', () => {
       await route.continue({ postData: JSON.stringify(body) });
     });
 
+    // Inject bypass header so Cloudflare WAF skips Bot Fight Mode for /cart/add.js.
+    // Requires a WAF custom rule: skip Bot Fight Mode when X-E2E-Token matches the secret.
+    if (process.env.E2E_TOKEN) {
+      await page.route('**/cart/add.js', async route => {
+        await route.continue({
+          headers: { ...route.request().headers(), 'X-E2E-Token': process.env.E2E_TOKEN },
+        });
+      });
+    }
+
     await page.goto(PRODUCT_PATH);
 
     // Switch to shader tab
