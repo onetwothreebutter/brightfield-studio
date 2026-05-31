@@ -1665,7 +1665,7 @@ dialog.mobile-nav[open]::backdrop {
     gap: 0.5rem;
 }
 
-@media (max-width: 400px) {
+@media (max-width: 600px) {
     .mockup-modal__footer-actions {
         flex-direction: column;
     }
