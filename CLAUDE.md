@@ -13,7 +13,7 @@
 ## Architecture
 - Shopify theme (custom, no base theme)
 - Products opt into shader UI via tag `shader-[filename]` (e.g. `shader-rise-shirt`)
-- Shader GUI params shared via `window._shaderState.values` (written by inline GUI script, read by deferred shader JS)
+- Shader GUI params shared via `window._shaderState.values` (written by the GUI builder in `assets/product-page.js`, read by deferred shader JS)
 - Each page section loads its own shader script — not globally
 
 ## Shader system
@@ -23,7 +23,8 @@
 - `assets/[name].js` — shader-specific GLSL + uniform wiring; calls `window.ShaderBase.create(...)`
 - `snippets/shader-controls-[name].liquid` — defines `var controls = [...]` and optionally `var customAfterBuild = function() {...}`
 - `snippets/shader-controls-base.liquid` — shared JS globals rendered before every shader snippet
-- `sections/main-product.liquid` — renders base snippet then the correct shader snippet via `{% case shader_file %}`
+- `sections/main-product.liquid` — renders base snippet then the correct shader snippet via `{% case shader_file %}`, exposing them as `window._shaderControls`; sets `window._productPageConfig` (shaderFile, productHandle, submissionId, holdReveal)
+- `assets/product-page.js` — all product-page JS (tabs, GUI builder, Preview on Shirt, community submit); deferred, must load before `shader-base.js`
 
 ### Shared globals (from `shader-controls-base.liquid`)
 Never redefine these locally in a shader snippet — they are already in scope:

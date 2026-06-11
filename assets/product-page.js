@@ -1,0 +1,1623 @@
+/**
+ * Product page behaviors — tab switcher, thumbnails, shader GUI builder,
+ * Preview on Shirt / mockup modal, community submit, in-house design assistant.
+ *
+ * Liquid-derived data comes from two globals set inline by sections/main-product.liquid:
+ *   window._productPageConfig — { shaderFile, productHandle, submissionId, holdReveal }
+ *   window._shaderControls    — { controls, customAfterBuild, toHex, applyColors }
+ *     (from the Liquid-rendered shader-control snippets; absent on non-shader products)
+ *
+ * Load order matters: this script must be a deferred script that precedes
+ * shader-base.js so window._shaderState exists when the shader scripts run.
+ */
+(function () {
+var cfg = window._productPageConfig || {};
+
+// ── Tab switcher ─────────────────────────────────────────────────────────────
+(function () {
+  var tabs          = document.querySelectorAll('.media-tab, [data-tab]');
+  var panels        = document.querySelectorAll('.media-panel');
+  var price         = document.querySelector('.product-price');
+  var orderForm     = document.getElementById('product-order-form');
+  var shaderGui       = document.getElementById('shader-gui');
+  var shaderPreview   = document.querySelector('.shader-gui__preview');
+  var customizeBtn    = document.querySelector('.product-customize-btn');
+  var defaultDesc   = document.querySelector('.product-description');
+  var productLayout = document.querySelector('.product-layout');
+  if (!tabs.length) return;
+
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      var target = this.dataset.tab;
+
+      tabs.forEach(function (t) { t.classList.remove('is-active'); });
+      panels.forEach(function (p) { p.classList.remove('is-active'); });
+
+      this.classList.add('is-active');
+      var panel = document.querySelector('[data-panel="' + target + '"]');
+      if (panel) panel.classList.add('is-active');
+
+      var isCustomize = target === 'shader';
+      if (price)         price.style.display         = isCustomize ? 'none'  : '';
+      if (orderForm)     orderForm.style.display     = isCustomize ? 'none'  : '';
+      if (customizeBtn)  customizeBtn.style.display  = isCustomize ? 'none'  : '';
+      if (shaderGui)     shaderGui.style.display     = isCustomize ? 'block' : 'none';
+      if (shaderPreview) shaderPreview.style.display = isCustomize ? 'block' : 'none';
+      if (defaultDesc)   defaultDesc.style.display   = isCustomize ? 'none'  : '';
+      if (productLayout) productLayout.classList.toggle('shader-mode', isCustomize);
+
+      if (isCustomize) {
+        window.dispatchEvent(new Event('resize'));
+        window.dispatchEvent(new CustomEvent('product-shader-mode'));
+        history.replaceState(null, '', window.location.pathname + window.location.search + '#shader');
+      } else {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    });
+  });
+}());
+
+// ── Auto-open Shader tab from URL hash ────────────────────────────────────────
+if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') === 0 || window.location.hash.indexOf('#share=') === 0) {
+  var shaderTab = document.querySelector('[data-tab="shader"]');
+  if (shaderTab) shaderTab.click();
+}
+
+// ── Thumbnail switcher ────────────────────────────────────────────────────────
+(function () {
+  var mainImg = document.querySelector('.product-media__image');
+  var thumbs  = document.querySelectorAll('.product-thumb');
+  if (!mainImg || !thumbs.length) return;
+
+  thumbs.forEach(function (thumb) {
+    thumb.addEventListener('click', function () {
+      mainImg.src = this.dataset.full;
+      mainImg.alt = this.alt;
+      thumbs.forEach(function (t) { t.classList.remove('is-active'); });
+      this.classList.add('is-active');
+    });
+  });
+}());
+
+// ── Shader GUI ────────────────────────────────────────────────────────────────
+(function () {
+  var body = document.getElementById('shader-gui-body');
+  if (!body) return;
+
+  // Control definitions are Liquid-rendered inline by main-product.liquid
+  var sc = window._shaderControls;
+  if (!sc) return;
+  var controls         = sc.controls;
+  var customAfterBuild = sc.customAfterBuild;
+  var toHex            = sc.toHex;
+  var applyColors      = sc.applyColors;
+
+  // Initialise shared state — shader.js reads this each frame
+  var values = {};
+  controls.forEach(function (c) {
+    if (!c.key) return;
+    values[c.key] = c.type === 'color' ? hexToRgb(c.value) : (c.toRadians ? c.value * Math.PI / 180 : c.value);
+  });
+  window._shaderState = { values: values, textDirty: true };
+  if (cfg.holdReveal) window._shaderState.holdReveal = true;
+
+  // Pre-populate restore key from ?bfr= share param (set by Worker share page)
+  (function () {
+    try {
+      var bfr = new URLSearchParams(location.search).get('bfr');
+      if (bfr) {
+        localStorage.setItem('brightfield_restore', atob(bfr));
+        history.replaceState(null, '', location.pathname + '#shader');
+      }
+    } catch (e) {}
+  }());
+
+  // Restore saved design if user clicked a gallery card
+  (function () {
+    var raw = localStorage.getItem('brightfield_restore');
+    if (!raw) return;
+    try {
+      var saved = JSON.parse(raw);
+      localStorage.removeItem('brightfield_restore');
+      if (saved.shader !== cfg.shaderFile) return;
+      Object.keys(saved.values).forEach(function (k) {
+        if (k in window._shaderState.values) {
+          window._shaderState.values[k] = saved.values[k];
+        }
+      });
+      window._shaderState.textDirty = true;
+      if (saved.creatorName) {
+        document.querySelectorAll('.product-title').forEach(function (titleEl) {
+          var remixEl = document.createElement('p');
+          remixEl.className = 'product-remixed-by';
+          remixEl.textContent = 'Remixed by ' + saved.creatorName;
+          titleEl.parentNode.insertBefore(remixEl, titleEl.nextSibling);
+        });
+      }
+    } catch (e) {
+      localStorage.removeItem('brightfield_restore');
+    }
+  }());
+
+  // Shared tooltip for control tips
+  var tipEl = document.createElement('div');
+  tipEl.className    = 'shader-tip__popup';
+  tipEl.style.display = 'none';
+  document.body.appendChild(tipEl);
+  var activeTipBtn = null;
+
+  function showTip(btn, text) {
+    var rect = btn.getBoundingClientRect();
+    tipEl.textContent  = text;
+    tipEl.style.display = 'block';
+    tipEl.style.top    = (rect.bottom + 6) + 'px';
+    tipEl.style.left   = rect.left + 'px';
+    if (activeTipBtn) activeTipBtn.classList.remove('is-open');
+    activeTipBtn = btn;
+    btn.classList.add('is-open');
+  }
+  function hideTip() {
+    tipEl.style.display = 'none';
+    if (activeTipBtn) { activeTipBtn.classList.remove('is-open'); activeTipBtn = null; }
+  }
+  document.addEventListener('click', function (e) {
+    if (activeTipBtn && !activeTipBtn.contains(e.target)) hideTip();
+  });
+
+  // Build controls
+  var paletteDependentRows    = [];
+  var stopDependentRows       = [];
+  var grainDependentRows      = [[], [], [], [], []];
+  var oklchDependentRows      = [];
+  var quadDependentRows       = [];
+  var textColorDependentRows  = [];
+  var outlineDependentRows    = [];
+  var wordDependentRows           = [];
+  var perLetterSizeDependentRows  = [];
+  var colorModeBtn     = null;
+  var colorModeSel     = null;
+  var grainModeSel     = null;
+  var useTextColorBtn  = null;
+  var outlineToggleBtn        = null;
+  var wordToggleBtn           = null;
+  var perLetterSizeToggleBtn  = null;
+  var controlEls = []; // [{ctrl, el}] for randomisation
+
+  controls.forEach(function (ctrl) {
+    if (ctrl.type === 'header') {
+      var h = document.createElement('div');
+      h.className   = 'shader-control__section-header';
+      h.textContent = ctrl.label;
+      body.appendChild(h);
+      return;
+    }
+
+    var row = document.createElement('div');
+    row.className = 'shader-control';
+
+    var label = document.createElement('label');
+    label.className   = 'shader-control__label';
+    label.textContent = ctrl.label;
+    if (ctrl.tip) {
+      var tipBtn       = document.createElement('button');
+      tipBtn.type      = 'button';
+      tipBtn.className = 'shader-tip-btn';
+      tipBtn.textContent = '?';
+      tipBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        activeTipBtn === this ? hideTip() : showTip(this, ctrl.tip);
+      });
+      label.appendChild(tipBtn);
+    }
+    row.appendChild(label);
+
+    if (ctrl.type === 'range') {
+      var wrap = document.createElement('div');
+      wrap.className = 'shader-control__range-wrap';
+
+      var input = document.createElement('input');
+      input.type      = 'range';
+      input.className = 'shader-control__range';
+      input.min   = ctrl.min;
+      input.max   = ctrl.max;
+      input.step  = ctrl.step;
+      input.value           = ctrl.value;
+      input.dataset.paramKey = ctrl.key;
+
+      var display = document.createElement('span');
+      display.className   = 'shader-control__value';
+      display.textContent = ctrl.value;
+
+      input.addEventListener('input', function () {
+        var v = parseFloat(this.value);
+        display.textContent = v;
+        window._shaderState.values[ctrl.key] = ctrl.toRadians ? v * Math.PI / 180 : v;
+        if (ctrl.textDirty) window._shaderState.textDirty = true;
+      });
+
+      wrap.appendChild(input);
+      wrap.appendChild(display);
+      row.appendChild(wrap);
+      controlEls.push({ ctrl: ctrl, el: input });
+
+    } else if (ctrl.type === 'toggle') {
+      var isOn = ctrl.value === 1;
+      var btn  = document.createElement('button');
+      btn.className   = 'shader-control__toggle' + (isOn ? ' is-on' : '');
+      btn.textContent = isOn ? 'On' : 'Off';
+      btn.dataset.on  = isOn ? '1' : '0';
+
+      btn.addEventListener('click', function () {
+        var wasOn = this.dataset.on === '1';
+        this.dataset.on  = wasOn ? '0' : '1';
+        this.textContent = wasOn ? 'Off' : 'On';
+        this.classList.toggle('is-on', !wasOn);
+        window._shaderState.values[ctrl.key] = wasOn ? 0 : 1;
+        if (ctrl.textDirty) window._shaderState.textDirty = true;
+      });
+
+      if (ctrl.key === 'u_color_mode')    colorModeBtn     = btn;
+      if (ctrl.key === 'u_use_text_color') useTextColorBtn  = btn;
+      if (ctrl.key === 'outlineEnabled')   outlineToggleBtn = btn;
+      if (ctrl.key === 'u_text_enabled')         wordToggleBtn           = btn;
+      if (ctrl.key === 'perLetterSizeEnabled')  perLetterSizeToggleBtn  = btn;
+
+      row.appendChild(btn);
+      controlEls.push({ ctrl: ctrl, el: btn });
+
+    } else if (ctrl.type === 'color') {
+      var picker = document.createElement('input');
+      picker.type             = 'text';
+      picker.className        = 'shader-control__color';
+      picker.value            = ctrl.value;
+      picker.dataset.coloris  = '';
+      picker.dataset.paramKey = ctrl.key;
+
+      picker.addEventListener('input', function () {
+        if (this.value.length < 7) return;
+        window._shaderState.values[ctrl.key] = hexToRgb(this.value);
+        if (ctrl.textDirty) window._shaderState.textDirty = true;
+      });
+
+      row.appendChild(picker);
+      controlEls.push({ ctrl: ctrl, el: picker });
+
+    } else if (ctrl.type === 'text') {
+      var textInput       = document.createElement('input');
+      textInput.type      = 'text';
+      textInput.className = 'shader-control__text-input';
+      textInput.dataset.paramKey = ctrl.key;
+      textInput.value     = ctrl.value;
+      textInput.placeholder = 'e.g. GLOW';
+
+      textInput.addEventListener('input', function () {
+        window._shaderState.values[ctrl.key] = this.value;
+        window._shaderState.textDirty = true;
+      });
+
+      row.appendChild(textInput);
+      controlEls.push({ ctrl: ctrl, el: textInput });
+
+    } else if (ctrl.type === 'select') {
+      var sel = document.createElement('select');
+      sel.className = 'shader-control__select';
+      sel.dataset.paramKey = ctrl.key;
+
+      ctrl.options.forEach(function (opt) {
+        var option = document.createElement('option');
+        option.value       = opt.value;
+        option.textContent = opt.label;
+        if (opt.value === ctrl.value) option.selected = true;
+        sel.appendChild(option);
+      });
+
+      sel.addEventListener('change', function () {
+        window._shaderState.values[ctrl.key] = this.value;
+        if (ctrl.textDirty) window._shaderState.textDirty = true;
+      });
+
+      if (ctrl.key === 'u_color_mode') colorModeSel = sel;
+      if (ctrl.key === 'u_grain_mode') grainModeSel = sel;
+
+      row.appendChild(sel);
+      controlEls.push({ ctrl: ctrl, el: sel });
+    }
+
+    if (ctrl.paletteDependent)   paletteDependentRows.push(row);
+    if (ctrl.stopDependent)      stopDependentRows.push(row);
+    if (ctrl.grainDependent != null) { grainDependentRows[ctrl.grainDependent].push(row); row.classList.add('shader-control--indented'); }
+    if (ctrl.oklchDependent)     oklchDependentRows.push(row);
+    if (ctrl.quadDependent)      quadDependentRows.push(row);
+    if (ctrl.textColorDependent) textColorDependentRows.push(row);
+    if (ctrl.outlineDependent)   outlineDependentRows.push(row);
+    if (ctrl.wordDependent)           wordDependentRows.push(row);
+    if (ctrl.perLetterSizeDependent)  perLetterSizeDependentRows.push(row);
+
+    body.appendChild(row);
+  });
+
+  // Show/hide palette-dependent rows based on Use Palette toggle
+  function applyPaletteVisibility() {
+    var mode;
+    if (colorModeSel) {
+      mode = colorModeSel.value;
+    } else {
+      mode = (colorModeBtn && colorModeBtn.dataset.on === '1') ? '1' : '0';
+    }
+    paletteDependentRows.forEach(function (r) {
+      r.style.display = mode === '0' ? '' : 'none';
+    });
+    stopDependentRows.forEach(function (r) {
+      r.style.display = mode === '1' ? '' : 'none';
+    });
+    oklchDependentRows.forEach(function (r) {
+      r.style.display = mode === '2' ? '' : 'none';
+    });
+    quadDependentRows.forEach(function (r) {
+      r.style.display = mode === '2' ? '' : 'none';
+    });
+  }
+  if (colorModeBtn) colorModeBtn.addEventListener('click', applyPaletteVisibility);
+  if (colorModeSel) colorModeSel.addEventListener('change', applyPaletteVisibility);
+  applyPaletteVisibility();
+
+  var grainModeDefaults = [[], [], [], [], []];
+  controlEls.forEach(function (item) {
+    if (item.ctrl.grainDependent != null) grainModeDefaults[item.ctrl.grainDependent].push(item);
+  });
+
+  function applyGrainVisibility() {
+    var mode = grainModeSel ? Math.round(parseFloat(grainModeSel.value)) : 0;
+    grainDependentRows.forEach(function (rows, i) {
+      rows.forEach(function (r) { r.style.display = i === mode ? '' : 'none'; });
+    });
+  }
+  if (grainModeSel) grainModeSel.addEventListener('change', function () {
+    applyGrainVisibility();
+    var mode = Math.round(parseFloat(this.value));
+    grainModeDefaults[mode].forEach(function (item) {
+      item.el.value = item.ctrl.value;
+      item.el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
+  applyGrainVisibility();
+
+  // Show/hide text-color row based on Custom Text Color toggle
+  function applyTextColorVisibility() {
+    var on = useTextColorBtn && useTextColorBtn.dataset.on === '1';
+    textColorDependentRows.forEach(function (r) { r.style.display = on ? '' : 'none'; });
+  }
+  if (useTextColorBtn) useTextColorBtn.addEventListener('click', applyTextColorVisibility);
+  applyTextColorVisibility();
+
+  // Show/hide outline rows based on Outline toggle
+  function applyOutlineVisibility() {
+    var on = outlineToggleBtn && outlineToggleBtn.dataset.on === '1';
+    outlineDependentRows.forEach(function (r) { r.style.display = on ? '' : 'none'; });
+  }
+  if (outlineToggleBtn) outlineToggleBtn.addEventListener('click', applyOutlineVisibility);
+  applyOutlineVisibility();
+
+  // Show/hide word overlay rows based on Word Enabled toggle
+  function applyWordVisibility() {
+    var on = wordToggleBtn && wordToggleBtn.dataset.on === '1';
+    wordDependentRows.forEach(function (r) { r.style.display = on ? '' : 'none'; });
+  }
+  if (wordToggleBtn) wordToggleBtn.addEventListener('click', applyWordVisibility);
+  applyWordVisibility();
+  function applyPerLetterSizeVisibility() {
+    var on = perLetterSizeToggleBtn && perLetterSizeToggleBtn.dataset.on === '1';
+    perLetterSizeDependentRows.forEach(function (r) { r.style.display = on ? '' : 'none'; });
+  }
+  if (perLetterSizeToggleBtn) perLetterSizeToggleBtn.addEventListener('click', applyPerLetterSizeVisibility);
+  applyPerLetterSizeVisibility();
+  if (typeof customAfterBuild === 'function') customAfterBuild();
+
+  // Auto-restore community design values — runs on load (if #shader) or when shader tab first opens
+  (function () {
+    var submissionId = cfg.submissionId;
+    if (!submissionId) return;
+
+    var restored = false;
+
+    function tryRestore() {
+      if (restored) return;
+      if (localStorage.getItem('brightfield_restore')) return;
+      restored = true;
+
+      var ctrlByKey = {};
+      controls.forEach(function (c) { if (c.key) ctrlByKey[c.key] = c; });
+
+      fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/community/design/' + encodeURIComponent(submissionId))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data || !data.values || !window._shaderState) {
+            if (window._shaderState) window._shaderState.holdReveal = false;
+            return;
+          }
+          var colorPairs = [];
+          Object.keys(data.values).forEach(function (k) {
+            if (!(k in window._shaderState.values)) return;
+            var val = data.values[k];
+            if (Array.isArray(val)) {
+              colorPairs.push([k, val]);
+              return;
+            }
+            window._shaderState.values[k] = val;
+            var inp = document.querySelector('[data-param-key="' + k + '"]');
+            if (!inp) return;
+            var ctrl = ctrlByKey[k];
+            if (inp.type === 'range') {
+              if (ctrl && ctrl.toRadians) return; // stored in radians; skip slider UI to avoid display mismatch
+              inp.value = val;
+              var disp = inp.parentNode && inp.parentNode.querySelector('.shader-control__value');
+              if (disp) disp.textContent = parseFloat(val).toFixed(
+                (inp.step || '1').indexOf('.') !== -1 ? (inp.step || '1').split('.')[1].length : 0
+              );
+            } else if (inp.classList.contains('shader-control__toggle')) {
+              inp.dataset.on = val === 1 ? '1' : '0';
+              inp.textContent = val === 1 ? 'On' : 'Off';
+            } else if (inp.tagName === 'SELECT') {
+              inp.value = val;
+              inp.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          });
+          if (colorPairs.length) applyColors(colorPairs);
+          window._shaderState.snapValues = true;
+          window._shaderState.holdReveal = false;
+          window._shaderState.textDirty = true;
+        })
+        .catch(function () { if (window._shaderState) window._shaderState.holdReveal = false; });
+    }
+
+    var h = window.location.hash;
+    if (h === '#shader' || h.indexOf('#s=') === 0 || h.indexOf('#share=') === 0) {
+      tryRestore();
+    }
+    window.addEventListener('product-shader-mode', function () { tryRestore(); });
+  }());
+
+  // Animation settings (exposed for browser debugging)
+  window._animationSettings = {
+    tweenDuration: 900,
+    tweenDelay: 0,
+    flyTranslateDuration: 900,
+    flyTranslateEasing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+    flyScaleDuration: 700,
+    flyScaleEasing: 'ease-in',
+    glowDuration: 800,
+    glowDelay: 0,
+    glowEasing: 'ease-out',
+    glowPeakOpacity: 0.5,
+    glowBlur: 40,
+    glowSpread: 10
+  };
+
+  // Load product-specific recent designs filmstrip
+  document.addEventListener('DOMContentLoaded', function () {
+    var rdContainer = document.getElementById('product-recent-designs-container');
+    var rdSection   = document.getElementById('product-recent-designs');
+    if (!rdContainer || !window.RecentDesigns) return;
+
+    var toastEl = document.createElement('div');
+    toastEl.className = 'anim-settings-toast';
+    toastEl.textContent = 'Design applied';
+    document.body.appendChild(toastEl);
+    var toastTimer;
+    function showToast() {
+      clearTimeout(toastTimer);
+      toastEl.classList.remove('anim-settings-toast--visible');
+      void toastEl.offsetWidth;
+      toastEl.classList.add('anim-settings-toast--visible');
+      toastTimer = setTimeout(function () {
+        toastEl.classList.remove('anim-settings-toast--visible');
+      }, 2000);
+    }
+    var currentDesigns = [];
+    function onCardClick(design, cardElement) {
+        var startValues = JSON.parse(JSON.stringify(window._shaderState.values));
+        var endValues = design.values;
+        var duration = window._animationSettings.tweenDuration;
+        var startTime;
+
+        function updateControlsUI(key, val) {
+          // Update the range/color/toggle inputs in the DOM
+          var input = document.querySelector('[data-param-key="' + key + '"]');
+          if (!input) return;
+
+          if (input.type === 'range') {
+            input.value = val;
+            var display = input.parentNode.querySelector('.shader-control__value');
+            if (display) display.textContent = val.toFixed((input.step || '1').includes('.') ? (input.step || '1').split('.')[1].length : 0);
+          } else if (input.tagName === 'SELECT') {
+            input.value = val;
+          } else if (input.classList.contains('shader-control__toggle')) {
+            var isOn = val === 1;
+            input.dataset.on = isOn ? '1' : '0';
+            input.textContent = isOn ? 'On' : 'Off';
+            input.classList.toggle('is-on', isOn);
+          } else if (input.classList.contains('shader-control__color')) {
+            // val is [r,g,b]
+            var hex = '#' + val.map(function(c) {
+              var s = Math.round(c * 255).toString(16);
+              return s.length === 1 ? '0' + s : s;
+            }).join('');
+            input.value = hex;
+          } else if (input.classList.contains('shader-control__text-input')) {
+            input.value = val;
+            window._shaderState.values[key] = val;
+            window._shaderState.textDirty = true;
+          }
+        }
+
+        function startValuesAnimation() {
+          var startTime = performance.now();
+          function animate(now) {
+            var elapsed = now - startTime;
+            var progress = Math.min(elapsed / duration, 1);
+            // Ease out cubic
+            var e = 1 - Math.pow(1 - progress, 3);
+
+            Object.keys(endValues).forEach(function (k) {
+              if (!(k in startValues)) return;
+              var start = startValues[k];
+              var end = endValues[k];
+
+              if (Array.isArray(start) && Array.isArray(end)) {
+                // Color [r,g,b]
+                window._shaderState.values[k] = [
+                  start[0] + (end[0] - start[0]) * e,
+                  start[1] + (end[1] - start[1]) * e,
+                  start[2] + (end[2] - start[2]) * e
+                ];
+              } else if (typeof start === 'number' && typeof end === 'number') {
+                window._shaderState.values[k] = start + (end - start) * e;
+              } else {
+                // String or boolean-ish
+                if (progress === 1) window._shaderState.values[k] = end;
+              }
+
+              // Update UI at the end or occasionally
+              if (progress === 1 || Math.random() > 0.8) {
+                var displayVal = window._shaderState.values[k];
+                // Convert back from radians if necessary for the UI input
+                var ctrl = controls.find(function(c) { return c.key === k; });
+                if (ctrl && ctrl.toRadians && typeof displayVal === 'number') {
+                  displayVal = displayVal * 180 / Math.PI;
+                }
+                updateControlsUI(k, displayVal);
+              }
+            });
+
+            window._shaderState.textDirty = true;
+
+            if (progress < 1) {
+              requestAnimationFrame(animate);
+            } else {
+              if (typeof applyPaletteVisibility === 'function') applyPaletteVisibility();
+              showToast();
+            }
+          }
+          requestAnimationFrame(animate);
+        }
+
+        var shaderTab = document.querySelector('[data-tab="shader"]');
+        if (shaderTab && !shaderTab.classList.contains('is-active')) shaderTab.click();
+
+        // Animate clicked image into the settings panel
+        var img = cardElement ? cardElement.querySelector('img') : null;
+        var target = document.getElementById('shader-canvas');
+        var targetContainer = document.querySelector('.media-panel[data-panel="shader"]');
+
+        function scheduleTween() {
+          if (fa.tweenDelay <= 0) { startValuesAnimation(); }
+          else { setTimeout(startValuesAnimation, fa.tweenDelay); }
+        }
+
+        if (!img || !target || !targetContainer) {
+          scheduleTween();
+          return;
+        }
+
+        var imgRect = img.getBoundingClientRect();
+        var targetRect = target.getBoundingClientRect();
+
+        var clone = img.cloneNode(true);
+        clone.style.position = 'fixed';
+        clone.style.left = imgRect.left + 'px';
+        clone.style.top = imgRect.top + 'px';
+        clone.style.width = imgRect.width + 'px';
+        clone.style.height = imgRect.height + 'px';
+        clone.style.zIndex = '9999';
+        var fa = window._animationSettings;
+        var tSec = (fa.flyTranslateDuration / 1000) + 's';
+        var sSec = (fa.flyScaleDuration     / 1000) + 's';
+        clone.style.transition = [
+          'left '      + tSec + ' ' + fa.flyTranslateEasing,
+          'top '       + tSec + ' ' + fa.flyTranslateEasing,
+          'transform ' + sSec + ' ' + fa.flyScaleEasing,
+          'opacity '   + sSec + ' ' + fa.flyScaleEasing
+        ].join(', ');
+        clone.style.borderRadius = '4px';
+        clone.style.pointerEvents = 'none';
+
+        document.body.appendChild(clone);
+
+        // Force reflow
+        clone.getBoundingClientRect();
+
+        var targetCenterX = targetRect.left + targetRect.width / 2;
+        var targetCenterY = targetRect.top + targetRect.height / 2;
+
+        clone.style.left = (targetCenterX - imgRect.width / 2) + 'px';
+        clone.style.top = (targetCenterY - imgRect.height / 2) + 'px';
+        clone.style.transform = 'scale(0.1)';
+        clone.style.opacity = '0';
+
+        // Fly cleanup + glow: fires when the longer of the two fly animations ends
+        setTimeout(function() {
+          if (document.body.contains(clone)) document.body.removeChild(clone);
+          var gs = window._animationSettings;
+          var root = document.documentElement;
+          root.style.setProperty('--glow-duration',     (gs.glowDuration    / 1000) + 's');
+          root.style.setProperty('--glow-delay',        (gs.glowDelay       / 1000) + 's');
+          root.style.setProperty('--glow-easing',        gs.glowEasing);
+          root.style.setProperty('--glow-peak-opacity',  gs.glowPeakOpacity);
+          root.style.setProperty('--glow-blur',          gs.glowBlur   + 'px');
+          root.style.setProperty('--glow-spread',        gs.glowSpread + 'px');
+          targetContainer.classList.add('shader-gui-glow');
+          setTimeout(function() {
+            targetContainer.classList.remove('shader-gui-glow');
+          }, gs.glowDuration + gs.glowDelay);
+        }, Math.max(fa.flyTranslateDuration, fa.flyScaleDuration));
+
+        // Tween start: fires independently at tweenDelay ms after fly begins
+        scheduleTween();
+    }
+
+    function renderStrip(designs) {
+      currentDesigns = designs || [];
+      if (!currentDesigns.length) return;
+      rdSection.style.display = '';
+      RecentDesigns.renderFilmstrip(rdContainer, currentDesigns, onCardClick);
+    }
+
+    RecentDesigns.fetchDesigns(cfg.shaderFile).then(renderStrip);
+
+    document.addEventListener('brightfield:design-saved', function (e) {
+      renderStrip([e.detail].concat(currentDesigns));
+    });
+
+    // ── Product community designs strip ──────────────────────
+    var communityContainer = document.getElementById('product-community-designs-container');
+    var communitySection   = document.getElementById('product-community-designs');
+    if (communityContainer && window.CommunityDesigns) {
+      CommunityDesigns.fetchCommunityDesigns(cfg.shaderFile, cfg.productHandle).then(function (designs) {
+        if (!designs || !designs.length) return;
+        communitySection.style.display = '';
+        CommunityDesigns.renderGrid(communityContainer, designs, {
+          getDeviceId: RecentDesigns.getDeviceId
+        });
+      });
+    }
+  });
+
+  // Randomize button
+  function randomizeAll() {
+    controlEls.forEach(function (item) {
+      var ctrl = item.ctrl;
+      var el   = item.el;
+      if (ctrl.noRandomize) return;
+
+      if (ctrl.type === 'range') {
+        var lo  = ctrl.randomMin != null ? ctrl.randomMin : ctrl.min;
+        var hi  = ctrl.randomMax != null ? ctrl.randomMax : ctrl.max;
+        var raw;
+        if (ctrl.gaussian) {
+          var mean   = (lo + hi) / 2;
+          var stddev = (hi - lo) / 6;
+          var u = 1 - Math.random();
+          var v = Math.random();
+          raw = mean + stddev * Math.sqrt(-2 * Math.log(u)) * Math.cos(6.28318 * v);
+        } else {
+          var steps = Math.round((hi - lo) / ctrl.step);
+          raw = lo + Math.floor(Math.random() * (steps + 1)) * ctrl.step;
+        }
+        var val = Math.round((raw - ctrl.min) / ctrl.step) * ctrl.step + ctrl.min;
+        val = parseFloat(Math.max(ctrl.min, Math.min(ctrl.max, val)).toFixed(10));
+        el.value = val;
+        var display = el.parentNode.querySelector('.shader-control__value');
+        if (display) display.textContent = val;
+        window._shaderState.values[ctrl.key] = ctrl.toRadians ? val * Math.PI / 180 : val;
+
+      } else if (ctrl.type === 'toggle') {
+        var isOn = Math.random() < 0.5;
+        el.dataset.on  = isOn ? '1' : '0';
+        el.textContent = isOn ? 'On' : 'Off';
+        el.classList.toggle('is-on', isOn);
+        window._shaderState.values[ctrl.key] = isOn ? 1 : 0;
+
+      } else if (ctrl.type === 'color') {
+        var hex = '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0');
+        el.value = hex;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+
+      } else if (ctrl.type === 'select' && ctrl.key !== '_palette_preset') {
+        var opts   = ctrl.options;
+        var chosen = opts[Math.floor(Math.random() * opts.length)];
+        el.value = chosen.value;
+        window._shaderState.values[ctrl.key] = chosen.value;
+        if (ctrl.textDirty) window._shaderState.textDirty = true;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+
+      } else if (ctrl.type === 'text' && ctrl.randomOptions) {
+        var picked = ctrl.randomOptions[Math.floor(Math.random() * ctrl.randomOptions.length)];
+        el.value = picked;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+    applyPaletteVisibility();
+    window._shaderState.textDirty = true;
+  }
+
+  var randomizeBtn       = document.createElement('button');
+  randomizeBtn.type      = 'button';
+  randomizeBtn.className = 'shader-control__randomize-btn';
+  randomizeBtn.textContent = 'Randomize';
+  randomizeBtn.addEventListener('click', randomizeAll);
+  body.insertBefore(randomizeBtn, body.firstChild);
+
+  // Encode/decode _shaderState.values to/from base64 for URL sharing.
+  // Colors are stored as [r,g,b] float arrays; convert to hex for compactness.
+  function encodeState(values) {
+    var out = {};
+    Object.keys(values).forEach(function (k) {
+      var v = values[k];
+      out[k] = Array.isArray(v) ? toHex(v) : v;
+    });
+    return btoa(JSON.stringify(out)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function decodeState(b64) {
+    var padded = b64.replace(/-/g, '+').replace(/_/g, '/');
+    while (padded.length % 4) padded += '=';
+    var obj = JSON.parse(atob(padded));
+    var result = {};
+    controlEls.forEach(function (item) {
+      var k = item.ctrl.key;
+      if (!(k in obj)) return;
+      result[k] = (item.ctrl.type === 'color') ? hexToRgb(obj[k]) : obj[k];
+    });
+    return result;
+  }
+
+  // Apply a pre-decoded state object to all controls
+  function applyRestoredState(restored) {
+    controlEls.forEach(function (item) {
+      var ctrl = item.ctrl, el = item.el, k = ctrl.key;
+      if (!(k in restored)) return;
+      var v = restored[k];
+
+      if (ctrl.type === 'range') {
+        var displayVal = ctrl.toRadians ? parseFloat((v * 180 / Math.PI).toFixed(10)) : v;
+        el.value = displayVal;
+        var display = el.parentNode.querySelector('.shader-control__value');
+        if (display) display.textContent = displayVal;
+        window._shaderState.values[k] = v;
+
+      } else if (ctrl.type === 'toggle') {
+        var isOn = v === 1;
+        el.dataset.on  = isOn ? '1' : '0';
+        el.textContent = isOn ? 'On' : 'Off';
+        el.classList.toggle('is-on', isOn);
+        window._shaderState.values[k] = v;
+
+      } else if (ctrl.type === 'color') {
+        el.value = toHex(v);
+        window._shaderState.values[k] = v;
+
+      } else {
+        el.value = v;
+        window._shaderState.values[k] = v;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+
+    window._shaderState.textDirty = true;
+    applyPaletteVisibility();
+    applyTextColorVisibility();
+    applyOutlineVisibility();
+    applyWordVisibility();
+    applyPerLetterSizeVisibility();
+  }
+
+  // Restore state from URL hash — supports #share=<id> (worker) and legacy #s=<base64>
+  (function () {
+    var hash = window.location.hash;
+    var cleanUrl = window.location.pathname + window.location.search + '#shader';
+
+    // Legacy: inline base64
+    if (hash.indexOf('#s=') === 0) {
+      var encoded = new URLSearchParams(hash.slice(1)).get('s');
+      if (encoded) {
+        try { applyRestoredState(decodeState(encoded)); } catch (e) {}
+      }
+      history.replaceState(null, '', cleanUrl);
+      return;
+    }
+
+    // Short ID from worker
+    if (hash.indexOf('#share=') === 0) {
+      var shareId = hash.slice('#share='.length);
+      fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/get-shader-state/' + shareId)
+        .then(function (r) { return r.json(); })
+        .then(function (state) {
+          var restored = {};
+          controlEls.forEach(function (item) {
+            var k = item.ctrl.key;
+            if (!(k in state)) return;
+            restored[k] = (item.ctrl.type === 'color') ? hexToRgb(state[k]) : state[k];
+          });
+          applyRestoredState(restored);
+          history.replaceState(null, '', cleanUrl);
+        })
+        .catch(function () { history.replaceState(null, '', cleanUrl); });
+    }
+  }());
+
+  // Share button — captures canvas as JPEG, uploads image + state, copies share.brightfield.studio URL
+  var shareBtn = document.createElement('button');
+  shareBtn.type = 'button';
+  shareBtn.className = 'shader-control__share-btn';
+  shareBtn.textContent = '↑ Share';
+  shareBtn.addEventListener('click', function () {
+    var self = this;
+    var canvas = document.getElementById('shader-canvas');
+    if (!canvas) return;
+    var base64jpeg;
+    try { base64jpeg = canvas.toDataURL('image/jpeg', 0.9).split(',')[1]; }
+    catch (e) { alert('Could not capture canvas: ' + e.message); return; }
+    self.textContent = 'Generating\u2026';
+    self.disabled = true;
+
+    function showConfirm() {
+      self.textContent = 'Copied!';
+      self.disabled = false;
+      setTimeout(function () { self.textContent = '↑ Share'; }, 1800);
+    }
+    function onError() {
+      self.textContent = 'Failed';
+      self.disabled = false;
+      setTimeout(function () { self.textContent = '↑ Share'; }, 1800);
+    }
+
+    var urlPromise = fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/create-share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image:         base64jpeg,
+        shader:        cfg.shaderFile,
+        productHandle: cfg.productHandle,
+        values:        window._shaderState ? window._shaderState.values : {},
+      }),
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.url) throw new Error(data.error || 'No URL');
+      return data.url;
+    });
+
+    // Safari requires clipboard.write() to be called synchronously within the
+    // user gesture. Passing a Promise inside ClipboardItem satisfies that while
+    // still resolving the URL asynchronously.
+    if (navigator.clipboard && window.ClipboardItem) {
+      navigator.clipboard.write([
+        new ClipboardItem({
+          'text/plain': urlPromise.then(function (url) {
+            return new Blob([url], { type: 'text/plain' });
+          }),
+        }),
+      ])
+      .then(showConfirm)
+      .catch(onError);
+    } else {
+      // Fallback for browsers without ClipboardItem
+      urlPromise
+        .then(function (url) {
+          var ta = document.createElement('textarea');
+          ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); } catch (e) {}
+          document.body.removeChild(ta);
+          showConfirm();
+        })
+        .catch(onError);
+    }
+  });
+  var secondaryActions = document.querySelector('.shader-secondary-actions');
+  if (secondaryActions) {
+    secondaryActions.appendChild(shareBtn);
+  } else {
+    randomizeBtn.insertAdjacentElement('afterend', shareBtn);
+  }
+
+  // Desktop popout — draggable floating panel (desktop only)
+  var popoutBtn   = document.getElementById('shader-gui-popout');
+  var shaderGuiEl = document.getElementById('shader-gui');
+  var mobileBar   = document.querySelector('.shader-gui__mobile-bar');
+  var dragging = false, dragOX = 0, dragOY = 0;
+
+  if (popoutBtn) {
+    popoutBtn.addEventListener('click', function () {
+      if (window.innerWidth <= 900) return;
+      var isFloating = shaderGuiEl.classList.toggle('shader-gui--floating');
+      this.textContent = isFloating ? 'Dock' : 'Popout';
+      if (isFloating) {
+        shaderGuiEl.style.top    = '70px';
+        shaderGuiEl.style.right  = '8px';
+        shaderGuiEl.style.left   = 'auto';
+        shaderGuiEl.style.bottom = 'auto';
+      } else {
+        shaderGuiEl.style.cssText = '';
+      }
+    });
+  }
+
+  if (mobileBar) {
+    mobileBar.addEventListener('touchstart', function (e) {
+      if (window.innerWidth <= 900) return;
+      if (!shaderGuiEl.classList.contains('shader-gui--floating')) return;
+      var touch = e.touches[0];
+      var rect  = shaderGuiEl.getBoundingClientRect();
+      dragging = true;
+      dragOX   = touch.clientX - rect.left;
+      dragOY   = touch.clientY - rect.top;
+      e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('touchmove', function (e) {
+      if (!dragging) return;
+      var touch = e.touches[0];
+      shaderGuiEl.style.left   = (touch.clientX - dragOX) + 'px';
+      shaderGuiEl.style.top    = (touch.clientY - dragOY) + 'px';
+      shaderGuiEl.style.right  = 'auto';
+      shaderGuiEl.style.bottom = 'auto';
+      e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('touchend', function () { dragging = false; });
+  }
+
+  function hexToRgb(hex) {
+    return [
+      parseInt(hex.slice(1, 3), 16) / 255,
+      parseInt(hex.slice(3, 5), 16) / 255,
+      parseInt(hex.slice(5, 7), 16) / 255
+    ];
+  }
+
+  // Load Coloris — replaces native <input type="color"> picker (too large on iOS)
+  var clrLink  = document.createElement('link');
+  clrLink.rel  = 'stylesheet';
+  clrLink.href = 'https://cdn.jsdelivr.net/npm/@melloware/coloris@latest/dist/coloris.min.css';
+  document.head.appendChild(clrLink);
+
+  var clrScript    = document.createElement('script');
+  clrScript.src    = 'https://cdn.jsdelivr.net/npm/@melloware/coloris@latest/dist/coloris.min.js';
+  clrScript.onload = function () {
+    Coloris({
+      el:               '[data-coloris]',
+      theme:            'default',
+      themeMode:        'dark',
+      format:           'hex',
+      closeButton:      true,
+      closeButtonLabel: 'Done'
+    });
+  };
+  document.head.appendChild(clrScript);
+}());
+
+// ── Mobile sticky-canvas fade for Customize controls ─────────────────────────
+(function () {
+  var guiBody = document.getElementById('shader-gui-body');
+  if (!guiBody) return;
+
+  var FADE_ZONE = 60;
+
+  function resetRows() {
+    var rows = guiBody.children;
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].style.opacity       = '';
+      rows[i].style.pointerEvents = '';
+    }
+  }
+
+  function fadeRow(el, canvasBottom) {
+    // Reset hidden rows so they show correctly when revealed
+    if (el.style.display === 'none') {
+      el.style.opacity       = '';
+      el.style.pointerEvents = '';
+      return;
+    }
+    var rect    = el.getBoundingClientRect();
+    var rowMid  = (rect.top + rect.bottom) / 2;
+    var dist    = rowMid - canvasBottom;
+    var opacity = dist <= 0 ? 0 : dist < FADE_ZONE ? dist / FADE_ZONE : 1;
+    el.style.opacity       = opacity;
+    el.style.pointerEvents = opacity < 0.15 ? 'none' : '';
+  }
+
+  function applyFade() {
+    if (window.innerWidth > 900) { resetRows(); return; }
+    var productLayout = document.querySelector('.product-layout');
+    if (!productLayout || !productLayout.classList.contains('shader-mode')) { resetRows(); return; }
+    var mediaEl = document.querySelector('.product-media');
+    if (!mediaEl) return;
+    var canvasBottom = mediaEl.getBoundingClientRect().bottom;
+    var rows = guiBody.children;
+    for (var i = 0; i < rows.length; i++) {
+      fadeRow(rows[i], canvasBottom);
+    }
+  }
+
+  // Re-check after scroll settles to catch iOS momentum scroll finishing
+  var settleTimer;
+  function onScroll() {
+    applyFade();
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(applyFade, 150);
+  }
+
+  // iOS momentum scroll can coast for ~1.5 s after touchend without firing
+  // reliable scroll events. Poll via rAF so fade clears as the page settles.
+  var pollRaf = null;
+  document.addEventListener('touchend', function () {
+    if (pollRaf) cancelAnimationFrame(pollRaf);
+    var deadline = Date.now() + 1500;
+    function poll() {
+      applyFade();
+      if (Date.now() < deadline) pollRaf = requestAnimationFrame(poll);
+    }
+    pollRaf = requestAnimationFrame(poll);
+  }, { passive: true });
+
+  document.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', applyFade);
+  // Wait for DOM reflow before evaluating positions after tab switch
+  window.addEventListener('product-shader-mode', function () {
+    requestAnimationFrame(applyFade);
+  });
+}());
+
+// ── Fade media-tabs when sticky canvas is stuck ───────────────────────────────
+// The canvas sticks at top:10px once the user scrolls past the product title.
+// Detect this by watching whether the title's bottom edge has cleared that threshold.
+(function () {
+  var mediaTabs     = document.querySelector('.media-tabs');
+  var titleMobile   = document.querySelector('.product-title-mobile');
+  var productLayout = document.querySelector('.product-layout');
+  if (!mediaTabs || !productLayout) return;
+
+  var STICKY_TOP = 10; // matches top:10px in CSS
+
+  function applyTabsFade() {
+    if (window.innerWidth > 900 || !productLayout.classList.contains('shader-mode')) {
+      mediaTabs.style.opacity       = '';
+      mediaTabs.style.pointerEvents = '';
+      return;
+    }
+    // Stuck = the title has scrolled above the sticky threshold
+    var stuck = titleMobile
+      ? titleMobile.getBoundingClientRect().bottom < STICKY_TOP
+      : false;
+    mediaTabs.style.opacity       = stuck ? '0.25' : '1';
+    mediaTabs.style.pointerEvents = stuck ? 'none'  : '';
+  }
+
+  document.addEventListener('scroll', applyTabsFade, { passive: true });
+  window.addEventListener('resize', applyTabsFade);
+  window.addEventListener('product-shader-mode', applyTabsFade);
+}());
+
+// ── Preview on Shirt ──────────────────────────────────────────────────────────
+(function () {
+  var btn           = document.getElementById('shader-preview-btn');
+  var modal         = document.getElementById('mockup-modal');
+  var modalImg      = document.getElementById('mockup-modal-img');
+  var modalOrder    = document.getElementById('mockup-modal-order');
+  var orderStatus   = document.getElementById('mockup-order-status');
+  var closeBtn      = document.getElementById('mockup-modal-close');
+  if (!btn || !modal) return;
+  var backdrop      = modal.querySelector('.mockup-modal__backdrop');
+
+  var workerUrl    = btn.dataset.workerUrl;
+  var printArea    = (btn.dataset.printArea || '0.20,0.15,0.60,0.68').split(',').map(Number);
+  var _pendingDesign = null;
+
+  // Preload shirt template so compositing is instant on click
+  var shirtImg = new Image();
+  shirtImg.crossOrigin = 'anonymous';
+  shirtImg.src = btn.dataset.shirtTemplate || '';
+
+  btn.addEventListener('click', function () {
+    if (!window._shaderExport) {
+      alert('Switch to the Shader tab first.');
+      return;
+    }
+
+    modalImg.src    = '';   // clear stale image before compositing starts
+    btn.disabled    = true;
+    btn.textContent = 'Compositing…';
+
+    window._shaderExport(1800, 2400, function (base64png) {
+      var canvas = document.createElement('canvas');
+      var ctx    = canvas.getContext('2d');
+
+      var designImg = new Image();
+      designImg.onerror = function () {
+        btn.disabled    = false;
+        btn.textContent = 'Preview on Shirt';
+      };
+      designImg.onload = function () {
+        var srcW = designImg.naturalWidth;
+        var srcH = designImg.naturalHeight;
+        var designAspect = srcW / srcH;
+        var areaAspect   = printArea[2] / printArea[3];
+        function doComposite() {
+          var shirtNW = shirtImg.naturalWidth  || 669;
+          var shirtNH = shirtImg.naturalHeight || 669;
+
+          // Size the canvas so the design renders at its native resolution,
+          // then scale the shirt template up to fill.
+          var tW, tH;
+          if (designAspect > areaAspect) {
+            tW = Math.round(srcW / printArea[2]);
+            tH = Math.round(tW * shirtNH / shirtNW);
+          } else {
+            tH = Math.round(srcH / printArea[3]);
+            tW = Math.round(tH * shirtNW / shirtNH);
+          }
+
+          canvas.width  = tW;
+          canvas.height = tH;
+
+          if (shirtImg.complete && shirtImg.naturalWidth) {
+            ctx.drawImage(shirtImg, 0, 0, tW, tH);
+          }
+
+          var px = Math.round(printArea[0] * tW);
+          var py = Math.round(printArea[1] * tH);
+          var pw = Math.round(printArea[2] * tW);
+          var ph = Math.round(printArea[3] * tH);
+
+          // Contain the design within the print area preserving the export aspect ratio
+          // (1800×2400 = 0.75); without this, drawImage would stretch to fill pw×ph.
+          var drawW, drawH, drawX, drawY;
+          if (designAspect > areaAspect) {
+            // design wider relative to area → constrain by width
+            drawW = pw;
+            drawH = pw / designAspect;
+            drawX = px;
+            drawY = py + Math.round((ph - drawH) / 2);
+          } else {
+            // design taller relative to area → constrain by height
+            drawH = ph;
+            drawW = ph * designAspect;
+            drawX = px + Math.round((pw - drawW) / 2);
+            drawY = py;
+          }
+          ctx.drawImage(designImg, drawX, drawY, drawW, drawH);
+
+          var compositeDataUrl = canvas.toDataURL('image/png');
+          var snapshotValues = JSON.parse(JSON.stringify(window._shaderState ? window._shaderState.values : {}));
+
+          // Create checkout image at display resolution (600×600) — full print res is
+          // wasteful for a checkout thumbnail and allocates ~17 MB of bitmap memory.
+          var checkoutCanvas = document.createElement('canvas');
+          checkoutCanvas.width  = 600;
+          checkoutCanvas.height = 600;
+          var checkoutCtx = checkoutCanvas.getContext('2d');
+          checkoutCtx.fillStyle = '#000';
+          checkoutCtx.fillRect(0, 0, 600, 600);
+          var coAspect = designImg.naturalWidth / designImg.naturalHeight;
+          var coW, coH, coX, coY;
+          if (coAspect > 1) {
+            coW = 600; coH = Math.round(600 / coAspect); coX = 0; coY = Math.round((600 - coH) / 2);
+          } else {
+            coH = 600; coW = Math.round(600 * coAspect); coX = Math.round((600 - coW) / 2); coY = 0;
+          }
+          checkoutCtx.drawImage(designImg, coX, coY, coW, coH);
+          var base64CheckoutPng = checkoutCanvas.toDataURL('image/png').split(',')[1];
+
+          // Show modal immediately — no waiting for API
+          modalImg.src = compositeDataUrl;
+          modal.classList.remove('mockup-modal--hidden');
+          document.body.style.overflow = 'hidden';
+
+          var communityForm    = document.getElementById('community-form');
+          var communitySuccess = document.getElementById('community-success');
+          var communityError   = document.getElementById('community-error');
+          var communitySubmit  = document.getElementById('community-submit');
+          if (communityForm)    communityForm.style.display = 'none';
+          if (communitySuccess) communitySuccess.style.display = 'none';
+          if (communityError)   communityError.style.display = 'none';
+          if (communitySubmit)  { communitySubmit.disabled = false; communitySubmit.textContent = 'Submit'; }
+
+          // Immediately add to Recent Designs strip — id filled in after upload
+          var pendingDetail = {
+            mockupUrl:     compositeDataUrl,
+            shader:        cfg.shaderFile,
+            productHandle: cfg.productHandle,
+            values:        snapshotValues,
+            timestamp:     Math.floor(Date.now() / 1000),
+            id:            null
+          };
+          document.dispatchEvent(new CustomEvent('brightfield:design-saved', { detail: pendingDetail }));
+
+          // Upload design + composite to R2 in the background
+          var uploadPromise = fetch(workerUrl + '/save-preview', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+              designImage:   base64png,
+              checkoutImage: base64CheckoutPng,
+              mockupImage:   compositeDataUrl.split(',')[1],
+              deviceId:      window.RecentDesigns ? window.RecentDesigns.getDeviceId() : null,
+              shader:        cfg.shaderFile,
+              productHandle: cfg.productHandle,
+              values:        snapshotValues
+            })
+          })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (!data.design_url) throw new Error(data.error || 'Upload failed');
+            // Upgrade the strip card: swap data URL → stable R2 URL, enable delete
+            pendingDetail.id = data.id || null;
+            pendingDetail.mockupUrl = data.mockup_url;
+            var stripContainer = document.getElementById('product-recent-designs-container');
+            if (stripContainer) {
+              var firstImg = stripContainer.querySelector('.recent-designs__card-img');
+              if (firstImg && firstImg.src.startsWith('data:')) firstImg.src = data.mockup_url;
+            }
+            return data;
+          });
+
+          _pendingDesign = {
+            shader:        cfg.shaderFile,
+            productHandle: cfg.productHandle,
+            values:        snapshotValues,
+            uploadPromise: uploadPromise,
+          };
+
+          btn.disabled    = false;
+          btn.textContent = 'Preview on Shirt';
+        }
+
+        // Wait for the shirt template if it hasn't loaded yet (race condition on first click).
+        // On retry the image is cached and complete immediately.
+        if (shirtImg.complete && shirtImg.naturalWidth) {
+          doComposite();
+        } else {
+          shirtImg.onload  = doComposite;
+          shirtImg.onerror = doComposite; // degrade gracefully: compose without shirt
+        }
+      };
+      designImg.src = 'data:image/png;base64,' + base64png;
+    });
+  });
+
+  modalOrder.addEventListener('click', function () {
+    if (!_pendingDesign) {
+      alert('Generate a preview first.');
+      return;
+    }
+
+    // Read size from modal picker (multi-variant) or hidden form input (single-variant).
+    var sizeSelect = document.getElementById('mockup-size-select');
+    var variantEl  = document.querySelector('select[name="id"]') || document.querySelector('input[name="id"]');
+    var shopifyVariantId = sizeSelect ? sizeSelect.value : (variantEl ? variantEl.value : null);
+    if (!shopifyVariantId) {
+      alert('Could not determine variant. Please select a size and try again.');
+      return;
+    }
+
+    modalOrder.disabled = true;
+    modalOrder.textContent = 'Adding… ';
+    var sp = document.createElement('span');
+    sp.className = 'btn-spinner';
+    sp.setAttribute('aria-hidden', 'true');
+    modalOrder.appendChild(sp);
+    if (orderStatus) { orderStatus.textContent = 'Uploading your design…'; orderStatus.style.display = ''; }
+
+    console.log('[add-to-cart] starting — shopifyVariantId:', shopifyVariantId);
+
+    _pendingDesign.uploadPromise
+      .then(function (data) {
+        console.log('[add-to-cart] upload resolved:', { design_url: data.design_url, mockup_url: data.mockup_url, checkout_image_url: data.checkout_image_url });
+        if (orderStatus) orderStatus.textContent = 'Creating your product…';
+        var cpBody = {
+          designUrl:        data.design_url,
+          mockupUrl:        data.mockup_url,
+          checkoutImageUrl: data.checkout_image_url || data.design_url,
+          shader:           _pendingDesign.shader,
+          productHandle:    _pendingDesign.productHandle,
+          values:           _pendingDesign.values,
+          variantId:        shopifyVariantId
+        };
+        console.log('[create-product] POST', cpBody);
+        return fetch(workerUrl + '/create-product', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cpBody)
+        })
+        .then(function (cpRes) {
+          return cpRes.json().then(function (cpData) {
+            console.log('[create-product] response', cpRes.status, cpData);
+            var cartVariantId = (cpRes.ok && cpData.variantId) ? cpData.variantId : shopifyVariantId;
+            if (!cpRes.ok) console.error('[create-product] failed, falling back to original variant:', cpData);
+            console.log('[add-to-cart] using cartVariantId:', cartVariantId);
+            var cartProps = {
+              '_design_url':     data.design_url,
+              '_mockup_url':     data.mockup_url,
+              '_checkout_image': data.checkout_image_url || data.design_url,
+              'Customization': 'Custom Shader Design'
+            };
+            if (sizeSelect) {
+              var selectedSizeOpt = sizeSelect.options[sizeSelect.selectedIndex];
+              if (selectedSizeOpt) cartProps['Size'] = selectedSizeOpt.text;
+            }
+            var cartPayload = JSON.stringify({
+              id:       Number(cartVariantId),
+              quantity: 1,
+              properties: cartProps
+            });
+            // Shopify needs a moment to index a brand-new variant before /cart/add.js
+            // can find it. Retry up to 4 times with exponential backoff.
+            function addToCartWithRetry(attempt) {
+              console.log('[add-to-cart] attempt', attempt, 'variantId:', cartVariantId);
+              return fetch('/cart/add.js', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: cartPayload
+              }).then(function (r) {
+                if (!r.ok && attempt < 4) {
+                  return r.text().then(function (text) {
+                    var desc = '';
+                    try { desc = JSON.parse(text).description || ''; } catch (e) {}
+                    console.warn('[add-to-cart] attempt', attempt, 'failed — status:', r.status, 'desc:', desc);
+                    var d = desc.toLowerCase();
+                    if (d.indexOf('cannot find variant') !== -1 ||
+                        d.indexOf('cannot find') !== -1 ||
+                        d.indexOf('sold out') !== -1 ||
+                        d.indexOf('already sold out') !== -1) {
+                      var delay = 1500 * attempt;
+                      console.log('[add-to-cart] variant not ready yet, retrying in', delay, 'ms');
+                      return new Promise(function (resolve) {
+                        if (orderStatus) orderStatus.textContent = 'Finalizing your order…';
+                        setTimeout(function () { resolve(addToCartWithRetry(attempt + 1)); }, delay);
+                      });
+                    }
+                    // Different error — reconstruct a Response-like object to pass along
+                    return new Response(text, { status: r.status, headers: { 'Content-Type': 'application/json' } });
+                  });
+                }
+                console.log('[add-to-cart] attempt', attempt, 'result — status:', r.status);
+                return r;
+              });
+            }
+            if (orderStatus) orderStatus.textContent = 'Adding to cart…';
+            return addToCartWithRetry(1);
+          });
+        });
+      })
+      .then(function (r) {
+        if (!r.ok) {
+          return r.text().then(function (text) {
+            console.error('[add-to-cart] final failure — status:', r.status, 'body:', text);
+            var msg = 'Cart error (' + r.status + ')';
+            try { msg = JSON.parse(text).description || msg; } catch (e) {}
+            throw new Error(msg);
+          });
+        }
+        console.log('[add-to-cart] success, redirecting to /cart');
+        window.location.href = '/cart';
+      })
+      .catch(function (err) {
+        console.error('[add-to-cart] caught error:', err);
+        alert('Could not add to cart: ' + err.message);
+        modalOrder.disabled = false;
+        modalOrder.textContent = 'Add to Cart';
+        if (orderStatus) { orderStatus.textContent = ''; orderStatus.style.display = 'none'; }
+      });
+  });
+
+  function closeModal() {
+    modal.classList.add('mockup-modal--hidden');
+    document.body.style.overflow = '';
+  }
+
+  closeBtn.addEventListener('click', closeModal);
+  backdrop.addEventListener('click', closeModal);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeModal();
+  });
+
+  // Reset modal state when page is restored from bfcache (browser back/forward)
+  // to prevent a stale preview image from showing on the next "Preview on Shirt" click.
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) {
+      modal.classList.add('mockup-modal--hidden');
+      modalImg.src    = '';
+      document.body.style.overflow = '';
+      btn.disabled    = false;
+      btn.textContent = 'Preview on Shirt';
+    }
+  });
+
+  // ── Community submit form ───────────────────────────────────
+  var communityToggle  = document.getElementById('community-toggle');
+  var communityForm    = document.getElementById('community-form');
+  var communitySuccess = document.getElementById('community-success');
+  var communityError   = document.getElementById('community-error');
+  var communitySubmit  = document.getElementById('community-submit');
+  var communityName    = document.getElementById('community-name');
+  var communityEmail   = document.getElementById('community-email');
+
+  if (communityToggle && communityForm) {
+    communityToggle.addEventListener('click', function () {
+      communityForm.style.display = communityForm.style.display === 'none' ? '' : 'none';
+    });
+  }
+
+  if (communitySubmit) {
+    communitySubmit.addEventListener('click', function () {
+      if (!_pendingDesign) return;
+      var name  = communityName  ? communityName.value.trim()  : '';
+      var email = communityEmail ? communityEmail.value.trim() : '';
+      if (!name)  { communityName  && communityName.focus();  return; }
+      if (!email) { communityEmail && communityEmail.focus(); return; }
+
+      communitySubmit.disabled    = true;
+      communitySubmit.textContent = 'Submitting…';
+      if (communityError) communityError.style.display = 'none';
+
+      _pendingDesign.uploadPromise
+        .then(function (data) {
+          return fetch(workerUrl + '/community/submit', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+              shader:           _pendingDesign.shader,
+              productHandle:    _pendingDesign.productHandle,
+              designUrl:        data.design_url,
+              mockupUrl:        data.mockup_url,
+              checkoutImageUrl: data.checkout_image_url,
+              values:           _pendingDesign.values,
+              creatorName:      name,
+              creatorEmail:     email
+            })
+          });
+        })
+        .then(function (r) {
+          if (!r.ok) throw new Error('Submit failed');
+          if (communityForm)    communityForm.style.display    = 'none';
+          if (communitySuccess) communitySuccess.style.display = '';
+        })
+        .catch(function () {
+          communitySubmit.disabled    = false;
+          communitySubmit.textContent = 'Submit';
+          if (communityError) communityError.style.display = '';
+        });
+    });
+  }
+}());
+
+// ── In-house design assistant ─────────────────────────────────────────────────
+(function () {
+  var LS_KEY = 'inhouse-design-assistant-enabled';
+  if (new URLSearchParams(location.search).has('new-inhouse-design')) {
+    localStorage.setItem(LS_KEY, '1');
+  }
+  if (!localStorage.getItem(LS_KEY)) return;
+
+  var modal      = document.getElementById('inhouse-assistant');
+  var reopenBtn  = document.getElementById('inhouse-reopen-btn');
+  var closeBtn   = document.getElementById('inhouse-assistant-close');
+  var valuesEl   = document.getElementById('inhouse-values');
+  var copyBtn    = document.getElementById('inhouse-copy-btn');
+  var turnoffBtn = document.getElementById('inhouse-turnoff-btn');
+  if (!modal) return;
+
+  function rgbToHex(v) {
+    return '#' + v.map(function (c) {
+      return Math.round(Math.max(0, Math.min(1, c)) * 255).toString(16).padStart(2, '0');
+    }).join('');
+  }
+
+  function getFormattedValues() {
+    if (!window._shaderState) return '// shader not loaded yet';
+    var vals = window._shaderState.values;
+    return Object.keys(vals).map(function (k) {
+      var v = vals[k];
+      var display = Array.isArray(v) ? ("'" + rgbToHex(v) + "'")
+                  : typeof v === 'string' ? ("'" + v + "'")
+                  : v;
+      return k + ': ' + display;
+    }).join('\n');
+  }
+
+  function refresh() {
+    if (valuesEl) valuesEl.textContent = getFormattedValues();
+  }
+
+  function open() {
+    refresh();
+    modal.classList.remove('inhouse-assistant--hidden');
+    reopenBtn.classList.add('inhouse-assistant__reopen--hidden');
+  }
+
+  function close() {
+    modal.classList.add('inhouse-assistant--hidden');
+    reopenBtn.classList.remove('inhouse-assistant__reopen--hidden');
+  }
+
+  function turnOff() {
+    localStorage.removeItem(LS_KEY);
+    modal.classList.add('inhouse-assistant--hidden');
+    reopenBtn.classList.add('inhouse-assistant__reopen--hidden');
+  }
+
+  closeBtn.addEventListener('click', close);
+  reopenBtn.addEventListener('click', open);
+  if (turnoffBtn) turnoffBtn.addEventListener('click', turnOff);
+
+  copyBtn.addEventListener('click', function () {
+    if (!valuesEl) return;
+    navigator.clipboard.writeText(valuesEl.textContent).then(function () {
+      copyBtn.textContent = 'Copied!';
+      setTimeout(function () { copyBtn.textContent = 'Copy'; }, 2000);
+    });
+  });
+
+  setInterval(function () {
+    if (!modal.classList.contains('inhouse-assistant--hidden')) refresh();
+  }, 1000);
+
+  open();
+}());
+
+// ── Desktop: scroll shadows on shader-gui ─────────────────────────────────────
+(function () {
+  var el = document.getElementById('shader-gui');
+  if (!el) return;
+  function update() {
+    el.classList.toggle('is-scrollable-top',    el.scrollTop > 4);
+    el.classList.toggle('is-scrollable-bottom', el.scrollTop + el.clientHeight < el.scrollHeight - 4);
+  }
+  el.addEventListener('scroll', function onFirstScroll() {
+    el.classList.add('has-scrolled');
+    el.removeEventListener('scroll', onFirstScroll);
+  }, { passive: true });
+  el.addEventListener('scroll', update, { passive: true });
+  if (window.ResizeObserver) { new ResizeObserver(update).observe(el); }
+  update();
+}());
+
+// ── Desktop: lock shader-gui height to canvas height ──────────────────────────
+(function () {
+  if (!window.ResizeObserver) return;
+  if (window.innerWidth <= 900) return;
+  var canvas = document.getElementById('shader-canvas');
+  var gui    = document.getElementById('shader-gui');
+  if (!canvas || !gui) return;
+  var isSquare = canvas.classList.contains('product-shader__canvas--square');
+  var ratio    = isSquare ? 1 : 4 / 3;
+  var media    = document.querySelector('.product-media');
+  if (!media) return;
+  new ResizeObserver(function (entries) {
+    var w = entries[0].contentRect.width;
+    gui.style.setProperty('--gui-max-h', (w * ratio) + 'px');
+  }).observe(media);
+}());
+
+}());
