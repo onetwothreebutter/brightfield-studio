@@ -1730,7 +1730,9 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
               properties: cartProps
             });
             // Shopify needs a moment to index a brand-new variant before /cart/add.js
-            // can find it. Retry up to 4 times with exponential backoff.
+            // can find it. Retry with exponential backoff (capped) for up to ~25s total,
+            // since propagation lag on freshly-created products can exceed a few seconds.
+            var MAX_ADD_TO_CART_ATTEMPTS = 7;
             function addToCartWithRetry(attempt) {
               console.log('[add-to-cart] attempt', attempt, 'variantId:', cartVariantId);
               return fetch('/cart/add.js', {
@@ -1738,7 +1740,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
                 headers: { 'Content-Type': 'application/json' },
                 body: cartPayload
               }).then(function (r) {
-                if (!r.ok && attempt < 4) {
+                if (!r.ok && attempt < MAX_ADD_TO_CART_ATTEMPTS) {
                   return r.text().then(function (text) {
                     var desc = '';
                     try { desc = JSON.parse(text).description || ''; } catch (e) {}
@@ -1748,7 +1750,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
                         d.indexOf('cannot find') !== -1 ||
                         d.indexOf('sold out') !== -1 ||
                         d.indexOf('already sold out') !== -1) {
-                      var delay = 1500 * attempt;
+                      var delay = Math.min(1500 * attempt, 5000);
                       console.log('[add-to-cart] variant not ready yet, retrying in', delay, 'ms');
                       return new Promise(function (resolve) {
                         if (orderStatus) orderStatus.textContent = 'Finalizing your order…';
