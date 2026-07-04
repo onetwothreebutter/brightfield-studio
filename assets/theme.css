@@ -821,6 +821,24 @@ h6 {
     color: var(--color-text-muted);
 }
 
+.footer-legal {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.footer-legal a {
+    font-size: 0.775rem;
+    color: var(--color-text-muted);
+}
+
+.footer-legal a:hover {
+    color: var(--color-primary);
+}
+
 /* ─── Cart Page ──────────────────────────────────────────── */
 .cart-page__title {
     font-size: clamp(2rem, 5vw, 3.5rem);
