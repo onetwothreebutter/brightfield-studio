@@ -18,9 +18,8 @@
 
       <div class="scroll-shadow scroll-shadow--top" aria-hidden="true"></div>
 
-      <!-- Randomize / Copy Link -->
+      <!-- Randomize -->
       <button type="button" class="shader-control__randomize-btn" id="demo-randomize">Randomize</button>
-      <button type="button" class="shader-control__copy-link-btn" id="demo-copy-link">Share</button>
 
       <!-- Cycle indicator dots -->
       <div class="shader-demo__cycle-indicator" id="demo-cycle-dots" aria-hidden="true"></div>
@@ -547,9 +546,7 @@
   <div class="shader-demo__footer container">
     <hr class="shader-demo__divider">
     <div class="shader-demo__cta-row">
-      <a href="{{ section.settings.product_url }}" class="btn btn--outline">
-        {{ section.settings.button_label | default: 'Buy Original' }}
-      </a>
+      <button type="button" class="btn btn--outline" id="demo-copy-link">Share</button>
       <button type="button" class="btn btn--primary" id="demo-preview-btn">
         Preview on Shirt
       </button>
@@ -1920,18 +1917,6 @@
       "label": "Product handle",
       "default": "line-circle",
       "info": "Used to load size options for ordering"
-    },
-    {
-      "type": "url",
-      "id": "product_url",
-      "label": "Product page link",
-      "info": "The Three-Square product page"
-    },
-    {
-      "type": "text",
-      "id": "button_label",
-      "label": "Button label",
-      "default": "Buy Original Design"
     }
   ],
   "presets": [
