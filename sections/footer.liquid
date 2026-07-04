@@ -29,16 +29,13 @@
 
     <div class="footer-bottom">
       <p class="footer-copy">&copy; {{ 'now' | date: '%Y' }} {{ shop.name }}. All rights reserved.</p>
-      {%- if shop.privacy_policy or shop.refund_policy or shop.terms_of_service or shop.shipping_policy -%}
+      {%- if shop.privacy_policy or shop.terms_of_service or shop.shipping_policy -%}
         <ul class="footer-legal">
           {%- if shop.privacy_policy -%}
             <li><a href="{{ shop.privacy_policy.url }}">{{ shop.privacy_policy.title }}</a></li>
           {%- endif -%}
           {%- if shop.terms_of_service -%}
             <li><a href="{{ shop.terms_of_service.url }}">{{ shop.terms_of_service.title }}</a></li>
-          {%- endif -%}
-          {%- if shop.refund_policy -%}
-            <li><a href="{{ shop.refund_policy.url }}">{{ shop.refund_policy.title }}</a></li>
           {%- endif -%}
           {%- if shop.shipping_policy -%}
             <li><a href="{{ shop.shipping_policy.url }}">{{ shop.shipping_policy.title }}</a></li>

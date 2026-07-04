@@ -1,0 +1,49 @@
+<div class="policy-page">
+
+  <section class="policy-hero section-padding">
+    <div class="container">
+      <h1 class="policy-heading">{{ shop.policy.title }}</h1>
+    </div>
+  </section>
+
+  <section class="policy-body section-padding">
+    <div class="container">
+      <div class="rte policy-content">
+        {{ shop.policy.body }}
+      </div>
+    </div>
+  </section>
+
+</div>
+
+{% stylesheet %}
+  .policy-hero {
+    padding-bottom: 0;
+  }
+
+  .policy-heading {
+    font-family: var(--font-heading);
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0;
+    line-height: 1.1;
+  }
+
+  .policy-content {
+    max-width: 760px;
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+    line-height: 1.75;
+    color: var(--color-text);
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Policy",
+  "presets": [
+    { "name": "Policy" }
+  ]
+}
+{% endschema %}
