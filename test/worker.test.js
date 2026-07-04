@@ -110,6 +110,28 @@ describe('POST /community/submit', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns 413 when the payload exceeds the size cap', async () => {
+    const res = await worker.fetch(
+      post('/community/submit', {
+        shader: 'rise-shirt', mockupUrl: 'https://x.com/m.jpg', creatorName: 'Jane',
+        values: { blob: 'x'.repeat(70 * 1024) },
+      }),
+      env
+    );
+    expect(res.status).toBe(413);
+  });
+
+  it('returns 400 when values is not a plain object', async () => {
+    const res = await worker.fetch(
+      post('/community/submit', {
+        shader: 'rise-shirt', mockupUrl: 'https://x.com/m.jpg', creatorName: 'Jane',
+        values: ['nope'],
+      }),
+      env
+    );
+    expect(res.status).toBe(400);
+  });
+
   it('returns 400 when creatorName is missing', async () => {
     const res = await worker.fetch(
       post('/community/submit', { shader: 'rise-shirt', mockupUrl: 'https://x.com/m.jpg' }),
@@ -450,6 +472,19 @@ describe('POST /save-shader-state', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns 400 when state is an array', async () => {
+    const res = await worker.fetch(post('/save-shader-state', { state: [1, 2, 3] }), env);
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 413 when the payload exceeds the size cap', async () => {
+    const res = await worker.fetch(
+      post('/save-shader-state', { state: { blob: 'x'.repeat(70 * 1024) } }),
+      env
+    );
+    expect(res.status).toBe(413);
+  });
+
   it('includes CORS headers', async () => {
     const res = await worker.fetch(
       new Request('http://worker/save-shader-state', {
@@ -484,6 +519,79 @@ describe('GET /get-shader-state/:id', () => {
   it('returns 404 for an unknown id', async () => {
     const res = await worker.fetch(get('/get-shader-state/no-such'), env);
     expect(res.status).toBe(404);
+  });
+});
+
+// ── /create-share ─────────────────────────────────────────────────────────────
+
+describe('POST /create-share', () => {
+  let env;
+  // Minimal JPEG: signature bytes followed by padding.
+  const jpegBase64 = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10]).toString('base64');
+  const pngBase64  = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A]).toString('base64');
+
+  beforeEach(() => {
+    env = makeEnv();
+    env.R2_PUBLIC_DOMAIN = 'cdn.example.com';
+  });
+
+  it('returns 201 and stores image + metadata for a valid JPEG', async () => {
+    const res = await worker.fetch(
+      post('/create-share', { image: jpegBase64, shader: 'rise-shirt', productHandle: 'rise-shirt', values: { u_rows: 3 } }),
+      env
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.url).toBe(`https://share.brightfield.studio/${body.id}`);
+    expect(env.MOCKUP_STAGING._store.has(`shares/${body.id}.jpg`)).toBe(true);
+    const meta = JSON.parse(env.MOCKUP_STAGING._store.get(`shares/${body.id}.json`));
+    expect(meta.values.u_rows).toBe(3);
+  });
+
+  it('returns 400 when image or productHandle is missing', async () => {
+    const res = await worker.fetch(post('/create-share', { image: jpegBase64 }), env);
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for a non-JPEG image', async () => {
+    const res = await worker.fetch(
+      post('/create-share', { image: pngBase64, productHandle: 'rise-shirt' }),
+      env
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for invalid base64', async () => {
+    const res = await worker.fetch(
+      post('/create-share', { image: '!!!not-base64!!!', productHandle: 'rise-shirt' }),
+      env
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 413 when the image exceeds the size cap', async () => {
+    // Passes the body cap but exceeds the 8 MB decoded-image cap.
+    const res = await worker.fetch(
+      post('/create-share', { image: 'A'.repeat(11_200_000), productHandle: 'rise-shirt' }),
+      env
+    );
+    expect(res.status).toBe(413);
+  });
+
+  it('returns 400 when values is not a plain object', async () => {
+    const res = await worker.fetch(
+      post('/create-share', { image: jpegBase64, productHandle: 'rise-shirt', values: [1, 2] }),
+      env
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for an oversized productHandle', async () => {
+    const res = await worker.fetch(
+      post('/create-share', { image: jpegBase64, productHandle: 'x'.repeat(300) }),
+      env
+    );
+    expect(res.status).toBe(400);
   });
 });
 

@@ -128,6 +128,28 @@ function corsHeaders(origin) {
   };
 }
 
+// ── Payload limits for unauthenticated write endpoints ───────────────────────
+// Shader-state / values objects are a few KB in practice; share images are
+// canvas JPEGs, typically well under 2 MB. Caps leave generous headroom while
+// keeping anonymous R2 writes bounded.
+const MAX_STATE_BYTES       = 64 * 1024;
+const MAX_SHARE_IMAGE_BYTES = 8 * 1024 * 1024;
+// Base64 inflates by 4/3; allow the image plus values/metadata.
+const MAX_SHARE_BODY_BYTES  = Math.ceil(MAX_SHARE_IMAGE_BYTES * 4 / 3) + MAX_STATE_BYTES;
+
+function isPlainObject(v) {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+// Reads and parses a JSON body, rejecting bodies over maxBytes before parsing.
+// Returns { body } on success, or { error, status } for the caller to return.
+async function readLimitedJson(request, maxBytes) {
+  const text = await request.text();
+  if (text.length > maxBytes) return { error: 'Payload too large', status: 413 };
+  try { return { body: JSON.parse(text) }; }
+  catch { return { error: 'Invalid JSON', status: 400 }; }
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
@@ -958,14 +980,15 @@ async function writeJson(env, key, data) {
 
 async function handleCommunitySubmit(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
-  let body;
-  try { body = await request.json(); } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
+  const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
   const { shader, productHandle, designUrl, mockupUrl, checkoutImageUrl, values, creatorName, creatorEmail } = body;
   if (!mockupUrl || !creatorName || !shader) {
     return new Response(JSON.stringify({ error: 'Missing required fields: mockupUrl, creatorName, shader' }), { status: 400, headers });
+  }
+  if (values != null && !isPlainObject(values)) {
+    return new Response(JSON.stringify({ error: 'Invalid values' }), { status: 400, headers });
   }
 
   const id = crypto.randomUUID();
@@ -1498,9 +1521,9 @@ function handleAdminUI(request, env) {
 
 async function handleSaveShaderState(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
-  let body;
-  try { body = await request.json(); } catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers }); }
-  if (!body.state || typeof body.state !== 'object') {
+  const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
+  if (!isPlainObject(body.state)) {
     return new Response(JSON.stringify({ error: 'Missing state' }), { status: 400, headers });
   }
   const id  = Math.random().toString(36).slice(2, 8);
@@ -1524,18 +1547,35 @@ async function handleGetShaderState(request, env, origin) {
 
 async function handleCreateShare(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
-  let body;
-  try { body = await request.json(); } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
+  const { body, error, status } = await readLimitedJson(request, MAX_SHARE_BODY_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
   const { image, shader, productHandle, values } = body;
   if (!image || !productHandle) {
     return new Response(JSON.stringify({ error: 'Missing image or productHandle' }), { status: 400, headers });
   }
+  if (typeof image !== 'string' || image.length * 3 / 4 > MAX_SHARE_IMAGE_BYTES) {
+    return new Response(JSON.stringify({ error: 'Image too large' }), { status: 413, headers });
+  }
+  if (typeof productHandle !== 'string' || productHandle.length > 256 ||
+      (shader != null && (typeof shader !== 'string' || shader.length > 256))) {
+    return new Response(JSON.stringify({ error: 'Invalid shader or productHandle' }), { status: 400, headers });
+  }
+  if (values != null && (!isPlainObject(values) || JSON.stringify(values).length > MAX_STATE_BYTES)) {
+    return new Response(JSON.stringify({ error: 'Invalid values' }), { status: 400, headers });
+  }
+  let imageData;
+  try { imageData = Uint8Array.from(atob(image), c => c.charCodeAt(0)); }
+  catch {
+    return new Response(JSON.stringify({ error: 'Invalid image encoding' }), { status: 400, headers });
+  }
+  // The share endpoint only ever receives canvas JPEGs; require the JPEG
+  // signature so the public share URL can't host arbitrary file types.
+  if (imageData.length < 3 || imageData[0] !== 0xFF || imageData[1] !== 0xD8 || imageData[2] !== 0xFF) {
+    return new Response(JSON.stringify({ error: 'Image must be a JPEG' }), { status: 400, headers });
+  }
   const id       = crypto.randomUUID();
   const imageKey = `shares/${id}.jpg`;
   const metaKey  = `shares/${id}.json`;
-  const imageData = Uint8Array.from(atob(image), c => c.charCodeAt(0));
   await env.MOCKUP_STAGING.put(imageKey, imageData, { httpMetadata: { contentType: 'image/jpeg' } });
   const imageUrl = `https://${env.R2_PUBLIC_DOMAIN}/${imageKey}`;
   await writeJson(env, metaKey, {
