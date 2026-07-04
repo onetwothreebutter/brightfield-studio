@@ -20,7 +20,7 @@
 
       <!-- Randomize / Copy Link -->
       <button type="button" class="shader-control__randomize-btn" id="demo-randomize">Randomize</button>
-      <button type="button" class="shader-control__copy-link-btn" id="demo-copy-link">Copy Link</button>
+      <button type="button" class="shader-control__copy-link-btn" id="demo-copy-link">Share</button>
 
       <!-- Cycle indicator dots -->
       <div class="shader-demo__cycle-indicator" id="demo-cycle-dots" aria-hidden="true"></div>
@@ -1640,7 +1640,7 @@
       function showConfirm() {
         self.textContent = 'Copied!';
         self.disabled = false;
-        setTimeout(function () { self.textContent = 'Copy Link'; }, 1800);
+        setTimeout(function () { self.textContent = 'Share'; }, 1800);
       }
       var ta = document.createElement('textarea');
       ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
@@ -1651,7 +1651,7 @@
     })
     .catch(function () {
       self.textContent = 'Failed';
-      setTimeout(function () { self.textContent = 'Copy Link'; self.disabled = false; }, 1800);
+      setTimeout(function () { self.textContent = 'Share'; self.disabled = false; }, 1800);
     });
   });
 
