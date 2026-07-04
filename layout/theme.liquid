@@ -45,6 +45,21 @@
 
     {{ content_for_header }}
 
+    {%- if settings.ga4_measurement_id != blank -%}
+      <script async src="https://www.googletagmanager.com/gtag/js?id={{ settings.ga4_measurement_id }}"></script>
+      <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', '{{ settings.ga4_measurement_id }}');
+        window.bfTrack = function (eventName, params) {
+          gtag('event', eventName, params || {});
+        };
+      </script>
+    {%- else -%}
+      <script>window.bfTrack = function () {};</script>
+    {%- endif -%}
+
     {{ 'theme.css' | asset_url | stylesheet_tag }}
   </head>
   <body class="template-{{ template.name | handle }}">

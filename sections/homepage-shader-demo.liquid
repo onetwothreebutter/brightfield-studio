@@ -1069,6 +1069,7 @@
 
   randomizeBtn.addEventListener('click', function () {
     onUserInteract();
+    window.bfTrack('shader_demo_randomize');
     var keys     = Object.keys(PRESETS);
     var name     = keys[Math.floor(Math.random() * keys.length)];
     var lineCount = Math.floor(Math.random() * 79) + 2;  // 2–80
@@ -1404,6 +1405,7 @@
 
   previewBtn.addEventListener('click', function () {
     if (!window._demoExport) return;
+    window.bfTrack('shader_demo_preview_on_shirt');
     stopCycle();
     loadVariants();
 
@@ -1545,6 +1547,7 @@
       }
       mockupOrder.disabled    = true;
       mockupOrder.textContent = 'Saving\u2026';
+      window.bfTrack('add_to_cart_start', { location: 'homepage_demo', shader: PRODUCT_HANDLE });
 
       _pendingDesign.uploadPromise
         .then(function (data) {
@@ -1609,9 +1612,11 @@
             try { msg = JSON.parse(t).description || msg; } catch (e) {}
             throw new Error(msg);
           });
+          window.bfTrack('add_to_cart_success', { location: 'homepage_demo', shader: PRODUCT_HANDLE });
           window.location.href = '/cart';
         })
         .catch(function (err) {
+          window.bfTrack('add_to_cart_failure', { location: 'homepage_demo', shader: PRODUCT_HANDLE, error: err.message });
           alert('Could not add to cart: ' + err.message);
           mockupOrder.disabled    = false;
           mockupOrder.textContent = 'Add to Cart';
@@ -1625,6 +1630,7 @@
     var self = this;
     self.textContent = 'Saving\u2026';
     self.disabled = true;
+    window.bfTrack('shader_demo_share');
     fetch('https://brightfield-mockup-worker.eric-d-johnson.workers.dev/save-shader-state', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1883,6 +1889,16 @@
 
   window.addEventListener('scroll', updateFade, { passive: true });
   updateFade();
+
+  // ── Analytics: generic control-change tracking (delegated, fires once per completed interaction) ──
+  var demoControlsEl = document.querySelector('.shader-demo__controls');
+  if (demoControlsEl) {
+    demoControlsEl.addEventListener('change', function (e) {
+      var t = e.target;
+      if (t.tagName !== 'SELECT' && t.tagName !== 'INPUT') return;
+      window.bfTrack('shader_demo_control_change', { control: t.id || t.dataset.paramKey || t.className });
+    });
+  }
 }());
 </script>
 
