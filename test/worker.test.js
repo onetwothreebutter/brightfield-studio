@@ -441,14 +441,14 @@ describe('POST /save-shader-state', () => {
   let env;
   beforeEach(() => { env = makeEnv(); });
 
-  it('returns 200 with a 6-char id', async () => {
+  it('returns 200 with a UUID id', async () => {
     const res = await worker.fetch(
       post('/save-shader-state', { state: { u_rows: 23, u_color_mode: '0' } }),
       env
     );
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.id).toMatch(/^[a-z0-9]{6}$/);
+    expect(body.id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   it('stores the state in R2 under shader-states/{id}.json', async () => {
