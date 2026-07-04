@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest';
-import worker from '../worker/src/index.js';
+import worker, { pickSizeVariant } from '../worker/src/index.js';
 
 // ── Mock R2 bucket ────────────────────────────────────────────────────────────
 
@@ -640,5 +640,25 @@ describe('POST /delete-design', () => {
   it('returns 400 when id or deviceId is missing', async () => {
     const res = await worker.fetch(post('/delete-design', { id: 'aaa' }), env);
     expect(res.status).toBe(400);
+  });
+});
+
+describe('pickSizeVariant', () => {
+  const sizeVariants = [
+    { id: 'gid://shopify/ProductVariant/1', selectedOptions: [{ name: 'Size', value: 'XS' }] },
+    { id: 'gid://shopify/ProductVariant/2', selectedOptions: [{ name: 'Size', value: 'M' }] },
+    { id: 'gid://shopify/ProductVariant/3', selectedOptions: [{ name: 'Size', value: 'L' }] },
+  ];
+
+  it('returns the variant matching requestedSize', () => {
+    expect(pickSizeVariant(sizeVariants, 'M').id).toBe('gid://shopify/ProductVariant/2');
+  });
+
+  it('falls back to the first variant when requestedSize is not found', () => {
+    expect(pickSizeVariant(sizeVariants, '2XL').id).toBe('gid://shopify/ProductVariant/1');
+  });
+
+  it('falls back to the first variant when requestedSize is null', () => {
+    expect(pickSizeVariant(sizeVariants, null).id).toBe('gid://shopify/ProductVariant/1');
   });
 });

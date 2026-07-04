@@ -441,9 +441,17 @@ async function handleSavePreview(request, env, origin) {
   return new Response(JSON.stringify({ design_url: designUrl, mockup_url: mockupUrl, checkout_image_url: checkoutImageUrl, id: savedId }), { status: 200, headers });
 }
 
+// Picks the size variant matching requestedSize (a Size option value like 'M'); falls back to the first variant.
+export function pickSizeVariant(sizeVariants, requestedSize) {
+  const matched = requestedSize
+    ? sizeVariants.find(v => v.selectedOptions?.some(o => o.name === 'Size' && o.value === requestedSize))
+    : null;
+  return matched || sizeVariants[0];
+}
+
 // Shared helper: creates a Shopify product, sets variant price, and publishes to Online Store.
 // Returns { newProductId, newVariantId } (numeric strings).
-async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUrl, shader, productTitle, price, tags, creatorName, values, submissionId, sourceProductHandle }) {
+async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUrl, shader, productTitle, price, tags, creatorName, values, submissionId, sourceProductHandle, requestedSize }) {
   const logPrefix = '[createShopifyProduct]';
 
   // Resize the mockup to ≤2000px wide so it stays under Shopify's 25 MP limit
@@ -588,7 +596,12 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     sizeVariants = [{ id: newVariantGid, inventoryItem: inventoryItemGid ? { id: inventoryItemGid } : null, selectedOptions: [] }];
   }
 
-  const firstSizeVariantGid = sizeVariants[0].id;
+  const matchedSizeVariant = pickSizeVariant(sizeVariants, requestedSize);
+  const requestedSizeFound = sizeVariants.some(v => v.selectedOptions?.some(o => o.name === 'Size' && o.value === requestedSize));
+  if (requestedSize && !requestedSizeFound) {
+    console.warn(logPrefix, 'requested size not found among created size variants:', requestedSize, '— falling back to first size variant');
+  }
+  const firstSizeVariantGid = matchedSizeVariant.id;
 
   // Step 2a: set price on all size variants
   const updateData = await shopifyAdmin(env,
@@ -835,6 +848,7 @@ async function handleCreateProduct(request, env, origin) {
         ... on ProductVariant {
           title
           price
+          selectedOptions { name value }
           product { title }
         }
       }
@@ -850,6 +864,7 @@ async function handleCreateProduct(request, env, origin) {
 
   console.log('[create-product] source variant:', { title: variant.title, price: variant.price, product: variant.product?.title });
   const price = variant.price || '0.00';
+  const requestedSize = variant.selectedOptions?.find(o => o.name === 'Size')?.value || null;
 
   let result;
   try {
@@ -863,6 +878,7 @@ async function handleCreateProduct(request, env, origin) {
       tags: ['custom-design', `shader-${shader || 'unknown'}`, ...(Array.isArray(extraTags) ? extraTags : [])],
       values,
       sourceProductHandle: productHandle,
+      requestedSize,
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 422, headers });
