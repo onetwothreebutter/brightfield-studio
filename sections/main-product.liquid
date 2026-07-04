@@ -694,6 +694,13 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     body.appendChild(row);
   });
 
+  // ── Analytics: generic control-change tracking (delegated, fires once per completed interaction) ──
+  body.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.tagName !== 'SELECT' && t.tagName !== 'INPUT') return;
+    window.bfTrack('product_shader_control_change', { shader: '{{ shader_file }}', control: t.dataset.paramKey || t.id });
+  });
+
   // Show/hide palette-dependent rows based on Use Palette toggle
   function applyPaletteVisibility() {
     var mode;
@@ -1503,6 +1510,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       return;
     }
 
+    window.bfTrack('product_preview_on_shirt', { shader: '{{ shader_file }}' });
     modalImg.src    = '';   // clear stale image before compositing starts
     btn.disabled    = true;
     btn.textContent = 'Compositing…';
@@ -1688,10 +1696,12 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     if (orderStatus) { orderStatus.textContent = 'Uploading your design…'; orderStatus.style.display = ''; }
 
     console.log('[add-to-cart] starting — shopifyVariantId:', shopifyVariantId);
+    window.bfTrack('add_to_cart_start', { shader: '{{ shader_file }}' });
 
     _pendingDesign.uploadPromise
       .then(function (data) {
         console.log('[add-to-cart] upload resolved:', { design_url: data.design_url, mockup_url: data.mockup_url, checkout_image_url: data.checkout_image_url });
+        window.bfTrack('add_to_cart_upload_done', { shader: '{{ shader_file }}' });
         if (orderStatus) orderStatus.textContent = 'Creating your product…';
         var cpBody = {
           designUrl:        data.design_url,
@@ -1780,10 +1790,12 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           });
         }
         console.log('[add-to-cart] success, redirecting to /cart');
+        window.bfTrack('add_to_cart_success', { shader: '{{ shader_file }}' });
         window.location.href = '/cart';
       })
       .catch(function (err) {
         console.error('[add-to-cart] caught error:', err);
+        window.bfTrack('add_to_cart_failure', { shader: '{{ shader_file }}', error: err.message });
         alert('Could not add to cart: ' + err.message);
         modalOrder.disabled = false;
         modalOrder.textContent = 'Add to Cart';

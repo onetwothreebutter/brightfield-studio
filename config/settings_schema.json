@@ -116,5 +116,16 @@
         "info": "Must match the ADMIN_TOKEN Cloudflare Worker secret."
       }
     ]
+  },
+  {
+    "name": "Analytics",
+    "settings": [
+      {
+        "type": "text",
+        "id": "ga4_measurement_id",
+        "label": "Google Analytics 4 Measurement ID",
+        "info": "e.g. G-XXXXXXXXXX. Leave blank to disable analytics."
+      }
+    ]
   }
 ]
