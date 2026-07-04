@@ -225,8 +225,10 @@
       var stateValues = window[stateKey] && window[stateKey].values;
       var exportOverrides = opts.exportValues || {};
       var savedOverrides = {};
+      if (window[stateKey]) {
+        window[stateKey].textDirty = true; // force texture re-upload at export size
+      }
       if (stateValues) {
-        stateValues.textDirty = true; // force texture re-upload at export size
         Object.keys(exportOverrides).forEach(function (k) {
           savedOverrides[k] = stateValues[k];
           stateValues[k] = exportOverrides[k];
