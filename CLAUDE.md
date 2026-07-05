@@ -19,7 +19,7 @@
 ## Shader system
 
 ### Key files
-- `assets/shader-base.js` — shared WebGL 1.0 boilerplate
+- `assets/shader-base.js` — shared WebGL2 boilerplate (`#version 300 es` GLSL: `in`/`out` varyings, `out vec4 fragColor` instead of `gl_FragColor`, `texture()` instead of `texture2D()`)
 - `assets/[name].js` — shader-specific GLSL + uniform wiring; calls `window.ShaderBase.create(...)`
 - `snippets/shader-controls-[name].liquid` — defines `var controls = [...]` and optionally `var customAfterBuild = function() {...}`
 - `snippets/shader-controls-base.liquid` — shared JS globals rendered before every shader snippet
@@ -133,9 +133,10 @@ gl.uniform1f(u.scale, v.u_scale  != null ? v.u_scale  : 1.0);
 ```
 
 ### Gamma encoding (always include in GLSL)
+Output is premultiplied alpha (the canvas is created with `premultipliedAlpha: true`):
 ```glsl
 vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));
-gl_FragColor  = vec4(encoded, alpha);
+fragColor = vec4(encoded * alpha, alpha);
 ```
 
 ### ctx.font weight

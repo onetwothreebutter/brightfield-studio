@@ -199,6 +199,7 @@
     <option value="four-circles">Four Circles</option>
     <option value="line-text">Line Text</option>
     <option value="scaling-letters">Scaling Letters</option>
+    <option value="outline-pulse">Outline Pulse</option>
   </select>
   <button id="export-btn">Export PNG</button>
 </div>
@@ -1634,6 +1635,117 @@ SHADERS['line-text'] = {
         });
       });
     }
+  },
+};
+
+// ── Outline Pulse ─────────────────────────────────────────────────────────────
+SHADERS['outline-pulse'] = {
+  controls: [
+    { type: 'header', label: 'Color Palette' },
+    { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '0',
+      options: [
+        { label: 'Cosine', value: '0' },
+        { label: '4-Stop', value: '1' },
+      ]
+    },
+    { key: '_op_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, noRandomize: true, value: 'Rainbow',
+      options: [
+        { label: 'Rainbow',   value: 'Rainbow'   },
+        { label: 'Cool Blue', value: 'Cool Blue' },
+        { label: 'Neon Heat', value: 'Neon Heat' },
+        { label: 'Cyberpunk', value: 'Cyberpunk' },
+        { label: 'Golden',    value: 'Golden'    },
+        { label: 'Synthwave', value: 'Synthwave' },
+        { label: 'Pastel',    value: 'Pastel'    },
+        { label: 'Arctic',    value: 'Arctic'    },
+      ]
+    },
+    { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
+      tip: 'Offset — base brightness per channel.' },
+    { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080',
+      tip: 'Amplitude — color swing range per channel.' },
+    { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff',
+      tip: 'Frequency — how many times the palette cycles.' },
+    { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#00547f',
+      tip: 'Phase — shifts the starting hue.' },
+    { key: 'u_color0', label: 'Color 1', type: 'color', stopDependent: true, value: '#ff3366' },
+    { key: 'u_color1', label: 'Color 2', type: 'color', stopDependent: true, value: '#ffcc00' },
+    { key: 'u_color2', label: 'Color 3', type: 'color', stopDependent: true, value: '#00ccff' },
+    { key: 'u_color3', label: 'Color 4', type: 'color', stopDependent: true, value: '#aa00ff' },
+    { key: '_op_stop_preset', label: 'Preset', type: 'select', stopDependent: true, noRandomize: true, value: 'Neon',
+      options: [
+        { label: 'Neon',     value: 'Neon'     },
+        { label: 'Retro',    value: 'Retro'    },
+        { label: 'Sunset',   value: 'Sunset'   },
+        { label: 'Aurora',   value: 'Aurora'   },
+        { label: 'Dusk',     value: 'Dusk'     },
+        { label: 'Midnight', value: 'Midnight' },
+        { label: 'Ember',    value: 'Ember'    },
+      ]
+    },
+    { type: 'header', label: 'Rings' },
+    { key: 'u_ring_freq',      label: 'Ring Count',     type: 'range', min: 1,  max: 30, step: 0.5,  value: 7.0,
+      tip: 'Number of concentric rings from the shirt boundary to the center.' },
+    { key: 'u_speed',          label: 'Speed',          type: 'range', min: -3, max: 3,  step: 0.05, value: 0.5,
+      tip: 'Animation speed. Positive = rings pulse inward. Negative = outward. Zero = frozen.' },
+    { key: 'u_palette_offset', label: 'Palette Offset', type: 'range', min: 0,  max: 1,  step: 0.01, value: 0.0,
+      tip: 'Rotates the starting position in the color palette.' },
+    { type: 'header', label: 'Edge Glow' },
+    { key: 'u_glow_strength',  label: 'Glow Strength',  type: 'range', min: 0,  max: 6,  step: 0.1,  value: 2.5,
+      tip: 'Brightness of the halo right at the shirt outline.' },
+    { key: 'u_glow_sharpness', label: 'Glow Tightness', type: 'range', min: 1,  max: 50, step: 0.5,  value: 12.0,
+      tip: 'Higher = a fine crisp line. Lower = a broad diffuse halo.' },
+    { type: 'header', label: 'Noise Warp' },
+    { key: 'u_noise_warp',  label: 'Warp Amount', type: 'range', min: 0, max: 0.5, step: 0.01, value: 0.08,
+      tip: 'Pushes the rings off-round for an organic, hand-drawn feel. 0 = perfect circles.' },
+    { key: 'u_noise_scale', label: 'Warp Scale',  type: 'range', min: 1, max: 20,  step: 0.5,  value: 5.0,
+      tip: 'Spatial frequency of the noise warp. Higher = finer detail.' },
+  ].concat([
+    { type: 'header', label: 'Finish' },
+    { key: 'u_transparent_bg', label: 'Transparent BG', type: 'toggle', value: 0,
+      tip: 'On = ring troughs are transparent (ink-on-fabric look). Off = solid fill inside the shirt shape.' },
+  ]).concat(FINISH_CONTROLS_PRE.slice(1)).concat(FINISH_CONTROLS_POST),
+  fonts: [],
+  customAfterBuild: function (body) {
+    var cosinePresets = {
+      'Rainbow':   { a: [0.5,  0.5,  0.5 ], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.0,   0.33,  0.67]  },
+      'Cool Blue': { a: [0.5,  0.5,  0.5 ], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.263, 0.416, 0.557] },
+      'Neon Heat': { a: [0.5,  0.5,  0.5 ], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.3,   0.2,   0.2  ] },
+      'Cyberpunk': { a: [0.5,  0.5,  0.5 ], b: [0.5, 0.5, 0.5], c: [2.0, 1.0, 0.0], d: [0.5,   0.2,   0.25 ] },
+      'Golden':    { a: [0.5,  0.5,  0.5 ], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 0.5], d: [0.8,   0.9,   0.3  ] },
+      'Synthwave': { a: [0.5,  0.2,  0.7 ], b: [0.5, 0.4, 0.3], c: [0.8, 1.0, 1.2], d: [0.5,   0.25,  0.65 ] },
+      'Pastel':    { a: [0.75, 0.65, 0.75], b: [0.2, 0.2, 0.2], c: [1.0, 1.0, 1.0], d: [0.0,   0.33,  0.67 ] },
+      'Arctic':    { a: [0.5,  0.6,  0.7 ], b: [0.3, 0.3, 0.3], c: [1.0, 0.8, 0.5], d: [0.0,   0.1,   0.3  ] },
+    };
+    var fourStopPresets = {
+      'Neon':     { c0: [1.0,  0.2,   0.4  ], c1: [1.0,   0.8,   0.0  ], c2: [0.0,   0.8,   1.0  ], c3: [0.667, 0.0,   1.0  ] },
+      'Retro':    { c0: [0.91, 0.286, 0.114], c1: [0.788, 0.627, 0.188], c2: [0.176, 0.541, 0.369], c3: [0.102, 0.153, 0.267] },
+      'Sunset':   { c0: [1.0,  0.318, 0.184], c1: [0.867, 0.141, 0.463], c2: [0.541, 0.169, 0.886], c3: [0.098, 0.098, 0.439] },
+      'Aurora':   { c0: [0.0,  1.0,   0.533], c1: [0.0,   0.898, 1.0  ], c2: [0.486, 0.302, 1.0  ], c3: [0.878, 0.251, 0.984] },
+      'Dusk':     { c0: [1.0,  0.6,   0.4  ], c1: [1.0,   0.369, 0.384], c2: [0.8,   0.169, 0.369], c3: [0.459, 0.227, 0.533] },
+      'Midnight': { c0: [0.04, 0.12,  0.30 ], c1: [0.02,  0.22,  0.32 ], c2: [0.14,  0.06,  0.32 ], c3: [0.06,  0.04,  0.16 ] },
+      'Ember':    { c0: [0.58, 0.14,  0.02 ], c1: [0.35,  0.06,  0.04 ], c2: [0.16,  0.04,  0.06 ], c3: [0.05,  0.03,  0.02 ] },
+    };
+    var cosineKeys = ['u_a', 'u_b', 'u_c', 'u_d'];
+    function applyColors(pairs) {
+      pairs.forEach(function(pair) {
+        window._shaderState.values[pair[0]] = pair[1];
+        var inp = document.querySelector('[data-param-key="' + pair[0] + '"]');
+        if (inp) inp.value = toHex(pair[1]);
+      });
+    }
+    function applyCosinePreset(p) {
+      applyColors(cosineKeys.map(function(k,i){ return [k,[p.a,p.b,p.c,p.d][i]]; }));
+    }
+    function apply4StopPreset(p) {
+      applyColors([['u_color0',p.c0],['u_color1',p.c1],['u_color2',p.c2],['u_color3',p.c3]]);
+    }
+    applyCosinePreset(cosinePresets['Rainbow']);
+    apply4StopPreset(fourStopPresets['Neon']);
+    var cSel = document.querySelector('[data-param-key="_op_palette_preset"]');
+    if (cSel) cSel.addEventListener('change', function(){ var p=cosinePresets[this.value]; if(p) applyCosinePreset(p); });
+    var fSel = document.querySelector('[data-param-key="_op_stop_preset"]');
+    if (fSel) fSel.addEventListener('change', function(){ var p=fourStopPresets[this.value]; if(p) apply4StopPreset(p); });
   },
 };
 
