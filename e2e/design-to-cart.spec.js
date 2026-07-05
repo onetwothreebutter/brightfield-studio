@@ -14,9 +14,15 @@ test.describe('Custom design add-to-cart flow', () => {
       throw new Error(`Unexpected alert: "${msg}"`);
     });
 
-    // Surface browser console errors in the test output for easier debugging.
+    // Surface all browser console output in the test log — the add-to-cart retry
+    // loop logs attempt-by-attempt detail via console.log/warn, which is invisible
+    // in CI unless we forward it. That detail is what makes Cloudflare-vs-Shopify
+    // failures distinguishable after the fact instead of showing only the final error.
     page.on('console', msg => {
-      if (msg.type() === 'error') console.error('[browser]', msg.text());
+      const type = msg.type();
+      if (type === 'error') console.error('[browser]', msg.text());
+      else if (type === 'warning') console.warn('[browser]', msg.text());
+      else console.log('[browser]', msg.text());
     });
 
     // Tag products created during E2E tests so they can be bulk-deleted later
@@ -28,8 +34,13 @@ test.describe('Custom design add-to-cart flow', () => {
       await route.continue({ postData: JSON.stringify(body) });
     });
 
-    // Inject bypass header so Cloudflare WAF skips Bot Fight Mode for /cart/add.js.
-    // Requires a WAF custom rule: skip Bot Fight Mode when X-E2E-Token matches the secret.
+    // Inject bypass header so Cloudflare WAF skips bot/rate-limit protection for
+    // /cart/add.js. Requires a WAF custom rule matching X-E2E-Token whose Skip
+    // action covers BOTH "Bot Fight Mode" AND "Rate Limiting rules" — the retry
+    // loop above can fire several POSTs to /cart/add.js in quick succession while
+    // waiting for a freshly-created variant to propagate, and a rule that only
+    // skips Bot Fight Mode still lets Cloudflare's rate limiter block those retries
+    // with a 429 + challenge page (observed intermittently in CI).
     if (process.env.E2E_TOKEN) {
       await page.route('**/cart/add.js', async route => {
         await route.continue({
