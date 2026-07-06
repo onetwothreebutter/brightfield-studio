@@ -382,7 +382,7 @@
     currency: {{ shop.currency | json }},
     value: {{ product.selected_or_first_available_variant.price | divided_by: 100.0 }},
     items: [{
-      item_id: {{ product.selected_or_first_available_variant.sku | default: product.selected_or_first_available_variant.id | json }},
+      item_id: {{ product.selected_or_first_available_variant.id | json }},
       item_name: {{ product.title | json }},
       item_variant: {{ product.selected_or_first_available_variant.title | json }},
       price: {{ product.selected_or_first_available_variant.price | divided_by: 100.0 }},
@@ -1807,7 +1807,11 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
             throw new Error(msg);
           });
         }
-        return r.json().then(function (item) {
+        // The item was already added server-side once r.ok is true — a body that
+        // fails to parse (truncated response, proxy glitch) must not block the
+        // redirect or misreport a successful add as a failure. Fall back to an
+        // empty item so analytics is merely incomplete, not wrong.
+        return r.json().catch(function () { return {}; }).then(function (item) {
           console.log('[add-to-cart] success, redirecting to /cart');
           window.bfTrack('add_to_cart_success', { shader: '{{ shader_file }}' });
           // ── Analytics: GA4 standard ecommerce — add_to_cart ─────────────────

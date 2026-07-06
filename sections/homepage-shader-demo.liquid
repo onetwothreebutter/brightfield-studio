@@ -1612,7 +1612,11 @@
             try { msg = JSON.parse(t).description || msg; } catch (e) {}
             throw new Error(msg);
           });
-          return r.json().then(function (item) {
+          // The item was already added server-side once r.ok is true — a body that
+          // fails to parse (truncated response, proxy glitch) must not block the
+          // redirect or misreport a successful add as a failure. Fall back to an
+          // empty item so analytics is merely incomplete, not wrong.
+          return r.json().catch(function () { return {}; }).then(function (item) {
             window.bfTrack('add_to_cart_success', { location: 'homepage_demo', shader: PRODUCT_HANDLE });
             // ── Analytics: GA4 standard ecommerce — add_to_cart ─────────────────
             window.bfTrack('add_to_cart', {
