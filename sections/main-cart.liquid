@@ -116,6 +116,31 @@
   </div>
 </div>
 
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var checkoutBtn = document.querySelector('button[name="checkout"]');
+    if (!checkoutBtn) return;
+    checkoutBtn.addEventListener('click', function () {
+      // ── Analytics: GA4 standard ecommerce — begin_checkout ──────────────
+      window.bfTrack('begin_checkout', {
+        currency: {{ cart.currency.iso_code | json }},
+        value: {{ cart.total_price | divided_by: 100.0 }},
+        items: [
+          {%- for item in cart.items -%}
+          {
+            item_id: {{ item.variant_id | json }},
+            item_name: {{ item.product.title | json }},
+            item_variant: {{ item.variant.title | json }},
+            price: {{ item.final_price | divided_by: 100.0 }},
+            quantity: {{ item.quantity | json }}
+          }{%- unless forloop.last -%},{%- endunless -%}
+          {%- endfor -%}
+        ]
+      });
+    });
+  });
+</script>
+
 {% schema %}
 {
   "name": "Cart",
