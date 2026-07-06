@@ -1542,7 +1542,7 @@ async function handleSaveShaderState(request, env, origin) {
   if (!isPlainObject(body.state)) {
     return new Response(JSON.stringify({ error: 'Missing state' }), { status: 400, headers });
   }
-  const id  = Math.random().toString(36).slice(2, 8);
+  const id  = crypto.randomUUID();
   const key = `shader-states/${id}.json`;
   await env.MOCKUP_STAGING.put(key, JSON.stringify(body.state), {
     httpMetadata: { contentType: 'application/json' },
