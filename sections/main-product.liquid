@@ -1756,7 +1756,11 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
                     try { desc = JSON.parse(text).description || ''; } catch (e) {}
                     console.warn('[add-to-cart] attempt', attempt, 'failed — status:', r.status, 'desc:', desc);
                     var d = desc.toLowerCase();
-                    if (d.indexOf('cannot find variant') !== -1 ||
+                    // 429/503 are transient rate-limit/availability signals (e.g. Cloudflare
+                    // challenge pages returned as non-JSON HTML, hence the empty desc) — always
+                    // retry those regardless of body content, same as an unready variant.
+                    if (r.status === 429 || r.status === 503 ||
+                        d.indexOf('cannot find variant') !== -1 ||
                         d.indexOf('cannot find') !== -1 ||
                         d.indexOf('sold out') !== -1 ||
                         d.indexOf('already sold out') !== -1) {
