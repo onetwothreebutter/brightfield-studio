@@ -376,6 +376,20 @@
   var customizeBtn    = document.querySelector('.product-customize-btn');
   var defaultDesc   = document.querySelector('.product-description');
   var productLayout = document.querySelector('.product-layout');
+
+  // ── Analytics: GA4 standard ecommerce — view_item ─────────────────────────
+  window.bfTrack('view_item', {
+    currency: {{ shop.currency | json }},
+    value: {{ product.selected_or_first_available_variant.price | divided_by: 100.0 }},
+    items: [{
+      item_id: {{ product.selected_or_first_available_variant.id | json }},
+      item_name: {{ product.title | json }},
+      item_variant: {{ product.selected_or_first_available_variant.title | json }},
+      price: {{ product.selected_or_first_available_variant.price | divided_by: 100.0 }},
+      quantity: 1
+    }]
+  });
+
   if (!tabs.length) return;
 
   tabs.forEach(function (tab) {
@@ -1793,9 +1807,27 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
             throw new Error(msg);
           });
         }
-        console.log('[add-to-cart] success, redirecting to /cart');
-        window.bfTrack('add_to_cart_success', { shader: '{{ shader_file }}' });
-        window.location.href = '/cart';
+        // The item was already added server-side once r.ok is true — a body that
+        // fails to parse (truncated response, proxy glitch) must not block the
+        // redirect or misreport a successful add as a failure. Fall back to an
+        // empty item so analytics is merely incomplete, not wrong.
+        return r.json().catch(function () { return {}; }).then(function (item) {
+          console.log('[add-to-cart] success, redirecting to /cart');
+          window.bfTrack('add_to_cart_success', { shader: '{{ shader_file }}' });
+          // ── Analytics: GA4 standard ecommerce — add_to_cart ─────────────────
+          window.bfTrack('add_to_cart', {
+            currency: {{ shop.currency | json }},
+            value: (item.final_price || item.price || 0) / 100,
+            items: [{
+              item_id: item.variant_id || item.id,
+              item_name: item.product_title || item.title,
+              item_variant: item.variant_title,
+              price: (item.final_price || item.price || 0) / 100,
+              quantity: item.quantity || 1
+            }]
+          });
+          window.location.href = '/cart';
+        });
       })
       .catch(function (err) {
         console.error('[add-to-cart] caught error:', err);

@@ -1612,8 +1612,26 @@
             try { msg = JSON.parse(t).description || msg; } catch (e) {}
             throw new Error(msg);
           });
-          window.bfTrack('add_to_cart_success', { location: 'homepage_demo', shader: PRODUCT_HANDLE });
-          window.location.href = '/cart';
+          // The item was already added server-side once r.ok is true — a body that
+          // fails to parse (truncated response, proxy glitch) must not block the
+          // redirect or misreport a successful add as a failure. Fall back to an
+          // empty item so analytics is merely incomplete, not wrong.
+          return r.json().catch(function () { return {}; }).then(function (item) {
+            window.bfTrack('add_to_cart_success', { location: 'homepage_demo', shader: PRODUCT_HANDLE });
+            // ── Analytics: GA4 standard ecommerce — add_to_cart ─────────────────
+            window.bfTrack('add_to_cart', {
+              currency: {{ shop.currency | json }},
+              value: (item.final_price || item.price || 0) / 100,
+              items: [{
+                item_id: item.variant_id || item.id,
+                item_name: item.product_title || item.title,
+                item_variant: item.variant_title,
+                price: (item.final_price || item.price || 0) / 100,
+                quantity: item.quantity || 1
+              }]
+            });
+            window.location.href = '/cart';
+          });
         })
         .catch(function (err) {
           window.bfTrack('add_to_cart_failure', { location: 'homepage_demo', shader: PRODUCT_HANDLE, error: err.message });

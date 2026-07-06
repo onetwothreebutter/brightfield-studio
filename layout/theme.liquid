@@ -45,11 +45,19 @@
 
     {{ content_for_header }}
 
-    {%- if settings.ga4_measurement_id != blank -%}
+    {%- if settings.ga4_measurement_id != blank and request.design_mode == false -%}
       <script async src="https://www.googletagmanager.com/gtag/js?id={{ settings.ga4_measurement_id }}"></script>
       <script>
         window.dataLayer = window.dataLayer || [];
         function gtag() { dataLayer.push(arguments); }
+        // No cookie-consent banner yet: keep analytics measurement flowing, but
+        // default advertising signals to denied until a real CMP is wired up.
+        gtag('consent', 'default', {
+          ad_storage: 'denied',
+          ad_user_data: 'denied',
+          ad_personalization: 'denied',
+          analytics_storage: 'granted'
+        });
         gtag('js', new Date());
         gtag('config', '{{ settings.ga4_measurement_id }}');
         window.bfTrack = function (eventName, params) {
