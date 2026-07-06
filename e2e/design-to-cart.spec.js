@@ -34,20 +34,13 @@ test.describe('Custom design add-to-cart flow', () => {
       await route.continue({ postData: JSON.stringify(body) });
     });
 
-    // Inject bypass header so Cloudflare WAF skips bot/rate-limit protection for
-    // /cart/add.js. Requires a WAF custom rule matching X-E2E-Token whose Skip
-    // action covers BOTH "Bot Fight Mode" AND "Rate Limiting rules" — the retry
-    // loop above can fire several POSTs to /cart/add.js in quick succession while
-    // waiting for a freshly-created variant to propagate, and a rule that only
-    // skips Bot Fight Mode still lets Cloudflare's rate limiter block those retries
-    // with a 429 + challenge page (observed intermittently in CI).
-    if (process.env.E2E_TOKEN) {
-      await page.route('**/cart/add.js', async route => {
-        await route.continue({
-          headers: { ...route.request().headers(), 'X-E2E-Token': process.env.E2E_TOKEN },
-        });
-      });
-    }
+    // Note on 429 challenges: brightfield.studio is DNS-only to Shopify, so the
+    // merchant Cloudflare zone never proxies storefront traffic — no header-based
+    // WAF bypass is possible (an earlier X-E2E-Token scheme was inert). The 429
+    // "Verifying your connection" pages come from Shopify's own platform bot
+    // protection, which challenges rapid repeat POSTs to /cart/add.js from
+    // datacenter IPs. The storefront avoids that signature by polling product
+    // availability (GET) and POSTing to /cart/add.js once — see main-product.liquid.
 
     await page.goto(PRODUCT_PATH);
 

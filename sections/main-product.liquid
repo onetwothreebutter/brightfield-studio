@@ -1736,6 +1736,10 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           return cpRes.json().then(function (cpData) {
             console.log('[create-product] response', cpRes.status, cpData);
             var cartVariantId = (cpRes.ok && cpData.variantId) ? cpData.variantId : shopifyVariantId;
+            // handle of the freshly created product — used to poll availability
+            // before adding to cart. Null when falling back to the original
+            // variant, which is long-published and needs no poll.
+            var newHandle = (cpRes.ok && cpData.variantId && cpData.handle) ? cpData.handle : null;
             if (!cpRes.ok) console.error('[create-product] failed, falling back to original variant:', cpData);
             console.log('[add-to-cart] using cartVariantId:', cartVariantId);
             var cartProps = {
@@ -1753,10 +1757,46 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
               quantity: 1,
               properties: cartProps
             });
-            // Shopify needs a moment to index a brand-new variant before /cart/add.js
-            // can find it. Retry with exponential backoff (capped) for up to ~25s total,
-            // since propagation lag on freshly-created products can exceed a few seconds.
-            var MAX_ADD_TO_CART_ATTEMPTS = 7;
+            // A freshly created product takes a few seconds to propagate to the
+            // storefront cache; POSTing /cart/add.js before then returns 422
+            // "sold out". Rapid repeat POSTs to /cart/add.js from one IP trip
+            // Shopify's platform-level bot protection (429 + challenge page,
+            // served by Shopify's own CDN — not merchant-configurable, cannot
+            // be bypassed by headers or merchant Cloudflare rules). So instead
+            // of burst-retrying the POST, poll the same-origin product JSON
+            // (a GET, which is not challenged) until the variant reports
+            // available, then POST once. Fallback retries are few and widely
+            // spaced so they never look like a bot burst.
+            function waitForVariantAvailable() {
+              if (!newHandle) return Promise.resolve();
+              var POLL_DELAY_MS = 1500, MAX_POLLS = 20; // up to ~30s
+              function poll(n) {
+                return fetch('/products/' + newHandle + '.js', { cache: 'no-store' })
+                  .then(function (r) { return r.ok ? r.json() : null; })
+                  .catch(function () { return null; })
+                  .then(function (prod) {
+                    var match = null;
+                    if (prod && prod.variants) {
+                      prod.variants.forEach(function (v) {
+                        if (String(v.id) === String(cartVariantId)) match = v;
+                      });
+                    }
+                    if (match && match.available) {
+                      console.log('[add-to-cart] variant available after', n, 'poll(s)');
+                      return;
+                    }
+                    if (n >= MAX_POLLS) {
+                      console.warn('[add-to-cart] variant not available after', n, 'polls — adding anyway');
+                      return;
+                    }
+                    return new Promise(function (resolve) { setTimeout(resolve, POLL_DELAY_MS); })
+                      .then(function () { return poll(n + 1); });
+                  });
+              }
+              return poll(1);
+            }
+            var MAX_ADD_TO_CART_ATTEMPTS = 3;
+            var ADD_RETRY_DELAY_MS = 8000;
             function addToCartWithRetry(attempt) {
               console.log('[add-to-cart] attempt', attempt, 'variantId:', cartVariantId);
               return fetch('/cart/add.js', {
@@ -1770,19 +1810,16 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
                     try { desc = JSON.parse(text).description || ''; } catch (e) {}
                     console.warn('[add-to-cart] attempt', attempt, 'failed — status:', r.status, 'desc:', desc);
                     var d = desc.toLowerCase();
-                    // 429/503 are transient rate-limit/availability signals (e.g. Cloudflare
-                    // challenge pages returned as non-JSON HTML, hence the empty desc) — always
-                    // retry those regardless of body content, same as an unready variant.
+                    // 429/503 are transient (bot challenge / unavailable, non-JSON
+                    // body so desc is empty); sold-out / cannot-find mean the cart
+                    // endpoint's cache still lags the availability poll above.
                     if (r.status === 429 || r.status === 503 ||
-                        d.indexOf('cannot find variant') !== -1 ||
                         d.indexOf('cannot find') !== -1 ||
-                        d.indexOf('sold out') !== -1 ||
-                        d.indexOf('already sold out') !== -1) {
-                      var delay = Math.min(1500 * attempt, 5000);
-                      console.log('[add-to-cart] variant not ready yet, retrying in', delay, 'ms');
+                        d.indexOf('sold out') !== -1) {
+                      console.log('[add-to-cart] retrying in', ADD_RETRY_DELAY_MS, 'ms');
                       return new Promise(function (resolve) {
                         if (orderStatus) orderStatus.textContent = 'Finalizing your order…';
-                        setTimeout(function () { resolve(addToCartWithRetry(attempt + 1)); }, delay);
+                        setTimeout(function () { resolve(addToCartWithRetry(attempt + 1)); }, ADD_RETRY_DELAY_MS);
                       });
                     }
                     // Different error — reconstruct a Response-like object to pass along
@@ -1793,8 +1830,11 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
                 return r;
               });
             }
-            if (orderStatus) orderStatus.textContent = 'Adding to cart…';
-            return addToCartWithRetry(1);
+            if (orderStatus) orderStatus.textContent = 'Finalizing your order…';
+            return waitForVariantAvailable().then(function () {
+              if (orderStatus) orderStatus.textContent = 'Adding to cart…';
+              return addToCartWithRetry(1);
+            });
           });
         });
       })

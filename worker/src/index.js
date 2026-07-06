@@ -885,7 +885,9 @@ async function handleCreateProduct(request, env, origin) {
   }
 
   console.log('[create-product] returning variantId:', result.newVariantId);
-  return new Response(JSON.stringify({ variantId: result.newVariantId, productId: result.newProductId }), { status: 200, headers });
+  // handle lets the storefront poll /products/{handle}.js for availability
+  // before POSTing /cart/add.js (see add-to-cart flow in main-product.liquid)
+  return new Response(JSON.stringify({ variantId: result.newVariantId, productId: result.newProductId, handle: result.newProductHandle }), { status: 200, headers });
 }
 
 async function handleListDesigns(request, env, origin) {
