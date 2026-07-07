@@ -1,0 +1,82 @@
+var controls = [
+  // ── Terrain ───────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Terrain — Hill 1' },
+  { key: 'u_hill1_x', label: 'X', type: 'range', min: -1, max: 1, step: 0.01, value: -0.3 },
+  { key: 'u_hill1_y', label: 'Y', type: 'range', min: -1, max: 1, step: 0.01, value: 0.2 },
+  { key: 'u_hill1_radius', label: 'Radius', type: 'range', min: 0.05, max: 0.8, step: 0.01, value: 0.4 },
+  { key: 'u_hill1_height', label: 'Height', type: 'range', min: -1.5, max: 1.5, step: 0.01, value: 1.0,
+    tip: 'Positive = peak. Negative = valley/basin.' },
+  { type: 'header', label: 'Terrain — Hill 2' },
+  { key: 'u_hill2_x', label: 'X', type: 'range', min: -1, max: 1, step: 0.01, value: 0.28 },
+  { key: 'u_hill2_y', label: 'Y', type: 'range', min: -1, max: 1, step: 0.01, value: -0.1 },
+  { key: 'u_hill2_radius', label: 'Radius', type: 'range', min: 0.05, max: 0.8, step: 0.01, value: 0.35 },
+  { key: 'u_hill2_height', label: 'Height', type: 'range', min: -1.5, max: 1.5, step: 0.01, value: 0.8 },
+  { type: 'header', label: 'Terrain — Hill 3' },
+  { key: 'u_hill3_x', label: 'X', type: 'range', min: -1, max: 1, step: 0.01, value: 0.0 },
+  { key: 'u_hill3_y', label: 'Y', type: 'range', min: -1, max: 1, step: 0.01, value: -0.32 },
+  { key: 'u_hill3_radius', label: 'Radius', type: 'range', min: 0.05, max: 0.8, step: 0.01, value: 0.3 },
+  { key: 'u_hill3_height', label: 'Height', type: 'range', min: -1.5, max: 1.5, step: 0.01, value: -0.6 },
+  // ── Contour Lines ────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Contour Lines' },
+  { key: 'u_contour_spacing', label: 'Spacing', type: 'range', min: 0.005, max: 0.4, step: 0.005, value: 0.12,
+    tip: 'Elevation interval between contour lines.' },
+  { key: 'u_contour_width', label: 'Line Width', type: 'range', min: 0.001, max: 0.03, step: 0.001, value: 0.006 },
+  // ── Color Palette ──────────────────────────────────────────────────────────
+  { type: 'header', label: 'Color Palette' },
+  { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
+    tip: 'Off = cosine palette. On = 4-stop linear gradient by elevation.' },
+  { key: '_tc_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
+    options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
+  },
+  { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
+    tip: 'Offset — base brightness per channel. Sets the center point colors oscillate around.' },
+  { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080',
+    tip: 'Amplitude — color swing range per channel. Higher = more vivid, saturated output.' },
+  { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff',
+    tip: 'Frequency — how many times the palette cycles per channel.' },
+  { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab',
+    tip: 'Phase — shifts the starting hue of the color cycle.' },
+  { key: '_tc_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
+    options: Object.keys(FOUR_STOP_PRESETS).map(function (k) { return { label: k, value: k }; })
+  },
+  { key: 'u_color0', label: 'Color 1 (Low)',  type: 'color', stopDependent: true, value: '#ff3366' },
+  { key: 'u_color1', label: 'Color 2',        type: 'color', stopDependent: true, value: '#ffcc00' },
+  { key: 'u_color2', label: 'Color 3',        type: 'color', stopDependent: true, value: '#00ccff' },
+  { key: 'u_color3', label: 'Color 4 (High)', type: 'color', stopDependent: true, value: '#aa00ff' },
+].concat(FINISH_CONTROLS);
+
+var customAfterBuild = function () {
+  var cosineKeys = ['u_a', 'u_b', 'u_c', 'u_d'];
+  function applyCosinePreset(p) {
+    applyColors(cosineKeys.map(function (k, i) {
+      return [k, [p.a, p.b, p.c, p.d][i]];
+    }));
+  }
+
+  function apply4ColorPreset(p) {
+    applyColors([
+      ['u_color0', p.c0],
+      ['u_color1', p.c1],
+      ['u_color2', p.c2],
+      ['u_color3', p.c3],
+    ]);
+  }
+
+  applyCosinePreset(COSINE_PRESETS['Rainbow']);
+
+  var cosinePresetSel = document.querySelector('[data-param-key="_tc_palette_preset"]');
+  if (cosinePresetSel) {
+    cosinePresetSel.addEventListener('change', function () {
+      var p = COSINE_PRESETS[this.value];
+      if (p) applyCosinePreset(p);
+    });
+  }
+
+  var fourColorPresetSel = document.querySelector('[data-param-key="_tc_4color_preset"]');
+  if (fourColorPresetSel) {
+    fourColorPresetSel.addEventListener('change', function () {
+      var p = FOUR_STOP_PRESETS[this.value];
+      if (p) apply4ColorPreset(p);
+    });
+  }
+};
