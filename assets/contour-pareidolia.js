@@ -166,7 +166,7 @@
       gl.uniform1f(u.hill3Radius, v.u_hill3_radius != null ? v.u_hill3_radius : 0.3);
       gl.uniform1f(u.hill3Height, v.u_hill3_height != null ? v.u_hill3_height : -0.6);
       gl.uniform1f(u.contourSpacing, v.u_contour_spacing != null ? v.u_contour_spacing : 0.12);
-      gl.uniform1f(u.contourWidth, v.u_contour_width != null ? v.u_contour_width : 0.006);
+      gl.uniform1f(u.contourWidth, v.u_contour_width != null ? v.u_contour_width : 0.025);
       gl.uniform1f(u.colorMode, parseFloat(v.u_color_mode || '0'));
       gl.uniform3fv(u.palA, v.u_a || [0.5, 0.5, 0.5]);
       gl.uniform3fv(u.palB, v.u_b || [0.5, 0.5, 0.5]);
