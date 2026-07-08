@@ -448,9 +448,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   {% when 'echo-text' %}        {% render 'shader-controls-echo-text' %}
   {% when 'line-text' %}        {% render 'shader-controls-line-text' %}
   {% when 'outline-pulse' %}    {% render 'shader-controls-outline-pulse' %}
-  {% when 'line-smudge' %}      {% render 'shader-controls-line-smudge' %}
-  {% when 'line-sphere' %}      {% render 'shader-controls-line-sphere' %}
-  {% when 'sdf-line' %}         {% render 'shader-controls-sdf-line' %}
   {% when 'three-contours' %}   {% render 'shader-controls-three-contours' %}
   {% else %}                    {% render 'shader-controls-rise-shirt' %}
   {% endcase %}
@@ -536,8 +533,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   var outlineDependentRows    = [];
   var wordDependentRows           = [];
   var perLetterSizeDependentRows  = [];
-  var repeatDependentRows         = [];
-  var ringDependentRows           = [];
   var colorModeBtn     = null;
   var colorModeSel     = null;
   var grainModeSel     = null;
@@ -545,8 +540,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   var outlineToggleBtn        = null;
   var wordToggleBtn           = null;
   var perLetterSizeToggleBtn  = null;
-  var repeatToggleBtn         = null;
-  var ringToggleBtn           = null;
   var controlEls = []; // [{ctrl, el}] for randomisation
 
   controls.forEach(function (ctrl) {
@@ -627,8 +620,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       if (ctrl.key === 'outlineEnabled')   outlineToggleBtn = btn;
       if (ctrl.key === 'u_text_enabled')         wordToggleBtn           = btn;
       if (ctrl.key === 'perLetterSizeEnabled')  perLetterSizeToggleBtn  = btn;
-      if (ctrl.key === 'u_repeat_enabled')      repeatToggleBtn         = btn;
-      if (ctrl.key === 'u_rings_enabled')       ringToggleBtn           = btn;
 
       row.appendChild(btn);
       controlEls.push({ ctrl: ctrl, el: btn });
@@ -700,8 +691,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     if (ctrl.outlineDependent)   outlineDependentRows.push(row);
     if (ctrl.wordDependent)           wordDependentRows.push(row);
     if (ctrl.perLetterSizeDependent)  perLetterSizeDependentRows.push(row);
-    if (ctrl.repeatDependent)         repeatDependentRows.push(row);
-    if (ctrl.ringDependent)           ringDependentRows.push(row);
 
     body.appendChild(row);
   });
@@ -788,18 +777,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   }
   if (perLetterSizeToggleBtn) perLetterSizeToggleBtn.addEventListener('click', applyPerLetterSizeVisibility);
   applyPerLetterSizeVisibility();
-  function applyRepeatVisibility() {
-    var on = repeatToggleBtn && repeatToggleBtn.dataset.on === '1';
-    repeatDependentRows.forEach(function (r) { r.style.display = on ? '' : 'none'; });
-  }
-  if (repeatToggleBtn) repeatToggleBtn.addEventListener('click', applyRepeatVisibility);
-  applyRepeatVisibility();
-  function applyRingVisibility() {
-    var on = ringToggleBtn && ringToggleBtn.dataset.on === '1';
-    ringDependentRows.forEach(function (r) { r.style.display = on ? '' : 'none'; });
-  }
-  if (ringToggleBtn) ringToggleBtn.addEventListener('click', applyRingVisibility);
-  applyRingVisibility();
   if (typeof customAfterBuild === 'function') customAfterBuild();
 
   // Auto-restore community design values — runs on load (if #shader) or when shader tab first opens
@@ -1218,8 +1195,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     applyOutlineVisibility();
     applyWordVisibility();
     applyPerLetterSizeVisibility();
-    applyRepeatVisibility();
-    applyRingVisibility();
   }
 
   // Restore state from URL hash — supports #share=<id> (worker) and legacy #s=<base64>
