@@ -200,7 +200,7 @@
     <option value="line-text">Line Text</option>
     <option value="scaling-letters">Scaling Letters</option>
     <option value="outline-pulse">Outline Pulse</option>
-    <option value="three-contours">Three Contours</option>
+    <option value="contour-pareidolia">Contour Pareidolia</option>
   </select>
   <button id="export-btn">Export PNG</button>
 </div>
@@ -1750,8 +1750,8 @@ SHADERS['outline-pulse'] = {
   },
 };
 
-// ── Three Contours ───────────────────────────────────────────────────────────
-SHADERS['three-contours'] = {
+// ── Contour Pareidolia ────────────────────────────────────────────────────────
+SHADERS['contour-pareidolia'] = {
   controls: [
     { type: 'header', label: 'Terrain — Hill 1' },
     { key: 'u_hill1_x', label: 'X', type: 'range', min: -1, max: 1, step: 0.01, value: -0.3 },
@@ -1776,7 +1776,7 @@ SHADERS['three-contours'] = {
     { type: 'header', label: 'Color Palette' },
     { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
       tip: 'Off = cosine palette. On = 4-stop linear gradient by elevation.' },
-    { key: '_tc_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
+    { key: '_cp_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
       options: [
         { label: 'Rainbow',   value: 'Rainbow'   },
         { label: 'Cool Blue', value: 'Cool Blue' },
@@ -1789,7 +1789,7 @@ SHADERS['three-contours'] = {
     { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080', tip: 'Amplitude.' },
     { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff', tip: 'Frequency.' },
     { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab', tip: 'Phase.' },
-    { key: '_tc_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
+    { key: '_cp_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
       options: [
         { label: 'Neon',   value: 'Neon'   }, { label: 'Retro',  value: 'Retro'  },
         { label: 'Sunset', value: 'Sunset' }, { label: 'Aurora', value: 'Aurora' },
@@ -1833,9 +1833,9 @@ SHADERS['three-contours'] = {
     }
     applyCosinePreset(cosinePresets['Rainbow']);
     apply4StopPreset(fourStopPresets['Neon']);
-    var cSel = document.querySelector('[data-param-key="_tc_palette_preset"]');
+    var cSel = document.querySelector('[data-param-key="_cp_palette_preset"]');
     if (cSel) cSel.addEventListener('change', function(){ var p=cosinePresets[this.value]; if(p) applyCosinePreset(p); });
-    var fSel = document.querySelector('[data-param-key="_tc_4color_preset"]');
+    var fSel = document.querySelector('[data-param-key="_cp_4color_preset"]');
     if (fSel) fSel.addEventListener('change', function(){ var p=fourStopPresets[this.value]; if(p) apply4StopPreset(p); });
   },
 };
