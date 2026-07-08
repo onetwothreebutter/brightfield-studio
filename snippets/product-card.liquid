@@ -7,10 +7,20 @@
   {% render 'product-card', product: product %}
 {% enddoc %}
 
+{%- assign new_cutoff = 'now' | date: '%s' | minus: 2592000 -%}
+{%- assign published_at_unix = product.published_at | date: '%s' -%}
+{%- assign is_new = false -%}
+{%- if published_at_unix and published_at_unix >= new_cutoff -%}
+  {%- assign is_new = true -%}
+{%- endif -%}
+
 <article class="product-card">
   <div class="product-card__glow" aria-hidden="true"></div>
   <a href="{{ product.url }}" class="product-card__link" aria-label="{{ product.title | escape }}">
     <div class="product-card__media">
+      {%- if is_new -%}
+        <span class="product-card__badge product-card__badge--new">New</span>
+      {%- endif -%}
       {%- if product.featured_image -%}
         {{
           product.featured_image
