@@ -340,18 +340,7 @@ SHADERS['chladni'] = {
       var steps = Math.floor((max - min) / step);
       return +(Math.min(max, min + Math.round(Math.random() * steps) * step).toFixed(10));
     }
-    function vividHex(hue) {
-      var s = 0.85, v = 0.95;
-      var i = Math.floor(hue * 6), f = hue * 6 - i;
-      var p = v * (1-s), q = v * (1-f*s), t = v * (1-(1-f)*s);
-      var r, g, b;
-      switch (i % 6) {
-        case 0: r=v; g=t; b=p; break; case 1: r=q; g=v; b=p; break;
-        case 2: r=p; g=v; b=t; break; case 3: r=p; g=q; b=v; break;
-        case 4: r=t; g=p; b=v; break; case 5: r=v; g=p; b=q; break;
-      }
-      return '#' + [r,g,b].map(function(c){ return Math.round(c*255).toString(16).padStart(2,'0'); }).join('');
-    }
+    // vividHex(hue) is defined in the shared helpers section below.
     function setColor(key, hex) {
       var inp = body.querySelector('[data-param-key="' + key + '"]');
       if (!inp) return;
@@ -1249,6 +1238,20 @@ function toHex(v) {
     return b.length===1?'0'+b:b;
   }).join('');
 }
+// Vivid hex color at a given hue (0–1), fixed high saturation + brightness —
+// mirrors vividHex() in snippets/shader-controls-base.liquid.
+function vividHex(hue) {
+  var s = 0.85, v = 0.95;
+  var i = Math.floor(hue * 6), f = hue * 6 - i;
+  var p = v * (1-s), q = v * (1-f*s), t = v * (1-(1-f)*s);
+  var r, g, b;
+  switch (i % 6) {
+    case 0: r=v; g=t; b=p; break; case 1: r=q; g=v; b=p; break;
+    case 2: r=p; g=v; b=t; break; case 3: r=p; g=q; b=v; break;
+    case 4: r=t; g=p; b=v; break; case 5: r=v; g=p; b=q; break;
+  }
+  return '#' + [r,g,b].map(function(c){ return Math.round(c*255).toString(16).padStart(2,'0'); }).join('');
+}
 
 // ── GUI builder ───────────────────────────────────────────────────────────────
 function buildGUI(shader) {
@@ -1501,7 +1504,7 @@ function buildGUI(shader) {
         el.classList.toggle('is-on',isOn);
         window._shaderState.values[ctrl.key]=isOn?1:0;
       } else if (ctrl.type==='color') {
-        var hex='#'+Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0');
+        var hex=vividHex(Math.random());
         el.value=hex; window._shaderState.values[ctrl.key]=hexToRgb(hex);
       } else if (ctrl.type==='select') {
         var opts=ctrl.options, chosen=opts[Math.floor(Math.random()*opts.length)];

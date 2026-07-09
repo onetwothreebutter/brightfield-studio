@@ -31,6 +31,7 @@ Never redefine these locally in a shader snippet — they are already in scope:
 - `COSINE_PRESETS` — 5 cosine palette presets (Rainbow, Cool Blue, Neon Heat, Cyberpunk, Golden)
 - `FOUR_STOP_PRESETS` — 5 four-stop presets (Neon, Retro, Sunset, Aurora, Dusk)
 - `toHex(v)` — float[3] → hex string
+- `vividHex(hue)` — hue (0–1) → vivid hex string at fixed high saturation/value; used by the global Randomize button for every `type: 'color'` control, and by any shader's own custom randomize button (e.g. Chladni's two-hue pattern randomizer)
 - `applyColors(keyValPairs)` — writes to `_shaderState.values` + updates color pickers + dispatches input event
 - Font preload `forEach` — preloads all `SHADER_FONTS` at 700 weight
 
