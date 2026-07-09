@@ -1118,7 +1118,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         window._shaderState.values[ctrl.key] = isOn ? 1 : 0;
 
       } else if (ctrl.type === 'color') {
-        var hex = '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0');
+        var hex = vividHex(Math.random());
         el.value = hex;
         el.dispatchEvent(new Event('input', { bubbles: true }));
 

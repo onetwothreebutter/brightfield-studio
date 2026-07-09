@@ -46,6 +46,26 @@ function toHex(v) {
   }).join('');
 }
 
+// Vivid hex color at a given hue (0–1), fixed high saturation + brightness —
+// avoids the muddy/dull tones a fully uniform-random hex can land on.
+function vividHex(hue) {
+  var s = 0.85, v = 0.95;
+  var i = Math.floor(hue * 6), f = hue * 6 - i;
+  var p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+  var r, g, b;
+  switch (i % 6) {
+    case 0: r = v; g = t; b = p; break;
+    case 1: r = q; g = v; b = p; break;
+    case 2: r = p; g = v; b = t; break;
+    case 3: r = p; g = q; b = v; break;
+    case 4: r = t; g = p; b = v; break;
+    case 5: r = v; g = p; b = q; break;
+  }
+  return '#' + [r, g, b].map(function (c) {
+    return Math.round(c * 255).toString(16).padStart(2, '0');
+  }).join('');
+}
+
 function applyColors(keyValPairs) {
   keyValPairs.forEach(function (pair) {
     window._shaderState.values[pair[0]] = pair[1];
