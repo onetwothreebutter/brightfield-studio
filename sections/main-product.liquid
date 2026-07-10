@@ -1873,7 +1873,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       .catch(function (err) {
         console.error('[add-to-cart] caught error:', err);
         window.bfTrack('add_to_cart_failure', { shader: '{{ shader_file }}', error: err.message });
-        alert('Could not add to cart: ' + err.message);
+        alert('Could not add to cart: ' + err.message + ' — please try again or contact us.');
         modalOrder.disabled = false;
         modalOrder.textContent = 'Add to Cart';
         if (orderStatus) { orderStatus.textContent = ''; orderStatus.style.display = 'none'; }
