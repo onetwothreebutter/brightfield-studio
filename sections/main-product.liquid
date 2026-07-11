@@ -1514,6 +1514,30 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   var printArea    = (btn.dataset.printArea || '0.20,0.15,0.60,0.68').split(',').map(Number);
   var _pendingDesign = null;
 
+  // Wraps fetch with a hard timeout via AbortController. Without this, a stalled
+  // worker call or Shopify Admin API request left the customer on "Adding…" forever
+  // with a disabled button and no way to recover except abandoning the page — the
+  // timeout instead rejects so callers' existing .catch handlers (which already
+  // reset the UI) fire.
+  function fetchWithTimeout(url, options, timeoutMs) {
+    var controller = new AbortController();
+    var timedOut   = false;
+    var timer = setTimeout(function () { timedOut = true; controller.abort(); }, timeoutMs);
+    var opts = Object.assign({}, options, { signal: controller.signal });
+    return fetch(url, opts).then(function (r) {
+      clearTimeout(timer);
+      return r;
+    }, function (err) {
+      clearTimeout(timer);
+      if (timedOut) {
+        var timeoutErr = new Error('Request timed out');
+        timeoutErr.isTimeout = true;
+        throw timeoutErr;
+      }
+      throw err;
+    });
+  }
+
   // Preload shirt template so compositing is instant on click
   var shirtImg = new Image();
   shirtImg.crossOrigin = 'anonymous';
@@ -1635,39 +1659,53 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           };
           document.dispatchEvent(new CustomEvent('brightfield:design-saved', { detail: pendingDetail }));
 
-          // Upload design + composite to R2 in the background
-          var uploadPromise = fetch(workerUrl + '/save-preview', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({
-              designImage:   base64png,
-              checkoutImage: base64CheckoutPng,
-              mockupImage:   compositeDataUrl.split(',')[1],
-              deviceId:      window.RecentDesigns ? window.RecentDesigns.getDeviceId() : null,
-              shader:        '{{ shader_file }}',
-              productHandle: '{{ product.handle }}',
-              values:        snapshotValues
-            })
-          })
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
-            if (!data.design_url) throw new Error(data.error || 'Upload failed');
-            // Upgrade the strip card: swap data URL → stable R2 URL, enable delete
-            pendingDetail.id = data.id || null;
-            pendingDetail.mockupUrl = data.mockup_url;
-            var stripContainer = document.getElementById('product-recent-designs-container');
-            if (stripContainer) {
-              var firstImg = stripContainer.querySelector('.recent-designs__card-img');
-              if (firstImg && firstImg.src.startsWith('data:')) firstImg.src = data.mockup_url;
-            }
-            return data;
-          });
+          // Upload design + composite to R2 in the background. Wrapped in a function
+          // (rather than a bare promise) so a failed attempt can be retried from the
+          // Add to Cart click — see _pendingDesign.getUploadPromise() below.
+          var SAVE_PREVIEW_TIMEOUT_MS = 20000;
+          function startUpload() {
+            return fetchWithTimeout(workerUrl + '/save-preview', {
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body:    JSON.stringify({
+                designImage:   base64png,
+                checkoutImage: base64CheckoutPng,
+                mockupImage:   compositeDataUrl.split(',')[1],
+                deviceId:      window.RecentDesigns ? window.RecentDesigns.getDeviceId() : null,
+                shader:        '{{ shader_file }}',
+                productHandle: '{{ product.handle }}',
+                values:        snapshotValues
+              })
+            }, SAVE_PREVIEW_TIMEOUT_MS)
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (!data.design_url) throw new Error(data.error || 'Upload failed');
+              // Upgrade the strip card: swap data URL → stable R2 URL, enable delete
+              pendingDetail.id = data.id || null;
+              pendingDetail.mockupUrl = data.mockup_url;
+              var stripContainer = document.getElementById('product-recent-designs-container');
+              if (stripContainer) {
+                var firstImg = stripContainer.querySelector('.recent-designs__card-img');
+                if (firstImg && firstImg.src.startsWith('data:')) firstImg.src = data.mockup_url;
+              }
+              return data;
+            });
+          }
 
           _pendingDesign = {
             shader:        '{{ shader_file }}',
             productHandle: '{{ product.handle }}',
             values:        snapshotValues,
-            uploadPromise: uploadPromise,
+            uploadPromise: startUpload(),
+            // Returns the in-flight/most recent upload attempt, retrying if the
+            // last one failed (e.g. timed out) instead of re-surfacing the same
+            // rejection on every subsequent Add to Cart / community-submit click.
+            getUploadPromise: function () {
+              return this.uploadPromise.catch(function () {
+                _pendingDesign.uploadPromise = startUpload();
+                return _pendingDesign.uploadPromise;
+              });
+            }
           };
 
           btn.disabled    = false;
@@ -1713,7 +1751,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     console.log('[add-to-cart] starting — shopifyVariantId:', shopifyVariantId);
     window.bfTrack('add_to_cart_start', { shader: '{{ shader_file }}' });
 
-    _pendingDesign.uploadPromise
+    _pendingDesign.getUploadPromise()
       .then(function (data) {
         console.log('[add-to-cart] upload resolved:', { design_url: data.design_url, mockup_url: data.mockup_url, checkout_image_url: data.checkout_image_url });
         window.bfTrack('add_to_cart_upload_done', { shader: '{{ shader_file }}' });
@@ -1728,11 +1766,12 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           variantId:        shopifyVariantId
         };
         console.log('[create-product] POST', cpBody);
-        return fetch(workerUrl + '/create-product', {
+        var CREATE_PRODUCT_TIMEOUT_MS = 45000; // createShopifyProduct runs ~15 sequential Admin API calls
+        return fetchWithTimeout(workerUrl + '/create-product', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(cpBody)
-        })
+        }, CREATE_PRODUCT_TIMEOUT_MS)
         .then(function (cpRes) {
           return cpRes.json().then(function (cpData) {
             console.log('[create-product] response', cpRes.status, cpData);
@@ -1770,9 +1809,9 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
             // spaced so they never look like a bot burst.
             function waitForVariantAvailable() {
               if (!newHandle) return Promise.resolve();
-              var POLL_DELAY_MS = 1500, MAX_POLLS = 20; // up to ~30s
+              var POLL_DELAY_MS = 1500, MAX_POLLS = 20, POLL_TIMEOUT_MS = 8000; // up to ~30s
               function poll(n) {
-                return fetch('/products/' + newHandle + '.js', { cache: 'no-store' })
+                return fetchWithTimeout('/products/' + newHandle + '.js', { cache: 'no-store' }, POLL_TIMEOUT_MS)
                   .then(function (r) { return r.ok ? r.json() : null; })
                   .catch(function () { return null; })
                   .then(function (prod) {
@@ -1798,13 +1837,14 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
             }
             var MAX_ADD_TO_CART_ATTEMPTS = 3;
             var ADD_RETRY_DELAY_MS = 8000;
+            var ADD_TO_CART_TIMEOUT_MS = 15000;
             function addToCartWithRetry(attempt) {
               console.log('[add-to-cart] attempt', attempt, 'variantId:', cartVariantId);
-              return fetch('/cart/add.js', {
+              return fetchWithTimeout('/cart/add.js', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: cartPayload
-              }).then(function (r) {
+              }, ADD_TO_CART_TIMEOUT_MS).then(function (r) {
                 if (!r.ok && attempt < MAX_ADD_TO_CART_ATTEMPTS) {
                   return r.text().then(function (text) {
                     var desc = '';
@@ -1829,6 +1869,18 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
                 }
                 console.log('[add-to-cart] attempt', attempt, 'result — status:', r.status);
                 return r;
+              }, function (err) {
+                // Network failure or timeout on the request itself (not an HTTP error
+                // response) — retry like a transient status instead of failing the
+                // whole order on one dropped connection.
+                if (attempt < MAX_ADD_TO_CART_ATTEMPTS) {
+                  console.warn('[add-to-cart] attempt', attempt, 'network error — retrying:', err.message);
+                  return new Promise(function (resolve) {
+                    if (orderStatus) orderStatus.textContent = 'Finalizing your order…';
+                    setTimeout(function () { resolve(addToCartWithRetry(attempt + 1)); }, ADD_RETRY_DELAY_MS);
+                  });
+                }
+                throw err;
               });
             }
             if (orderStatus) orderStatus.textContent = 'Finalizing your order…';
@@ -1872,8 +1924,11 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       })
       .catch(function (err) {
         console.error('[add-to-cart] caught error:', err);
-        window.bfTrack('add_to_cart_failure', { shader: '{{ shader_file }}', error: err.message });
-        alert('Could not add to cart: ' + err.message);
+        window.bfTrack('add_to_cart_failure', { shader: '{{ shader_file }}', error: err.message, timeout: !!err.isTimeout });
+        var msg = err.isTimeout
+          ? 'This is taking longer than expected. Please try again.'
+          : 'Could not add to cart: ' + err.message;
+        alert(msg);
         modalOrder.disabled = false;
         modalOrder.textContent = 'Add to Cart';
         if (orderStatus) { orderStatus.textContent = ''; orderStatus.style.display = 'none'; }
@@ -1930,7 +1985,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       communitySubmit.textContent = 'Submitting…';
       if (communityError) communityError.style.display = 'none';
 
-      _pendingDesign.uploadPromise
+      _pendingDesign.getUploadPromise()
         .then(function (data) {
           return fetch(workerUrl + '/community/submit', {
             method:  'POST',

@@ -841,20 +841,30 @@ async function handleCreateProduct(request, env, origin) {
   console.log('[create-product] variantId:', variantId, 'shader:', shader);
   const gid = `gid://shopify/ProductVariant/${variantId}`;
 
-  // Fetch original variant price + parent product title
-  const variantData = await shopifyAdmin(env,
-    `query GetVariant($id: ID!) {
-      node(id: $id) {
-        ... on ProductVariant {
-          title
-          price
-          selectedOptions { name value }
-          product { title }
+  // Fetch original variant price + parent product title. Wrapped in try/catch —
+  // unlike the createShopifyProduct() call below, this one used to run unguarded,
+  // so a network failure here threw an unhandled rejection out of the Worker's
+  // fetch() handler instead of a CORS-headered JSON response, leaving the client
+  // with an opaque network error it couldn't distinguish from a CORS failure.
+  let variantData;
+  try {
+    variantData = await shopifyAdmin(env,
+      `query GetVariant($id: ID!) {
+        node(id: $id) {
+          ... on ProductVariant {
+            title
+            price
+            selectedOptions { name value }
+            product { title }
+          }
         }
-      }
-    }`,
-    { id: gid }
-  );
+      }`,
+      { id: gid }
+    );
+  } catch (err) {
+    console.error('[create-product] variant lookup request failed:', err.message);
+    return new Response(JSON.stringify({ error: 'Could not look up variant' }), { status: 502, headers });
+  }
 
   const variant = variantData?.data?.node;
   if (!variant) {
