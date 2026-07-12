@@ -1696,6 +1696,13 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
             shader:        '{{ shader_file }}',
             productHandle: '{{ product.handle }}',
             values:        snapshotValues,
+            // Sent to /create-product on every attempt for this design (including a
+            // manual retry after a timeout) so the worker can recognize a repeat
+            // request and return the product it already created instead of creating
+            // a duplicate — see the idempotency guard in handleCreateProduct.
+            createProductKey: (window.crypto && window.crypto.randomUUID)
+              ? window.crypto.randomUUID()
+              : ('key-' + Date.now() + '-' + Math.random().toString(36).slice(2)),
             uploadPromise: startUpload(),
             // Returns the in-flight/most recent upload attempt, retrying if the
             // last one failed (e.g. timed out) instead of re-surfacing the same
@@ -1757,13 +1764,14 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         window.bfTrack('add_to_cart_upload_done', { shader: '{{ shader_file }}' });
         if (orderStatus) orderStatus.textContent = 'Creating your product…';
         var cpBody = {
-          designUrl:        data.design_url,
-          mockupUrl:        data.mockup_url,
-          checkoutImageUrl: data.checkout_image_url || data.design_url,
-          shader:           _pendingDesign.shader,
-          productHandle:    _pendingDesign.productHandle,
-          values:           _pendingDesign.values,
-          variantId:        shopifyVariantId
+          designUrl:         data.design_url,
+          mockupUrl:         data.mockup_url,
+          checkoutImageUrl:  data.checkout_image_url || data.design_url,
+          shader:            _pendingDesign.shader,
+          productHandle:     _pendingDesign.productHandle,
+          values:            _pendingDesign.values,
+          variantId:         shopifyVariantId,
+          createProductKey:  _pendingDesign.createProductKey
         };
         console.log('[create-product] POST', cpBody);
         var CREATE_PRODUCT_TIMEOUT_MS = 45000; // createShopifyProduct runs ~15 sequential Admin API calls
@@ -1835,6 +1843,24 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
               }
               return poll(1);
             }
+            // A network error or timeout on /cart/add.js is ambiguous — the POST may
+            // have already reached Shopify and added the item before the client gave
+            // up waiting for a response. Retrying blindly risks a second line item or
+            // a doubled quantity, so this checks the live cart (a safe, repeatable
+            // GET) for a line matching this exact design before retrying or failing.
+            var CART_CHECK_TIMEOUT_MS = 8000;
+            function cartAlreadyHasItem() {
+              return fetchWithTimeout('/cart.js', { cache: 'no-store' }, CART_CHECK_TIMEOUT_MS)
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .catch(function () { return null; })
+                .then(function (cart) {
+                  if (!cart || !cart.items) return false;
+                  return cart.items.some(function (item) {
+                    return String(item.id) === String(cartVariantId) &&
+                      item.properties && item.properties['_design_url'] === cartProps['_design_url'];
+                  });
+                });
+            }
             var MAX_ADD_TO_CART_ATTEMPTS = 3;
             var ADD_RETRY_DELAY_MS = 8000;
             var ADD_TO_CART_TIMEOUT_MS = 15000;
@@ -1871,16 +1897,22 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
                 return r;
               }, function (err) {
                 // Network failure or timeout on the request itself (not an HTTP error
-                // response) — retry like a transient status instead of failing the
-                // whole order on one dropped connection.
-                if (attempt < MAX_ADD_TO_CART_ATTEMPTS) {
-                  console.warn('[add-to-cart] attempt', attempt, 'network error — retrying:', err.message);
-                  return new Promise(function (resolve) {
-                    if (orderStatus) orderStatus.textContent = 'Finalizing your order…';
-                    setTimeout(function () { resolve(addToCartWithRetry(attempt + 1)); }, ADD_RETRY_DELAY_MS);
-                  });
-                }
-                throw err;
+                // response) — outcome unknown, so check the cart before deciding
+                // whether to retry or give up (see cartAlreadyHasItem above).
+                console.warn('[add-to-cart] attempt', attempt, 'network error — checking cart before retry:', err.message);
+                return cartAlreadyHasItem().then(function (alreadyAdded) {
+                  if (alreadyAdded) {
+                    console.log('[add-to-cart] item already in cart from a prior attempt — treating as success');
+                    return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+                  }
+                  if (attempt < MAX_ADD_TO_CART_ATTEMPTS) {
+                    return new Promise(function (resolve) {
+                      if (orderStatus) orderStatus.textContent = 'Finalizing your order…';
+                      setTimeout(function () { resolve(addToCartWithRetry(attempt + 1)); }, ADD_RETRY_DELAY_MS);
+                    });
+                  }
+                  throw err;
+                });
               });
             }
             if (orderStatus) orderStatus.textContent = 'Finalizing your order…';

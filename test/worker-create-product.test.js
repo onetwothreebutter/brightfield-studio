@@ -301,6 +301,55 @@ describe('POST /create-product', () => {
     expect(priceVars.variants.every((v) => v.price === '25.00')).toBe(true);
   });
 
+  it('returns the cached product on a repeat request with the same createProductKey instead of creating a duplicate', async () => {
+    // Regression test: a client-side timeout on /create-product doesn't mean
+    // createShopifyProduct() failed server-side — it may have finished just as
+    // the client gave up and retried with the same key.
+    const env = makeEnv();
+    const fetchMock = makeShopifyFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const body = createProductBody({ createProductKey: 'key-abc-123' });
+    const first = await worker.fetch(makeRequest('POST', '/create-product', body), env);
+    expect(first.status).toBe(200);
+    const firstBody = await first.json();
+
+    const second = await worker.fetch(makeRequest('POST', '/create-product', body), env);
+    expect(second.status).toBe(200);
+    const secondBody = await second.json();
+    expect(secondBody).toEqual(firstBody);
+
+    // Only the first request should have actually run productCreate — the
+    // repeat should be served from the idempotency cache, not create a
+    // second Shopify product.
+    const createCalls = fetchMock.calls.filter((c) => c.url.includes('graphql.json') && JSON.parse(c.opts.body).query.includes('mutation CreateProduct'));
+    expect(createCalls).toHaveLength(1);
+  });
+
+  it('creates a distinct product for a different createProductKey (no false-positive cache hit)', async () => {
+    const env = makeEnv();
+    const fetchMock = makeShopifyFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await worker.fetch(makeRequest('POST', '/create-product', createProductBody({ createProductKey: 'key-one' })), env);
+    await worker.fetch(makeRequest('POST', '/create-product', createProductBody({ createProductKey: 'key-two' })), env);
+
+    const createCalls = fetchMock.calls.filter((c) => c.url.includes('graphql.json') && JSON.parse(c.opts.body).query.includes('mutation CreateProduct'));
+    expect(createCalls).toHaveLength(2);
+  });
+
+  it('creates a distinct product on every request when no createProductKey is provided (backward compatible)', async () => {
+    const env = makeEnv();
+    const fetchMock = makeShopifyFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await worker.fetch(makeRequest('POST', '/create-product', createProductBody()), env);
+    await worker.fetch(makeRequest('POST', '/create-product', createProductBody()), env);
+
+    const createCalls = fetchMock.calls.filter((c) => c.url.includes('graphql.json') && JSON.parse(c.opts.body).query.includes('mutation CreateProduct'));
+    expect(createCalls).toHaveLength(2);
+  });
+
   it('merges extraTags (used by E2E tests to tag disposable products) into the product tags', async () => {
     const fetchMock = makeShopifyFetch();
     vi.stubGlobal('fetch', fetchMock);
