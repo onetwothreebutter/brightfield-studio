@@ -29,12 +29,15 @@ function makeR2() {
   return {
     _store: store,
     get:    vi.fn(async (key) => {
-      const val = store.get(key);
-      if (val === undefined) return null;
-      return { text: async () => val };
+      if (!store.has(key)) return null;
+      return { text: async () => store.get(key) };
     }),
     put:    vi.fn(async (key, value) => { store.set(key, typeof value === 'string' ? value : String(value)); }),
-    delete: vi.fn(async () => {}),
+    // Was a no-op stub, unlike the real R2 binding and the other makeR2 mocks in
+    // this suite (worker.test.js, worker-designs.test.js) — a test that put()s a
+    // key, delete()s it, then get()s it again would have silently seen the stale
+    // value instead of null.
+    delete: vi.fn(async (key) => { store.delete(key); }),
   };
 }
 
@@ -88,6 +91,9 @@ function makeShopifyFetch(overrides = {}) {
     const query = body.query || '';
 
     if (query.includes('mutation CreateProduct')) {
+      if (overrides.createProductTransportFails) {
+        throw new TypeError('Network connection lost');
+      }
       if (overrides.productCreateUserErrors) {
         return jsonRes({ data: { productCreate: { product: null, userErrors: overrides.productCreateUserErrors } } });
       }
@@ -373,6 +379,19 @@ describe('POST /create-product', () => {
     vi.stubGlobal('fetch', makeShopifyFetch({ productCreateNoVariant: true }));
     const res = await worker.fetch(makeRequest('POST', '/create-product', createProductBody()), makeEnv());
     expect(res.status).toBe(422);
+  });
+
+  // createShopifyProduct() runs ~15 sequential Admin API calls; only the first
+  // (productCreate) is exercised here, but any of them failing at the transport
+  // level (not a Shopify userErrors response) should classify the same way — a
+  // 502, matching the GetVariant lookup's classification above, not a 422 as if
+  // the customer's input were the problem.
+  it('returns 502 (not 422) when a call inside createShopifyProduct fails at the transport level', async () => {
+    vi.stubGlobal('fetch', makeShopifyFetch({ createProductTransportFails: true }));
+    const res = await worker.fetch(makeRequest('POST', '/create-product', createProductBody()), makeEnv());
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).toBe('Network connection lost');
   });
 
   it('falls back to the default variant when productOptionsCreate (size setup) fails non-fatally', async () => {

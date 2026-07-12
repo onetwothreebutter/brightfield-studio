@@ -545,7 +545,9 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
   const userErrors = createData?.data?.productCreate?.userErrors;
   if (userErrors?.length) {
     console.error(logPrefix, 'userErrors:', JSON.stringify(userErrors));
-    throw new Error(userErrors[0].message);
+    const err = new Error(userErrors[0].message);
+    err.isValidationError = true; // bad input, not a transport/infra failure — see handleCreateProduct's catch
+    throw err;
   }
 
   const newProductGid    = createData?.data?.productCreate?.product?.id;
@@ -555,7 +557,9 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
   const inventoryItemGid = newVariantNode?.inventoryItem?.id;
   if (!newVariantGid) {
     console.error(logPrefix, 'no variant returned:', JSON.stringify(createData));
-    throw new Error('Product created but no variant returned');
+    const err = new Error('Product created but no variant returned');
+    err.isValidationError = true; // productCreate itself succeeded — a data-shape anomaly, not a transport failure
+    throw err;
   }
 
   // Step 2: add Size option, which auto-creates one variant per size and removes the default Title variant
@@ -907,7 +911,14 @@ async function handleCreateProduct(request, env, origin) {
       requestedSize,
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 422, headers });
+    // createShopifyProduct() runs ~15 sequential Admin API calls; a rejection can
+    // mean Shopify rejected the input (userErrors, flagged isValidationError above —
+    // a genuine 422) or that one of those calls failed at the network/transport
+    // level partway through (unmarked — a 502, same classification as the GetVariant
+    // lookup failure above, not the client's fault and worth a plain retry).
+    console.error('[create-product] createShopifyProduct failed:', err.message);
+    const status = err.isValidationError ? 422 : 502;
+    return new Response(JSON.stringify({ error: err.message }), { status, headers });
   }
 
   console.log('[create-product] returning variantId:', result.newVariantId);

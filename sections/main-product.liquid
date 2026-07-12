@@ -1692,7 +1692,13 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
             });
           }
 
-          _pendingDesign = {
+          // Built as a local object, then assigned to _pendingDesign, so the retry
+          // closure below captures this specific design via `thisDesign` instead of
+          // the mutable _pendingDesign global. Without that indirection, a retry from
+          // an old design's failed upload could resolve after the customer starts a
+          // second "Preview on Shirt" and overwrite the NEW _pendingDesign's upload
+          // promise with the OLD design's data.
+          var thisDesign = {
             shader:        '{{ shader_file }}',
             productHandle: '{{ product.handle }}',
             values:        snapshotValues,
@@ -1708,12 +1714,13 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
             // last one failed (e.g. timed out) instead of re-surfacing the same
             // rejection on every subsequent Add to Cart / community-submit click.
             getUploadPromise: function () {
-              return this.uploadPromise.catch(function () {
-                _pendingDesign.uploadPromise = startUpload();
-                return _pendingDesign.uploadPromise;
+              return thisDesign.uploadPromise.catch(function () {
+                thisDesign.uploadPromise = startUpload();
+                return thisDesign.uploadPromise;
               });
             }
           };
+          _pendingDesign = thisDesign;
 
           btn.disabled    = false;
           btn.textContent = 'Preview on Shirt';
@@ -1817,7 +1824,10 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
             // spaced so they never look like a bot burst.
             function waitForVariantAvailable() {
               if (!newHandle) return Promise.resolve();
-              var POLL_DELAY_MS = 1500, MAX_POLLS = 20, POLL_TIMEOUT_MS = 8000; // up to ~30s
+              // ~30s typical (20 polls × 1.5s delay, each resolving quickly). Worst
+              // case, if every poll itself times out, is ~190s (20 × 8s timeout +
+              // 19 × 1.5s delay) before falling through to "adding anyway" below.
+              var POLL_DELAY_MS = 1500, MAX_POLLS = 20, POLL_TIMEOUT_MS = 8000;
               function poll(n) {
                 return fetchWithTimeout('/products/' + newHandle + '.js', { cache: 'no-store' }, POLL_TIMEOUT_MS)
                   .then(function (r) { return r.ok ? r.json() : null; })
@@ -1866,6 +1876,30 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
             var ADD_TO_CART_TIMEOUT_MS = 15000;
             function addToCartWithRetry(attempt) {
               console.log('[add-to-cart] attempt', attempt, 'variantId:', cartVariantId);
+
+              // A network failure, a request timeout, or a failure to read the response
+              // body back are all ambiguous — the POST may have already reached Shopify
+              // before the client gave up. All three route through this same check-the-
+              // cart-before-retry path (see cartAlreadyHasItem above) rather than only
+              // the fetch-level rejection, so a body-read failure doesn't fall straight
+              // through to the final .catch and misreport a successful add as a failure.
+              function handleAmbiguousOutcome(err) {
+                console.warn('[add-to-cart] attempt', attempt, 'ambiguous outcome — checking cart before retry:', err.message);
+                return cartAlreadyHasItem().then(function (alreadyAdded) {
+                  if (alreadyAdded) {
+                    console.log('[add-to-cart] item already in cart from a prior attempt — treating as success');
+                    return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+                  }
+                  if (attempt < MAX_ADD_TO_CART_ATTEMPTS) {
+                    return new Promise(function (resolve) {
+                      if (orderStatus) orderStatus.textContent = 'Finalizing your order…';
+                      setTimeout(function () { resolve(addToCartWithRetry(attempt + 1)); }, ADD_RETRY_DELAY_MS);
+                    });
+                  }
+                  throw err;
+                });
+              }
+
               return fetchWithTimeout('/cart/add.js', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1891,29 +1925,11 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
                     }
                     // Different error — reconstruct a Response-like object to pass along
                     return new Response(text, { status: r.status, headers: { 'Content-Type': 'application/json' } });
-                  });
+                  }, handleAmbiguousOutcome);
                 }
                 console.log('[add-to-cart] attempt', attempt, 'result — status:', r.status);
                 return r;
-              }, function (err) {
-                // Network failure or timeout on the request itself (not an HTTP error
-                // response) — outcome unknown, so check the cart before deciding
-                // whether to retry or give up (see cartAlreadyHasItem above).
-                console.warn('[add-to-cart] attempt', attempt, 'network error — checking cart before retry:', err.message);
-                return cartAlreadyHasItem().then(function (alreadyAdded) {
-                  if (alreadyAdded) {
-                    console.log('[add-to-cart] item already in cart from a prior attempt — treating as success');
-                    return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
-                  }
-                  if (attempt < MAX_ADD_TO_CART_ATTEMPTS) {
-                    return new Promise(function (resolve) {
-                      if (orderStatus) orderStatus.textContent = 'Finalizing your order…';
-                      setTimeout(function () { resolve(addToCartWithRetry(attempt + 1)); }, ADD_RETRY_DELAY_MS);
-                    });
-                  }
-                  throw err;
-                });
-              });
+              }, handleAmbiguousOutcome);
             }
             if (orderStatus) orderStatus.textContent = 'Finalizing your order…';
             return waitForVariantAvailable().then(function () {
@@ -2017,9 +2033,10 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       communitySubmit.textContent = 'Submitting…';
       if (communityError) communityError.style.display = 'none';
 
+      var COMMUNITY_SUBMIT_TIMEOUT_MS = 20000;
       _pendingDesign.getUploadPromise()
         .then(function (data) {
-          return fetch(workerUrl + '/community/submit', {
+          return fetchWithTimeout(workerUrl + '/community/submit', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({
@@ -2032,7 +2049,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
               creatorName:      name,
               creatorEmail:     email
             })
-          });
+          }, COMMUNITY_SUBMIT_TIMEOUT_MS);
         })
         .then(function (r) {
           if (!r.ok) throw new Error('Submit failed');
