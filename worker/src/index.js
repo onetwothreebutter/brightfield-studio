@@ -833,28 +833,54 @@ async function handleCreateProduct(request, env, origin) {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
   }
 
-  const { designUrl, mockupUrl, checkoutImageUrl, shader, productHandle, values, variantId, extraTags } = body;
+  const { designUrl, mockupUrl, checkoutImageUrl, shader, productHandle, values, variantId, extraTags, createProductKey } = body;
   if (!designUrl || !mockupUrl || !variantId) {
     return new Response(JSON.stringify({ error: 'Missing designUrl, mockupUrl, or variantId' }), { status: 400, headers });
+  }
+
+  // Idempotency guard: a client-side timeout on this request doesn't mean
+  // createShopifyProduct() failed server-side — it can finish creating a real
+  // product just after the client gives up waiting. The client sends the same
+  // createProductKey on every attempt for a given design (including a manual
+  // retry after the "taking longer than expected" message), so a repeat
+  // request returns the product already created instead of creating a
+  // duplicate.
+  const idempotencyKey = typeof createProductKey === 'string' && createProductKey ? createProductKey : null;
+  if (idempotencyKey) {
+    const cached = await readJson(env, `create-product-keys/${idempotencyKey}.json`);
+    if (cached) {
+      console.log('[create-product] idempotency hit — returning previously created product:', cached);
+      return new Response(JSON.stringify(cached), { status: 200, headers });
+    }
   }
 
   console.log('[create-product] variantId:', variantId, 'shader:', shader);
   const gid = `gid://shopify/ProductVariant/${variantId}`;
 
-  // Fetch original variant price + parent product title
-  const variantData = await shopifyAdmin(env,
-    `query GetVariant($id: ID!) {
-      node(id: $id) {
-        ... on ProductVariant {
-          title
-          price
-          selectedOptions { name value }
-          product { title }
+  // Fetch original variant price + parent product title. Wrapped in try/catch —
+  // unlike the createShopifyProduct() call below, this one used to run unguarded,
+  // so a network failure here threw an unhandled rejection out of the Worker's
+  // fetch() handler instead of a CORS-headered JSON response, leaving the client
+  // with an opaque network error it couldn't distinguish from a CORS failure.
+  let variantData;
+  try {
+    variantData = await shopifyAdmin(env,
+      `query GetVariant($id: ID!) {
+        node(id: $id) {
+          ... on ProductVariant {
+            title
+            price
+            selectedOptions { name value }
+            product { title }
+          }
         }
-      }
-    }`,
-    { id: gid }
-  );
+      }`,
+      { id: gid }
+    );
+  } catch (err) {
+    console.error('[create-product] variant lookup request failed:', err.message);
+    return new Response(JSON.stringify({ error: 'Could not look up variant' }), { status: 502, headers });
+  }
 
   const variant = variantData?.data?.node;
   if (!variant) {
@@ -887,7 +913,18 @@ async function handleCreateProduct(request, env, origin) {
   console.log('[create-product] returning variantId:', result.newVariantId);
   // handle lets the storefront poll /products/{handle}.js for availability
   // before POSTing /cart/add.js (see add-to-cart flow in main-product.liquid)
-  return new Response(JSON.stringify({ variantId: result.newVariantId, productId: result.newProductId, handle: result.newProductHandle }), { status: 200, headers });
+  const responseBody = { variantId: result.newVariantId, productId: result.newProductId, handle: result.newProductHandle };
+
+  if (idempotencyKey) {
+    // Non-fatal: if this write fails, the worst case is a future retry with
+    // this key creates a duplicate product instead of hitting the cache —
+    // no worse than before this guard existed.
+    await writeJson(env, `create-product-keys/${idempotencyKey}.json`, responseBody).catch((err) => {
+      console.warn('[create-product] failed to persist idempotency record (non-fatal):', err.message);
+    });
+  }
+
+  return new Response(JSON.stringify(responseBody), { status: 200, headers });
 }
 
 async function handleListDesigns(request, env, origin) {
