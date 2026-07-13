@@ -1983,7 +1983,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         window.bfTrack('add_to_cart_failure', { shader: '{{ shader_file }}', error: err.message, timeout: !!err.isTimeout });
         var msg = err.isTimeout
           ? 'This is taking longer than expected. Please try again.'
-          : 'Could not add to cart: ' + err.message;
+          : 'Could not add to cart: ' + err.message + ' — please try again or contact us.';
         alert(msg);
         modalOrder.disabled = false;
         modalOrder.textContent = 'Add to Cart';
