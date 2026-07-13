@@ -162,8 +162,7 @@
     '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
     '  float vigMask = computeVigMask(dUV);',
     '  alpha = applyDistress(alpha, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff, dot(finalCol, vec3(0.299, 0.587, 0.114)), vigMask) * u_opacity;',
-    '  finalCol = finalCol * vigMask;',
-    '  alpha = alpha * vigMask;',
+    '  finalCol = finalCol * (u_grain_mode < 3.5 ? vigMask : 1.0);',
     '  vec3 encoded   = pow(max(finalCol, 0.0), vec3(1.0 / 2.2));',
     '  fragColor      = vec4(encoded * alpha * inDesign, alpha * inDesign);',
     '}'

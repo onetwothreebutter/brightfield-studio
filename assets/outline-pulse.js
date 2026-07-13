@@ -166,7 +166,7 @@
     '  float glowA   = min(edgeGlow, 1.0) * inside;',
     '  float ringA   = max(rings * inside, glowA);',
     '  float alpha   = ringA;',
-    '  alpha *= u_opacity * distressMask * vigMask;',
+    '  alpha *= u_opacity * distressMask;',
     '',
     '  vec3 encoded = pow(max(color, 0.0), vec3(1.0 / 2.2));',
     '  fragColor    = vec4(encoded * alpha, alpha);',

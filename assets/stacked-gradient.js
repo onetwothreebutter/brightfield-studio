@@ -272,7 +272,6 @@
     '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
     '  float vigMask = computeVigMask(dUV);',
     '  finalAlpha = applyDistress(finalAlpha, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff, dot(finalColor.xyz, vec3(0.299, 0.587, 0.114)), vigMask) * u_opacity;',
-    '  finalAlpha = finalAlpha * vigMask;',
     '  // Linear -> sRGB to match Three.js renderer output',
     '  vec3 encoded = pow(finalColor.xyz, vec3(1.0 / 2.2));',
     '  fragColor = vec4(encoded * finalAlpha, finalAlpha);',
