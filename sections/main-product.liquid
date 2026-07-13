@@ -1744,6 +1744,14 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       alert('Generate a preview first.');
       return;
     }
+    // Captured once at click time, then read exclusively from here on — not from
+    // _pendingDesign — for the rest of this handler. The create-product call below
+    // can take up to 45s, and the "Preview on Shirt" button re-enables as soon as
+    // compositing finishes, well before that; without this local, a second preview
+    // click during that window reassigns the global mid-flight and this handler's
+    // .then() would read the NEW design's shader/values/createProductKey paired
+    // with the OLD design's already-uploaded image.
+    var orderDesign = _pendingDesign;
 
     // Read size from modal picker (multi-variant) or hidden form input (single-variant).
     var sizeSelect = document.getElementById('mockup-size-select');
@@ -1765,7 +1773,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     console.log('[add-to-cart] starting — shopifyVariantId:', shopifyVariantId);
     window.bfTrack('add_to_cart_start', { shader: '{{ shader_file }}' });
 
-    _pendingDesign.getUploadPromise()
+    orderDesign.getUploadPromise()
       .then(function (data) {
         console.log('[add-to-cart] upload resolved:', { design_url: data.design_url, mockup_url: data.mockup_url, checkout_image_url: data.checkout_image_url });
         window.bfTrack('add_to_cart_upload_done', { shader: '{{ shader_file }}' });
@@ -1774,11 +1782,11 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           designUrl:         data.design_url,
           mockupUrl:         data.mockup_url,
           checkoutImageUrl:  data.checkout_image_url || data.design_url,
-          shader:            _pendingDesign.shader,
-          productHandle:     _pendingDesign.productHandle,
-          values:            _pendingDesign.values,
+          shader:            orderDesign.shader,
+          productHandle:     orderDesign.productHandle,
+          values:            orderDesign.values,
           variantId:         shopifyVariantId,
-          createProductKey:  _pendingDesign.createProductKey
+          createProductKey:  orderDesign.createProductKey
         };
         console.log('[create-product] POST', cpBody);
         var CREATE_PRODUCT_TIMEOUT_MS = 45000; // createShopifyProduct runs ~15 sequential Admin API calls
@@ -2024,6 +2032,11 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   if (communitySubmit) {
     communitySubmit.addEventListener('click', function () {
       if (!_pendingDesign) return;
+      // Captured once at click time (see the identical orderDesign capture in the
+      // Add to Cart handler above) so a "Preview on Shirt" click during the ~20s
+      // submit window can't pair a stale design's metadata with a fresh upload,
+      // or vice versa.
+      var submitDesign = _pendingDesign;
       var name  = communityName  ? communityName.value.trim()  : '';
       var email = communityEmail ? communityEmail.value.trim() : '';
       if (!name)  { communityName  && communityName.focus();  return; }
@@ -2034,18 +2047,18 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       if (communityError) communityError.style.display = 'none';
 
       var COMMUNITY_SUBMIT_TIMEOUT_MS = 20000;
-      _pendingDesign.getUploadPromise()
+      submitDesign.getUploadPromise()
         .then(function (data) {
           return fetchWithTimeout(workerUrl + '/community/submit', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({
-              shader:           _pendingDesign.shader,
-              productHandle:    _pendingDesign.productHandle,
+              shader:           submitDesign.shader,
+              productHandle:    submitDesign.productHandle,
               designUrl:        data.design_url,
               mockupUrl:        data.mockup_url,
               checkoutImageUrl: data.checkout_image_url,
-              values:           _pendingDesign.values,
+              values:           submitDesign.values,
               creatorName:      name,
               creatorEmail:     email
             })

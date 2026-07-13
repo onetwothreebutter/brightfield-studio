@@ -546,7 +546,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
   if (userErrors?.length) {
     console.error(logPrefix, 'userErrors:', JSON.stringify(userErrors));
     const err = new Error(userErrors[0].message);
-    err.isValidationError = true; // bad input, not a transport/infra failure — see handleCreateProduct's catch
+    err.status = 422; // bad input, not a transport/infra failure — see handleCreateProduct's catch
     throw err;
   }
 
@@ -558,7 +558,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
   if (!newVariantGid) {
     console.error(logPrefix, 'no variant returned:', JSON.stringify(createData));
     const err = new Error('Product created but no variant returned');
-    err.isValidationError = true; // productCreate itself succeeded — a data-shape anomaly, not a transport failure
+    err.status = 422; // productCreate itself succeeded — a data-shape anomaly, not a transport failure
     throw err;
   }
 
@@ -912,13 +912,14 @@ async function handleCreateProduct(request, env, origin) {
     });
   } catch (err) {
     // createShopifyProduct() runs ~15 sequential Admin API calls; a rejection can
-    // mean Shopify rejected the input (userErrors, flagged isValidationError above —
-    // a genuine 422) or that one of those calls failed at the network/transport
-    // level partway through (unmarked — a 502, same classification as the GetVariant
-    // lookup failure above, not the client's fault and worth a plain retry).
-    console.error('[create-product] createShopifyProduct failed:', err.message);
-    const status = err.isValidationError ? 422 : 502;
-    return new Response(JSON.stringify({ error: err.message }), { status, headers });
+    // mean Shopify rejected the input (err.status set to 422 at the throw site
+    // above, already logged there) or that one of those calls failed at the
+    // network/transport level partway through (no err.status — defaults to 502,
+    // same classification as the GetVariant lookup failure above, not the
+    // client's fault and worth a plain retry). Only log here for the unmarked
+    // case — the 422 paths already logged their own detail before throwing.
+    if (!err.status) console.error('[create-product] createShopifyProduct failed:', err.message);
+    return new Response(JSON.stringify({ error: err.message }), { status: err.status || 502, headers });
   }
 
   console.log('[create-product] returning variantId:', result.newVariantId);
