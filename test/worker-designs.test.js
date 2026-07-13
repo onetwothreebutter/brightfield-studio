@@ -7,12 +7,14 @@ function makeR2() {
   return {
     _store: store,
     get:    vi.fn(async (key) => {
-      const val = store.get(key);
-      if (!val) return null;
-      return { text: async () => val };
+      if (!store.has(key)) return null;
+      return { text: async () => store.get(key) };
     }),
     put:    vi.fn(async (key, value) => { store.set(key, String(value)); }),
-    delete: vi.fn(async () => {}),
+    // Was a no-op stub — see the same fix in worker-create-product.test.js. A test
+    // that put()s a key, delete()s it, then get()s it again would have silently
+    // seen the stale value instead of null.
+    delete: vi.fn(async (key) => { store.delete(key); }),
   };
 }
 
