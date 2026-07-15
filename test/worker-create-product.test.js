@@ -53,8 +53,8 @@ function makeEnv(overrides = {}) {
   };
 }
 
-function makeRequest(method, path, body, origin = 'https://brightfield-2.myshopify.com') {
-  const init = { method, headers: { Origin: origin, 'Content-Type': 'application/json' } };
+function makeRequest(method, path, body, origin = 'https://brightfield-2.myshopify.com', headers = {}) {
+  const init = { method, headers: { Origin: origin, 'Content-Type': 'application/json', ...headers } };
   if (body !== undefined) init.body = JSON.stringify(body);
   return new Request(`https://worker.example.com${path}`, init);
 }
@@ -323,7 +323,9 @@ describe('POST /create-product', () => {
     const second = await worker.fetch(makeRequest('POST', '/create-product', body), env);
     expect(second.status).toBe(200);
     const secondBody = await second.json();
-    expect(secondBody).toEqual(firstBody);
+    // Same product, plus the idempotent marker so callers can tell a cache hit
+    // from a fresh creation
+    expect(secondBody).toEqual({ ...firstBody, idempotent: true });
 
     // Only the first request should have actually run productCreate — the
     // repeat should be served from the idempotency cache, not create a
@@ -413,6 +415,116 @@ describe('POST /create-product', () => {
 
     const restPublishCall = fetchMock.calls.find((c) => c.url.includes('/admin/api/2025-01/products/999.json') && c.opts.method === 'PUT');
     expect(restPublishCall).toBeDefined();
+  });
+
+  // ── In-house branch (scripts/create-inhouse-designs.mjs) ──────────────────
+  // inhouse: true lets an admin-authenticated caller set the product title,
+  // description, and inhouse-design tag. The endpoint is public, so this branch
+  // must be locked behind requireAdmin and must never leak into the anonymous path.
+
+  const ADMIN = 'test-admin-token';
+  const authHeader = { Authorization: `Bearer ${ADMIN}` };
+
+  function inhouseBody(overrides = {}) {
+    return createProductBody({
+      shader: 'contour-pareidolia',
+      productHandle: 'contour-pareidolia',
+      inhouse: true,
+      productTitle: 'Contour Pareidolia — High Desert',
+      descriptionHtml: '<p>A dense topographic study.</p>',
+      ...overrides,
+    });
+  }
+
+  it('rejects inhouse: true without admin auth (403, no Shopify calls)', async () => {
+    const fetchMock = makeShopifyFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(makeRequest('POST', '/create-product', inhouseBody()), makeEnv({ ADMIN_TOKEN: ADMIN }));
+    expect(res.status).toBe(403);
+    // Fail loudly, never fall through to minting a mis-titled "Custom …" product
+    expect(fetchMock.calls.filter((c) => c.url.includes('graphql.json'))).toHaveLength(0);
+  });
+
+  it('rejects inhouse: true with admin auth but no productTitle (400)', async () => {
+    vi.stubGlobal('fetch', makeShopifyFetch());
+    const res = await worker.fetch(
+      makeRequest('POST', '/create-product', inhouseBody({ productTitle: '  ' }), undefined, authHeader),
+      makeEnv({ ADMIN_TOKEN: ADMIN })
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('authenticated inhouse request sets title, description, inhouse-design tag, INHOUSE SKUs, and mockup media', async () => {
+    const fetchMock = makeShopifyFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(
+      makeRequest('POST', '/create-product', inhouseBody(), undefined, authHeader),
+      makeEnv({ ADMIN_TOKEN: ADMIN })
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.productTitle).toBe('Contour Pareidolia — High Desert');
+
+    const createCall = fetchMock.calls.find((c) => c.url.includes('graphql.json') && JSON.parse(c.opts.body).query.includes('mutation CreateProduct'));
+    const createVars = JSON.parse(createCall.opts.body).variables;
+    expect(createVars.input.title).toBe('Contour Pareidolia — High Desert');
+    expect(createVars.input.descriptionHtml).toBe('<p>A dense topographic study.</p>');
+    expect(createVars.input.tags).toEqual(expect.arrayContaining(['inhouse-design', 'shader-contour-pareidolia']));
+    expect(createVars.input.tags).not.toContain('custom-design');
+    // Featured image = shirt mockup (collection-grid merchandising), not the
+    // design-on-black checkout image the anonymous path uses
+    expect(createVars.media[0].originalSource).toBe('https://r2.example.com/mockups/abc.jpg');
+
+    const skuCalls = fetchMock.calls.filter((c) => c.url.includes('graphql.json') && JSON.parse(c.opts.body).query.includes('mutation UpdateInventoryItem'));
+    expect(skuCalls.length).toBeGreaterThan(0);
+    for (const c of skuCalls) {
+      expect(JSON.parse(c.opts.body).variables.input.sku).toMatch(/^INHOUSE-/);
+    }
+  });
+
+  it('marks the idempotency-cache response so re-runs can tell "created" from "already existed"', async () => {
+    const env = makeEnv({ ADMIN_TOKEN: ADMIN });
+    const fetchMock = makeShopifyFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const body = inhouseBody({ createProductKey: 'inhouse-contour-pareidolia-high-desert-v1' });
+    const first = await worker.fetch(makeRequest('POST', '/create-product', body, undefined, authHeader), env);
+    const firstBody = await first.json();
+    expect(firstBody.idempotent).toBeUndefined();
+
+    const second = await worker.fetch(makeRequest('POST', '/create-product', body, undefined, authHeader), env);
+    const secondBody = await second.json();
+    expect(secondBody.idempotent).toBe(true);
+    expect(secondBody.productTitle).toBe(firstBody.productTitle);
+
+    const createCalls = fetchMock.calls.filter((c) => c.url.includes('graphql.json') && JSON.parse(c.opts.body).query.includes('mutation CreateProduct'));
+    expect(createCalls).toHaveLength(1);
+  });
+
+  it('ignores productTitle/descriptionHtml on anonymous requests (regression pin for the public path)', async () => {
+    const fetchMock = makeShopifyFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    // No inhouse flag, no auth — the title/description fields must have no effect
+    const res = await worker.fetch(makeRequest('POST', '/create-product',
+      createProductBody({ productTitle: 'Evil Title', descriptionHtml: '<p>spam</p>' })), makeEnv());
+    expect(res.status).toBe(200);
+
+    const createCall = fetchMock.calls.find((c) => c.url.includes('graphql.json') && JSON.parse(c.opts.body).query.includes('mutation CreateProduct'));
+    const createVars = JSON.parse(createCall.opts.body).variables;
+    expect(createVars.input.title).toBe('Custom Dot Rise');
+    expect(createVars.input.descriptionHtml).toBe('');
+    expect(createVars.input.tags).toContain('custom-design');
+    expect(createVars.input.tags).not.toContain('inhouse-design');
+  });
+
+  it('serves GET /inhouse/version as the deploy preflight', async () => {
+    const res = await worker.fetch(makeRequest('GET', '/inhouse/version'), makeEnv());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.version).toBe(1);
   });
 
   it('returns a clean 502 (not an unhandled rejection) when the initial variant lookup request fails outright', async () => {

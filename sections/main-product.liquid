@@ -10,6 +10,10 @@
 {%- if product.tags contains 'community-design' -%}
   {%- assign is_community_design = true -%}
 {%- endif -%}
+{%- assign is_inhouse_design = false -%}
+{%- if product.tags contains 'inhouse-design' -%}
+  {%- assign is_inhouse_design = true -%}
+{%- endif -%}
 
 {%- if shader_file -%}
 <style>
@@ -499,6 +503,10 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         }
       });
       window._shaderState.textDirty = true;
+      // Signals later restore paths (e.g. the inhouse-design metafield seed) that
+      // a gallery-card restore already applied — the localStorage key itself is
+      // removed above, so it can't serve as that signal.
+      window._bfLocalRestore = true;
       if (saved.creatorName) {
         document.querySelectorAll('.product-title').forEach(function (titleEl) {
           var remixEl = document.createElement('p');
@@ -856,6 +864,21 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     }
     window.addEventListener('product-shader-mode', function () { tryRestore(); });
   }());
+
+  {%- if is_inhouse_design and product.metafields.custom.shader_values != blank -%}
+  // Seed the customizer with this in-house design's saved values. The JSON
+  // metafield renders straight into the page — no worker round-trip like the
+  // community-design restore above.
+  (function () {
+    var h = window.location.hash;
+    if (h.indexOf('#s=') === 0 || h.indexOf('#share=') === 0) return; // share links win
+    if (window._bfLocalRestore) return;                               // gallery restore wins
+    try {
+      applyRestoredState({{ product.metafields.custom.shader_values.value | json }});
+      window._shaderState.snapValues = true;
+    } catch (e) {}
+  }());
+  {%- endif -%}
 
   // Animation settings (exposed for browser debugging)
   window._animationSettings = {

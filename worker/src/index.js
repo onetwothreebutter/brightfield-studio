@@ -204,6 +204,15 @@ export default {
     if (method === 'POST' && pathname === '/save-preview')    return handleSavePreview(request, env, origin);
     if (method === 'POST' && pathname === '/create-product')  return handleCreateProduct(request, env, origin);
 
+    // Deploy preflight for scripts/create-inhouse-designs.mjs: a 200 here means
+    // this worker understands the admin-gated inhouse fields on /create-product.
+    if (method === 'GET' && pathname === '/inhouse/version') {
+      return new Response(JSON.stringify({ version: 1 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
+      });
+    }
+
     return new Response('Not found', { status: 404 });
   }
 };
@@ -451,12 +460,16 @@ export function pickSizeVariant(sizeVariants, requestedSize) {
 
 // Shared helper: creates a Shopify product, sets variant price, and publishes to Online Store.
 // Returns { newProductId, newVariantId } (numeric strings).
-async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUrl, shader, productTitle, price, tags, creatorName, values, submissionId, sourceProductHandle, requestedSize }) {
+async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUrl, shader, productTitle, descriptionHtml, price, tags, creatorName, values, submissionId, sourceProductHandle, requestedSize, preferMockupMedia }) {
   const logPrefix = '[createShopifyProduct]';
 
   // Resize the mockup to ≤2000px wide so it stays under Shopify's 25 MP limit
   let shopifyImageUrl = null;
-  const mediaSource = checkoutImageUrl || designUrl || mockupUrl;
+  // In-house products are browsed in collection grids, so the shirt mockup sells
+  // better as the featured image than the design-on-black checkout thumbnail.
+  const mediaSource = preferMockupMedia
+    ? (mockupUrl || checkoutImageUrl || designUrl)
+    : (checkoutImageUrl || designUrl || mockupUrl);
   console.log(logPrefix, 'media source URL:', mediaSource);
 
   // Try IMAGES binding first; fall back to cf.image fetch; skip if both fail
@@ -525,7 +538,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
         status: 'ACTIVE',
         vendor: 'Brightfield Studio',
         tags,
-        descriptionHtml: '',
+        descriptionHtml: descriptionHtml || '',
         metafields: [
           { namespace: 'custom', key: 'design_url',             type: 'url',                    value: designUrl },
           { namespace: 'custom', key: 'mockup_url',             type: 'url',                    value: mockupUrl },
@@ -628,7 +641,8 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
   }
 
   // Step 2b: set SKU on each inventory item (required by Printful before inventoryActivate)
-  const skuPrefix = tags?.includes('community-design') ? 'COMMUNITY' : 'CUSTOM';
+  const skuPrefix = tags?.includes('inhouse-design') ? 'INHOUSE'
+    : tags?.includes('community-design') ? 'COMMUNITY' : 'CUSTOM';
   const baseTimestamp = Date.now();
   for (const sv of sizeVariants) {
     const invGid = sv.inventoryItem?.id;
@@ -837,9 +851,21 @@ async function handleCreateProduct(request, env, origin) {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
   }
 
-  const { designUrl, mockupUrl, checkoutImageUrl, shader, productHandle, values, variantId, extraTags, createProductKey } = body;
+  const { designUrl, mockupUrl, checkoutImageUrl, shader, productHandle, values, variantId, extraTags, createProductKey, inhouse, productTitle, descriptionHtml } = body;
   if (!designUrl || !mockupUrl || !variantId) {
     return new Response(JSON.stringify({ error: 'Missing designUrl, mockupUrl, or variantId' }), { status: 400, headers });
+  }
+
+  // In-house designs set their own title/description/tags, so the branch is
+  // admin-only — and it fails loudly rather than falling through to the public
+  // path, which would silently mint a mis-titled "Custom …" product.
+  if (inhouse === true) {
+    if (!await requireAdmin(request, env)) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers });
+    }
+    if (typeof productTitle !== 'string' || !productTitle.trim()) {
+      return new Response(JSON.stringify({ error: 'Missing productTitle' }), { status: 400, headers });
+    }
   }
 
   // Idempotency guard: a client-side timeout on this request doesn't mean
@@ -854,7 +880,7 @@ async function handleCreateProduct(request, env, origin) {
     const cached = await readJson(env, `create-product-keys/${idempotencyKey}.json`);
     if (cached) {
       console.log('[create-product] idempotency hit — returning previously created product:', cached);
-      return new Response(JSON.stringify(cached), { status: 200, headers });
+      return new Response(JSON.stringify({ ...cached, idempotent: true }), { status: 200, headers });
     }
   }
 
@@ -896,6 +922,7 @@ async function handleCreateProduct(request, env, origin) {
   const price = variant.price || '0.00';
   const requestedSize = variant.selectedOptions?.find(o => o.name === 'Size')?.value || null;
 
+  const finalTitle = inhouse === true ? productTitle.trim() : `Custom ${variant.product?.title || 'Design'}`;
   let result;
   try {
     result = await createShopifyProduct(env, {
@@ -903,12 +930,14 @@ async function handleCreateProduct(request, env, origin) {
       mockupUrl,
       checkoutImageUrl,
       shader,
-      productTitle: `Custom ${variant.product?.title || 'Design'}`,
+      productTitle: finalTitle,
+      descriptionHtml: inhouse === true ? descriptionHtml : '',
       price,
-      tags: ['custom-design', `shader-${shader || 'unknown'}`, ...(Array.isArray(extraTags) ? extraTags : [])],
+      tags: [inhouse === true ? 'inhouse-design' : 'custom-design', `shader-${shader || 'unknown'}`, ...(Array.isArray(extraTags) ? extraTags : [])],
       values,
       sourceProductHandle: productHandle,
       requestedSize,
+      preferMockupMedia: inhouse === true,
     });
   } catch (err) {
     // createShopifyProduct() runs ~15 sequential Admin API calls; a rejection can
@@ -925,7 +954,7 @@ async function handleCreateProduct(request, env, origin) {
   console.log('[create-product] returning variantId:', result.newVariantId);
   // handle lets the storefront poll /products/{handle}.js for availability
   // before POSTing /cart/add.js (see add-to-cart flow in main-product.liquid)
-  const responseBody = { variantId: result.newVariantId, productId: result.newProductId, handle: result.newProductHandle };
+  const responseBody = { variantId: result.newVariantId, productId: result.newProductId, handle: result.newProductHandle, productTitle: finalTitle };
 
   if (idempotencyKey) {
     // Non-fatal: if this write fails, the worst case is a future retry with
