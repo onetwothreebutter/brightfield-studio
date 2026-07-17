@@ -1,0 +1,84 @@
+{
+  "shader": "contour-pareidolia",
+  "sourceProductHandle": "contour-pareidolia",
+  "designs": [
+    {
+      "slug": "high-desert",
+      "title": "Contour Pareidolia — High Desert",
+      "version": 1,
+      "descriptionHtml": "<p>A dense topographic study in sun-baked terracotta. Fine elevation lines trace three overlapping ridges, like a survey map of country that doesn't exist.</p><p>One of five in-house designs built from the Contour Pareidolia shader — buy it as-is, or open the customizer and make it yours.</p>",
+      "values": {
+        "u_hill1_x": -0.45, "u_hill1_y": 0.35, "u_hill1_radius": 0.55, "u_hill1_height": 1.1,
+        "u_hill2_x": 0.3,   "u_hill2_y": 0.0,  "u_hill2_radius": 0.45, "u_hill2_height": 0.7,
+        "u_hill3_x": 0.05,  "u_hill3_y": -0.5, "u_hill3_radius": 0.35, "u_hill3_height": -0.5,
+        "u_contour_spacing": 0.035, "u_contour_width": 0.003,
+        "u_color_mode": 0,
+        "_cp_palette_preset": "Terracotta",
+        "u_a": [0.825, 0.575, 0.42], "u_b": [-0.105, -0.225, -0.18], "u_c": [1, 1, 1], "u_d": [0, 0, 0]
+      }
+    },
+    {
+      "slug": "caldera",
+      "title": "Contour Pareidolia — Caldera",
+      "version": 1,
+      "descriptionHtml": "<p>Concentric rings of heat around a sunken core — a volcanic crater rendered as pure elevation data, in inferno reds and molten golds.</p><p>One of five in-house designs built from the Contour Pareidolia shader — buy it as-is, or open the customizer and make it yours.</p>",
+      "values": {
+        "u_hill1_x": 0.0,  "u_hill1_y": 0.05,  "u_hill1_radius": 0.62, "u_hill1_height": 1.3,
+        "u_hill2_x": 0.0,  "u_hill2_y": 0.05,  "u_hill2_radius": 0.28, "u_hill2_height": -0.9,
+        "u_hill3_x": 0.35, "u_hill3_y": -0.45, "u_hill3_radius": 0.3,  "u_hill3_height": 0.4,
+        "u_contour_spacing": 0.08, "u_contour_width": 0.012,
+        "u_color_mode": 0,
+        "_cp_palette_preset": "Inferno",
+        "u_a": [0.8, 0.3, 0.1], "u_b": [0.5, 0.4, 0.2], "u_c": [1, 1, 2], "u_d": [0, 0.1, 0.25]
+      }
+    },
+    {
+      "slug": "interference",
+      "title": "Contour Pareidolia — Interference",
+      "version": 1,
+      "descriptionHtml": "<p>Two equal peaks whose contour fields collide and merge, like ripples meeting in a wave tank — mapped in deep ocean blues and teals.</p><p>One of five in-house designs built from the Contour Pareidolia shader — buy it as-is, or open the customizer and make it yours.</p>",
+      "values": {
+        "u_hill1_x": -0.4, "u_hill1_y": 0.15, "u_hill1_radius": 0.42, "u_hill1_height": 0.95,
+        "u_hill2_x": 0.4,  "u_hill2_y": 0.15, "u_hill2_radius": 0.42, "u_hill2_height": 0.95,
+        "u_hill3_x": 0.0,  "u_hill3_y": -0.4, "u_hill3_radius": 0.5,  "u_hill3_height": -0.7,
+        "u_contour_spacing": 0.05, "u_contour_width": 0.006,
+        "u_color_mode": 0,
+        "_cp_palette_preset": "Ocean",
+        "u_a": [0.2, 0.5, 0.6], "u_b": [0.2, 0.3, 0.4], "u_c": [1, 1, 1], "u_d": [0, 0.15, 0.3]
+      }
+    },
+    {
+      "slug": "abyss",
+      "title": "Contour Pareidolia — Abyss",
+      "version": 1,
+      "descriptionHtml": "<p>Inverted terrain: two deep basins plunge below the surface, traced by sparse, bold contour lines in bioluminescent greens. A scratched, weathered finish gives it the feel of a recovered deep-sea chart.</p><p>One of five in-house designs built from the Contour Pareidolia shader — buy it as-is, or open the customizer and make it yours.</p>",
+      "values": {
+        "u_hill1_x": -0.2, "u_hill1_y": -0.25, "u_hill1_radius": 0.6, "u_hill1_height": -1.2,
+        "u_hill2_x": 0.45, "u_hill2_y": 0.3,   "u_hill2_radius": 0.4, "u_hill2_height": -0.8,
+        "u_hill3_x": -0.5, "u_hill3_y": 0.55,  "u_hill3_radius": 0.3, "u_hill3_height": 0.5,
+        "u_contour_spacing": 0.14, "u_contour_width": 0.02,
+        "u_color_mode": 0,
+        "_cp_palette_preset": "Bioluminescent",
+        "u_a": [0.09, 0.5, 0.435], "u_b": [-0.06, -0.45, -0.315], "u_c": [1, 1, 1], "u_d": [0, 0, 0],
+        "u_grain_mode": "2", "u_distress_2": 0.35, "u_distress_scale_2": 2000
+      }
+    },
+    {
+      "slug": "aurora-summit",
+      "title": "Contour Pareidolia — Aurora Summit",
+      "version": 1,
+      "descriptionHtml": "<p>A full elevation sweep through the aurora gradient — mint at the valley floor climbing through cyan and violet to magenta at the summit, finished with a fine halftone dot grid.</p><p>One of five in-house designs built from the Contour Pareidolia shader — buy it as-is, or open the customizer and make it yours.</p>",
+      "values": {
+        "u_hill1_x": -0.15, "u_hill1_y": 0.45,  "u_hill1_radius": 0.38, "u_hill1_height": 1.2,
+        "u_hill2_x": 0.3,   "u_hill2_y": -0.05, "u_hill2_radius": 0.5,  "u_hill2_height": 0.8,
+        "u_hill3_x": -0.35, "u_hill3_y": -0.45, "u_hill3_radius": 0.42, "u_hill3_height": -0.9,
+        "u_contour_spacing": 0.06, "u_contour_width": 0.008,
+        "u_color_mode": 1,
+        "_cp_4color_preset": "Aurora",
+        "u_color0": [0, 1, 0.533], "u_color1": [0, 0.898, 1], "u_color2": [0.486, 0.302, 1], "u_color3": [0.878, 0.251, 0.984],
+        "u_grain_mode": "4", "u_distress_4": 0.5, "u_distress_scale_4": 287,
+        "u_halftone_angle": 45, "u_halftone_luma": 0.5
+      }
+    }
+  ]
+}
