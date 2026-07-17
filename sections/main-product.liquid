@@ -40,6 +40,44 @@
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+.design-picker { margin: 0.25rem 0 1.25rem; }
+.design-picker__label {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin: 0 0 0.5rem;
+}
+.design-picker__row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.design-picker__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 84px;
+  padding: 4px;
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  font: inherit;
+}
+.design-picker__card img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 4px;
+  display: block;
+}
+.design-picker__card span {
+  font-size: 0.7rem;
+  line-height: 1.2;
+  text-align: center;
+}
+.design-picker__card:hover { border-color: rgba(0, 255, 255, 0.5); }
+.design-picker__card.is-selected { border-color: #00ffff; }
 </style>
 {%- endif -%}
 
@@ -218,6 +256,45 @@
           {%- endif -%}
           {{ product.price | money }}
         </p>
+
+        {%- assign inhouse_designs = product.metafields.custom.inhouse_designs.value -%}
+        {%- if shader_file and inhouse_designs.size > 0 -%}
+        <!-- In-house design picker: each card is a real Shopify product created by
+             scripts/create-inhouse-designs.mjs and linked here via the source
+             product's custom.inhouse_designs metafield (see linkInhouseDesign in
+             the worker). Picking one swaps the buy form's variant IDs, the featured
+             image, and the shader state in place — combined-listing style. Without
+             JS the cards degrade to links to the design products' own pages. -->
+        <div class="design-picker" id="design-picker">
+          <p class="design-picker__label">Designs</p>
+          <div class="design-picker__row">
+            <button type="button" class="design-picker__card is-selected" data-design-slug="">
+              <img src="{{ product.featured_image | image_url: width: 160 }}" alt="" width="72" height="72">
+              <span>Original</span>
+            </button>
+            {%- for dp in inhouse_designs -%}
+              {%- assign dp_slug = dp.metafields.custom.design_slug | default: dp.handle -%}
+              {%- assign dp_name = dp.title | split: ' — ' | last -%}
+              {%- capture dp_variants -%}
+                {%- for v in dp.variants -%}
+                  {{ v.title | json }}: { "id": {{ v.id }}, "available": {{ v.available }} }{%- unless forloop.last -%},{%- endunless -%}
+                {%- endfor -%}
+              {%- endcapture -%}
+              <a
+                class="design-picker__card"
+                href="{{ dp.url }}"
+                data-design-slug="{{ dp_slug | escape }}"
+                data-image="{{ dp.featured_image | image_url: width: 900 }}"
+                data-variants="{{ '{' }}{{ dp_variants | escape }}{{ '}' }}"
+                data-values="{{ dp.metafields.custom.shader_values.value | json | escape }}"
+              >
+                <img src="{{ dp.featured_image | image_url: width: 160 }}" alt="{{ dp_name | escape }}" width="72" height="72" loading="lazy">
+                <span>{{ dp_name | escape }}</span>
+              </a>
+            {%- endfor -%}
+          </div>
+        </div>
+        {%- endif -%}
 
         <div id="product-order-form">
           {%- form 'product', product -%}
@@ -879,6 +956,111 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     } catch (e) {}
   }());
   {%- endif -%}
+
+  // ── In-house design picker ──────────────────────────────────────────────────
+  // Picking a design swaps the buy form to that design product's variants (the
+  // hidden select's option values are rewritten in place — the form's own
+  // title-matching sync script keeps working untouched), swaps the featured
+  // image, and applies the design's saved values to the shader.
+  (function () {
+    var picker = document.getElementById('design-picker');
+    if (!picker) return;
+
+    var cards   = Array.prototype.slice.call(picker.querySelectorAll('[data-design-slug]'));
+    var mainImg = document.querySelector('.product-media__image');
+    var originalImgSrc = mainImg ? mainImg.getAttribute('src') : null;
+    var form       = document.querySelector('#product-order-form form');
+    var variantSel = form && form.querySelector('select.variant-select');
+    var hiddenId   = form && form.querySelector('input[name="id"]');
+
+    var originalOptions = {};
+    if (variantSel) {
+      Array.prototype.forEach.call(variantSel.options, function (opt) {
+        originalOptions[opt.dataset.variantTitle] = { value: opt.value, disabled: opt.disabled };
+      });
+    }
+    var originalHiddenId = hiddenId ? hiddenId.value : null;
+
+    // Shader defaults, for restoring when "Original" is re-selected
+    var defaultValues = {};
+    controls.forEach(function (c) {
+      if (!c.key) return;
+      defaultValues[c.key] = c.type === 'color' ? hexToRgb(c.value) : (c.toRadians ? c.value * Math.PI / 180 : c.value);
+    });
+
+    function setVariants(variants) { // null → restore the source product's own
+      if (variantSel) {
+        Array.prototype.forEach.call(variantSel.options, function (opt) {
+          var title = opt.dataset.variantTitle;
+          if (!variants) {
+            var orig = originalOptions[title];
+            if (orig) { opt.value = orig.value; opt.disabled = orig.disabled; }
+          } else if (variants[title]) {
+            opt.value    = String(variants[title].id);
+            opt.disabled = !variants[title].available;
+          } else {
+            opt.disabled = true;
+          }
+        });
+      } else if (hiddenId) {
+        if (!variants) {
+          hiddenId.value = originalHiddenId;
+        } else {
+          var first = Object.keys(variants)[0];
+          if (first) hiddenId.value = String(variants[first].id);
+        }
+      }
+    }
+
+    function setUrlParam(slug) {
+      try {
+        var params = new URLSearchParams(location.search);
+        if (slug) params.set('design', slug); else params.delete('design');
+        var qs = params.toString();
+        history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+      } catch (e) {}
+    }
+
+    function applyDesign(card) {
+      cards.forEach(function (c) { c.classList.toggle('is-selected', c === card); });
+      var slug = card.dataset.designSlug;
+
+      if (!slug) { // Original
+        setVariants(null);
+        if (mainImg && originalImgSrc) mainImg.src = originalImgSrc;
+        applyRestoredState(defaultValues);
+        window._shaderState.snapValues = true;
+        setUrlParam(null);
+        return;
+      }
+
+      try { setVariants(JSON.parse(card.dataset.variants)); } catch (e) {}
+      if (mainImg && card.dataset.image) mainImg.src = card.dataset.image;
+      try {
+        applyRestoredState(JSON.parse(card.dataset.values));
+        window._shaderState.snapValues = true;
+      } catch (e) {}
+      setUrlParam(slug);
+    }
+
+    cards.forEach(function (card) {
+      card.addEventListener('click', function (e) {
+        e.preventDefault();
+        applyDesign(this);
+      });
+    });
+
+    // Deep link: ?design=<slug> pre-selects a design. Share links and
+    // gallery-card restores carry their own state and win.
+    var h = window.location.hash;
+    if (h.indexOf('#s=') !== 0 && h.indexOf('#share=') !== 0 && !window._bfLocalRestore) {
+      var want = new URLSearchParams(location.search).get('design');
+      if (want) {
+        var match = cards.filter(function (c) { return c.dataset.designSlug === want; })[0];
+        if (match) applyDesign(match);
+      }
+    }
+  }());
 
   // Animation settings (exposed for browser debugging)
   window._animationSettings = {

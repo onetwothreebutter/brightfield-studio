@@ -284,6 +284,7 @@ async function createProducts(args, spec, results) {
       inhouse: true,
       productTitle: d.title,
       descriptionHtml: d.descriptionHtml || '',
+      designSlug: d.slug,
       createProductKey: `inhouse-${spec.shader}-${d.slug}-v${d.version}`,
     }, { Authorization: `Bearer ${adminToken}` });
 
@@ -293,6 +294,10 @@ async function createProducts(args, spec, results) {
     }
     created.push({ slug: d.slug, ...product });
     console.log(product.idempotent ? 'already existed ✓' : 'created ✓');
+    if (product.linked === false) {
+      console.warn(`  WARNING: ${d.slug} was created but not linked into ${spec.sourceProductHandle}'s ` +
+        `inhouse_designs metafield — it won't appear in the product-page design picker. Check worker logs.`);
+    }
   }
 
   console.log('\nProducts:');

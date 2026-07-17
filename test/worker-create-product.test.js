@@ -159,6 +159,20 @@ function makeShopifyFetch(overrides = {}) {
     if (query.includes('mutation AssignShippingProfile')) {
       return jsonRes({ data: { deliveryProfileUpdate: { profile: { id: 'p', name: 'US Flat Rate' }, userErrors: [] } } });
     }
+    if (query.includes('query SourceProduct')) {
+      return jsonRes({ data: { productByHandle: {
+        id: 'gid://shopify/Product/555',
+        metafield: overrides.sourceInhouseList
+          ? { value: JSON.stringify(overrides.sourceInhouseList) }
+          : null,
+      } } });
+    }
+    if (query.includes('query DesignSlugs')) {
+      return jsonRes({ data: { nodes: overrides.designSlugNodes || [] } });
+    }
+    if (query.includes('mutation SetInhouseDesigns')) {
+      return jsonRes({ data: { metafieldsSet: { metafields: [{ id: 'mf1' }], userErrors: [] } } });
+    }
     if (query.includes('query GetVariant')) {
       if (overrides.variantLookupFails) {
         return jsonRes({ data: { node: null } });
@@ -432,8 +446,13 @@ describe('POST /create-product', () => {
       inhouse: true,
       productTitle: 'Contour Pareidolia — High Desert',
       descriptionHtml: '<p>A dense topographic study.</p>',
+      designSlug: 'high-desert',
       ...overrides,
     });
+  }
+
+  function findGraphqlCall(fetchMock, marker) {
+    return fetchMock.calls.find((c) => c.url.includes('graphql.json') && JSON.parse(c.opts.body).query.includes(marker));
   }
 
   it('rejects inhouse: true without admin auth (403, no Shopify calls)', async () => {
@@ -482,6 +501,39 @@ describe('POST /create-product', () => {
     for (const c of skuCalls) {
       expect(JSON.parse(c.opts.body).variables.input.sku).toMatch(/^INHOUSE-/);
     }
+
+    // design_slug metafield on the new product (dedupe key for version bumps)
+    const slugMf = createVars.input.metafields.find((m) => m.key === 'design_slug');
+    expect(slugMf?.value).toBe('high-desert');
+
+    // The design is linked into the source product's picker-list metafield
+    expect(body.linked).toBe(true);
+    const linkCall = findGraphqlCall(fetchMock, 'mutation SetInhouseDesigns');
+    const linkMf = JSON.parse(linkCall.opts.body).variables.metafields[0];
+    expect(linkMf.ownerId).toBe('gid://shopify/Product/555');
+    expect(linkMf.key).toBe('inhouse_designs');
+    expect(JSON.parse(linkMf.value)).toEqual(['gid://shopify/Product/999']);
+  });
+
+  it('version bump replaces the same-slug product in the source picker list instead of appending', async () => {
+    const fetchMock = makeShopifyFetch({
+      sourceInhouseList: ['gid://shopify/Product/777', 'gid://shopify/Product/778'],
+      designSlugNodes: [
+        { id: 'gid://shopify/Product/777', metafield: { value: 'high-desert' } }, // stale v1 — replaced
+        { id: 'gid://shopify/Product/778', metafield: { value: 'caldera' } },     // different design — kept
+      ],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(
+      makeRequest('POST', '/create-product', inhouseBody(), undefined, authHeader),
+      makeEnv({ ADMIN_TOKEN: ADMIN })
+    );
+    expect((await res.json()).linked).toBe(true);
+
+    const linkCall = findGraphqlCall(fetchMock, 'mutation SetInhouseDesigns');
+    const linkMf = JSON.parse(linkCall.opts.body).variables.metafields[0];
+    expect(JSON.parse(linkMf.value)).toEqual(['gid://shopify/Product/778', 'gid://shopify/Product/999']);
   });
 
   it('marks the idempotency-cache response so re-runs can tell "created" from "already existed"', async () => {

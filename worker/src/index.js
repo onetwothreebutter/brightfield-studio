@@ -460,7 +460,7 @@ export function pickSizeVariant(sizeVariants, requestedSize) {
 
 // Shared helper: creates a Shopify product, sets variant price, and publishes to Online Store.
 // Returns { newProductId, newVariantId } (numeric strings).
-async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUrl, shader, productTitle, descriptionHtml, price, tags, creatorName, values, submissionId, sourceProductHandle, requestedSize, preferMockupMedia }) {
+async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUrl, shader, productTitle, descriptionHtml, price, tags, creatorName, values, submissionId, sourceProductHandle, requestedSize, preferMockupMedia, designSlug }) {
   const logPrefix = '[createShopifyProduct]';
 
   // Resize the mockup to ≤2000px wide so it stays under Shopify's 25 MP limit
@@ -547,6 +547,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
           { namespace: 'custom', key: 'shader_values',          type: 'json',                   value: JSON.stringify(values || {}) },
           { namespace: 'custom', key: 'submission_id',          type: 'single_line_text_field', value: submissionId || '' },
           { namespace: 'custom', key: 'source_product_handle',  type: 'single_line_text_field', value: sourceProductHandle || '' },
+          ...(designSlug ? [{ namespace: 'custom', key: 'design_slug', type: 'single_line_text_field', value: designSlug }] : []),
         ],
       },
       media: shopifyImageUrl
@@ -841,6 +842,77 @@ async function getDefaultVariantForHandle(env, handle) {
   };
 }
 
+// Links a freshly created in-house design product into its source product's
+// custom.inhouse_designs list metafield, which the product page reads to render
+// the design picker. Dedupes by custom.design_slug so a version bump replaces
+// the old product in the list instead of showing both.
+async function linkInhouseDesign(env, sourceHandle, newProductId, designSlug) {
+  const logPrefix = '[linkInhouseDesign]';
+  const newGid = `gid://shopify/Product/${newProductId}`;
+
+  const sourceData = await shopifyAdmin(env,
+    `query SourceProduct($handle: String!) {
+      productByHandle(handle: $handle) {
+        id
+        metafield(namespace: "custom", key: "inhouse_designs") { value }
+      }
+    }`,
+    { handle: sourceHandle }
+  );
+  const source = sourceData?.data?.productByHandle;
+  if (!source?.id) {
+    console.error(logPrefix, 'source product not found:', sourceHandle);
+    return false;
+  }
+
+  let list = [];
+  try {
+    const parsed = JSON.parse(source.metafield?.value || '[]');
+    if (Array.isArray(parsed)) list = parsed;
+  } catch {}
+
+  if (designSlug && list.length) {
+    const slugData = await shopifyAdmin(env,
+      `query DesignSlugs($ids: [ID!]!) {
+        nodes(ids: $ids) {
+          ... on Product { id metafield(namespace: "custom", key: "design_slug") { value } }
+        }
+      }`,
+      { ids: list }
+    );
+    const sameSlug = new Set(
+      (slugData?.data?.nodes || [])
+        .filter(n => n?.metafield?.value === designSlug)
+        .map(n => n.id)
+    );
+    list = list.filter(gid => !sameSlug.has(gid));
+  }
+  if (!list.includes(newGid)) list.push(newGid);
+
+  const setData = await shopifyAdmin(env,
+    `mutation SetInhouseDesigns($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        metafields { id }
+        userErrors { field message }
+      }
+    }`,
+    { metafields: [{
+      ownerId: source.id,
+      namespace: 'custom',
+      key: 'inhouse_designs',
+      type: 'list.product_reference',
+      value: JSON.stringify(list),
+    }] }
+  );
+  const errors = setData?.data?.metafieldsSet?.userErrors;
+  if (errors?.length) {
+    console.error(logPrefix, 'metafieldsSet errors:', JSON.stringify(errors));
+    return false;
+  }
+  console.log(logPrefix, 'linked', newGid, 'into', sourceHandle, '— list size:', list.length);
+  return true;
+}
+
 async function handleCreateProduct(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
 
@@ -851,7 +923,7 @@ async function handleCreateProduct(request, env, origin) {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
   }
 
-  const { designUrl, mockupUrl, checkoutImageUrl, shader, productHandle, values, variantId, extraTags, createProductKey, inhouse, productTitle, descriptionHtml } = body;
+  const { designUrl, mockupUrl, checkoutImageUrl, shader, productHandle, values, variantId, extraTags, createProductKey, inhouse, productTitle, descriptionHtml, designSlug } = body;
   if (!designUrl || !mockupUrl || !variantId) {
     return new Response(JSON.stringify({ error: 'Missing designUrl, mockupUrl, or variantId' }), { status: 400, headers });
   }
@@ -938,6 +1010,7 @@ async function handleCreateProduct(request, env, origin) {
       sourceProductHandle: productHandle,
       requestedSize,
       preferMockupMedia: inhouse === true,
+      designSlug: inhouse === true ? designSlug : undefined,
     });
   } catch (err) {
     // createShopifyProduct() runs ~15 sequential Admin API calls; a rejection can
@@ -955,6 +1028,18 @@ async function handleCreateProduct(request, env, origin) {
   // handle lets the storefront poll /products/{handle}.js for availability
   // before POSTing /cart/add.js (see add-to-cart flow in main-product.liquid)
   const responseBody = { variantId: result.newVariantId, productId: result.newProductId, handle: result.newProductHandle, productTitle: finalTitle };
+
+  // Link the design into the source product's picker list. Best-effort: the
+  // product itself exists either way, so report the outcome instead of failing —
+  // the creation script surfaces linked: false as a warning.
+  if (inhouse === true) {
+    try {
+      responseBody.linked = await linkInhouseDesign(env, productHandle, result.newProductId, designSlug);
+    } catch (err) {
+      console.error('[create-product] linkInhouseDesign failed:', err.message);
+      responseBody.linked = false;
+    }
+  }
 
   if (idempotencyKey) {
     // Non-fatal: if this write fails, the worst case is a future retry with
