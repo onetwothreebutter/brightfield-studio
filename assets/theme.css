@@ -841,21 +841,17 @@ h6 {
     color: var(--color-text-muted);
 }
 
-.footer-legal {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1.25rem;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-.footer-legal a {
+.footer-business {
     font-size: 0.775rem;
     color: var(--color-text-muted);
 }
 
-.footer-legal a:hover {
+.footer-business a {
+    color: var(--color-text-muted);
+    transition: color var(--transition-fast);
+}
+
+.footer-business a:hover {
     color: var(--color-primary);
 }
 
@@ -1031,21 +1027,6 @@ h6 {
     .cart-actions {
         flex-direction: column;
     }
-}
-
-.footer-social {
-    display: flex;
-    gap: 1.5rem;
-}
-
-.footer-social a {
-    font-size: 0.7rem;
-    letter-spacing: 0.1em;
-    color: var(--color-text-muted);
-    transition: color var(--transition-fast);
-}
-.footer-social a:hover {
-    color: var(--color-primary);
 }
 
 /* ─── Responsive ─────────────────────────────────────────── */
