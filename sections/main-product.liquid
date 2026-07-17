@@ -275,21 +275,20 @@
             {%- for dp in inhouse_designs -%}
               {%- assign dp_slug = dp.metafields.custom.design_slug | default: dp.handle -%}
               {%- assign dp_name = dp.title | split: ' — ' | last -%}
-              {%- capture dp_variants -%}
-                {%- for v in dp.variants -%}
-                  {{ v.title | json }}: { "id": {{ v.id }}, "available": {{ v.available }} }{%- unless forloop.last -%},{%- endunless -%}
-                {%- endfor -%}
-              {%- endcapture -%}
               <a
                 class="design-picker__card"
                 href="{{ dp.url }}"
                 data-design-slug="{{ dp_slug | escape }}"
                 data-image="{{ dp.featured_image | image_url: width: 900 }}"
-                data-variants="{{ '{' }}{{ dp_variants | escape }}{{ '}' }}"
                 data-values="{{ dp.metafields.custom.shader_values.value | json | escape }}"
               >
                 <img src="{{ dp.featured_image | image_url: width: 160 }}" alt="{{ dp_name | escape }}" width="72" height="72" loading="lazy">
                 <span>{{ dp_name | escape }}</span>
+                <span class="design-picker__variants" hidden>
+                  {%- for v in dp.variants -%}
+                  <b data-title="{{ v.title | escape }}" data-id="{{ v.id }}" data-available="{{ v.available }}"></b>
+                  {%- endfor -%}
+                </span>
               </a>
             {%- endfor -%}
           </div>
@@ -1034,7 +1033,11 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         return;
       }
 
-      try { setVariants(JSON.parse(card.dataset.variants)); } catch (e) {}
+      var variants = {};
+      card.querySelectorAll('.design-picker__variants b').forEach(function (b) {
+        variants[b.dataset.title] = { id: b.dataset.id, available: b.dataset.available === 'true' };
+      });
+      setVariants(variants);
       if (mainImg && card.dataset.image) mainImg.src = card.dataset.image;
       try {
         applyRestoredState(JSON.parse(card.dataset.values));
