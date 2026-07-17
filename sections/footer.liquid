@@ -10,46 +10,70 @@
       </div>
 
       <nav class="footer-nav" aria-label="Footer navigation">
-        {%- for block in section.blocks -%}
-          {%- if block.type == 'link_list' -%}
-            <div class="footer-nav__column" {{ block.shopify_attributes }}>
-              {%- if block.settings.heading != blank -%}
-                <h3 class="footer-nav__heading">{{ block.settings.heading }}</h3>
+        <div class="footer-nav__column">
+          <h3 class="footer-nav__heading">Customer Care</h3>
+          <ul class="footer-nav__list">
+            <li><a href="/pages/contact">Contact</a></li>
+            <li><a href="/pages/faq">FAQ</a></li>
+            {%- if shop.shipping_policy -%}
+              <li><a href="{{ shop.shipping_policy.url }}">Shipping</a></li>
+            {%- endif -%}
+            {%- if shop.refund_policy -%}
+              <li><a href="{{ shop.refund_policy.url }}">Returns</a></li>
+            {%- endif -%}
+            <li><a href="/pages/faq#size-guide">Size Guide</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-nav__column">
+          <h3 class="footer-nav__heading">About</h3>
+          <ul class="footer-nav__list">
+            <li><a href="/pages/about">About Brightfield</a></li>
+            <li><a href="/pages/about#how-it-works">How It Works</a></li>
+            <li><a href="/pages/community-designs">Community</a></li>
+          </ul>
+        </div>
+
+        {%- if shop.privacy_policy or shop.terms_of_service -%}
+          <div class="footer-nav__column">
+            <h3 class="footer-nav__heading">Legal</h3>
+            <ul class="footer-nav__list">
+              {%- if shop.privacy_policy -%}
+                <li><a href="{{ shop.privacy_policy.url }}">{{ shop.privacy_policy.title }}</a></li>
               {%- endif -%}
-              <ul class="footer-nav__list">
-                {%- for link in linklists[block.settings.menu].links -%}
-                  <li><a href="{{ link.url }}">{{ link.title }}</a></li>
-                {%- endfor -%}
-              </ul>
-            </div>
-          {%- endif -%}
-        {%- endfor -%}
+              {%- if shop.terms_of_service -%}
+                <li><a href="{{ shop.terms_of_service.url }}">{{ shop.terms_of_service.title }}</a></li>
+              {%- endif -%}
+            </ul>
+          </div>
+        {%- endif -%}
+
+        {%- if section.settings.instagram != blank -%}
+          <div class="footer-nav__column">
+            <h3 class="footer-nav__heading">Follow</h3>
+            <ul class="footer-nav__list">
+              <li><a href="{{ section.settings.instagram }}" target="_blank" rel="noopener noreferrer">Instagram</a></li>
+            </ul>
+          </div>
+        {%- endif -%}
       </nav>
     </div>
 
     <div class="footer-bottom">
       <p class="footer-copy">&copy; {{ 'now' | date: '%Y' }} {{ shop.name }}. All rights reserved.</p>
-      {%- if shop.privacy_policy or shop.terms_of_service or shop.shipping_policy -%}
-        <ul class="footer-legal">
-          {%- if shop.privacy_policy -%}
-            <li><a href="{{ shop.privacy_policy.url }}">{{ shop.privacy_policy.title }}</a></li>
+      {%- if shop.email != blank or section.settings.location_text != blank -%}
+        <p class="footer-business">
+          {%- if shop.email != blank -%}
+            <a href="mailto:{{ shop.email }}">{{ shop.email }}</a>
           {%- endif -%}
-          {%- if shop.terms_of_service -%}
-            <li><a href="{{ shop.terms_of_service.url }}">{{ shop.terms_of_service.title }}</a></li>
+          {%- if shop.email != blank and section.settings.location_text != blank -%}
+            <span aria-hidden="true"> &middot; </span>
           {%- endif -%}
-          {%- if shop.shipping_policy -%}
-            <li><a href="{{ shop.shipping_policy.url }}">{{ shop.shipping_policy.title }}</a></li>
+          {%- if section.settings.location_text != blank -%}
+            {{ section.settings.location_text }}
           {%- endif -%}
-        </ul>
+        </p>
       {%- endif -%}
-      <div class="footer-social">
-        {%- if section.settings.instagram != blank -%}
-          <a href="{{ section.settings.instagram }}" target="_blank" rel="noopener noreferrer" aria-label="Instagram">IG</a>
-        {%- endif -%}
-        {%- if section.settings.twitter != blank -%}
-          <a href="{{ section.settings.twitter }}" target="_blank" rel="noopener noreferrer" aria-label="X / Twitter">TW</a>
-        {%- endif -%}
-      </div>
     </div>
 
   </div>
@@ -71,29 +95,11 @@
       "label": "Instagram URL"
     },
     {
-      "type": "url",
-      "id": "twitter",
-      "label": "X / Twitter URL"
+      "type": "text",
+      "id": "location_text",
+      "label": "Location / business identity",
+      "info": "Shown next to the contact email in the footer, e.g. \"Designed in Bend, OR\"."
     }
-  ],
-  "blocks": [
-    {
-      "type": "link_list",
-      "name": "Navigation column",
-      "settings": [
-        {
-          "type": "text",
-          "id": "heading",
-          "label": "Column heading"
-        },
-        {
-          "type": "link_list",
-          "id": "menu",
-          "label": "Menu"
-        }
-      ]
-    }
-  ],
-  "max_blocks": 3
+  ]
 }
 {% endschema %}
