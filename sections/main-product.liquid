@@ -249,9 +249,23 @@
               >
                 {%- if product.available -%}Add to Cart{%- else -%}Sold Out{%- endif -%}
               </button>
+              {%- if shader_file -%}
+              <button type="button" class="product-customize-btn btn btn--secondary btn--lg" data-tab="shader">Design Yours</button>
+              {%- endif -%}
             </div>
 
           {%- endform -%}
+        </div>
+
+        <div class="product-trust">
+          <ul class="product-trust__list">
+            <li>Unisex fit — true to size</li>
+            <li><a href="/pages/faq#size-guide">Size guide</a></li>
+            <li>Printed to order in 2–5 business days</li>
+            <li>Estimated arrival: 5–10 business days</li>
+            <li>Free replacement for damage or print defects</li>
+          </ul>
+          <a class="product-trust__link" href="/pages/faq#shipping-returns">Shipping &amp; returns</a>
         </div>
 
         {%- if product.variants.size > 1 -%}
@@ -282,10 +296,6 @@
           });
         })();
         </script>
-        {%- endif -%}
-
-        {%- if shader_file -%}
-        <button class="product-customize-btn btn btn--secondary btn--lg btn--full" data-tab="shader">Design Yours</button>
         {%- endif -%}
 
         {%- if shader_file -%}
