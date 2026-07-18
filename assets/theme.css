@@ -791,6 +791,7 @@ h6 {
     inset: 0;
     margin: auto;
     padding: 0;
+    overflow: hidden;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     background: var(--color-surface);
@@ -804,6 +805,15 @@ h6 {
         0 0 60px rgba(0, 255, 255, 0.05);
 }
 
+/* display must stay scoped to [open] — an unconditional `display: flex` on
+   .size-guide-modal would win over the UA stylesheet's dialog:not([open])
+   { display: none } (author origin beats user-agent origin regardless of
+   specificity), leaving the dialog visible even when closed. */
+.size-guide-modal[open] {
+    display: flex;
+    flex-direction: column;
+}
+
 .size-guide-modal::backdrop {
     background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(6px);
@@ -815,6 +825,7 @@ h6 {
     justify-content: space-between;
     padding: 0.75rem 1rem 0.75rem 1.25rem;
     border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
 }
 
 .size-guide-modal__title {
@@ -844,6 +855,7 @@ h6 {
 }
 
 .size-guide-modal__body {
+    flex: 1;
     padding: 1.25rem;
     overflow-y: auto;
 }
