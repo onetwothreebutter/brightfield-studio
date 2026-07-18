@@ -260,13 +260,23 @@
         <div class="product-trust">
           <ul class="product-trust__list">
             <li>Unisex fit — true to size</li>
-            <li><a href="/pages/faq#size-guide">Size guide</a></li>
+            <li><a href="/pages/faq#size-guide" id="size-guide-trigger" aria-haspopup="dialog">Size guide</a></li>
             <li>Printed to order in 2–5 business days</li>
             <li>Estimated arrival: 5–10 business days</li>
             <li>Free replacement for damage or print defects</li>
           </ul>
           <a class="product-trust__link" href="/pages/faq#shipping-returns">Shipping &amp; returns</a>
         </div>
+
+        <dialog id="size-guide-modal" class="size-guide-modal" aria-labelledby="size-guide-modal-title">
+          <div class="size-guide-modal__header">
+            <h2 id="size-guide-modal-title" class="size-guide-modal__title">Size Guide</h2>
+            <button type="button" class="size-guide-modal__close" id="size-guide-modal-close" aria-label="Close">&times;</button>
+          </div>
+          <div class="size-guide-modal__body">
+            {%- render 'size-chart-table' -%}
+          </div>
+        </dialog>
 
         {%- if product.variants.size > 1 -%}
         <script>
@@ -297,6 +307,40 @@
         })();
         </script>
         {%- endif -%}
+
+        <script>
+        (function () {
+          var trigger = document.getElementById('size-guide-trigger');
+          var modal   = document.getElementById('size-guide-modal');
+          var closeBtn = document.getElementById('size-guide-modal-close');
+          if (!trigger || !modal || typeof modal.showModal !== 'function') return;
+
+          function openModal(e) {
+            e.preventDefault();
+            document.body.style.overflow = 'hidden';
+            modal.showModal();
+          }
+
+          function closeModal() {
+            modal.close();
+          }
+
+          trigger.addEventListener('click', openModal);
+          closeBtn.addEventListener('click', closeModal);
+
+          modal.addEventListener('close', function () {
+            document.body.style.overflow = '';
+          });
+
+          // Click on the backdrop (outside the dialog's own box) closes it.
+          modal.addEventListener('click', function (e) {
+            var rect = modal.getBoundingClientRect();
+            var inBox = e.clientX >= rect.left && e.clientX <= rect.right &&
+                        e.clientY >= rect.top && e.clientY <= rect.bottom;
+            if (!inBox) modal.close();
+          });
+        })();
+        </script>
 
         {%- if shader_file -%}
         <div class="shader-gui" id="shader-gui">

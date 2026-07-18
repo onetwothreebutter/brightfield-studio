@@ -732,6 +732,134 @@ h6 {
     color: var(--color-primary);
 }
 
+.size-chart__note {
+    margin: 0 0 1rem;
+    font-size: 0.875rem;
+    color: var(--color-text);
+}
+
+.size-chart__table-wrap {
+    overflow-x: auto;
+    margin-bottom: 1rem;
+}
+
+.size-chart__table {
+    width: 100%;
+    min-width: 380px;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+}
+
+.size-chart__table th,
+.size-chart__table td {
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+    white-space: nowrap;
+}
+
+.size-chart__table thead th {
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.size-chart__table tbody th {
+    color: var(--color-primary);
+    font-weight: 700;
+}
+
+.size-chart__tip,
+.size-chart__source {
+    margin: 0 0 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+}
+
+.size-chart__source a {
+    color: var(--color-text-muted);
+    text-decoration: underline;
+}
+
+.size-chart__source a:hover {
+    color: var(--color-primary);
+}
+
+.size-guide-modal {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    color: var(--color-text);
+    width: min(520px, 92vw);
+    height: fit-content;
+    max-height: 90vh;
+    box-shadow:
+        0 0 0 1px rgba(0, 255, 255, 0.06),
+        0 8px 32px rgba(0, 0, 0, 0.6),
+        0 0 60px rgba(0, 255, 255, 0.05);
+}
+
+/* display must stay scoped to [open] — an unconditional `display: flex` on
+   .size-guide-modal would win over the UA stylesheet's dialog:not([open])
+   { display: none } (author origin beats user-agent origin regardless of
+   specificity), leaving the dialog visible even when closed. */
+.size-guide-modal[open] {
+    display: flex;
+    flex-direction: column;
+}
+
+.size-guide-modal::backdrop {
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(6px);
+}
+
+.size-guide-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+}
+
+.size-guide-modal__title {
+    font-family: var(--font-heading);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-primary);
+    margin: 0;
+}
+
+.size-guide-modal__close {
+    background: none;
+    border: none;
+    color: var(--color-text);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: var(--radius);
+    transition: color var(--transition-fast);
+}
+
+.size-guide-modal__close:hover {
+    color: var(--color-primary);
+}
+
+.size-guide-modal__body {
+    flex: 1;
+    padding: 1.25rem;
+    overflow-y: auto;
+}
+
 .product-description {
     border-top: 1px solid var(--color-border);
     padding-top: 2rem;
