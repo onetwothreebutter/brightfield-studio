@@ -45,5 +45,5 @@
       "settings": {}
     }
   },
-  "order": ["hero", "shader-demo", "designs-row", "featured-collection", "community-designs", "newsletter"]
+  "order": ["hero", "featured-collection", "shader-demo", "designs-row", "community-designs", "newsletter"]
 }
