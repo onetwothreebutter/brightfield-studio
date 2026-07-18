@@ -714,7 +714,7 @@ h6 {
 .product-trust__list a {
     color: var(--color-text);
     text-decoration: underline;
-    text-decoration-color: var(--color-border);
+    text-decoration-color: currentColor;
 }
 
 .product-trust__list a:hover {
