@@ -136,22 +136,32 @@
                   </div>
                 {%- endif -%}
                 <div class="mockup-modal__footer-actions">
-                  <button id="mockup-modal-order" class="btn btn--primary btn--sm">Add to Cart</button>
-                  <button class="btn btn--ghost btn--sm" id="community-toggle">Submit for Gallery</button>
+                  <button id="mockup-modal-order" class="btn btn--primary btn--sm btn--full">Add to Cart</button>
                 </div>
                 <p class="mockup-modal__order-status" id="mockup-order-status" style="display:none"></p>
-                <div class="mockup-modal__community">
-                  <div class="mockup-modal__community-form" id="community-form" style="display:none">
-                    <p class="mockup-modal__community-note">Share this design to the community gallery so others can get inspired by it.</p>
-                    <input type="text" id="community-name" class="mockup-modal__community-input" placeholder="Your name (displayed publicly)">
-                    <input type="email" id="community-email" class="mockup-modal__community-input" placeholder="Email (kept private)">
-                    <button class="btn btn--primary btn--sm" id="community-submit">Submit</button>
-                    <p class="mockup-modal__community-error" id="community-error" style="display:none">Submission failed. Please try again.</p>
-                    <p class="mockup-modal__community-note">Designs are reviewed before appearing publicly.</p>
+
+                <!-- Shown only after a successful add-to-cart — gallery submission is
+                     secondary to the sale, so it only appears once the purchase path
+                     is already complete, never competing with Add to Cart. -->
+                <div class="mockup-modal__success" id="mockup-modal-success" style="display:none">
+                  <p class="mockup-modal__success-message">Added to your cart.</p>
+                  <button class="btn btn--primary btn--sm btn--full" id="mockup-modal-continue">Continue to Cart</button>
+                  <div class="mockup-modal__gallery-ask">
+                    <button class="btn btn--ghost btn--sm btn--full" id="community-toggle">Submit this design to the gallery (optional)</button>
+                    <div class="mockup-modal__community">
+                      <div class="mockup-modal__community-form" id="community-form" style="display:none">
+                        <p class="mockup-modal__community-note">Share this design to the community gallery so others can get inspired by it.</p>
+                        <input type="text" id="community-name" class="mockup-modal__community-input" placeholder="Your name (displayed publicly)">
+                        <input type="email" id="community-email" class="mockup-modal__community-input" placeholder="Email (kept private)">
+                        <button class="btn btn--primary btn--sm" id="community-submit">Submit</button>
+                        <p class="mockup-modal__community-error" id="community-error" style="display:none">Submission failed. Please try again.</p>
+                        <p class="mockup-modal__community-note">Designs are reviewed before appearing publicly.</p>
+                      </div>
+                      <p class="mockup-modal__community-success" id="community-success" style="display:none">
+                        Submitted! Your design will appear after review.
+                      </p>
+                    </div>
                   </div>
-                  <p class="mockup-modal__community-success" id="community-success" style="display:none">
-                    Submitted! Your design will appear after review.
-                  </p>
                 </div>
               </div>
             </div>
@@ -250,7 +260,7 @@
                 {%- if product.available -%}Add to Cart{%- else -%}Sold Out{%- endif -%}
               </button>
               {%- if shader_file -%}
-              <button type="button" class="product-customize-btn btn btn--secondary btn--lg" data-tab="shader">Design Yours</button>
+              <button type="button" class="product-customize-btn btn btn--outline btn--lg" data-tab="shader">Design Yours</button>
               {%- endif -%}
             </div>
 
@@ -1534,6 +1544,8 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   var modalImg      = document.getElementById('mockup-modal-img');
   var modalOrder    = document.getElementById('mockup-modal-order');
   var orderStatus   = document.getElementById('mockup-order-status');
+  var modalSuccess  = document.getElementById('mockup-modal-success');
+  var modalContinue = document.getElementById('mockup-modal-continue');
   var closeBtn      = document.getElementById('mockup-modal-close');
   var backdrop      = modal.querySelector('.mockup-modal__backdrop');
   if (!btn) return;
@@ -1675,6 +1687,14 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           if (communitySuccess) communitySuccess.style.display = 'none';
           if (communityError)   communityError.style.display = 'none';
           if (communitySubmit)  { communitySubmit.disabled = false; communitySubmit.textContent = 'Submit'; }
+
+          // Reset the post-add-to-cart success/gallery panel back to the primary
+          // Add to Cart state in case this modal was already completed once before
+          // (e.g. shopper goes back and re-customizes without leaving the page).
+          modalOrder.style.display = '';
+          modalOrder.disabled      = false;
+          modalOrder.textContent   = 'Add to Cart';
+          if (modalSuccess) modalSuccess.style.display = 'none';
 
           // Immediately add to Recent Designs strip — id filled in after upload
           var pendingDetail = {
@@ -1989,7 +2009,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         // redirect or misreport a successful add as a failure. Fall back to an
         // empty item so analytics is merely incomplete, not wrong.
         return r.json().catch(function () { return {}; }).then(function (item) {
-          console.log('[add-to-cart] success, redirecting to /cart');
+          console.log('[add-to-cart] success — showing gallery-submission prompt before continuing to cart');
           window.bfTrack('add_to_cart_success', { shader: '{{ shader_file }}' });
           // ── Analytics: GA4 standard ecommerce — add_to_cart ─────────────────
           window.bfTrack('add_to_cart', {
@@ -2003,7 +2023,9 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
               quantity: item.quantity || 1
             }]
           });
-          window.location.href = '/cart';
+          if (orderStatus) { orderStatus.textContent = ''; orderStatus.style.display = 'none'; }
+          modalOrder.style.display = 'none';
+          if (modalSuccess) modalSuccess.style.display = '';
         });
       })
       .catch(function (err) {
@@ -2018,6 +2040,12 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         if (orderStatus) { orderStatus.textContent = ''; orderStatus.style.display = 'none'; }
       });
   });
+
+  if (modalContinue) {
+    modalContinue.addEventListener('click', function () {
+      window.location.href = '/cart';
+    });
+  }
 
   function closeModal() {
     modal.classList.add('mockup-modal--hidden');

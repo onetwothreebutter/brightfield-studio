@@ -1868,18 +1868,25 @@ dialog.mobile-nav[open]::backdrop {
 
 .mockup-modal__footer-actions {
     display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
 }
 
-@media (max-width: 600px) {
-    .mockup-modal__footer-actions {
-        flex-direction: column;
-    }
-    .mockup-modal__footer-actions .btn {
-        width: 100%;
-        text-align: center;
-    }
+.mockup-modal__success {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+.mockup-modal__success-message {
+    font-size: 0.8125rem;
+    color: var(--color-text);
+    text-align: center;
+    margin: 0;
+}
+
+.mockup-modal__gallery-ask {
+    margin-top: 0.375rem;
+    padding-top: 0.625rem;
+    border-top: 1px solid var(--color-border);
 }
 @keyframes btn-spin {
     to { transform: rotate(360deg); }
