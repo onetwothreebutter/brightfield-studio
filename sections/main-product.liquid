@@ -107,6 +107,22 @@
           {%- endif -%}
         </div>
 
+        {%- comment -%}
+          Default size selection: prefer M over the first variant (XS). With a
+          no-returns policy an accidental-XS order is a straight loss, so never
+          preselect the smallest size. An explicit ?variant= deep link
+          (product.selected_variant) still wins.
+        {%- endcomment -%}
+        {%- assign default_variant = product.selected_or_first_available_variant -%}
+        {%- unless product.selected_variant -%}
+          {%- for v in product.variants -%}
+            {%- if v.available and v.option1 == 'M' -%}
+              {%- assign default_variant = v -%}
+              {%- break -%}
+            {%- endif -%}
+          {%- endfor -%}
+        {%- endunless -%}
+
         <!-- Shader panel — only shown when product has a shader-[file] tag -->
         {%- if shader_file -%}
         <div class="media-panel" data-panel="shader">
@@ -128,7 +144,12 @@
                     <label class="mockup-modal__size-label" for="mockup-size-select">Size</label>
                     <select id="mockup-size-select" class="mockup-modal__size-select">
                       {%- for variant in product.variants -%}
-                        <option value="{{ variant.id }}" {% unless variant.available %}disabled{% endunless %}>
+                        <option
+                          value="{{ variant.id }}"
+                          data-price="{{ variant.price | money }}"
+                          {% if variant.id == default_variant.id %}selected{% endif %}
+                          {% unless variant.available %}disabled{% endunless %}
+                        >
                           {{ variant.title }}
                         </option>
                       {%- endfor -%}
@@ -136,6 +157,7 @@
                   </div>
                 {%- endif -%}
                 <div class="mockup-modal__footer-actions">
+                  <span class="mockup-modal__price" id="mockup-modal-price">{{ default_variant.price | money }}</span>
                   <button id="mockup-modal-order" class="btn btn--primary btn--sm btn--full">Add to Cart</button>
                 </div>
                 <p class="mockup-modal__order-status" id="mockup-order-status" style="display:none"></p>
@@ -204,6 +226,7 @@
 
             {%- if product.variants.size > 1 -%}
               {%- for option in product.options_with_values -%}
+                {%- assign opt_idx = option.position | minus: 1 -%}
                 <fieldset class="variant-fieldset">
                   <legend class="variant-label">{{ option.name }}</legend>
                   <div class="variant-options">
@@ -213,7 +236,7 @@
                           type="radio"
                           name="options[{{ option.name | escape }}]"
                           value="{{ value | escape }}"
-                          {% if option.selected_value == value %}checked{% endif %}
+                          {% if default_variant.options[opt_idx] == value %}checked{% endif %}
                         >
                         <span>{{ value | escape }}</span>
                       </label>
@@ -227,7 +250,7 @@
                   <option
                     value="{{ variant.id }}"
                     data-variant-title="{{ variant.title | escape }}"
-                    {% if variant == product.selected_or_first_available_variant %}selected{% endif %}
+                    {% if variant.id == default_variant.id %}selected{% endif %}
                     {% unless variant.available %}disabled{% endunless %}
                   >
                     {{ variant.title }}
@@ -313,6 +336,18 @@
 
           form.querySelectorAll('input[type="radio"]').forEach(function (radio) {
             radio.addEventListener('change', syncVariant);
+          });
+        })();
+        </script>
+
+        <script>
+        (function () {
+          var sel   = document.getElementById('mockup-size-select');
+          var price = document.getElementById('mockup-modal-price');
+          if (!sel || !price) return;
+          sel.addEventListener('change', function () {
+            var opt = sel.options[sel.selectedIndex];
+            if (opt && opt.dataset.price) price.textContent = opt.dataset.price;
           });
         })();
         </script>

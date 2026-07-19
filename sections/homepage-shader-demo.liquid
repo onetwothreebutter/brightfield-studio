@@ -648,6 +648,7 @@
         </select>
       </div>
       <div class="mockup-modal__footer-actions">
+        <span class="mockup-modal__price" id="demo-mockup-price"></span>
         <button id="demo-mockup-order" class="btn btn--primary btn--sm">Add to Cart</button>
         <button class="btn btn--ghost btn--sm" id="demo-community-toggle">Submit for Gallery</button>
       </div>
@@ -1452,9 +1453,25 @@
           var opt       = document.createElement('option');
           opt.value     = v.id;
           opt.textContent = v.title;
+          // /products/{handle}.js returns prices in cents
+          opt.dataset.price = '$' + (v.price / 100).toFixed(2);
           if (!v.available) opt.disabled = true;
           sel.appendChild(opt);
         });
+        // Default to M when available — never preselect XS, misorders are nonrefundable
+        for (var i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].textContent === 'M' && !sel.options[i].disabled) {
+            sel.selectedIndex = i;
+            break;
+          }
+        }
+        var priceEl = document.getElementById('demo-mockup-price');
+        function showPrice() {
+          var opt = sel.options[sel.selectedIndex];
+          if (priceEl && opt && opt.dataset.price) priceEl.textContent = opt.dataset.price;
+        }
+        showPrice();
+        sel.addEventListener('change', showPrice);
         // Hide size row if only one variant
         var sizeWrap = document.getElementById('demo-mockup-size-wrap');
         if (sizeWrap && product.variants.length <= 1) sizeWrap.style.display = 'none';

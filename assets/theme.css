@@ -1868,6 +1868,19 @@ dialog.mobile-nav[open]::backdrop {
 
 .mockup-modal__footer-actions {
     display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.mockup-modal__price {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-text);
+    white-space: nowrap;
+}
+
+.mockup-modal__price:empty {
+    display: none;
 }
 
 .mockup-modal__success {
