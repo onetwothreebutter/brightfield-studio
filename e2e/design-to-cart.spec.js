@@ -70,8 +70,14 @@ test.describe('Custom design add-to-cart flow', () => {
     await page.locator('#mockup-modal-order').click();
 
     // /create-product does multiple sequential Shopify API calls; allow extra time
-    // for CI environments where Shopify API latency can be higher than local
-    await page.waitForURL('**/cart', { timeout: 120000 });
+    // for CI environments where Shopify API latency can be higher than local.
+    // A successful add no longer redirects immediately — it shows a "Continue to
+    // Cart" step (with an optional, secondary gallery-submission prompt) so the
+    // sale isn't sharing top billing with the gallery ask.
+    await page.locator('#mockup-modal-continue').waitFor({ state: 'visible', timeout: 120000 });
+    await page.locator('#mockup-modal-continue').click();
+
+    await page.waitForURL('**/cart', { timeout: 30000 });
 
     // Cart item should show the "Custom Design" badge
     await expect(page.locator('.cart-item__custom-badge')).toBeVisible();
