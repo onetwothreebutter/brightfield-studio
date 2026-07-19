@@ -301,6 +301,10 @@ describe('POST /create-product', () => {
     const createVars = JSON.parse(createCall.opts.body).variables;
     expect(createVars.input.title).toBe('Custom Dot Rise');
     expect(createVars.input.tags).toEqual(expect.arrayContaining(['custom-design', 'shader-rise-shirt']));
+    // Generated products must be hidden from storefront search and the sitemap
+    expect(createVars.input.metafields).toEqual(
+      expect.arrayContaining([expect.objectContaining({ namespace: 'seo', key: 'hidden', value: '1' })])
+    );
 
     const priceCall = fetchMock.calls.find((c) => c.url.includes('graphql.json') && JSON.parse(c.opts.body).query.includes('mutation UpdateVariants'));
     const priceVars = JSON.parse(priceCall.opts.body).variables;
