@@ -246,7 +246,7 @@ var FINISH_CONTROLS_PRE = [
   { key: 'u_distress_scale_4', label: 'Dot Size',     type: 'range', min: 10, max: 600, step: 1,    value: 91,   noRandomize: true, grainDependent: 4 },
   { key: 'u_halftone_angle',   label: 'Angle',        type: 'range', min: 0, max: 180,  step: 1,    value: 45,   noRandomize: true, grainDependent: 4 },
   { key: 'u_halftone_luma',    label: 'Luma Drive',   type: 'range', min: 0, max: 1,    step: 0.01, value: 1.0,  noRandomize: true, grainDependent: 4,
-    tip: 'At 1, bright pixels have smaller dots (classic AM halftone). At 0, all dots are the same size.' },
+    tip: 'At 1, dot size follows brightness — brighter areas get bigger dots. At 0, all dots are the same size.' },
   { key: 'u_distress_falloff', label: 'Edge Falloff', type: 'range', min: 0, max: 1,    step: 0.05, value: 0.0,  noRandomize: true,
     tip: 'At 0, grain is uniform. At 1, it concentrates toward edges and corners.' },
 ];

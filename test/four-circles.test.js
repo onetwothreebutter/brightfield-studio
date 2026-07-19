@@ -80,11 +80,11 @@ describe('four-circles.js', () => {
     expect(frag).toContain('perQuadCol');
   });
 
-  it('fragSrc uses max(baseAlpha, wordAlpha) so word bleeds outside circle shapes', () => {
+  it('fragSrc takes the max of shape and word alpha so word bleeds outside circle shapes', () => {
     const frag = Array.isArray(opts.fragSrc) ? opts.fragSrc.join('\n') : opts.fragSrc;
-    expect(frag).toContain('baseAlpha');
-    expect(frag).toContain('wordAlpha');
-    expect(frag).toContain('max(baseAlpha, wordAlpha)');
+    expect(frag).toContain('shapeMask');
+    expect(frag).toContain('wordA');
+    expect(frag).toContain('max(shapeMask, wordA)');
   });
 
   it('fragSrc applies gamma encoding before output', () => {
