@@ -213,7 +213,7 @@ describe('POST /save-preview', () => {
     expect(res.status).toBe(400);
   });
 
-  it('uploads design, mockup, and checkout images and returns their R2 URLs', async () => {
+  it('uploads design, mockup, and checkout images and returns worker-served /img/ URLs', async () => {
     const env = makeEnv();
     const res = await worker.fetch(makeRequest('POST', '/save-preview', {
       designImage:   btoa('design-bytes'),
@@ -226,9 +226,9 @@ describe('POST /save-preview', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.design_url).toContain('r2.example.com/designs/');
-    expect(body.mockup_url).toContain('r2.example.com/mockups/');
-    expect(body.checkout_image_url).toContain('r2.example.com/checkouts/');
+    expect(body.design_url).toContain('share.brightfield.studio/img/designs/');
+    expect(body.mockup_url).toContain('share.brightfield.studio/img/mockups/');
+    expect(body.checkout_image_url).toContain('share.brightfield.studio/img/checkouts/');
     expect(env.MOCKUP_STAGING.put).toHaveBeenCalledTimes(3);
   });
 
