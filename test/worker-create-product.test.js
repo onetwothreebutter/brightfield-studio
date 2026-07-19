@@ -30,7 +30,10 @@ function makeR2() {
     _store: store,
     get:    vi.fn(async (key) => {
       if (!store.has(key)) return null;
-      return { text: async () => store.get(key) };
+      return {
+        text:        async () => store.get(key),
+        arrayBuffer: async () => new TextEncoder().encode(store.get(key)).buffer,
+      };
     }),
     put:    vi.fn(async (key, value) => { store.set(key, typeof value === 'string' ? value : String(value)); }),
     // Was a no-op stub, unlike the real R2 binding and the other makeR2 mocks in
@@ -309,6 +312,43 @@ describe('POST /create-product', () => {
     const priceCall = fetchMock.calls.find((c) => c.url.includes('graphql.json') && JSON.parse(c.opts.body).query.includes('mutation UpdateVariants'));
     const priceVars = JSON.parse(priceCall.opts.body).variables;
     expect(priceVars.variants.every((v) => v.price === '25.00')).toBe(true);
+  });
+
+  it('reads own-domain media straight from R2 for the IMAGES resize (no self-fetch)', async () => {
+    // In production the media URLs point at the worker's own /img/ route, which
+    // a worker cannot fetch() — the bytes must come from the R2 binding. A
+    // regression here fails soft (cf.image fallback), so only this test sees it.
+    const fetchMock = makeShopifyFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const images = {
+      input:     () => images,
+      transform: () => images,
+      output:    () => images,
+      response:  () => new Response('resized-bytes'),
+    };
+    const env = makeEnv({ IMAGES: images });
+    await env.MOCKUP_STAGING.put('checkouts/abc.png', 'png-bytes');
+
+    const res = await worker.fetch(makeRequest('POST', '/create-product', createProductBody({
+      checkoutImageUrl: 'https://share.brightfield.studio/img/checkouts/abc.png',
+    })), env);
+    expect(res.status).toBe(200);
+
+    // Media bytes came from the R2 binding, not an HTTP fetch of our own URL
+    expect(env.MOCKUP_STAGING.get).toHaveBeenCalledWith('checkouts/abc.png');
+    expect(fetchMock.calls.some((c) => c.url.includes('checkouts/abc.png'))).toBe(false);
+
+    // The resized buffer was re-hosted under product-images/ and attached as
+    // the product's media, served via /img/
+    const imgKey = env.MOCKUP_STAGING.put.mock.calls.map(([k]) => k).find((k) => k.startsWith('product-images/'));
+    expect(imgKey).toBeTruthy();
+    const createCall = fetchMock.calls.find((c) => c.url.includes('graphql.json') && JSON.parse(c.opts.body).query.includes('mutation CreateProduct'));
+    const createVars = JSON.parse(createCall.opts.body).variables;
+    expect(createVars.media).toEqual([{
+      originalSource:   `https://share.brightfield.studio/img/${imgKey}`,
+      mediaContentType: 'IMAGE',
+    }]);
   });
 
   it('returns the cached product on a repeat request with the same createProductKey instead of creating a duplicate', async () => {

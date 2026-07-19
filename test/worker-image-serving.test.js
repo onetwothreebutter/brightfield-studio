@@ -79,6 +79,7 @@ describe('GET /img/{key}', () => {
       '/img/community/submissions/abc.json',
       '/img/shares/abc.json',
       '/img/mockups/%2e%2e/device-designs/dev-1.json',
+      '/img/mockups/%zz.jpg', // malformed %-encoding must 404, not throw
     ]) {
       const res = await worker.fetch(get(path), env);
       expect(res.status, path).toBe(404);
@@ -96,6 +97,7 @@ describe('GET /img/{key}', () => {
     // Source format is preserved (PNG mockups carry alpha)
     expect(calls.output).toMatchObject({ format: 'image/jpeg' });
     expect(await res.text()).toBe('small-bytes');
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
   });
 
   it('caps ?w= at 2000 and ignores invalid values', async () => {
@@ -120,6 +122,8 @@ describe('GET /img/{key}', () => {
     const res = await worker.fetch(get('/img/mockups/abc.jpg?w=320'), env);
     expect(res.status).toBe(200);
     expect(await res.text()).toBe('jpeg-bytes');
+    // The full-res fallback must not get pinned under the thumbnail cache key
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
   });
 
   it('serves the original when no IMAGES binding is configured', async () => {
@@ -129,6 +133,7 @@ describe('GET /img/{key}', () => {
     const res = await worker.fetch(get('/img/mockups/abc.jpg?w=320'), env);
     expect(res.status).toBe(200);
     expect(await res.text()).toBe('jpeg-bytes');
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
   });
 });
 

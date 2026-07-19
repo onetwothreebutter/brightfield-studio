@@ -209,7 +209,9 @@ async function fetchImageBytes(env, url) {
 
 async function handleServeImage(request, env, ctx) {
   const url = new URL(request.url);
-  const key = decodeURIComponent(url.pathname.slice('/img/'.length));
+  let key;
+  try { key = decodeURIComponent(url.pathname.slice('/img/'.length)); }
+  catch { return new Response('Not found', { status: 404 }); } // malformed %-encoding
 
   if (!IMG_PREFIXES.some(p => key.startsWith(p)) || !/\.(png|jpe?g|webp)$/i.test(key) || key.includes('..')) {
     return new Response('Not found', { status: 404 });
@@ -234,6 +236,9 @@ async function handleServeImage(request, env, ctx) {
 
   let body = await obj.arrayBuffer();
   let outType = sourceType;
+  // Full-size responses always match their cache key; a ?w= response only does
+  // if the resize actually ran
+  let cacheable = !width;
   if (width && env.IMAGES) {
     try {
       // Keep the source format: PNG mockups carry alpha (background-removed)
@@ -242,6 +247,7 @@ async function handleServeImage(request, env, ctx) {
         .transform({ width, fit: 'scale-down' })
         .output({ format: sourceType, quality: 82 });
       body = await resized.response().arrayBuffer();
+      cacheable = true;
     } catch (err) {
       console.warn('[serve-image] resize failed, serving original:', err.message);
     }
@@ -251,11 +257,15 @@ async function handleServeImage(request, env, ctx) {
     headers: {
       'Content-Type': outType,
       // Keys are UUIDs and content never changes once written
-      'Cache-Control': 'public, max-age=31536000, immutable',
+      'Cache-Control': cacheable
+        ? 'public, max-age=31536000, immutable'
+        // Failed resize: don't let the full-res original get pinned under the
+        // thumbnail key — not in the edge cache, not in the browser
+        : 'no-store',
       'Access-Control-Allow-Origin': '*',
     },
   });
-  if (cache) {
+  if (cache && cacheable) {
     const store = cache.put(cacheKey, response.clone());
     if (ctx?.waitUntil) ctx.waitUntil(store); else await store;
   }
