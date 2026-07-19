@@ -150,8 +150,130 @@ async function readLimitedJson(request, maxBytes) {
   catch { return { error: 'Invalid JSON', status: 400 }; }
 }
 
+// ── Image serving ────────────────────────────────────────────────────────────
+// Images live in R2 but are served through this worker at /img/{key} instead of
+// the pub-*.r2.dev URL: that domain is a rate-limited dev domain (images
+// intermittently fail to load in production), and serving them here also allows
+// on-the-fly thumbnail resizing via the IMAGES binding (?w=320).
+
+const IMG_BASE = 'https://share.brightfield.studio/img';
+const IMG_MAX_WIDTH = 2000;
+// Only image objects are servable — JSON blobs under other prefixes
+// (device-designs/, community/submissions/, shader-states/) stay private.
+const IMG_PREFIXES = ['mockups/', 'designs/', 'checkouts/', 'product-images/', 'shares/'];
+
+function imgUrl(key) {
+  return `${IMG_BASE}/${key}`;
+}
+
+// Returns the R2 key when `url` points at an image we host ourselves (either
+// the worker's /img/ route or the legacy pub-*.r2.dev domain), else null.
+function ownImageKey(env, url) {
+  if (!url) return null;
+  if (url.startsWith(`${IMG_BASE}/`)) return url.slice(IMG_BASE.length + 1).split('?')[0];
+  if (env.R2_PUBLIC_DOMAIN && url.startsWith(`https://${env.R2_PUBLIC_DOMAIN}/`)) {
+    return url.slice(`https://${env.R2_PUBLIC_DOMAIN}/`.length).split('?')[0];
+  }
+  return null;
+}
+
+function rewriteLegacyImgUrl(env, url) {
+  if (!url || !env.R2_PUBLIC_DOMAIN) return url;
+  const prefix = `https://${env.R2_PUBLIC_DOMAIN}/`;
+  return url.startsWith(prefix) ? imgUrl(url.slice(prefix.length)) : url;
+}
+
+// Rewrites the image-URL fields of a stored design/submission entry in place,
+// so entries saved before the /img/ route existed render through it too.
+const IMG_URL_FIELDS = ['designUrl', 'mockupUrl', 'checkoutImageUrl', 'imageUrl'];
+function rewriteLegacyImgUrls(env, entry) {
+  if (!entry) return entry;
+  for (const f of IMG_URL_FIELDS) {
+    if (entry[f]) entry[f] = rewriteLegacyImgUrl(env, entry[f]);
+  }
+  return entry;
+}
+
+// Fetches image bytes, reading straight from R2 when the URL is one of our own —
+// a worker cannot fetch() its own custom domain, and going through pub-*.r2.dev
+// hits its rate limit. Returns null when the image can't be read.
+async function fetchImageBytes(env, url) {
+  const key = ownImageKey(env, url);
+  if (key) {
+    const obj = await env.MOCKUP_STAGING.get(key);
+    return obj ? await obj.arrayBuffer() : null;
+  }
+  const res = await fetch(url);
+  return res.ok ? await res.arrayBuffer() : null;
+}
+
+async function handleServeImage(request, env, ctx) {
+  const url = new URL(request.url);
+  let key;
+  try { key = decodeURIComponent(url.pathname.slice('/img/'.length)); }
+  catch { return new Response('Not found', { status: 404 }); } // malformed %-encoding
+
+  if (!IMG_PREFIXES.some(p => key.startsWith(p)) || !/\.(png|jpe?g|webp)$/i.test(key) || key.includes('..')) {
+    return new Response('Not found', { status: 404 });
+  }
+
+  // Only ?w= participates in the cache key so junk params can't fragment the cache
+  let width = parseInt(url.searchParams.get('w'), 10);
+  width = Number.isFinite(width) && width > 0 ? Math.min(width, IMG_MAX_WIDTH) : 0;
+
+  const cache = typeof caches !== 'undefined' ? caches.default : null;
+  const cacheKey = new Request(`${IMG_BASE}/${key}${width ? `?w=${width}` : ''}`);
+  if (cache) {
+    const cached = await cache.match(cacheKey);
+    if (cached) return cached;
+  }
+
+  const obj = await env.MOCKUP_STAGING.get(key);
+  if (!obj) return new Response('Not found', { status: 404 });
+
+  const sourceType = obj.httpMetadata?.contentType
+    || (/\.png$/i.test(key) ? 'image/png' : /\.webp$/i.test(key) ? 'image/webp' : 'image/jpeg');
+
+  let body = await obj.arrayBuffer();
+  let outType = sourceType;
+  // Full-size responses always match their cache key; a ?w= response only does
+  // if the resize actually ran
+  let cacheable = !width;
+  if (width && env.IMAGES) {
+    try {
+      // Keep the source format: PNG mockups carry alpha (background-removed)
+      const resized = await env.IMAGES
+        .input(body)
+        .transform({ width, fit: 'scale-down' })
+        .output({ format: sourceType, quality: 82 });
+      body = await resized.response().arrayBuffer();
+      cacheable = true;
+    } catch (err) {
+      console.warn('[serve-image] resize failed, serving original:', err.message);
+    }
+  }
+
+  const response = new Response(body, {
+    headers: {
+      'Content-Type': outType,
+      // Keys are UUIDs and content never changes once written
+      'Cache-Control': cacheable
+        ? 'public, max-age=31536000, immutable'
+        // Failed resize: don't let the full-res original get pinned under the
+        // thumbnail key — not in the edge cache, not in the browser
+        : 'no-store',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+  if (cache && cacheable) {
+    const store = cache.put(cacheKey, response.clone());
+    if (ctx?.waitUntil) ctx.waitUntil(store); else await store;
+  }
+  return response;
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const origin = request.headers.get('Origin') || '';
 
     // CORS preflight
@@ -186,6 +308,9 @@ export default {
     if (method === 'POST' && pathname === '/save-shader-state')           return handleSaveShaderState(request, env, origin);
     if (method === 'GET'  && pathname.startsWith('/get-shader-state/'))   return handleGetShaderState(request, env, origin);
     if (method === 'POST' && pathname === '/create-share')                return handleCreateShare(request, env, origin);
+
+    // Must precede the share.brightfield.studio catch-all below
+    if (method === 'GET' && pathname.startsWith('/img/')) return handleServeImage(request, env, ctx);
 
     // Custom domain: share.brightfield.studio/{id}
     if (method === 'GET' && url.hostname === 'share.brightfield.studio') return handleShare(request, env, pathname.slice(1));
@@ -231,8 +356,8 @@ async function handleGenerateMockup(request, env, origin) {
     httpMetadata: { contentType: 'image/png' }
   });
 
-  // R2 public URL — requires the bucket to have public access enabled
-  const imageUrl = `https://${env.R2_PUBLIC_DOMAIN}/${imageKey}`;
+  // Served through the worker's /img/ route (Printful fetches this externally)
+  const imageUrl = imgUrl(imageKey);
 
   try {
     // 2. Create Printful mockup task
@@ -321,7 +446,7 @@ async function handleGenerateMockup(request, env, origin) {
       await env.MOCKUP_STAGING.put(mockupKey, mockupData, {
         httpMetadata: { contentType: mockupContentType }
       });
-      mockupUrl = `https://${env.R2_PUBLIC_DOMAIN}/${mockupKey}`;
+      mockupUrl = imgUrl(mockupKey);
       const shaderSlug = (shader || '').replace(/[^a-z0-9-]/g, '') || 'design';
       downloadUrl = `${new URL(request.url).origin}/download-mockup?key=${encodeURIComponent(mockupKey)}&shader=${encodeURIComponent(shaderSlug)}`;
     }
@@ -419,9 +544,9 @@ async function handleSavePreview(request, env, origin) {
   if (checkoutKey) uploads.push(env.MOCKUP_STAGING.put(checkoutKey, checkoutData, { httpMetadata: { contentType: 'image/png' } }));
   await Promise.all(uploads);
 
-  const designUrl       = `https://${env.R2_PUBLIC_DOMAIN}/${designKey}`;
-  const mockupUrl       = `https://${env.R2_PUBLIC_DOMAIN}/${mockupKey}`;
-  const checkoutImageUrl = checkoutKey ? `https://${env.R2_PUBLIC_DOMAIN}/${checkoutKey}` : null;
+  const designUrl       = imgUrl(designKey);
+  const mockupUrl       = imgUrl(mockupKey);
+  const checkoutImageUrl = checkoutKey ? imgUrl(checkoutKey) : null;
 
   let savedId = null;
   if (deviceId) {
@@ -463,16 +588,16 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
   let resizedBuf = null;
   if (env.IMAGES) {
     try {
-      const imgRes = await fetch(mediaSource);
-      console.log(logPrefix, 'media fetch status (IMAGES path):', imgRes.status);
-      if (imgRes.ok) {
-        const imgBuf = await imgRes.arrayBuffer();
+      const imgBuf = await fetchImageBytes(env, mediaSource);
+      if (imgBuf) {
         const resized = await env.IMAGES
           .input(imgBuf)
           .transform({ width: 2000, fit: 'scale-down' })
           .output({ format: 'image/jpeg', quality: 85 });
         resizedBuf = await resized.response().arrayBuffer();
         console.log(logPrefix, 'IMAGES resize succeeded');
+      } else {
+        console.warn(logPrefix, 'media source unreadable (IMAGES path):', mediaSource);
       }
     } catch (err) {
       console.warn(logPrefix, 'IMAGES resize failed, trying cf.image fallback:', err.message, err.toString());
@@ -481,7 +606,11 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
 
   if (!resizedBuf) {
     try {
-      const cfRes = await fetch(mediaSource, {
+      // cf.image needs a fetchable URL; our own /img/ URLs can't be self-fetched,
+      // so fall back to the legacy R2 public domain for those
+      const cfKey    = ownImageKey(env, mediaSource);
+      const cfSource = cfKey && env.R2_PUBLIC_DOMAIN ? `https://${env.R2_PUBLIC_DOMAIN}/${cfKey}` : mediaSource;
+      const cfRes = await fetch(cfSource, {
         cf: { image: { width: 2000, fit: 'scale-down', format: 'jpeg', quality: 85 } },
       });
       console.log(logPrefix, 'cf.image fetch status:', cfRes.status);
@@ -499,7 +628,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     await env.MOCKUP_STAGING.put(imgKey, resizedBuf, {
       httpMetadata: { contentType: 'image/jpeg' },
     });
-    shopifyImageUrl = `https://${env.R2_PUBLIC_DOMAIN}/${imgKey}`;
+    shopifyImageUrl = imgUrl(imgKey);
     console.log(logPrefix, 'media uploaded to R2:', shopifyImageUrl);
   } else {
     // Both resize methods failed — use the original R2 URL directly since it's already public
@@ -953,8 +1082,9 @@ async function handleListDesigns(request, env, origin) {
   try {
     const obj = await env.MOCKUP_STAGING.get(`device-designs/${deviceId}.json`);
     if (!obj) return new Response(JSON.stringify([]), { status: 200, headers });
-    const text = await obj.text();
-    return new Response(text, { status: 200, headers });
+    const designs = JSON.parse(await obj.text());
+    designs.forEach(d => rewriteLegacyImgUrls(env, d));
+    return new Response(JSON.stringify(designs), { status: 200, headers });
   } catch {
     return new Response(JSON.stringify([]), { status: 200, headers });
   }
@@ -1106,7 +1236,7 @@ async function handleCommunityList(request, env, origin) {
     return true;
   });
 
-  const sanitized = filtered.map(({ creatorEmail: _omit, ...rest }) => rest);
+  const sanitized = filtered.map(({ creatorEmail: _omit, ...rest }) => rewriteLegacyImgUrls(env, rest));
   return new Response(JSON.stringify(sanitized), { status: 200, headers });
 }
 
@@ -1158,6 +1288,7 @@ async function handleCommunityPending(request, env, origin) {
   const submissions = (
     await Promise.all(list.map(id => readJson(env, `community/submissions/${id}.json`)))
   ).filter(s => s && s.status === statusFilter);
+  submissions.forEach(s => rewriteLegacyImgUrls(env, s));
 
   return new Response(JSON.stringify(submissions), { status: 200, headers });
 }
@@ -1226,7 +1357,7 @@ async function handleCommunityDesign(request, env, origin, id) {
   const sub = await readJson(env, `community/submissions/${id}.json`);
   if (!sub || sub.status !== 'approved') return new Response('Not found', { status: 404, headers });
   const { creatorEmail: _omit, ...sanitized } = sub;
-  return new Response(JSON.stringify(sanitized), { status: 200, headers });
+  return new Response(JSON.stringify(rewriteLegacyImgUrls(env, sanitized)), { status: 200, headers });
 }
 
 // ── Share page ───────────────────────────────────────────────────────────────
@@ -1276,7 +1407,7 @@ async function handleShare(request, env, id) {
     const title    = escHtml('A custom ' + shaderLabel + ' design from Brightfield Studio');
     const desc     = escHtml('Customize your own design at Brightfield Studio');
     const shareUrl = escHtml('https://share.brightfield.studio/' + id);
-    const imageUrl = escHtml(meta.imageUrl || '');
+    const imageUrl = escHtml(rewriteLegacyImgUrl(env, meta.imageUrl || ''));
     const restorePayload = btoa(JSON.stringify({ values: meta.values, shader: meta.shader }));
     const productUrl = 'https://brightfield.studio/products/' + encodeURIComponent(meta.productHandle || '')
       + '?bfr=' + encodeURIComponent(restorePayload) + '#shader';
@@ -1297,7 +1428,7 @@ async function handleShare(request, env, id) {
   const title      = escHtml((design.creatorName || 'Anonymous') + "'s design on Brightfield Studio");
   const desc       = escHtml('A custom ' + shaderLabel + ' design created on Brightfield Studio');
   const shareUrl   = escHtml('https://share.brightfield.studio/' + id);
-  const mockupUrl  = escHtml(design.mockupUrl || '');
+  const mockupUrl  = escHtml(rewriteLegacyImgUrl(env, design.mockupUrl || ''));
   const productUrl = design.shopifyProductHandle
     ? 'https://brightfield.studio/products/' + encodeURIComponent(design.shopifyProductHandle)
     : 'https://brightfield.studio/pages/community-design?id=' + encodeURIComponent(id);
@@ -1648,7 +1779,7 @@ async function handleCreateShare(request, env, origin) {
   const imageKey = `shares/${id}.jpg`;
   const metaKey  = `shares/${id}.json`;
   await env.MOCKUP_STAGING.put(imageKey, imageData, { httpMetadata: { contentType: 'image/jpeg' } });
-  const imageUrl = `https://${env.R2_PUBLIC_DOMAIN}/${imageKey}`;
+  const imageUrl = imgUrl(imageKey);
   await writeJson(env, metaKey, {
     id,
     shader:        shader        || '',
@@ -1688,9 +1819,8 @@ async function handleRemoveBg(request, env, origin) {
 
   let sourceData;
   try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    sourceData = await res.arrayBuffer();
+    sourceData = await fetchImageBytes(env, url);
+    if (!sourceData) throw new Error('image not readable');
   } catch (err) {
     return new Response(JSON.stringify({ error: `Failed to fetch image: ${err.message}` }), { status: 502, headers });
   }

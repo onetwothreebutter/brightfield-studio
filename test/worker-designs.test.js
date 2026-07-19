@@ -114,7 +114,7 @@ describe('POST /generate-mockup — design saving', () => {
     expect(saved[0]).toMatchObject({
       shader: 'echo-text',
       productHandle: 'echo-text-shirt',
-      mockupUrl: expect.stringContaining('r2.example.com/mockups/'),
+      mockupUrl: expect.stringContaining('share.brightfield.studio/img/mockups/'),
       values: { u_speed: 1.5 },
     });
     expect(saved[0].id).toBeTruthy();
@@ -183,7 +183,7 @@ describe('POST /generate-mockup — design saving', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.mockup_url).toContain('r2.example.com/mockups/');
-    expect(body.design_url).toContain('r2.example.com/designs/');
+    expect(body.mockup_url).toContain('share.brightfield.studio/img/mockups/');
+    expect(body.design_url).toContain('share.brightfield.studio/img/designs/');
   });
 });
