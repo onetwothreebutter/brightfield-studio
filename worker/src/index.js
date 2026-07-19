@@ -527,6 +527,10 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
         tags,
         descriptionHtml: '',
         metafields: [
+          // Hide generated per-customer products from storefront search, the
+          // sitemap, and search engines (noindex). They stay ACTIVE so the
+          // buyer's cart/checkout links keep working.
+          { namespace: 'seo',    key: 'hidden',                 type: 'number_integer',         value: '1' },
           { namespace: 'custom', key: 'design_url',             type: 'url',                    value: designUrl },
           { namespace: 'custom', key: 'mockup_url',             type: 'url',                    value: mockupUrl },
           { namespace: 'custom', key: 'shader',                 type: 'single_line_text_field', value: shader || '' },
