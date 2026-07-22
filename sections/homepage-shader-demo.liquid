@@ -648,6 +648,7 @@
         </select>
       </div>
       <div class="mockup-modal__footer-actions">
+        <span class="mockup-modal__price" id="demo-mockup-price"></span>
         <button id="demo-mockup-order" class="btn btn--primary btn--sm">Add to Cart</button>
         <button class="btn btn--ghost btn--sm" id="demo-community-toggle">Submit for Gallery</button>
       </div>
@@ -1422,6 +1423,22 @@
   // ── Preview on Shirt ───────────────────────────────────────────────────────
   var WORKER_BASE_URL    = 'https://brightfield-mockup-worker.eric-d-johnson.workers.dev';
   var PRODUCT_HANDLE     = {{ section.settings.product_handle | default: 'line-circle' | json }};
+  var SHOP_MONEY_FORMAT  = {{ shop.money_format | json }};
+
+  // Formats variant.price (cents, from /products/{handle}.js) using the shop's
+  // actual money_format setting — mirrors the `money` filter Liquid uses
+  // everywhere else, instead of assuming a hardcoded "$X.XX".
+  function formatMoney(cents, format) {
+    var amount = (cents / 100).toFixed(2);
+    var withComma = amount.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    var placeholder = /\{\{\s*(amount|amount_no_decimals|amount_with_comma_separator)\s*\}\}/;
+    var match = format && format.match(placeholder);
+    if (!match) return '$' + amount;
+    var value = match[1] === 'amount_no_decimals' ? Math.round(cents / 100)
+      : match[1] === 'amount_with_comma_separator' ? withComma
+      : amount;
+    return format.replace(placeholder, value);
+  }
   var PRINT_AREA         = [0.30, 0.20, 0.40, 0.45];
   var currentDesignUrl   = null;
   var _lastMockupData    = null;
@@ -1452,9 +1469,24 @@
           var opt       = document.createElement('option');
           opt.value     = v.id;
           opt.textContent = v.title;
+          opt.dataset.price = formatMoney(v.price, SHOP_MONEY_FORMAT);
           if (!v.available) opt.disabled = true;
           sel.appendChild(opt);
         });
+        // Default to M when available — never preselect XS, misorders are nonrefundable
+        for (var i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].textContent === 'M' && !sel.options[i].disabled) {
+            sel.selectedIndex = i;
+            break;
+          }
+        }
+        var priceEl = document.getElementById('demo-mockup-price');
+        function showPrice() {
+          var opt = sel.options[sel.selectedIndex];
+          if (priceEl && opt && opt.dataset.price) priceEl.textContent = opt.dataset.price;
+        }
+        showPrice();
+        sel.addEventListener('change', showPrice);
         // Hide size row if only one variant
         var sizeWrap = document.getElementById('demo-mockup-size-wrap');
         if (sizeWrap && product.variants.length <= 1) sizeWrap.style.display = 'none';
