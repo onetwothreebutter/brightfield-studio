@@ -146,7 +146,7 @@
                       {%- for variant in product.variants -%}
                         <option
                           value="{{ variant.id }}"
-                          data-price="{{ variant.price | money }}"
+                          data-price="{{ variant.price | money | escape }}"
                           {% if variant.id == default_variant.id %}selected{% endif %}
                           {% unless variant.available %}disabled{% endunless %}
                         >
