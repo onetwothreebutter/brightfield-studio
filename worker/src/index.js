@@ -1120,7 +1120,17 @@ async function handleDeleteDesign(request, env, origin) {
 
 // ── Community helpers ────────────────────────────────────────────────────────
 
-async function verifyShopifySessionToken(token, clientSecret) {
+// Shopify App Bridge session token claim formats (confirmed against Shopify's own
+// reference implementations: @shopify/shopify-api's decode-session-token.ts /
+// session-utils.ts, and the shopify_api Ruby gem's jwt_payload.rb):
+//   aud  — the app's client ID (API key), exact match.
+//   dest — the shop's domain as a full origin, e.g. "https://{shop}.myshopify.com"
+//          (session-utils.ts derives `shop` via `dest.replace(/^https:\/\//, '')`).
+//   iss  — the shop's admin domain, e.g. "https://{shop}.myshopify.com/admin"
+//          (jwt_payload.rb checks `iss.end_with?("/admin")`).
+// Shopify's docs additionally require dest/iss to agree on the same shop, and both
+// checked against the configured store — enforced below via exact string comparison.
+async function verifyShopifySessionToken(token, clientSecret, clientId, storeDomain) {
   if (!token || !clientSecret) return false;
   try {
     const parts = token.split('.');
@@ -1148,6 +1158,13 @@ async function verifyShopifySessionToken(token, clientSecret) {
 
     const payload = JSON.parse(new TextDecoder().decode(b64urlToBytes(payloadB64)));
     if (payload.exp < Date.now() / 1000) return false;
+    if (Date.now() / 1000 < payload.nbf) return false;
+
+    if (!clientId || payload.aud !== clientId) return false;
+
+    if (!storeDomain) return false;
+    if (payload.dest !== `https://${storeDomain}`) return false;
+    if (payload.iss !== `https://${storeDomain}/admin`) return false;
 
     return true;
   } catch {
@@ -1159,7 +1176,12 @@ async function requireAdmin(request, env) {
   const auth = request.headers.get('Authorization') || '';
   if (auth === `Bearer ${env.ADMIN_TOKEN}`) return true;
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  return verifyShopifySessionToken(token, env.SHOPIFY_APP_CLIENT_SECRET);
+  return verifyShopifySessionToken(
+    token,
+    env.SHOPIFY_APP_CLIENT_SECRET,
+    env.SHOPIFY_APP_CLIENT_ID,
+    env.SHOPIFY_STORE_DOMAIN
+  );
 }
 
 async function readJson(env, key) {
