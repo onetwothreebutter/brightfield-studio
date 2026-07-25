@@ -652,6 +652,7 @@
         <button id="demo-mockup-order" class="btn btn--primary btn--sm">Add to Cart</button>
         <button class="btn btn--ghost btn--sm" id="demo-community-toggle">Submit for Gallery</button>
       </div>
+      <p class="mockup-modal__order-status" id="demo-order-status" role="status" aria-live="polite"></p>
       <div class="mockup-modal__community" id="demo-community-wrap">
         <div class="mockup-modal__community-form" id="demo-community-form" style="display:none">
           <p class="mockup-modal__community-note">Share this design to the community gallery so others can get inspired by it.</p>
@@ -832,6 +833,28 @@
   var mockupImg           = document.getElementById('demo-mockup-img');
   var mockupSizeEl        = document.getElementById('demo-mockup-size');
   var mockupOrder         = document.getElementById('demo-mockup-order');
+  var orderStatus         = document.getElementById('demo-order-status');
+
+  // orderStatus doubles as both the polite progress announcer and, on failure,
+  // an assertive inline error message — replacing a blocking alert() that
+  // screen readers can't associate with the add-to-cart flow. setOrderError()
+  // flips the element to role="alert" so assistive tech announces it
+  // immediately; setOrderStatus() flips it back to the polite default for the
+  // next attempt. Mirrors the same pattern in sections/main-product.liquid.
+  function setOrderStatus(msg) {
+    if (!orderStatus) return;
+    orderStatus.setAttribute('role', 'status');
+    orderStatus.setAttribute('aria-live', 'polite');
+    orderStatus.classList.remove('mockup-modal__order-status--error');
+    orderStatus.textContent = msg;
+  }
+  function setOrderError(msg) {
+    if (!orderStatus) return;
+    orderStatus.setAttribute('role', 'alert');
+    orderStatus.setAttribute('aria-live', 'assertive');
+    orderStatus.classList.add('mockup-modal__order-status--error');
+    orderStatus.textContent = msg;
+  }
 
   // ── Cycle dots ─────────────────────────────────────────────────────────────
   CYCLE_STEPS.forEach(function () {
@@ -1587,6 +1610,7 @@
         if (dCommunitySuccess) dCommunitySuccess.style.display = 'none';
         if (dCommunityError)   dCommunityError.style.display = 'none';
         if (dCommunitySubmit)  { dCommunitySubmit.disabled = false; dCommunitySubmit.textContent = 'Submit'; }
+        setOrderStatus(''); // clear any add-to-cart error left over from a previous preview
 
         // Create checkout thumbnail (600×600, black background) for cart/checkout display
         var checkoutCanvas = document.createElement('canvas');
@@ -1646,22 +1670,25 @@
 
   if (mockupOrder) {
     mockupOrder.addEventListener('click', function () {
+      setOrderStatus(''); // clear any error/status left over from a previous attempt
       if (!_pendingDesign) {
-        alert('Generate a preview first.');
+        setOrderError('Generate a preview first.');
         return;
       }
       var shopifyVariantId = mockupSizeEl ? mockupSizeEl.value : null;
       if (!shopifyVariantId) {
-        alert('Could not determine variant. Please select a size and try again.');
+        setOrderError('Could not determine variant. Please select a size and try again.');
         return;
       }
       mockupOrder.disabled    = true;
       mockupOrder.textContent = 'Saving\u2026';
+      setOrderStatus('Saving your design\u2026');
       window.bfTrack('add_to_cart_start', { location: 'homepage_demo', shader: PRODUCT_HANDLE });
 
       _pendingDesign.uploadPromise
         .then(function (data) {
           mockupOrder.textContent = 'Creating your design\u2026';
+          setOrderStatus('Creating your design\u2026');
           var cpBody = {
             designUrl:        data.design_url,
             mockupUrl:        data.mockup_url,
@@ -1745,7 +1772,7 @@
         })
         .catch(function (err) {
           window.bfTrack('add_to_cart_failure', { location: 'homepage_demo', shader: PRODUCT_HANDLE, error: err.message });
-          alert('Could not add to cart: ' + err.message);
+          setOrderError('Could not add to cart: ' + err.message);
           mockupOrder.disabled    = false;
           mockupOrder.textContent = 'Add to Cart';
         });
