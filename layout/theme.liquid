@@ -75,15 +75,21 @@
           });
         }
 
-        if (window.Shopify && window.Shopify.customerPrivacy) {
-          // Returning visitors (or visitors outside a region requiring
-          // consent) already have a resolved decision — apply it immediately
-          // rather than waiting for visitorConsentCollected, which only
-          // fires when consent changes, not on page load.
-          bfSyncConsent(
-            window.Shopify.customerPrivacy.analyticsProcessingAllowed(),
-            window.Shopify.customerPrivacy.marketingAllowed()
-          );
+        // window.Shopify.customerPrivacy isn't available until explicitly
+        // loaded — checking for it directly (without loadFeatures) is always
+        // false this early in page load, so the sync below silently never ran.
+        if (window.Shopify) {
+          window.Shopify.loadFeatures([{ name: 'consent-tracking-api', version: '0.1' }], function (error) {
+            if (error) return;
+            // Returning visitors (or visitors outside a region requiring
+            // consent) already have a resolved decision — apply it immediately
+            // rather than waiting for visitorConsentCollected, which only
+            // fires when consent changes, not on page load.
+            bfSyncConsent(
+              window.Shopify.customerPrivacy.analyticsProcessingAllowed(),
+              window.Shopify.customerPrivacy.marketingAllowed()
+            );
+          });
         }
 
         // Fires whenever the shopper accepts/updates consent via Shopify's
