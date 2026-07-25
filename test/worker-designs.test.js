@@ -18,8 +18,14 @@ function makeR2() {
   };
 }
 
-function makeEnv(r2 = makeR2()) {
-  return { MOCKUP_STAGING: r2, PRINTFUL_API_KEY: 'test-key', R2_PUBLIC_DOMAIN: 'r2.example.com' };
+function makeEnv(r2 = makeR2(), overrides = {}) {
+  return { MOCKUP_STAGING: r2, PRINTFUL_API_KEY: 'test-key', R2_PUBLIC_DOMAIN: 'r2.example.com', ...overrides };
+}
+
+// Rate-limit binding mock — same shape as the real Workers Rate Limiting
+// binding's `limit()` method: an async function returning { success }.
+function makeRateLimiter(success = true) {
+  return { limit: vi.fn(async () => ({ success })) };
 }
 
 function makeRequest(method, path, body, origin = 'https://brightfield-2.myshopify.com') {
@@ -229,5 +235,47 @@ describe('POST /generate-mockup — design saving', () => {
     const body = await res.json();
     expect(body.mockup_url).toContain('share.brightfield.studio/img/mockups/');
     expect(body.design_url).toContain('share.brightfield.studio/img/designs/');
+  });
+
+  // ── Rate limiting (RATE_LIMITER_GENERATE_MOCKUP binding) ────────────────────
+
+  it('succeeds normally when the rate limiter reports under-limit', async () => {
+    const r2 = makeR2();
+    const env = makeEnv(r2, { RATE_LIMITER_GENERATE_MOCKUP: makeRateLimiter(true) });
+    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
+      image: btoa('fake-png'),
+      variant_id: 4017,
+    }), env);
+    expect(res.status).toBe(200);
+    expect(env.RATE_LIMITER_GENERATE_MOCKUP.limit).toHaveBeenCalledWith({ key: expect.any(String) });
+  });
+
+  it('returns 429 with a JSON error when the rate limiter reports over-limit, without calling Printful', async () => {
+    const printfulFetch = makePrintfulFetch();
+    vi.stubGlobal('fetch', printfulFetch);
+    const r2 = makeR2();
+    const env = makeEnv(r2, { RATE_LIMITER_GENERATE_MOCKUP: makeRateLimiter(false) });
+    const req = makeRequest('POST', '/generate-mockup', { image: btoa('fake-png'), variant_id: 4017 });
+    req.headers.set('CF-Connecting-IP', '203.0.113.5');
+    const res = await worker.fetch(req, env);
+    expect(res.status).toBe(429);
+    expect(res.headers.get('Content-Type')).toBe('application/json');
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://brightfield-2.myshopify.com');
+    const body = await res.json();
+    expect(body.error).toBeTruthy();
+    expect(printfulFetch).not.toHaveBeenCalled();
+    expect(r2.put).not.toHaveBeenCalled();
+  });
+
+  it('fails open (request succeeds) when the rate limiter binding throws', async () => {
+    const r2 = makeR2();
+    const env = makeEnv(r2, {
+      RATE_LIMITER_GENERATE_MOCKUP: { limit: vi.fn(async () => { throw new Error('binding misconfigured'); }) },
+    });
+    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
+      image: btoa('fake-png'),
+      variant_id: 4017,
+    }), env);
+    expect(res.status).toBe(200);
   });
 });

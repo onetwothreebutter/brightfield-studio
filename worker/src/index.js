@@ -157,6 +157,49 @@ function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
+// ── Rate limiting ────────────────────────────────────────────────────────────
+// Uses Cloudflare's native Workers Rate Limiting binding (GA since 2025-09-19;
+// https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/),
+// declared per-endpoint in wrangler.toml as [[ratelimits]] blocks. A binding's
+// limit/period is fixed at deploy time, so each endpoint gets its own named
+// binding rather than one shared binding differentiated by key — see
+// wrangler.toml for the limit chosen per endpoint and the reasoning.
+//
+// Keyed by CF-Connecting-IP: the real client IP as seen by Cloudflare's edge,
+// set on every request that reaches a Worker and not attacker-controlled
+// (unlike X-Forwarded-For, which a client can send any value for). The
+// binding docs generally steer away from pure-IP keys because a shared IP
+// (office NAT, campus network) can cause false positives across unrelated
+// users — but the goal here isn't per-user fairness, it's stopping a single
+// flooding script, and the limits in wrangler.toml are set well above what a
+// real shopper's editing session ever needs, so legitimate shared-IP traffic
+// shouldn't trip it.
+async function checkRateLimit(env, bindingName, request) {
+  const limiter = env[bindingName];
+  // Binding missing (e.g. some local/test environments) — nothing to check.
+  if (!limiter) return true;
+  const key = request.headers.get('CF-Connecting-IP') || 'unknown-ip';
+  try {
+    const { success } = await limiter.limit({ key });
+    return success;
+  } catch (err) {
+    // Fail OPEN, not closed. If the limiter binding itself is misconfigured or
+    // has a transient error, the right degradation is "no rate limiting for
+    // this request" — not a 500 on every request to an otherwise-healthy
+    // endpoint. A broken abuse-prevention layer should never be able to take
+    // the whole endpoint down; anonymous flooding is the lesser risk.
+    console.warn(`[rate-limit] ${bindingName} check failed, failing open:`, err.message);
+    return true;
+  }
+}
+
+function rateLimitedResponse(headers) {
+  return new Response(
+    JSON.stringify({ error: 'Too many requests. Please slow down and try again shortly.' }),
+    { status: 429, headers }
+  );
+}
+
 // Reads and parses a JSON body, rejecting bodies over maxBytes before parsing.
 // Returns { body } on success, or { error, status } for the caller to return.
 async function readLimitedJson(request, maxBytes) {
@@ -352,6 +395,10 @@ export default {
 async function handleGenerateMockup(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
 
+  if (!(await checkRateLimit(env, 'RATE_LIMITER_GENERATE_MOCKUP', request))) {
+    return rateLimitedResponse(headers);
+  }
+
   const { body, error, status } = await readLimitedJson(request, MAX_SINGLE_IMAGE_BODY_BYTES);
   if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
@@ -533,6 +580,10 @@ function sleep(ms) {
 
 async function handleSavePreview(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+
+  if (!(await checkRateLimit(env, 'RATE_LIMITER_SAVE_PREVIEW', request))) {
+    return rateLimitedResponse(headers);
+  }
 
   const { body, error, status } = await readLimitedJson(request, MAX_PREVIEW_BODY_BYTES);
   if (error) return new Response(JSON.stringify({ error }), { status, headers });
@@ -985,6 +1036,10 @@ async function getDefaultVariantForHandle(env, handle) {
 
 async function handleCreateProduct(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+
+  if (!(await checkRateLimit(env, 'RATE_LIMITER_CREATE_PRODUCT', request))) {
+    return rateLimitedResponse(headers);
+  }
 
   const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
   if (error) return new Response(JSON.stringify({ error }), { status, headers });
