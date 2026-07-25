@@ -128,13 +128,15 @@ function corsHeaders(origin) {
 }
 
 // ── Payload limits for unauthenticated write endpoints ───────────────────────
-// Shader-state / values objects are a few KB in practice; share images are
-// canvas JPEGs, typically well under 2 MB. Caps leave generous headroom while
-// keeping anonymous R2 writes bounded.
-const MAX_STATE_BYTES       = 64 * 1024;
-const MAX_SHARE_IMAGE_BYTES = 8 * 1024 * 1024;
-// Base64 inflates by 4/3; allow the image plus values/metadata.
-const MAX_SHARE_BODY_BYTES  = Math.ceil(MAX_SHARE_IMAGE_BYTES * 4 / 3) + MAX_STATE_BYTES;
+// Shader-state / values objects are a few KB in practice; canvas images
+// (design/mockup/checkout/share) are typically well under 2 MB. Caps leave
+// generous headroom while keeping anonymous R2 writes bounded.
+const MAX_STATE_BYTES = 64 * 1024;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+// Base64 inflates by 4/3; allow the image(s) plus values/metadata.
+const MAX_SINGLE_IMAGE_BODY_BYTES = Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + MAX_STATE_BYTES;
+// /save-preview carries up to three images: design, mockup, and optional checkout.
+const MAX_PREVIEW_BODY_BYTES = Math.ceil(MAX_IMAGE_BYTES * 4 / 3) * 3 + MAX_STATE_BYTES;
 
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -335,21 +337,22 @@ export default {
 async function handleGenerateMockup(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
+  const { body, error, status } = await readLimitedJson(request, MAX_SINGLE_IMAGE_BODY_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
   const { image, variant_id, deviceId, shader, productHandle, values, skipBgRemoval } = body;
   if (!image || !variant_id) {
     return new Response(JSON.stringify({ error: 'Missing image or variant_id' }), { status: 400, headers });
   }
+  if (typeof image !== 'string' || image.length * 3 / 4 > MAX_IMAGE_BYTES) {
+    return new Response(JSON.stringify({ error: 'Image too large' }), { status: 413, headers });
+  }
 
   // 1. Decode base64 PNG and upload to R2
-  const imageKey  = `designs/${crypto.randomUUID()}.png`;
-  const imageData = Uint8Array.from(atob(image), c => c.charCodeAt(0));
+  const imageKey = `designs/${crypto.randomUUID()}.png`;
+  let imageData;
+  try { imageData = Uint8Array.from(atob(image), c => c.charCodeAt(0)); }
+  catch { return new Response(JSON.stringify({ error: 'Invalid image encoding' }), { status: 400, headers }); }
 
   await env.MOCKUP_STAGING.put(imageKey, imageData, {
     httpMetadata: { contentType: 'image/png' }
@@ -516,25 +519,31 @@ function sleep(ms) {
 async function handleSavePreview(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
+  const { body, error, status } = await readLimitedJson(request, MAX_PREVIEW_BODY_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
   const { designImage, checkoutImage, mockupImage, deviceId, shader, productHandle, values } = body;
   if (!designImage || !mockupImage) {
     return new Response(JSON.stringify({ error: 'Missing designImage or mockupImage' }), { status: 400, headers });
+  }
+  for (const [name, img] of [['designImage', designImage], ['mockupImage', mockupImage], ['checkoutImage', checkoutImage]]) {
+    if (img != null && (typeof img !== 'string' || img.length * 3 / 4 > MAX_IMAGE_BYTES)) {
+      return new Response(JSON.stringify({ error: `${name} too large` }), { status: 413, headers });
+    }
   }
 
   const designKey   = `designs/${crypto.randomUUID()}.png`;
   const mockupKey   = `mockups/${crypto.randomUUID()}.jpg`;
   const checkoutKey = checkoutImage ? `checkouts/${crypto.randomUUID()}.png` : null;
 
-  const designData   = Uint8Array.from(atob(designImage), c => c.charCodeAt(0));
-  const mockupData   = Uint8Array.from(atob(mockupImage), c => c.charCodeAt(0));
-  const checkoutData = checkoutImage ? Uint8Array.from(atob(checkoutImage), c => c.charCodeAt(0)) : null;
+  let designData, mockupData, checkoutData;
+  try {
+    designData   = Uint8Array.from(atob(designImage), c => c.charCodeAt(0));
+    mockupData   = Uint8Array.from(atob(mockupImage), c => c.charCodeAt(0));
+    checkoutData = checkoutImage ? Uint8Array.from(atob(checkoutImage), c => c.charCodeAt(0)) : null;
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid image encoding' }), { status: 400, headers });
+  }
 
   const uploads = [
     env.MOCKUP_STAGING.put(designKey, designData, { httpMetadata: { contentType: 'image/png' } }),
@@ -962,12 +971,8 @@ async function getDefaultVariantForHandle(env, handle) {
 async function handleCreateProduct(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
+  const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
   const { designUrl, mockupUrl, checkoutImageUrl, shader, productHandle, values, variantId, extraTags, createProductKey } = body;
   if (!designUrl || !mockupUrl || !variantId) {
@@ -1748,13 +1753,13 @@ async function handleGetShaderState(request, env, origin) {
 
 async function handleCreateShare(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
-  const { body, error, status } = await readLimitedJson(request, MAX_SHARE_BODY_BYTES);
+  const { body, error, status } = await readLimitedJson(request, MAX_SINGLE_IMAGE_BODY_BYTES);
   if (error) return new Response(JSON.stringify({ error }), { status, headers });
   const { image, shader, productHandle, values } = body;
   if (!image || !productHandle) {
     return new Response(JSON.stringify({ error: 'Missing image or productHandle' }), { status: 400, headers });
   }
-  if (typeof image !== 'string' || image.length * 3 / 4 > MAX_SHARE_IMAGE_BYTES) {
+  if (typeof image !== 'string' || image.length * 3 / 4 > MAX_IMAGE_BYTES) {
     return new Response(JSON.stringify({ error: 'Image too large' }), { status: 413, headers });
   }
   if (typeof productHandle !== 'string' || productHandle.length > 256 ||
