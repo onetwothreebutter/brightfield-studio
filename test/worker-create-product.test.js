@@ -72,11 +72,21 @@ function jsonRes(obj) {
 // force one step to fail without hand-rolling the whole chain each time.
 function makeShopifyFetch(overrides = {}) {
   const calls = [];
+  let tokenCallCount = 0;
   const fn = vi.fn(async (url, opts = {}) => {
     const u = typeof url === 'string' ? url : url.toString();
     calls.push({ url: u, opts });
 
     if (u.includes('/admin/oauth/access_token')) {
+      // tokenResponses lets a test script a sequence of token-endpoint replies
+      // (e.g. a valid token that immediately expires, then a broken response on
+      // the next refetch) to exercise re-fetch mid-flow. Falls back to the last
+      // entry once exhausted; defaults to one long-lived token for every call.
+      if (overrides.tokenResponses) {
+        const i = Math.min(tokenCallCount, overrides.tokenResponses.length - 1);
+        tokenCallCount++;
+        return overrides.tokenResponses[i];
+      }
       return jsonRes({ access_token: 'test-token', expires_in: 3600 });
     }
     if (u.startsWith('https://api.printful.com/products/')) {
@@ -436,6 +446,27 @@ describe('POST /create-product', () => {
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body.error).toBe('Network connection lost');
+  });
+
+  it('does not leak the raw token-endpoint response when a mid-flow token refetch returns non-JSON', async () => {
+    // The first token fetch (during the GetVariant lookup) succeeds but with an
+    // expires_in so short it's already "expired" per the cache formula
+    // (expiry = now + (expires_in - 60)s), forcing a refetch on the very next
+    // Admin API call — the first one inside createShopifyProduct. That refetch
+    // returns a non-JSON body, simulating a transient outage. getShopifyToken
+    // must not embed that raw body in the thrown error, since createShopifyProduct's
+    // catch reflects err.message straight back to this unauthenticated client.
+    vi.stubGlobal('fetch', makeShopifyFetch({
+      tokenResponses: [
+        jsonRes({ access_token: 'tok1', expires_in: 1 }),
+        { status: 502, text: async () => '<html>Bad Gateway — upstream secret=super-secret-value</html>' },
+      ],
+    }));
+    const res = await worker.fetch(makeRequest('POST', '/create-product', createProductBody()), makeEnv());
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).not.toContain('secret=super-secret-value');
+    expect(body.error).toBe('Token endpoint returned non-JSON (status 502)');
   });
 
   it('falls back to the default variant when productOptionsCreate (size setup) fails non-fatally', async () => {

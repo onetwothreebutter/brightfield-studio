@@ -34,7 +34,15 @@ async function getShopifyToken(env) {
   console.log('[getShopifyToken] status:', res.status);
   let data;
   try { data = JSON.parse(rawText); }
-  catch { throw new Error(`Token endpoint returned non-JSON (status ${res.status}): ${rawText.slice(0, 200)}`); }
+  catch {
+    // Log the raw detail server-side only — this error can propagate up through
+    // shopifyAdmin() -> createShopifyProduct() to the unauthenticated /create-product
+    // handler, which reflects err.message straight back to the client (see the
+    // catch block around createShopifyProduct() below). Never embed response body
+    // content in the thrown message.
+    console.error(`[getShopifyToken] non-JSON response (status ${res.status}):`, rawText.slice(0, 200));
+    throw new Error(`Token endpoint returned non-JSON (status ${res.status})`);
+  }
   if (!data.access_token) throw new Error('Failed to get Shopify token: ' + JSON.stringify(data));
   _shopifyToken = data.access_token;
   _shopifyTokenExpiry = Date.now() + ((data.expires_in || 3600) - 60) * 1000;
