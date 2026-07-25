@@ -24,6 +24,9 @@
     'precision mediump float;',
     'uniform float u_time;',
     'uniform vec2  u_resolution;',
+    'uniform float u_mobile_fade;',
+    'uniform float u_fade_start;',
+    'uniform float u_fade_end;',
     '',
     'out vec4 fragColor;',
     '',
@@ -51,7 +54,9 @@
     '  r += scan; g += scan; b += scan;',
     '',
     '  float vign = 1.0 - smoothstep(0.5, 1.4, length(p * 0.6));',
-    '  fragColor = vec4(r * vign, g * vign, b * vign, 1.0);',
+    '',
+    '  float topFade = mix(1.0, 1.0 - smoothstep(u_fade_start, u_fade_end, uv.y), u_mobile_fade);',
+    '  fragColor = vec4(r * vign * topFade, g * vign * topFade, b * vign * topFade, topFade);',
     '}'
   ].join('\n');
 
@@ -95,8 +100,89 @@
   gl.enableVertexAttribArray(posLoc);
   gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-  var timeLoc = gl.getUniformLocation(program, 'u_time');
-  var resLoc  = gl.getUniformLocation(program, 'u_resolution');
+  var timeLoc        = gl.getUniformLocation(program, 'u_time');
+  var resLoc         = gl.getUniformLocation(program, 'u_resolution');
+  var mobileFadeLoc  = gl.getUniformLocation(program, 'u_mobile_fade');
+  var fadeStartLoc   = gl.getUniformLocation(program, 'u_fade_start');
+  var fadeEndLoc     = gl.getUniformLocation(program, 'u_fade_end');
+
+  var mobileQuery = window.matchMedia('(max-width: 768px)');
+
+  var params = {
+    forceMobileFade: false,
+    fadeStart: 0.19,
+    fadeEnd: 0.64
+  };
+
+  function currentMobileFade() {
+    if (params.forceMobileFade) return 1.0;
+    return mobileQuery.matches ? 1.0 : 0.0;
+  }
+
+  if (window.location.search.indexOf('heroDebug') !== -1) {
+    buildDebugPanel();
+  }
+
+  function buildDebugPanel() {
+    var panel = document.createElement('div');
+    panel.style.cssText = [
+      'position:fixed', 'bottom:1rem', 'right:1rem', 'z-index:9999',
+      'background:rgba(0,0,0,0.85)', 'color:#0ff', 'font:12px monospace',
+      'padding:12px 14px', 'border:1px solid #0ff', 'border-radius:6px',
+      'width:220px'
+    ].join(';');
+
+    function addRow(labelText, min, max, step, value, onInput) {
+      var row = document.createElement('div');
+      row.style.cssText = 'margin-bottom:8px;';
+
+      var label = document.createElement('label');
+      label.style.cssText = 'display:flex;justify-content:space-between;';
+      var valueSpan = document.createElement('span');
+      valueSpan.textContent = value;
+      label.textContent = labelText + ' ';
+      label.appendChild(valueSpan);
+
+      var input = document.createElement('input');
+      input.type = 'range';
+      input.min = min;
+      input.max = max;
+      input.step = step;
+      input.value = value;
+      input.style.cssText = 'width:100%;';
+      input.addEventListener('input', function () {
+        var v = parseFloat(input.value);
+        valueSpan.textContent = v;
+        onInput(v);
+      });
+
+      row.appendChild(label);
+      row.appendChild(input);
+      panel.appendChild(row);
+    }
+
+    var title = document.createElement('div');
+    title.textContent = 'hero-shader debug';
+    title.style.cssText = 'margin-bottom:10px;font-weight:bold;';
+    panel.appendChild(title);
+
+    var forceRow = document.createElement('label');
+    forceRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:10px;';
+    var forceCheckbox = document.createElement('input');
+    forceCheckbox.type = 'checkbox';
+    forceCheckbox.checked = params.forceMobileFade;
+    forceCheckbox.addEventListener('change', function () {
+      params.forceMobileFade = forceCheckbox.checked;
+    });
+    forceRow.appendChild(forceCheckbox);
+    forceRow.appendChild(document.createTextNode('force mobile fade'));
+    panel.appendChild(forceRow);
+
+    addRow('fade start', 0, 1, 0.01, params.fadeStart, function (v) { params.fadeStart = v; });
+    addRow('fade end', 0, 1, 0.01, params.fadeEnd, function (v) { params.fadeEnd = v; });
+
+    document.body.appendChild(panel);
+  }
 
   function resize() {
     canvas.width  = canvas.offsetWidth;
@@ -114,6 +200,9 @@
     var t = (performance.now() - start) / 1000.0;
     gl.uniform1f(timeLoc, t);
     gl.uniform2f(resLoc, canvas.width, canvas.height);
+    gl.uniform1f(mobileFadeLoc, currentMobileFade());
+    gl.uniform1f(fadeStartLoc, params.fadeStart);
+    gl.uniform1f(fadeEndLoc, params.fadeEnd);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     requestAnimationFrame(render);
   }
