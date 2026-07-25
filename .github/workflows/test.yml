@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     if: github.ref == 'refs/heads/main'
+    environment: production
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,6 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     if: github.ref == 'refs/heads/main'
+    environment: production
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -83,3 +85,22 @@ jobs:
       - run: npm run test:e2e
         env:
           BASE_URL: https://brightfield.studio
+
+  cleanup-e2e:
+    name: Cleanup E2E Test Products
+    runs-on: ubuntu-latest
+    needs: e2e
+    # always() so orphaned e2e-test products still get deleted on a flaky/failed
+    # e2e run; the ref check keeps this from firing on PR runs (where e2e itself
+    # is skipped and there's nothing to clean up).
+    if: always() && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Delete e2e-test tagged products
+        run: node scripts/cleanup-e2e-products.mjs
+        env:
+          SHOPIFY_CUSTOM_DESIGN_CLIENT_ID: ${{ secrets.SHOPIFY_CUSTOM_DESIGN_CLIENT_ID }}
+          SHOPIFY_CUSTOM_DESIGN_CLIENT_SECRET: ${{ secrets.SHOPIFY_CUSTOM_DESIGN_CLIENT_SECRET }}
