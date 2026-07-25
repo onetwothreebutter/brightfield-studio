@@ -469,6 +469,25 @@ describe('POST /create-product', () => {
     expect(body.error).toBe('Token endpoint returned non-JSON (status 502)');
   });
 
+  it('does not leak the raw token-endpoint response when a mid-flow token refetch is valid JSON but missing access_token', async () => {
+    // Same propagation path as the non-JSON case above, but for the other error
+    // site in getShopifyToken: a well-formed JSON body that simply lacks
+    // access_token (e.g. an OAuth error response). That body must not be
+    // embedded verbatim in the thrown error either.
+    const errBody = { error: 'invalid_client', error_description: 'upstream secret=super-secret-value' };
+    vi.stubGlobal('fetch', makeShopifyFetch({
+      tokenResponses: [
+        jsonRes({ access_token: 'tok1', expires_in: 1 }),
+        { status: 401, text: async () => JSON.stringify(errBody) },
+      ],
+    }));
+    const res = await worker.fetch(makeRequest('POST', '/create-product', createProductBody()), makeEnv());
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).not.toContain('secret=super-secret-value');
+    expect(body.error).toBe('Failed to get Shopify token (status 401)');
+  });
+
   it('falls back to the default variant when productOptionsCreate (size setup) fails non-fatally', async () => {
     vi.stubGlobal('fetch', makeShopifyFetch({ optionsCreateFails: true }));
     const res = await worker.fetch(makeRequest('POST', '/create-product', createProductBody()), makeEnv());

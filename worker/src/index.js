@@ -43,7 +43,14 @@ async function getShopifyToken(env) {
     console.error(`[getShopifyToken] non-JSON response (status ${res.status}):`, rawText.slice(0, 200));
     throw new Error(`Token endpoint returned non-JSON (status ${res.status})`);
   }
-  if (!data.access_token) throw new Error('Failed to get Shopify token: ' + JSON.stringify(data));
+  if (!data.access_token) {
+    // Same reasoning as the non-JSON branch above: this error can reach the
+    // unauthenticated /create-product client verbatim. Shopify's OAuth error
+    // body is normally just { error, error_description } with no secrets, but
+    // don't reflect arbitrary upstream JSON to a public caller regardless.
+    console.error('[getShopifyToken] token endpoint response missing access_token:', JSON.stringify(data));
+    throw new Error(`Failed to get Shopify token (status ${res.status})`);
+  }
   _shopifyToken = data.access_token;
   _shopifyTokenExpiry = Date.now() + ((data.expires_in || 3600) - 60) * 1000;
   return _shopifyToken;
