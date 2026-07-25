@@ -50,14 +50,48 @@
       <script>
         window.dataLayer = window.dataLayer || [];
         function gtag() { dataLayer.push(arguments); }
-        // No cookie-consent banner yet: keep analytics measurement flowing, but
-        // default advertising signals to denied until a real CMP is wired up.
+        // Default everything to denied. Shopify's native Customer Privacy API
+        // (window.Shopify.customerPrivacy) is the CMP of record here — it
+        // resolves each visitor's actual consent (banner choice, or "allowed"
+        // by default in regions where consent isn't legally required) and we
+        // mirror that into Consent Mode below, instead of assuming granted.
+        // https://shopify.dev/docs/api/customer-privacy
         gtag('consent', 'default', {
           ad_storage: 'denied',
           ad_user_data: 'denied',
           ad_personalization: 'denied',
-          analytics_storage: 'granted'
+          analytics_storage: 'denied'
         });
+
+        // Maps Shopify's consent categories onto Google's Consent Mode
+        // signals. Shopify's "marketing" bucket covers ads/targeting, so it
+        // drives all three ad_* signals; "analytics" drives analytics_storage.
+        function bfSyncConsent(analyticsAllowed, marketingAllowed) {
+          gtag('consent', 'update', {
+            analytics_storage: analyticsAllowed ? 'granted' : 'denied',
+            ad_storage: marketingAllowed ? 'granted' : 'denied',
+            ad_user_data: marketingAllowed ? 'granted' : 'denied',
+            ad_personalization: marketingAllowed ? 'granted' : 'denied'
+          });
+        }
+
+        if (window.Shopify && window.Shopify.customerPrivacy) {
+          // Returning visitors (or visitors outside a region requiring
+          // consent) already have a resolved decision — apply it immediately
+          // rather than waiting for visitorConsentCollected, which only
+          // fires when consent changes, not on page load.
+          bfSyncConsent(
+            window.Shopify.customerPrivacy.analyticsProcessingAllowed(),
+            window.Shopify.customerPrivacy.marketingAllowed()
+          );
+        }
+
+        // Fires whenever the shopper accepts/updates consent via Shopify's
+        // consent banner (native or app-based) — keeps gtag in sync live.
+        document.addEventListener('visitorConsentCollected', function (event) {
+          bfSyncConsent(!!event.detail.analyticsAllowed, !!event.detail.marketingAllowed);
+        });
+
         gtag('js', new Date());
         gtag('config', '{{ settings.ga4_measurement_id }}');
         window.bfTrack = function (eventName, params) {
