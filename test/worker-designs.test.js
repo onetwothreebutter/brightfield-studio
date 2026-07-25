@@ -86,6 +86,37 @@ describe('GET /list-designs', () => {
   });
 });
 
+// ── POST /generate-mockup — validation ─────────────────────────────────────────
+
+describe('POST /generate-mockup — validation', () => {
+  it('returns 413 when the raw body exceeds the size cap', async () => {
+    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
+      image: 'A'.repeat(11_500_000),
+      variant_id: 4017,
+    }), makeEnv());
+    expect(res.status).toBe(413);
+  });
+
+  it('returns 413 when the image exceeds the decoded-image cap', async () => {
+    // Passes the body cap but exceeds the 8 MB decoded-image cap.
+    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
+      image: 'A'.repeat(11_200_000),
+      variant_id: 4017,
+    }), makeEnv());
+    expect(res.status).toBe(413);
+  });
+
+  it('returns 400 on invalid JSON', async () => {
+    const req = new Request('https://worker.example.com/generate-mockup', {
+      method: 'POST',
+      headers: { Origin: 'https://brightfield-2.myshopify.com', 'Content-Type': 'application/json' },
+      body: '{not json',
+    });
+    const res = await worker.fetch(req, makeEnv());
+    expect(res.status).toBe(400);
+  });
+});
+
 // ── POST /generate-mockup — design saving ─────────────────────────────────────
 
 describe('POST /generate-mockup — design saving', () => {

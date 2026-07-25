@@ -260,6 +260,23 @@ describe('POST /save-preview', () => {
     expect(body.id).toBeNull();
     expect([...env.MOCKUP_STAGING._store.keys()].some((k) => k.startsWith('device-designs/'))).toBe(false);
   });
+
+  it('returns 413 when the raw body exceeds the size cap', async () => {
+    const res = await worker.fetch(makeRequest('POST', '/save-preview', {
+      designImage: 'A'.repeat(34_000_000),
+      mockupImage: btoa('m'),
+    }), makeEnv());
+    expect(res.status).toBe(413);
+  });
+
+  it('returns 413 when a single image exceeds the decoded-image cap', async () => {
+    // Passes the combined body cap but designImage alone exceeds the 8 MB decoded-image cap.
+    const res = await worker.fetch(makeRequest('POST', '/save-preview', {
+      designImage: 'A'.repeat(11_200_000),
+      mockupImage: btoa('m'),
+    }), makeEnv());
+    expect(res.status).toBe(413);
+  });
 });
 
 // ── POST /create-product ──────────────────────────────────────────────────────
@@ -284,6 +301,16 @@ describe('POST /create-product', () => {
     vi.stubGlobal('fetch', makeShopifyFetch({ variantLookupFails: true }));
     const res = await worker.fetch(makeRequest('POST', '/create-product', createProductBody()), makeEnv());
     expect(res.status).toBe(502);
+  });
+
+  it('returns 413 when the payload exceeds the size cap', async () => {
+    const res = await worker.fetch(
+      makeRequest('POST', '/create-product', createProductBody({
+        values: { blob: 'x'.repeat(70 * 1024) },
+      })),
+      makeEnv()
+    );
+    expect(res.status).toBe(413);
   });
 
   it('happy path: creates the product, sizes, price, and returns the new variant', async () => {
