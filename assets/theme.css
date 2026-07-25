@@ -330,17 +330,13 @@ h6 {
     .hero__content {
         padding-bottom: 4.5rem;
     }
-
-    .hero__eyebrow {
-        color: white;
-    }
 }
 
 .hero__eyebrow {
     font-size: 0.75rem;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--color-secondary);
+    color: white;
     margin-bottom: 1.25rem;
     filter: drop-shadow(2px 4px 6px black);
 }
