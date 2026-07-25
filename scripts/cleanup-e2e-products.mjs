@@ -10,18 +10,24 @@
 // Idempotent: matching zero products is not an error, and it's safe to run
 // repeatedly (e.g. re-run locally after a bad e2e run).
 //
+// Needs the custom-design app's credentials (Admin API product read/write
+// scope) — NOT the theme-push app's SHOPIFY_CLIENT_ID/SECRET used elsewhere
+// in this workflow, which is theme-scoped only and can't query/delete
+// products. Same pair the worker already uses in production (see
+// SHOPIFY_CUSTOM_DESIGN_CLIENT_ID/SECRET in worker/wrangler.toml).
+//
 // Usage:
-//   SHOPIFY_CLIENT_ID=... SHOPIFY_CLIENT_SECRET=... node scripts/cleanup-e2e-products.mjs [--dry-run]
+//   SHOPIFY_CUSTOM_DESIGN_CLIENT_ID=... SHOPIFY_CUSTOM_DESIGN_CLIENT_SECRET=... node scripts/cleanup-e2e-products.mjs [--dry-run]
 //
 // Optional: SHOPIFY_STORE_DOMAIN (defaults to brightfield-2.myshopify.com)
 
 const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN || 'brightfield-2.myshopify.com';
-const CLIENT_ID = process.env.SHOPIFY_CLIENT_ID;
-const CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET;
+const CLIENT_ID = process.env.SHOPIFY_CUSTOM_DESIGN_CLIENT_ID;
+const CLIENT_SECRET = process.env.SHOPIFY_CUSTOM_DESIGN_CLIENT_SECRET;
 const DRY_RUN = process.argv.includes('--dry-run');
 
 if (!CLIENT_ID || !CLIENT_SECRET) {
-  console.error('Missing SHOPIFY_CLIENT_ID / SHOPIFY_CLIENT_SECRET');
+  console.error('Missing SHOPIFY_CUSTOM_DESIGN_CLIENT_ID / SHOPIFY_CUSTOM_DESIGN_CLIENT_SECRET');
   process.exit(1);
 }
 
@@ -87,6 +93,7 @@ if (DRY_RUN || targets.length === 0) {
 }
 
 let done = 0;
+let failed = 0;
 for (const t of targets) {
   const data = await admin(
     `mutation DeleteE2eProduct($input: ProductDeleteInput!) {
@@ -100,6 +107,7 @@ for (const t of targets) {
   const errs = data.productDelete.userErrors;
   if (errs?.length) {
     console.error(`  Failed to delete ${t.handle} (${t.id}): ${JSON.stringify(errs)}`);
+    failed += 1;
     continue;
   }
   done += 1;
@@ -107,3 +115,9 @@ for (const t of targets) {
 }
 
 console.log('Done.');
+// Partial failures only logged above otherwise — a non-zero exit here is what
+// actually surfaces them as a failed CI step instead of a silent green run.
+if (failed > 0) {
+  console.error(`${failed} product(s) failed to delete — see errors above.`);
+  process.exit(1);
+}

@@ -102,5 +102,5 @@ jobs:
       - name: Delete e2e-test tagged products
         run: node scripts/cleanup-e2e-products.mjs
         env:
-          SHOPIFY_CLIENT_ID: ${{ secrets.SHOPIFY_CLIENT_ID }}
-          SHOPIFY_CLIENT_SECRET: ${{ secrets.SHOPIFY_CLIENT_SECRET }}
+          SHOPIFY_CUSTOM_DESIGN_CLIENT_ID: ${{ secrets.SHOPIFY_CUSTOM_DESIGN_CLIENT_ID }}
+          SHOPIFY_CUSTOM_DESIGN_CLIENT_SECRET: ${{ secrets.SHOPIFY_CUSTOM_DESIGN_CLIENT_SECRET }}
