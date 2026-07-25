@@ -42,6 +42,71 @@ function adminHeaders() {
   return { Authorization: 'Bearer test-secret' };
 }
 
+// ── Shopify App Bridge session token (JWT) helpers ─────────────────────────────
+// Mints HS256-signed test JWTs shaped like real Shopify session tokens, using the
+// Web Crypto API (crypto.subtle) available globally in the Node test environment.
+
+const TEST_CLIENT_SECRET = 'test-client-secret';
+const TEST_CLIENT_ID     = 'test-client-id';
+const TEST_STORE_DOMAIN  = 'brightfield-2.myshopify.com';
+
+function base64url(bytesOrString) {
+  const bytes = typeof bytesOrString === 'string'
+    ? new TextEncoder().encode(bytesOrString)
+    : bytesOrString;
+  let binary = '';
+  bytes.forEach(b => { binary += String.fromCharCode(b); });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function signHS256(headerB64, payloadB64, secret) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${headerB64}.${payloadB64}`));
+  return base64url(new Uint8Array(sig));
+}
+
+// Builds an HS256 JWT. Pass `secret` to control the signing key (defaults to the
+// "real" test client secret so most tests only need to override payload claims).
+async function mintSessionToken(payloadOverrides = {}, secret = TEST_CLIENT_SECRET) {
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    iss: `https://${TEST_STORE_DOMAIN}/admin`,
+    dest: `https://${TEST_STORE_DOMAIN}`,
+    aud: TEST_CLIENT_ID,
+    sub: '1',
+    exp: now + 60,
+    nbf: now - 10,
+    iat: now - 10,
+    jti: 'test-jti',
+    sid: 'test-sid',
+    ...payloadOverrides,
+  };
+  const headerB64  = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const payloadB64 = base64url(JSON.stringify(payload));
+  const sigB64      = await signHS256(headerB64, payloadB64, secret);
+  return `${headerB64}.${payloadB64}.${sigB64}`;
+}
+
+function makeAdminEnv(r2 = makeR2()) {
+  return {
+    MOCKUP_STAGING: r2,
+    ADMIN_TOKEN: 'test-secret',
+    SHOPIFY_APP_CLIENT_SECRET: TEST_CLIENT_SECRET,
+    SHOPIFY_APP_CLIENT_ID: TEST_CLIENT_ID,
+    SHOPIFY_STORE_DOMAIN: TEST_STORE_DOMAIN,
+  };
+}
+
+function bearerHeaders(token) {
+  return { Authorization: `Bearer ${token}` };
+}
+
 async function submitDesign(env, overrides = {}) {
   const res = await worker.fetch(
     post('/community/submit', {
@@ -660,5 +725,92 @@ describe('pickSizeVariant', () => {
 
   it('falls back to the first variant when requestedSize is null', () => {
     expect(pickSizeVariant(sizeVariants, null).id).toBe('gid://shopify/ProductVariant/1');
+  });
+});
+
+// ── Shopify session token (JWT) admin auth ────────────────────────────────────
+// requireAdmin() accepts either the static ADMIN_TOKEN bearer, or an HS256 App
+// Bridge session token whose aud/dest/iss/nbf/exp all check out. GET /community/pending
+// is a requireAdmin-gated endpoint that needs no other setup, so it's used as the
+// harness for exercising verifyShopifySessionToken end-to-end.
+
+describe('admin auth via Shopify session token (JWT)', () => {
+  let env;
+  beforeEach(() => { env = makeAdminEnv(); });
+
+  it('accepts a valid session token with correct aud/dest/iss/nbf', async () => {
+    const token = await mintSessionToken();
+    const res = await worker.fetch(get('/community/pending', bearerHeaders(token)), env);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([]);
+  });
+
+  it('still accepts the static ADMIN_TOKEN bearer fallback', async () => {
+    const res = await worker.fetch(get('/community/pending', adminHeaders()), env);
+    expect(res.status).toBe(200);
+  });
+
+  it('rejects a token with the wrong aud (different app)', async () => {
+    const token = await mintSessionToken({ aud: 'some-other-client-id' });
+    const res = await worker.fetch(get('/community/pending', bearerHeaders(token)), env);
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a token missing aud entirely', async () => {
+    const token = await mintSessionToken({ aud: undefined });
+    const res = await worker.fetch(get('/community/pending', bearerHeaders(token)), env);
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a token with the wrong dest (different shop)', async () => {
+    const token = await mintSessionToken({ dest: 'https://some-other-shop.myshopify.com' });
+    const res = await worker.fetch(get('/community/pending', bearerHeaders(token)), env);
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a token with the wrong iss (different shop admin domain)', async () => {
+    const token = await mintSessionToken({ iss: 'https://some-other-shop.myshopify.com/admin' });
+    const res = await worker.fetch(get('/community/pending', bearerHeaders(token)), env);
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a dest that is missing the https:// scheme', async () => {
+    // Some tooling emits bare domains — real App Bridge tokens never do, but the
+    // comparison must be exact rather than a loose "contains" check.
+    const token = await mintSessionToken({ dest: TEST_STORE_DOMAIN });
+    const res = await worker.fetch(get('/community/pending', bearerHeaders(token)), env);
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a token whose nbf is in the future', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const token = await mintSessionToken({ nbf: now + 3600 });
+    const res = await worker.fetch(get('/community/pending', bearerHeaders(token)), env);
+    expect(res.status).toBe(401);
+  });
+
+  it('accepts a token whose nbf is exactly now-or-past', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const token = await mintSessionToken({ nbf: now - 1 });
+    const res = await worker.fetch(get('/community/pending', bearerHeaders(token)), env);
+    expect(res.status).toBe(200);
+  });
+
+  it('rejects an expired token', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const token = await mintSessionToken({ exp: now - 60 });
+    const res = await worker.fetch(get('/community/pending', bearerHeaders(token)), env);
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a token signed with the wrong secret', async () => {
+    const token = await mintSessionToken({}, 'not-the-real-secret');
+    const res = await worker.fetch(get('/community/pending', bearerHeaders(token)), env);
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a missing Authorization header', async () => {
+    const res = await worker.fetch(get('/community/pending'), env);
+    expect(res.status).toBe(401);
   });
 });
