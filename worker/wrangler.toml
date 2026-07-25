@@ -24,11 +24,11 @@ bucket_name = "mockup-staging"
 # Per-key sliding-window limiter, created automatically on deploy — no separate
 # resource provisioning (unlike the R2 bucket above). `period` only accepts 10
 # or 60 (seconds). One binding per endpoint since limit/period are fixed per
-# binding and the three endpoints below warrant different thresholds; see
+# binding and each endpoint below warrants a different threshold; see
 # index.js checkRateLimit() for the CF-Connecting-IP-keyed usage and PR
 # description for why these specific limits were chosen.
 # namespace_id just needs to be a positive integer unique within this account;
-# these three are arbitrary and only need to stay stable once deployed.
+# these are arbitrary and only need to stay stable once deployed.
 [[ratelimits]]
 name = "RATE_LIMITER_CREATE_PRODUCT"
 namespace_id = "1001"
@@ -48,6 +48,16 @@ name = "RATE_LIMITER_GENERATE_MOCKUP"
 namespace_id = "1003"
   [ratelimits.simple]
   limit = 10
+  period = 60
+
+# Reviews are a common spam target and cost nothing to attempt repeatedly (no
+# image upload, no Shopify Admin API call on the write path itself), so this
+# gets the tightest limit of the bunch.
+[[ratelimits]]
+name = "RATE_LIMITER_REVIEWS_SUBMIT"
+namespace_id = "1004"
+  [ratelimits.simple]
+  limit = 5
   period = 60
 
 # Required secrets (set via: npx wrangler secret put SECRET_NAME)
