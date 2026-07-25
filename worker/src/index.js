@@ -32,7 +32,6 @@ async function getShopifyToken(env) {
   });
   const rawText = await res.text();
   console.log('[getShopifyToken] status:', res.status);
-  console.log('[getShopifyToken] response (first 500 chars):', rawText.slice(0, 500));
   let data;
   try { data = JSON.parse(rawText); }
   catch { throw new Error(`Token endpoint returned non-JSON (status ${res.status}): ${rawText.slice(0, 200)}`); }
