@@ -44,6 +44,15 @@ function makeR2() {
   };
 }
 
+// Rate-limit binding mock — same shape as the real Workers Rate Limiting
+// binding's `limit()` method: an async function returning { success }.
+// See makeEnv()'s RATE_LIMITER_* entries below for how tests select
+// under-limit (default omitted — see checkRateLimit's fail-open-when-missing
+// path), over-limit, and throwing mocks.
+function makeRateLimiter(success = true) {
+  return { limit: vi.fn(async () => ({ success })) };
+}
+
 function makeEnv(overrides = {}) {
   return {
     MOCKUP_STAGING:      makeR2(),
@@ -299,6 +308,46 @@ describe('POST /save-preview', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe('Invalid image encoding');
+  });
+
+  // ── Rate limiting (RATE_LIMITER_SAVE_PREVIEW binding) ───────────────────────
+
+  it('succeeds normally when the rate limiter reports under-limit', async () => {
+    const env = makeEnv({ RATE_LIMITER_SAVE_PREVIEW: makeRateLimiter(true) });
+    const res = await worker.fetch(makeRequest('POST', '/save-preview', {
+      designImage: btoa('d'),
+      mockupImage: btoa('m'),
+    }), env);
+    expect(res.status).toBe(200);
+    expect(env.RATE_LIMITER_SAVE_PREVIEW.limit).toHaveBeenCalledWith({ key: expect.any(String) });
+  });
+
+  it('returns 429 with a JSON error when the rate limiter reports over-limit', async () => {
+    const env = makeEnv({ RATE_LIMITER_SAVE_PREVIEW: makeRateLimiter(false) });
+    const req = makeRequest('POST', '/save-preview', {
+      designImage: btoa('d'),
+      mockupImage: btoa('m'),
+    });
+    req.headers.set('CF-Connecting-IP', '203.0.113.5');
+    const res = await worker.fetch(req, env);
+    expect(res.status).toBe(429);
+    expect(res.headers.get('Content-Type')).toBe('application/json');
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://brightfield-2.myshopify.com');
+    const body = await res.json();
+    expect(body.error).toBeTruthy();
+    // No R2 writes should happen once the request is rejected for rate limiting
+    expect(env.MOCKUP_STAGING.put).not.toHaveBeenCalled();
+  });
+
+  it('fails open (request succeeds) when the rate limiter binding throws', async () => {
+    const env = makeEnv({
+      RATE_LIMITER_SAVE_PREVIEW: { limit: vi.fn(async () => { throw new Error('binding misconfigured'); }) },
+    });
+    const res = await worker.fetch(makeRequest('POST', '/save-preview', {
+      designImage: btoa('d'),
+      mockupImage: btoa('m'),
+    }), env);
+    expect(res.status).toBe(200);
   });
 });
 
@@ -564,5 +613,41 @@ describe('POST /create-product', () => {
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body.error).toBe('Could not look up variant');
+  });
+
+  // ── Rate limiting (RATE_LIMITER_CREATE_PRODUCT binding) ─────────────────────
+
+  it('succeeds normally when the rate limiter reports under-limit', async () => {
+    vi.stubGlobal('fetch', makeShopifyFetch());
+    const env = makeEnv({ RATE_LIMITER_CREATE_PRODUCT: makeRateLimiter(true) });
+    const res = await worker.fetch(makeRequest('POST', '/create-product', createProductBody()), env);
+    expect(res.status).toBe(200);
+    expect(env.RATE_LIMITER_CREATE_PRODUCT.limit).toHaveBeenCalledWith({ key: expect.any(String) });
+  });
+
+  it('returns 429 with a JSON error when the rate limiter reports over-limit, without creating a product', async () => {
+    const fetchMock = makeShopifyFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    const env = makeEnv({ RATE_LIMITER_CREATE_PRODUCT: makeRateLimiter(false) });
+    const req = makeRequest('POST', '/create-product', createProductBody());
+    req.headers.set('CF-Connecting-IP', '203.0.113.5');
+    const res = await worker.fetch(req, env);
+    expect(res.status).toBe(429);
+    expect(res.headers.get('Content-Type')).toBe('application/json');
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://brightfield-2.myshopify.com');
+    const body = await res.json();
+    expect(body.error).toBeTruthy();
+    // Rejected before any Shopify Admin API calls — no product created, no quota burned
+    const createCalls = fetchMock.calls.filter((c) => c.url.includes('graphql.json') && JSON.parse(c.opts.body).query.includes('mutation CreateProduct'));
+    expect(createCalls).toHaveLength(0);
+  });
+
+  it('fails open (request succeeds) when the rate limiter binding throws', async () => {
+    vi.stubGlobal('fetch', makeShopifyFetch());
+    const env = makeEnv({
+      RATE_LIMITER_CREATE_PRODUCT: { limit: vi.fn(async () => { throw new Error('binding misconfigured'); }) },
+    });
+    const res = await worker.fetch(makeRequest('POST', '/create-product', createProductBody()), env);
+    expect(res.status).toBe(200);
   });
 });

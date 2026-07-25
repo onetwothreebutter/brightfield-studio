@@ -19,6 +19,37 @@ binding = "MOCKUP_STAGING"
 preview_bucket_name = "mockup-staging"
 bucket_name = "mockup-staging"
 
+# ── Rate limiting (Workers Rate Limiting binding, GA since 2025-09-19) ──────
+# https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
+# Per-key sliding-window limiter, created automatically on deploy — no separate
+# resource provisioning (unlike the R2 bucket above). `period` only accepts 10
+# or 60 (seconds). One binding per endpoint since limit/period are fixed per
+# binding and the three endpoints below warrant different thresholds; see
+# index.js checkRateLimit() for the CF-Connecting-IP-keyed usage and PR
+# description for why these specific limits were chosen.
+# namespace_id just needs to be a positive integer unique within this account;
+# these three are arbitrary and only need to stay stable once deployed.
+[[ratelimits]]
+name = "RATE_LIMITER_CREATE_PRODUCT"
+namespace_id = "1001"
+  [ratelimits.simple]
+  limit = 10
+  period = 60
+
+[[ratelimits]]
+name = "RATE_LIMITER_SAVE_PREVIEW"
+namespace_id = "1002"
+  [ratelimits.simple]
+  limit = 30
+  period = 60
+
+[[ratelimits]]
+name = "RATE_LIMITER_GENERATE_MOCKUP"
+namespace_id = "1003"
+  [ratelimits.simple]
+  limit = 10
+  period = 60
+
 # Required secrets (set via: npx wrangler secret put SECRET_NAME)
 #   ADMIN_TOKEN                - static fallback token for tests / CLI use
 #   PRINTFUL_API_KEY           - Printful API key
