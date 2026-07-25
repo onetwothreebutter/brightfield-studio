@@ -349,8 +349,10 @@ async function handleGenerateMockup(request, env, origin) {
   }
 
   // 1. Decode base64 PNG and upload to R2
-  const imageKey  = `designs/${crypto.randomUUID()}.png`;
-  const imageData = Uint8Array.from(atob(image), c => c.charCodeAt(0));
+  const imageKey = `designs/${crypto.randomUUID()}.png`;
+  let imageData;
+  try { imageData = Uint8Array.from(atob(image), c => c.charCodeAt(0)); }
+  catch { return new Response(JSON.stringify({ error: 'Invalid image encoding' }), { status: 400, headers }); }
 
   await env.MOCKUP_STAGING.put(imageKey, imageData, {
     httpMetadata: { contentType: 'image/png' }
@@ -534,9 +536,14 @@ async function handleSavePreview(request, env, origin) {
   const mockupKey   = `mockups/${crypto.randomUUID()}.jpg`;
   const checkoutKey = checkoutImage ? `checkouts/${crypto.randomUUID()}.png` : null;
 
-  const designData   = Uint8Array.from(atob(designImage), c => c.charCodeAt(0));
-  const mockupData   = Uint8Array.from(atob(mockupImage), c => c.charCodeAt(0));
-  const checkoutData = checkoutImage ? Uint8Array.from(atob(checkoutImage), c => c.charCodeAt(0)) : null;
+  let designData, mockupData, checkoutData;
+  try {
+    designData   = Uint8Array.from(atob(designImage), c => c.charCodeAt(0));
+    mockupData   = Uint8Array.from(atob(mockupImage), c => c.charCodeAt(0));
+    checkoutData = checkoutImage ? Uint8Array.from(atob(checkoutImage), c => c.charCodeAt(0)) : null;
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid image encoding' }), { status: 400, headers });
+  }
 
   const uploads = [
     env.MOCKUP_STAGING.put(designKey, designData, { httpMetadata: { contentType: 'image/png' } }),

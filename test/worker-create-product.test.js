@@ -277,6 +277,19 @@ describe('POST /save-preview', () => {
     }), makeEnv());
     expect(res.status).toBe(413);
   });
+
+  it('returns 400 (not an unhandled exception) for a syntactically invalid base64 image', async () => {
+    // '!' is not a valid base64 character — atob() throws on it. Passes the
+    // string-type and size checks (it's short), so this only ever hits the
+    // atob() call itself.
+    const res = await worker.fetch(makeRequest('POST', '/save-preview', {
+      designImage: '!'.repeat(100),
+      mockupImage: btoa('m'),
+    }), makeEnv());
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Invalid image encoding');
+  });
 });
 
 // ── POST /create-product ──────────────────────────────────────────────────────
