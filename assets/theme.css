@@ -46,6 +46,13 @@ html {
     scroll-behavior: smooth;
 }
 
+/* The native `hidden` attribute must win over any component's own `display`
+   rule (e.g. `.cart-empty { display: flex }`) — author rules of equal
+   specificity otherwise beat the UA stylesheet's `[hidden] { display: none }`. */
+[hidden] {
+    display: none !important;
+}
+
 body {
     background-color: var(--color-bg);
     color: var(--color-text);

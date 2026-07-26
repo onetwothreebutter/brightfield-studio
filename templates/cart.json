@@ -3,7 +3,11 @@
     "main": {
       "type": "main-cart",
       "settings": {}
+    },
+    "product-recommendations": {
+      "type": "product-recommendations",
+      "settings": {}
     }
   },
-  "order": ["main"]
+  "order": ["main", "product-recommendations"]
 }

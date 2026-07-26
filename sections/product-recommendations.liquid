@@ -32,24 +32,26 @@
 {%- if rec_product_id != blank -%}
   {%- assign recommendations_url = routes.product_recommendations_url | append: '?section_id=' | append: section.id | append: '&product_id=' | append: rec_product_id | append: '&limit=4&intent=related' -%}
 
-  <div
-    class="product-recommendations"
-    id="product-recommendations"
-    data-url="{{ recommendations_url }}"
-    style="display:none"
-  >
-    <div class="section-header">
-      <h2 class="section-title glitch" data-text="You May Also Like">You May Also Like</h2>
-    </div>
-    <div class="product-grid product-recommendations__grid" id="product-recommendations-grid">
-      {%- if recommendations.performed -%}
-        {%- for rec_product in recommendations.products -%}
-          {%- assign rec_hidden = rec_product.metafields.seo.hidden | default: 0 -%}
-          {%- unless rec_hidden == 1 or rec_hidden == '1' -%}
-            {%- render 'product-card', product: rec_product -%}
-          {%- endunless -%}
-        {%- endfor -%}
-      {%- endif -%}
+  <div class="container">
+    <div
+      class="product-recommendations"
+      id="product-recommendations"
+      data-url="{{ recommendations_url }}"
+      style="display:none"
+    >
+      <div class="section-header">
+        <h2 class="section-title glitch" data-text="You May Also Like">You May Also Like</h2>
+      </div>
+      <div class="product-grid product-recommendations__grid" id="product-recommendations-grid">
+        {%- if recommendations.performed -%}
+          {%- for rec_product in recommendations.products -%}
+            {%- assign rec_hidden = rec_product.metafields.seo.hidden | default: 0 -%}
+            {%- unless rec_hidden == 1 or rec_hidden == '1' -%}
+              {%- render 'product-card', product: rec_product -%}
+            {%- endunless -%}
+          {%- endfor -%}
+        {%- endif -%}
+      </div>
     </div>
   </div>
 
