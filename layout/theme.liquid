@@ -46,6 +46,8 @@
       <meta name="twitter:image" content="https:{{ og_image }}">
     {%- endif -%}
 
+    {%- render 'structured-data' -%}
+
     <link rel="icon" href="{{ 'favicon.ico' | asset_url }}" sizes="any">
     <link rel="icon" href="{{ 'favicon.svg' | asset_url }}" type="image/svg+xml">
     <link rel="apple-touch-icon" href="{{ 'apple-touch-icon.png' | asset_url }}">
