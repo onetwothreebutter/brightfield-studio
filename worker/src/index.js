@@ -9,11 +9,19 @@ const PRODUCT_ID   = 71;
 const PRINT_WIDTH  = 1800;
 const PRINT_HEIGHT = 2400;
 
+// Garment color used for order fulfillment. The storefront doesn't offer a
+// color choice, so every custom-design order is fulfilled in one fixed color —
+// matches the Black/M variant (4017) already used as the canonical example
+// elsewhere in this repo (worker/test-upload.mjs, worker/fetch-printfiles.mjs).
+// Override with the PRINTFUL_GARMENT_COLOR var/secret if that ever changes.
+const DEFAULT_PRINTFUL_GARMENT_COLOR = 'Black';
+
 let _shopifyToken = null;
 let _shopifyTokenExpiry = 0;
 let _onlineStorePublicationId = null;
 let _printfulLocationId = null;
 let _printfulSizes = null;
+let _printfulVariantMap = null;
 
 async function getShopifyToken(env) {
   if (_shopifyToken && Date.now() < _shopifyTokenExpiry) return _shopifyToken;
@@ -123,6 +131,63 @@ async function getPrintfulSizes(env) {
     return _printfulSizes;
   } catch (err) {
     console.warn('[getPrintfulSizes] error (non-fatal):', err.message);
+    return null;
+  }
+}
+
+// Maps each garment size (e.g. 'M', 'XL') to its Printful catalog variant ID for
+// PRODUCT_ID, filtered to a single garment color (see
+// DEFAULT_PRINTFUL_GARMENT_COLOR) since the storefront doesn't offer a color
+// choice. Used by the orders/paid webhook to translate a custom-design line
+// item's SKU size suffix (see parseCustomSku()) into the variant_id Printful's
+// POST /orders endpoint requires.
+//
+// Extends the same Printful catalog fetch getPrintfulSizes() above already
+// makes (GET /products/{id}): that function only keeps the deduped size
+// *labels* it needs for the Shopify "Size" option, discarding color and id;
+// this one keeps the size -> variant *id* mapping needed to actually place an
+// order. Kept as a separate cached call (rather than sharing one raw-variants
+// cache) so each stays simple and independently testable.
+async function getPrintfulVariantMap(env) {
+  if (_printfulVariantMap) return _printfulVariantMap;
+  try {
+    const res = await fetch(`${PRINTFUL_API}/products/${PRODUCT_ID}`, {
+      headers: env.PRINTFUL_API_KEY ? { 'Authorization': `Bearer ${env.PRINTFUL_API_KEY}` } : {},
+    });
+    if (!res.ok) {
+      console.warn('[getPrintfulVariantMap] non-OK response:', res.status);
+      return null;
+    }
+    const data = await res.json();
+    const variants = data?.result?.variants || [];
+    const targetColor = (env.PRINTFUL_GARMENT_COLOR || DEFAULT_PRINTFUL_GARMENT_COLOR).toLowerCase();
+
+    const map = {};
+    // Pass 1: only the target color, so two variants sharing a size (different
+    // colors) never collide.
+    for (const v of variants) {
+      if (v.size && v.id != null && (v.color || '').toLowerCase() === targetColor) {
+        map[v.size] = v.id;
+      }
+    }
+    // Pass 2: fill any size missing from the target color (e.g. a color that
+    // doesn't offer every size) from whatever color is available, so a gap in
+    // one color's size run doesn't silently drop an order — better to fulfill
+    // in a slightly-off color than fail outright. Logged so it's noticeable.
+    for (const v of variants) {
+      if (v.size && v.id != null && !(v.size in map)) {
+        console.warn('[getPrintfulVariantMap] no', targetColor, 'variant for size', v.size, '— falling back to color', v.color);
+        map[v.size] = v.id;
+      }
+    }
+
+    if (Object.keys(map).length) {
+      _printfulVariantMap = map;
+      console.log('[getPrintfulVariantMap] size -> variant id map:', map);
+    }
+    return _printfulVariantMap;
+  } catch (err) {
+    console.warn('[getPrintfulVariantMap] error (non-fatal):', err.message);
     return null;
   }
 }
@@ -403,6 +468,11 @@ export default {
 
     if (method === 'POST' && pathname === '/save-preview')    return handleSavePreview(request, env, origin);
     if (method === 'POST' && pathname === '/create-product')  return handleCreateProduct(request, env, origin);
+
+    // Shopify webhook — server-to-server, HMAC-authenticated (not browser CORS,
+    // see handleOrderPaidWebhook). Registered on the orders/paid topic; see
+    // wrangler.toml + PR description for the (manual, one-time) registration step.
+    if (method === 'POST' && pathname === '/webhook/order-paid') return handleOrderPaidWebhook(request, env, ctx);
 
     return new Response('Not found', { status: 404 });
   },
@@ -1291,6 +1361,45 @@ async function verifyShopifySessionToken(token, clientSecret, clientId, storeDom
   }
 }
 
+// ── Webhook HMAC verification (orders/paid) ─────────────────────────────────
+// A different scheme from verifyShopifySessionToken() above: that verifies an
+// App Bridge session token — a JWS/JWT (HS256-signed header.payload.signature,
+// base64url segments, exp/nbf/aud/dest/iss claims to check). Shopify webhook
+// signing has none of that: it's a raw HMAC-SHA256 over the exact request body
+// bytes, base64-encoded (standard base64, not base64url), sent whole in the
+// X-Shopify-Hmac-Sha256 header, with no claims — just compare digests.
+// https://shopify.dev/docs/apps/build/webhooks/subscribe/verify-a-webhook
+async function verifyShopifyWebhookHmac(rawBody, headerValue, secret) {
+  if (!rawBody || !headerValue || !secret) return false;
+  try {
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const sigBuf = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody));
+    let binary = '';
+    new Uint8Array(sigBuf).forEach(b => { binary += String.fromCharCode(b); });
+    const computed = btoa(binary);
+    return timingSafeEqualStrings(computed, headerValue);
+  } catch {
+    return false;
+  }
+}
+
+// Constant-time comparison so a mismatching signature can't be distinguished by
+// response-time timing. Both inputs are fixed-length base64 (44 chars for a
+// SHA-256 digest) on the success path; short-circuiting on a length mismatch is
+// safe since length alone doesn't reveal anything about the digest.
+function timingSafeEqualStrings(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 async function requireAdmin(request, env) {
   const auth = request.headers.get('Authorization') || '';
   if (auth === `Bearer ${env.ADMIN_TOKEN}`) return true;
@@ -1415,6 +1524,253 @@ async function authorizeDeviceWrite(env, deviceId, deviceToken) {
     return { ok: false, newToken: null };
   }
   return { ok: true, newToken: null };
+}
+
+// ── Order fulfillment (orders/paid webhook) ─────────────────────────────────
+// Automates what the merchant currently does by hand: copy the `_design_url`
+// cart line-item property out of a paid order and upload it to Printful.
+//
+// Custom-design SKUs are distinguished from normal catalog SKUs by prefix (see
+// createShopifyProduct()'s skuPrefix + inventoryItemUpdate call above):
+// `CUSTOM-{timestamp}-{size}` for direct custom-design purchases,
+// `COMMUNITY-{timestamp}-{size}` for community-gallery-approved designs turned
+// into products. Both are handled identically here — the design_url metafield
+// lives on the generated product either way.
+const CUSTOM_SKU_RE = /^(CUSTOM|COMMUNITY)-(\d+)-(.+)$/;
+
+// Parses a size-suffixed custom/community SKU. Returns null for a normal
+// catalog SKU (or anything else that doesn't match), so callers can filter an
+// order's line items down to just the custom-design ones.
+export function parseCustomSku(sku) {
+  if (typeof sku !== 'string') return null;
+  const m = CUSTOM_SKU_RE.exec(sku);
+  if (!m) return null;
+  return { prefix: m[1], timestamp: m[2], size: m[3] };
+}
+
+async function handleOrderPaidWebhook(request, env, ctx) {
+  const headers = { 'Content-Type': 'application/json' };
+  // No CORS headers: Shopify calls this server-to-server, not from a browser —
+  // this endpoint is authenticated via HMAC (below), not Origin.
+
+  // HMAC verification must run over the exact raw body bytes, so read text()
+  // (not json()) first — a Request body stream can only be consumed once, and
+  // parsing to JSON and re-stringifying it would not reliably reproduce the
+  // same bytes Shopify signed (key order, whitespace, unicode escaping).
+  const rawBody = await request.text();
+  const hmacHeader = request.headers.get('X-Shopify-Hmac-Sha256');
+  const validHmac = await verifyShopifyWebhookHmac(rawBody, hmacHeader, env.SHOPIFY_WEBHOOK_SECRET);
+  if (!validHmac) {
+    console.warn('[order-paid] rejected: missing/invalid HMAC signature');
+    return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 401, headers });
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
+  }
+
+  const shopifyOrderId = payload?.id;
+  if (!shopifyOrderId) {
+    return new Response(JSON.stringify({ error: 'Missing order id' }), { status: 400, headers });
+  }
+
+  // Idempotency: Shopify redelivers webhooks on timeouts/non-2xx responses, and
+  // orders/paid can in principle fire more than once for the same order. If a
+  // Printful order was already created for this Shopify order, this delivery
+  // is a repeat — no-op rather than a duplicate fulfillment order.
+  const idempotencyKey = `printful-orders/${shopifyOrderId}.json`;
+  const existing = await readJson(env, idempotencyKey);
+  if (existing) {
+    console.log('[order-paid] idempotency hit for Shopify order', shopifyOrderId, '— Printful order already created:', existing.printfulOrderId);
+    return new Response(JSON.stringify({ ok: true, alreadyProcessed: true, printfulOrderId: existing.printfulOrderId }), { status: 200, headers });
+  }
+
+  // Re-fetch the order via the Admin API rather than trusting the webhook
+  // payload's own shape: design_url lives on the *product* (a metafield), not
+  // the order, so it isn't in the payload at all regardless of shape; GraphQL
+  // gets order + line items + the metafield in one consistent round trip.
+  let orderData;
+  try {
+    orderData = await shopifyAdmin(env,
+      `query GetOrderForFulfillment($id: ID!) {
+        order(id: $id) {
+          id
+          name
+          email
+          shippingAddress {
+            firstName
+            lastName
+            address1
+            address2
+            city
+            province
+            provinceCode
+            zip
+            country
+            countryCode
+            phone
+          }
+          customer { firstName lastName email }
+          lineItems(first: 100) {
+            edges {
+              node {
+                sku
+                quantity
+                title
+                product {
+                  id
+                  metafield(namespace: "custom", key: "design_url") { value }
+                }
+              }
+            }
+          }
+        }
+      }`,
+      { id: `gid://shopify/Order/${shopifyOrderId}` }
+    );
+  } catch (err) {
+    console.error('[order-paid] order lookup request failed:', err.message);
+    return new Response(JSON.stringify({ error: 'Could not look up order' }), { status: 502, headers });
+  }
+
+  const order = orderData?.data?.order;
+  if (!order) {
+    console.error('[order-paid] order lookup failed:', JSON.stringify(orderData));
+    return new Response(JSON.stringify({ error: 'Could not look up order' }), { status: 502, headers });
+  }
+
+  const lineItems = (order.lineItems?.edges || []).map(e => e.node);
+  const customLineItems = lineItems
+    .map(li => ({ ...li, skuInfo: parseCustomSku(li.sku) }))
+    .filter(li => li.skuInfo);
+
+  // Acceptance criteria: non-custom orders are ignored entirely.
+  if (!customLineItems.length) {
+    console.log('[order-paid] no custom-design line items on order', order.name, '— ignoring');
+    return new Response(JSON.stringify({ ok: true, ignored: true }), { status: 200, headers });
+  }
+
+  const variantMap = await getPrintfulVariantMap(env);
+  if (!variantMap) {
+    console.error('[order-paid] could not load Printful size -> variant map for order', order.name);
+    return new Response(JSON.stringify({ error: 'Printful catalog lookup failed' }), { status: 502, headers });
+  }
+
+  const printfulItems = [];
+  const skippedItems = [];
+  for (const li of customLineItems) {
+    const designUrl = li.product?.metafield?.value;
+    const printfulVariantId = variantMap[li.skuInfo.size];
+    if (!designUrl) {
+      console.error('[order-paid] line item missing design_url metafield, skipping:', li.sku, li.product?.id);
+      skippedItems.push({ sku: li.sku, reason: 'missing design_url metafield' });
+      continue;
+    }
+    if (!printfulVariantId) {
+      console.error('[order-paid] no Printful variant for size, skipping:', li.skuInfo.size, li.sku);
+      skippedItems.push({ sku: li.sku, reason: `no Printful variant for size ${li.skuInfo.size}` });
+      continue;
+    }
+    printfulItems.push({
+      variant_id: printfulVariantId,
+      quantity: li.quantity || 1,
+      // Same files/position shape as the mockup-task call in
+      // handleGenerateMockup above — Printful's order file-attachment shape
+      // mirrors the mockup-generator one.
+      files: [{
+        placement: 'front',
+        image_url: designUrl,
+        position: {
+          area_width:  PRINT_WIDTH,
+          area_height: PRINT_HEIGHT,
+          width:       PRINT_WIDTH,
+          height:      PRINT_HEIGHT,
+          top:  0,
+          left: 0,
+        },
+      }],
+    });
+  }
+
+  if (!printfulItems.length) {
+    // Every custom line item had a data problem (missing metafield / unmapped
+    // size) — nothing valid to submit. Not something a Shopify redelivery would
+    // fix on its own, so 422 rather than 502; each skip reason is logged above
+    // for the merchant to resolve by hand.
+    console.error('[order-paid] no valid custom line items to submit for order', order.name, JSON.stringify(skippedItems));
+    return new Response(JSON.stringify({ error: 'No valid custom line items', skipped: skippedItems }), { status: 422, headers });
+  }
+
+  const shipping = order.shippingAddress;
+  if (!shipping) {
+    console.error('[order-paid] order has custom line items but no shipping address:', order.name);
+    return new Response(JSON.stringify({ error: 'Missing shipping address' }), { status: 422, headers });
+  }
+
+  const recipientName = [shipping.firstName, shipping.lastName].filter(Boolean).join(' ')
+    || [order.customer?.firstName, order.customer?.lastName].filter(Boolean).join(' ')
+    || 'Customer';
+
+  const printfulOrderBody = {
+    external_id: `shopify-${shopifyOrderId}`,
+    recipient: {
+      name:         recipientName,
+      address1:     shipping.address1 || '',
+      address2:     shipping.address2 || '',
+      city:         shipping.city || '',
+      state_code:   shipping.provinceCode || shipping.province || '',
+      country_code: shipping.countryCode || '',
+      zip:          shipping.zip || '',
+      phone:        shipping.phone || '',
+      email:        order.email || order.customer?.email || '',
+    },
+    items: printfulItems,
+    // Draft, not auto-confirmed — the merchant reviews it in the Printful
+    // dashboard before it enters production. Per the ticket: don't auto-confirm
+    // orders yet.
+    confirm: false,
+  };
+
+  let printfulJson;
+  try {
+    const printfulRes = await fetch(`${PRINTFUL_API}/orders`, {
+      method:  'POST',
+      headers: {
+        'Authorization': `Bearer ${env.PRINTFUL_API_KEY}`,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify(printfulOrderBody),
+    });
+    printfulJson = await printfulRes.json();
+    console.log('[order-paid] Printful order-create response:', JSON.stringify(printfulJson));
+    if (printfulJson.code !== 200) {
+      throw new Error(printfulJson.result || printfulJson.error || JSON.stringify(printfulJson));
+    }
+  } catch (err) {
+    console.error('[order-paid] Printful order creation failed for order', order.name, ':', err.message);
+    return new Response(JSON.stringify({ error: 'Printful order creation failed: ' + err.message }), { status: 502, headers });
+  }
+
+  const printfulOrderId = printfulJson.result?.id;
+  const record = {
+    shopifyOrderId,
+    shopifyOrderName: order.name,
+    printfulOrderId,
+    createdAt: Date.now(),
+    skus: customLineItems.map(li => li.sku),
+    skipped: skippedItems.length ? skippedItems : undefined,
+  };
+  // Persisted right after successful creation — this is what a future
+  // redelivery checks (above) to avoid submitting a duplicate Printful order.
+  await writeJson(env, idempotencyKey, record).catch((err) => {
+    console.error('[order-paid] failed to persist idempotency record for order', order.name, '— a redelivery could create a duplicate Printful order:', err.message);
+  });
+
+  console.log('[order-paid] created Printful draft order', printfulOrderId, 'for Shopify order', order.name);
+  return new Response(JSON.stringify({ ok: true, printfulOrderId, skipped: skippedItems }), { status: 200, headers });
 }
 
 // ── Community handlers ───────────────────────────────────────────────────────
