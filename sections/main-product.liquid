@@ -452,7 +452,15 @@
     {%- endcomment -%}
     {%- assign review_count = product.metafields.custom.review_count.value | default: 0 -%}
     {%- assign review_average = product.metafields.custom.review_average.value | default: 0 -%}
-    {%- assign review_entries = product.metafields.custom.review_entries.value | default: '[]' | parse_json -%}
+    {%- comment -%}
+      Metafields of type `json` are auto-parsed by Liquid — `.value` is
+      already an array/hash here, not a JSON string. Piping it through
+      `parse_json` works today only because the metafield doesn't exist yet
+      (nil -> default '[]' string -> parse_json), but breaks with a Liquid
+      render error the moment the worker writes real entries.
+      https://shopify.dev/docs/api/liquid/objects/metafield
+    {%- endcomment -%}
+    {%- assign review_entries = product.metafields.custom.review_entries.value -%}
 
     <div class="product-reviews" id="product-reviews">
       <h2 class="product-reviews__heading">Reviews</h2>
