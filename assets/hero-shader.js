@@ -27,6 +27,9 @@
     'uniform float u_mobile_fade;',
     'uniform float u_fade_start;',
     'uniform float u_fade_end;',
+    'uniform float u_desktop_fade;',
+    'uniform float u_fade_start_x;',
+    'uniform float u_fade_end_x;',
     '',
     'out vec4 fragColor;',
     '',
@@ -56,7 +59,9 @@
     '  float vign = 1.0 - smoothstep(0.5, 1.4, length(p * 0.6));',
     '',
     '  float topFade = mix(1.0, 1.0 - smoothstep(u_fade_start, u_fade_end, uv.y), u_mobile_fade);',
-    '  fragColor = vec4(r * vign * topFade, g * vign * topFade, b * vign * topFade, topFade);',
+    '  float leftRightFade = mix(1.0, 1.0 - smoothstep(u_fade_start_x, u_fade_end_x, uv.x), u_desktop_fade);',
+    '  float fade = topFade * leftRightFade;',
+    '  fragColor = vec4(r * vign * fade, g * vign * fade, b * vign * fade, fade);',
     '}'
   ].join('\n');
 
@@ -105,18 +110,29 @@
   var mobileFadeLoc  = gl.getUniformLocation(program, 'u_mobile_fade');
   var fadeStartLoc   = gl.getUniformLocation(program, 'u_fade_start');
   var fadeEndLoc     = gl.getUniformLocation(program, 'u_fade_end');
+  var desktopFadeLoc = gl.getUniformLocation(program, 'u_desktop_fade');
+  var fadeStartXLoc  = gl.getUniformLocation(program, 'u_fade_start_x');
+  var fadeEndXLoc    = gl.getUniformLocation(program, 'u_fade_end_x');
 
   var mobileQuery = window.matchMedia('(max-width: 768px)');
 
   var params = {
     forceMobileFade: false,
     fadeStart: 0.19,
-    fadeEnd: 0.64
+    fadeEnd: 0.64,
+    forceDesktopFade: false,
+    fadeStartX: 0.35,
+    fadeEndX: 0.9
   };
 
   function currentMobileFade() {
     if (params.forceMobileFade) return 1.0;
     return mobileQuery.matches ? 1.0 : 0.0;
+  }
+
+  function currentDesktopFade() {
+    if (params.forceDesktopFade) return 1.0;
+    return mobileQuery.matches ? 0.0 : 1.0;
   }
 
   if (window.location.search.indexOf('heroDebug') !== -1) {
@@ -181,6 +197,21 @@
     addRow('fade start', 0, 1, 0.01, params.fadeStart, function (v) { params.fadeStart = v; });
     addRow('fade end', 0, 1, 0.01, params.fadeEnd, function (v) { params.fadeEnd = v; });
 
+    var forceDesktopRow = document.createElement('label');
+    forceDesktopRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:10px;';
+    var forceDesktopCheckbox = document.createElement('input');
+    forceDesktopCheckbox.type = 'checkbox';
+    forceDesktopCheckbox.checked = params.forceDesktopFade;
+    forceDesktopCheckbox.addEventListener('change', function () {
+      params.forceDesktopFade = forceDesktopCheckbox.checked;
+    });
+    forceDesktopRow.appendChild(forceDesktopCheckbox);
+    forceDesktopRow.appendChild(document.createTextNode('force desktop L-R fade'));
+    panel.appendChild(forceDesktopRow);
+
+    addRow('fade start x', 0, 1, 0.01, params.fadeStartX, function (v) { params.fadeStartX = v; });
+    addRow('fade end x', 0, 1, 0.01, params.fadeEndX, function (v) { params.fadeEndX = v; });
+
     document.body.appendChild(panel);
   }
 
@@ -203,6 +234,9 @@
     gl.uniform1f(mobileFadeLoc, currentMobileFade());
     gl.uniform1f(fadeStartLoc, params.fadeStart);
     gl.uniform1f(fadeEndLoc, params.fadeEnd);
+    gl.uniform1f(desktopFadeLoc, currentDesktopFade());
+    gl.uniform1f(fadeStartXLoc, params.fadeStartX);
+    gl.uniform1f(fadeEndXLoc, params.fadeEndX);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     requestAnimationFrame(render);
   }
