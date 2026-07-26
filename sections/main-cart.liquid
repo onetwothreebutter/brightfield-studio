@@ -122,6 +122,10 @@
 
     {%- endif -%}
 
+    {%- if cart.item_count > 0 -%}
+      {%- section 'product-recommendations' -%}
+    {%- endif -%}
+
   </div>
 </div>
 
