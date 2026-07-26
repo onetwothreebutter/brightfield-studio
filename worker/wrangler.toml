@@ -19,6 +19,28 @@ binding = "MOCKUP_STAGING"
 preview_bucket_name = "mockup-staging"
 bucket_name = "mockup-staging"
 
+# ── Garbage collection (issue #550) ─────────────────────────────────────────
+# Daily sweep of abandoned custom-design/community-design products (created
+# by createShopifyProduct(), see index.js) that have zero orders, plus their
+# now-orphaned R2 blobs. See index.js `scheduled()` / runGc() for the full
+# logic and safety model.
+[triggers]
+crons = ["0 6 * * *"]
+
+# GC_DRY_RUN gates the actual productDelete/R2 delete calls the cron job
+# makes (see gcIsDryRun() in index.js). Unset — as it is right now — means
+# dry-run: the job still runs on schedule and logs exactly what it would
+# delete, but deletes nothing. It must be set to the literal string "false"
+# below to make deletion live.
+#
+# Do NOT uncomment this until a human has reviewed dry-run output (via
+# GET /admin/gc-dry-run, or the cron job's own logs) against real order data
+# and is satisfied nothing that should survive would be deleted. This is a
+# deploy-owner decision, not something to flip as part of shipping this
+# feature — see the PR description for issue #550.
+# [vars]
+# GC_DRY_RUN = "false"
+
 # ── Rate limiting (Workers Rate Limiting binding, GA since 2025-09-19) ──────
 # https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
 # Per-key sliding-window limiter, created automatically on deploy — no separate
@@ -75,3 +97,12 @@ namespace_id = "1004"
 #                                 system. Until this is set, device-token minting/
 #                                 verification silently no-ops (fail open) rather
 #                                 than hard-breaking /delete-design or /community/like.
+#
+# The SHOPIFY_CUSTOM_DESIGN_CLIENT_* app (above) additionally needs the
+# `read_orders` access scope for the GC job's per-SKU orders(query: "sku:...")
+# check (see runGc() in index.js) to succeed — verify this in Shopify admin
+# under the app's configuration before relying on GC_DRY_RUN=false. If the
+# scope is missing, that check fails closed (treated as "can't verify — keep
+# the product"), so a missing scope means GC silently deletes nothing rather
+# than deleting something it shouldn't — but it also means GC won't do its
+# job until the scope is granted.

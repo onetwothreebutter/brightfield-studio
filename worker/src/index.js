@@ -395,6 +395,7 @@ export default {
 
     if (method === 'GET'  && pathname === '/admin/list-designs') return handleAdminListDesigns(request, env);
     if (method === 'POST' && pathname === '/admin/patch-design-url') return handleAdminPatchDesignUrl(request, env);
+    if (method === 'GET'  && pathname === '/admin/gc-dry-run') return handleGcDryRun(request, env);
 
     if (method === 'GET'  && pathname === '/download-mockup') return handleDownloadMockup(request, env, origin);
 
@@ -404,7 +405,16 @@ export default {
     if (method === 'POST' && pathname === '/create-product')  return handleCreateProduct(request, env, origin);
 
     return new Response('Not found', { status: 404 });
-  }
+  },
+
+  // Cloudflare Workers Cron Trigger (see wrangler.toml [triggers] crons).
+  // Runs the abandoned-product / orphaned-R2-blob GC pass — see runGc() and
+  // the "Garbage collection" section below for the full design and safety
+  // model. Deletion is gated behind env.GC_DRY_RUN (see gcIsDryRun()) — unset
+  // or anything other than "false" runs dry-run (log only, delete nothing).
+  async scheduled(event, env, ctx) {
+    await runScheduledGc(env);
+  },
 };
 
 async function handleGenerateMockup(request, env, origin) {
@@ -2332,4 +2342,349 @@ async function saveDesignEntry(env, deviceId, entry) {
   const existingClaim = await getDeviceClaim(env, deviceId);
   if (existingClaim) return null;
   return claimDeviceId(env, deviceId);
+}
+
+// ── Garbage collection: abandoned generated products + orphaned R2 blobs ────
+// See issue #550. createShopifyProduct() (above) permanently creates an
+// ACTIVE, published Shopify product on every custom-design/community-design
+// checkout attempt — no TTL, no cleanup. Most of these are abandoned carts
+// that never convert to a real order. This runs on a daily Cron Trigger (see
+// `scheduled` in the default export below and wrangler.toml [triggers]), and
+// on demand (always dry-run) via GET /admin/gc-dry-run.
+//
+// Safety model:
+//  - GC_DRY_RUN (env var) defaults to dry-run (unset, or anything other than
+//    the literal string "false"). Must be explicitly set to "false" in
+//    wrangler.toml [vars] to actually delete anything — see that file's
+//    comment. This is a decision for whoever owns the deploy, not something
+//    flipped automatically here.
+//  - Every "would this be safe to delete" check fails closed: if we can't
+//    positively verify a product has zero orders, or can't parse a date, we
+//    keep it rather than risk deleting something live.
+//  - Products with ANY matching order are never deleted, at any age — so an
+//    R2 blob attached to a real order can only become orphaned if the
+//    product referencing it was deleted while genuinely orderless, which
+//    means no order ever pointed at it in the first place.
+
+// Named constant per project convention — see CLAUDE.md checklist ask for GC.
+const GC_PRODUCT_MAX_AGE_DAYS = 30;
+// R2 blobs are swept more aggressively than products since most are pure
+// upload staging, but still well clear of any realistic in-flight checkout
+// (design upload -> create-product is a single request/response, seconds not
+// hours) so this only needs to dodge concurrent-request races, not slow
+// shoppers.
+const GC_BLOB_MAX_AGE_DAYS = 2;
+
+// Prefixes cross-referenced against every currently-live custom-design/
+// community-design product's `custom.design_url` / `custom.mockup_url`
+// metafields before deletion — those two metafields are the only place a
+// design/mockup R2 URL is ever persisted long-term (see createShopifyProduct
+// above). A blob under one of these prefixes survives as long as any live
+// product still points at it, regardless of age.
+const GC_REFERENCE_CHECKED_PREFIXES = ['designs/', 'mockups/'];
+
+// Prefixes swept on age alone, no reference check — each is pure transient
+// staging with no metafield or other durable reference once past the age
+// cutoff:
+//   product-images/     — a resized copy staged only so Shopify's
+//     productCreate media step can fetch it; Shopify ingests its own copy to
+//     its CDN within the same request, so this R2 copy is dead weight
+//     immediately after product creation succeeds.
+//   checkouts/           — only ever referenced via the `_checkout_image`
+//     cart line-item property (see main-product.liquid / homepage-shader-
+//     demo.liquid). The one extension that read that property back
+//     (app/checkout-design-preview) was removed from the repo 2026-05-11 and
+//     never shipped to production — nothing live consumes this today.
+//   create-product-keys/ — /create-product idempotency records; only need to
+//     survive a client-side retry window (minutes), not days.
+const GC_AGE_ONLY_PREFIXES = ['product-images/', 'checkouts/', 'create-product-keys/'];
+
+// Deliberately NOT swept, despite being one of the six R2 prefixes this
+// product family writes to: shader-states/ backs the standalone "Copy Link"
+// share feature (save-shader-state / get-shader-state, used from
+// homepage-shader-demo.liquid and main-product.liquid) — durable share links
+// a visitor can bookmark or send to someone else, with no relationship to any
+// product, cart, or order and no natural expiry. Sweeping it on the same
+// cutoff as abandoned-cart staging assets would silently break old share
+// links. See the PR description for this call-out — flagging it rather than
+// guessing at a safe retention window for an unrelated live feature.
+
+function gcIsDryRun(env) {
+  return env.GC_DRY_RUN !== 'false';
+}
+
+// Shopify's search-syntax value quoting: wrap in double quotes and escape any
+// literal backslash/quote inside the value. SKUs are always
+// `CUSTOM-{timestamp}-{sizeLabel}` / `COMMUNITY-{timestamp}-{sizeLabel}` (see
+// createShopifyProduct's SKU step) so this never actually fires in practice —
+// it's defensive, not load-bearing.
+function gcEscapeSearchValue(v) {
+  return String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+const GC_LIST_CANDIDATE_PRODUCTS_QUERY = `
+  query GCListCandidateProducts($cursor: String) {
+    products(first: 250, after: $cursor, query: "tag:custom-design OR tag:community-design") {
+      edges {
+        node {
+          id
+          title
+          handle
+          createdAt
+          variants(first: 20) {
+            edges { node { sku } }
+          }
+          designUrlMeta: metafield(namespace: "custom", key: "design_url") { value }
+          mockupUrlMeta: metafield(namespace: "custom", key: "mockup_url") { value }
+        }
+      }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+`;
+
+// Verified against Shopify's Admin GraphQL search syntax docs
+// (https://shopify.dev/docs/api/admin-graphql/latest/queries/orders):
+// "Filter by the product variant `sku` field... Example: `sku:ABC123`".
+// Multiple values on one field combine with `OR` (documented the same way
+// for e.g. `vendor:Snowdevil OR vendor:Icedevil`) so every size variant's SKU
+// can be checked in a single request instead of one request per SKU.
+const GC_CHECK_SKU_ORDERS_QUERY = `
+  query GCCheckSkuOrders($skuQuery: String!) {
+    orders(first: 1, query: $skuQuery) {
+      edges { node { id name } }
+    }
+  }
+`;
+
+const GC_DELETE_PRODUCT_MUTATION = `
+  mutation GCDeleteProduct($id: ID!) {
+    productDelete(input: { id: $id }) {
+      deletedProductId
+      userErrors { field message }
+    }
+  }
+`;
+
+// Returns true if ANY of the given SKUs appears on an existing order — a
+// single combined query rather than one per SKU, so checking a product with
+// several size variants still costs one Admin API call. Throws (rather than
+// returning false) on a transport/GraphQL error so the caller can fail
+// closed — see gcRunProductPass below.
+async function gcProductHasOrder(env, skus) {
+  if (!skus.length) {
+    // No SKU at all to check against (e.g. inventoryItemUpdate never ran) —
+    // can't positively rule out an order, so the caller must treat this the
+    // same as "check failed" and keep the product.
+    throw new Error('no SKUs to check');
+  }
+  const skuQuery = skus.map(s => `sku:"${gcEscapeSearchValue(s)}"`).join(' OR ');
+  const data = await shopifyAdmin(env, GC_CHECK_SKU_ORDERS_QUERY, { skuQuery });
+  if (data?.errors) {
+    throw new Error(`orders query failed: ${JSON.stringify(data.errors)}`);
+  }
+  return (data?.data?.orders?.edges?.length || 0) > 0;
+}
+
+async function gcDeleteProduct(env, productGid) {
+  const data = await shopifyAdmin(env, GC_DELETE_PRODUCT_MUTATION, { id: productGid });
+  const userErrors = data?.data?.productDelete?.userErrors;
+  if (data?.errors?.length || userErrors?.length) {
+    throw new Error(`productDelete failed: ${JSON.stringify(data?.errors || userErrors)}`);
+  }
+  if (!data?.data?.productDelete?.deletedProductId) {
+    throw new Error('productDelete returned no deletedProductId');
+  }
+  return data.data.productDelete.deletedProductId;
+}
+
+// Phase 1: page through every custom-design/community-design product, decide
+// which are old + orderless enough to delete, and (unless dryRun) delete
+// them. Returns { checked, deleted: [...], kept: [...], referencedKeys }
+// where referencedKeys is the set of R2 keys still pointed at by a
+// design_url/mockup_url metafield on a product that survives this pass — fed
+// into gcSweepBlobs so a blob doesn't get swept out from under a live
+// product just because it wasn't itself old enough to be a GC candidate.
+async function gcRunProductPass(env, { dryRun }) {
+  const result = { checked: 0, deleted: [], kept: [] };
+  const referencedKeys = new Set();
+  const cutoffMs = Date.now() - GC_PRODUCT_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+
+  let cursor = null;
+  do {
+    let data;
+    try {
+      data = await shopifyAdmin(env, GC_LIST_CANDIDATE_PRODUCTS_QUERY, { cursor });
+    } catch (err) {
+      result.errors = result.errors || [];
+      result.errors.push(`products query failed: ${err.message}`);
+      break;
+    }
+    if (data?.errors) {
+      result.errors = result.errors || [];
+      result.errors.push(`products query returned errors: ${JSON.stringify(data.errors)}`);
+      break;
+    }
+    const conn = data?.data?.products;
+    if (!conn) break;
+
+    for (const edge of conn.edges) {
+      const node = edge.node;
+      result.checked++;
+
+      const skus = (node.variants?.edges || []).map(e => e.node?.sku).filter(Boolean);
+      const designKey = node.designUrlMeta?.value ? ownImageKey(env, node.designUrlMeta.value) : null;
+      const mockupKey = node.mockupUrlMeta?.value ? ownImageKey(env, node.mockupUrlMeta.value) : null;
+      const summary = { id: node.id, title: node.title, handle: node.handle, createdAt: node.createdAt, skus };
+
+      const createdAtMs = Date.parse(node.createdAt);
+      let eligible = false;
+      let reason;
+      if (!Number.isFinite(createdAtMs)) {
+        reason = 'unparseable createdAt — kept for safety';
+      } else if (createdAtMs > cutoffMs) {
+        reason = 'not old enough';
+      } else {
+        try {
+          eligible = !(await gcProductHasOrder(env, skus));
+          reason = eligible ? 'no matching order, past age cutoff' : 'has a matching order';
+        } catch (err) {
+          reason = `order check failed — kept for safety (${err.message})`;
+        }
+      }
+
+      if (eligible) {
+        if (dryRun) {
+          result.deleted.push({ ...summary, reason: `${reason} (dry run — not deleted)` });
+          // Dry run doesn't actually delete the product, but for the R2 sweep
+          // we want the report to show what WOULD subsequently become
+          // orphaned too — so its blobs are deliberately left out of
+          // referencedKeys here.
+        } else {
+          try {
+            await gcDeleteProduct(env, node.id);
+            result.deleted.push({ ...summary, reason });
+          } catch (err) {
+            result.kept.push({ ...summary, reason: `delete failed — kept (${err.message})` });
+            if (designKey) referencedKeys.add(designKey);
+            if (mockupKey) referencedKeys.add(mockupKey);
+          }
+        }
+      } else {
+        result.kept.push({ ...summary, reason });
+        if (designKey) referencedKeys.add(designKey);
+        if (mockupKey) referencedKeys.add(mockupKey);
+      }
+    }
+
+    cursor = conn.pageInfo?.hasNextPage ? conn.pageInfo.endCursor : null;
+  } while (cursor);
+
+  return { ...result, referencedKeys };
+}
+
+// Phase 2: sweep R2 blobs under the GC-eligible prefixes. Reference-checked
+// prefixes (designs/, mockups/) survive if their key is in referencedKeys;
+// age-only prefixes are eligible purely on the uploaded timestamp. Mirrors
+// the pagination shape of handleAdminListDesigns above (R2 .list() cursor/
+// truncated).
+async function gcSweepBlobs(env, { dryRun, referencedKeys }) {
+  const result = { checked: 0, deleted: [], kept: [] };
+  const cutoffMs = Date.now() - GC_BLOB_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+  const prefixes = [...GC_REFERENCE_CHECKED_PREFIXES, ...GC_AGE_ONLY_PREFIXES];
+
+  for (const prefix of prefixes) {
+    let cursor;
+    do {
+      const page = await env.MOCKUP_STAGING.list({ prefix, cursor, limit: 1000 });
+      for (const obj of page.objects) {
+        result.checked++;
+        const uploadedMs = obj.uploaded instanceof Date ? obj.uploaded.getTime() : Date.parse(obj.uploaded);
+
+        if (!Number.isFinite(uploadedMs) || uploadedMs > cutoffMs) {
+          result.kept.push({ key: obj.key, reason: 'not old enough' });
+          continue;
+        }
+        if (GC_REFERENCE_CHECKED_PREFIXES.includes(prefix) && referencedKeys.has(obj.key)) {
+          result.kept.push({ key: obj.key, reason: 'referenced by a live product' });
+          continue;
+        }
+
+        if (dryRun) {
+          result.deleted.push({ key: obj.key, reason: 'orphaned, past age cutoff (dry run — not deleted)' });
+        } else {
+          try {
+            await env.MOCKUP_STAGING.delete(obj.key);
+            result.deleted.push({ key: obj.key, reason: 'orphaned, past age cutoff' });
+          } catch (err) {
+            result.kept.push({ key: obj.key, reason: `delete failed — kept (${err.message})` });
+          }
+        }
+      }
+      cursor = page.truncated ? page.cursor : null;
+    } while (cursor);
+  }
+
+  return result;
+}
+
+// Entry point for both the daily Cron Trigger and GET /admin/gc-dry-run.
+async function runGc(env, { dryRun }) {
+  const report = {
+    dryRun,
+    startedAt: new Date().toISOString(),
+    products: null,
+    blobs: null,
+  };
+  const productPass = await gcRunProductPass(env, { dryRun });
+  report.products = {
+    checked: productPass.checked,
+    deleted: productPass.deleted,
+    kept:    productPass.kept,
+    errors:  productPass.errors || [],
+  };
+  report.blobs = await gcSweepBlobs(env, { dryRun, referencedKeys: productPass.referencedKeys });
+  report.finishedAt = new Date().toISOString();
+  return report;
+}
+
+async function handleGcDryRun(request, env) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (!await requireAdmin(request, env)) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
+  }
+  try {
+    // Always dry-run regardless of env.GC_DRY_RUN — this is a GET endpoint
+    // for verifying what the scheduled job would do; it must never have a
+    // side effect of its own.
+    const report = await runGc(env, { dryRun: true });
+    return new Response(JSON.stringify(report, null, 2), { status: 200, headers });
+  } catch (err) {
+    console.error('[gc-dry-run] failed:', err.message);
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
+  }
+}
+
+async function runScheduledGc(env) {
+  const dryRun = gcIsDryRun(env);
+  console.log('[gc] scheduled run starting — dryRun:', dryRun);
+  try {
+    const report = await runGc(env, { dryRun });
+    console.log('[gc] scheduled run complete:', JSON.stringify({
+      dryRun,
+      products: {
+        checked: report.products.checked,
+        deleted: report.products.deleted.length,
+        kept:    report.products.kept.length,
+        errors:  report.products.errors,
+      },
+      blobs: {
+        checked: report.blobs.checked,
+        deleted: report.blobs.deleted.length,
+        kept:    report.blobs.kept.length,
+      },
+    }));
+  } catch (err) {
+    console.error('[gc] scheduled run failed:', err.message, err.stack);
+  }
 }
