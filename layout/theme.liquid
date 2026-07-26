@@ -17,10 +17,18 @@
       {%- assign og_image = settings.og_image | image_url: width: 1200 -%}
     {%- endif -%}
 
+    <link rel="canonical" href="{{ canonical_url }}">
+
     <meta property="og:site_name" content="{{ shop.name | escape }}">
     <meta property="og:url" content="{{ og_url }}">
     <meta property="og:title" content="{{ og_title | escape }}">
-    <meta property="og:type" content="website">
+    {%- if template.name == 'product' -%}
+      <meta property="og:type" content="product">
+      <meta property="product:price:amount" content="{{ product.selected_or_first_available_variant.price | money_without_currency }}">
+      <meta property="product:price:currency" content="{{ shop.currency }}">
+    {%- else -%}
+      <meta property="og:type" content="website">
+    {%- endif -%}
     {%- if og_description != blank -%}
       <meta property="og:description" content="{{ og_description | escape }}">
     {%- endif -%}
@@ -37,6 +45,8 @@
     {%- if og_image -%}
       <meta name="twitter:image" content="https:{{ og_image }}">
     {%- endif -%}
+
+    {%- render 'structured-data' -%}
 
     <link rel="icon" href="{{ 'favicon.ico' | asset_url }}" sizes="any">
     <link rel="icon" href="{{ 'favicon.svg' | asset_url }}" type="image/svg+xml">

@@ -1,0 +1,173 @@
+{% doc %}
+  Renders JSON-LD structured data for SEO / Google Rich Results:
+  - Organization + WebSite (site-wide, every page)
+  - BreadcrumbList (collection and product pages)
+  - Product + Offer (product pages)
+
+  Every string value is passed through the `json` filter so quotes,
+  backslashes and control characters are escaped per the JSON spec. As a
+  second layer of defense, each finished JSON block additionally has every
+  `</` sequence rewritten to `<\/` before being printed inside the
+  `<script>` tag — a legal JSON escape for `/` that an HTML parser can't
+  mistake for a real closing tag, so a title/description containing a
+  literal `</script>` substring can't break out of the tag.
+
+  Rendered once, site-wide, from layout/theme.liquid.
+
+  @example
+  {% render 'structured-data' %}
+{% enddoc %}
+
+{%- assign ld_site_url = shop.secure_url | default: request.origin -%}
+
+{%- comment -%}
+  Organization's `sameAs` (social profile links) is intentionally omitted:
+  the only social URL in the theme is the Instagram link on the footer
+  section's own settings (sections/footer.liquid), which isn't a global
+  theme setting and isn't reliably reachable from this site-wide snippet.
+  Rather than invent a new setting or depend on unverified cross-section
+  object access, this only ships what's actually available.
+{%- endcomment -%}
+
+{%- comment -%} ---------- Organization + WebSite (site-wide) ---------- {%- endcomment -%}
+{%- capture ld_org_site_json -%}
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": {{ ld_site_url | append: '#organization' | json }},
+        "name": {{ shop.name | json }},
+        "url": {{ ld_site_url | json }}
+      },
+      {
+        "@type": "WebSite",
+        "@id": {{ ld_site_url | append: '#website' | json }},
+        "url": {{ ld_site_url | json }},
+        "name": {{ shop.name | json }},
+        "publisher": { "@id": {{ ld_site_url | append: '#organization' | json }} }
+      }
+    ]
+  }
+{%- endcapture -%}
+{%- assign ld_org_site_json = ld_org_site_json | replace: '</', '<\/' -%}
+
+{%- comment -%} ---------- BreadcrumbList (collection/product pages) ---------- {%- endcomment -%}
+{%- assign ld_show_breadcrumbs = false -%}
+{%- if template.name == 'collection' or template.name == 'product' -%}
+  {%- assign ld_show_breadcrumbs = true -%}
+{%- endif -%}
+
+{%- if ld_show_breadcrumbs -%}
+  {%- assign ld_position = 1 -%}
+  {%- capture ld_crumbs -%}
+    { "@type": "ListItem", "position": {{ ld_position }}, "name": {{ shop.name | json }}, "item": {{ ld_site_url | json }} }
+  {%- endcapture -%}
+
+  {%- if template.name == 'collection' and collection -%}
+    {%- assign ld_position = ld_position | plus: 1 -%}
+    {%- assign ld_crumb_url = ld_site_url | append: collection.url -%}
+    {%- capture ld_crumb_next -%}
+      , { "@type": "ListItem", "position": {{ ld_position }}, "name": {{ collection.title | json }}, "item": {{ ld_crumb_url | json }} }
+    {%- endcapture -%}
+    {%- assign ld_crumbs = ld_crumbs | append: ld_crumb_next -%}
+  {%- endif -%}
+
+  {%- if template.name == 'product' and product -%}
+    {%- comment -%}
+      Shopify only exposes `collection` on a product page when the visitor
+      arrived via a collection-scoped URL (/collections/x/products/y) — it
+      doesn't track "which collection did they come from" otherwise. Fall
+      back to the product's first assigned collection so the breadcrumb
+      still has a sensible middle crumb off that URL shape.
+    {%- endcomment -%}
+    {%- if collection -%}
+      {%- assign ld_breadcrumb_collection = collection -%}
+    {%- else -%}
+      {%- assign ld_breadcrumb_collection = product.collections.first -%}
+    {%- endif -%}
+
+    {%- if ld_breadcrumb_collection -%}
+      {%- assign ld_position = ld_position | plus: 1 -%}
+      {%- assign ld_crumb_url = ld_site_url | append: ld_breadcrumb_collection.url -%}
+      {%- capture ld_crumb_next -%}
+        , { "@type": "ListItem", "position": {{ ld_position }}, "name": {{ ld_breadcrumb_collection.title | json }}, "item": {{ ld_crumb_url | json }} }
+      {%- endcapture -%}
+      {%- assign ld_crumbs = ld_crumbs | append: ld_crumb_next -%}
+    {%- endif -%}
+
+    {%- assign ld_position = ld_position | plus: 1 -%}
+    {%- assign ld_product_fallback_url = ld_site_url | append: product.url -%}
+    {%- assign ld_product_url = canonical_url | default: ld_product_fallback_url -%}
+    {%- capture ld_crumb_next -%}
+      , { "@type": "ListItem", "position": {{ ld_position }}, "name": {{ product.title | json }}, "item": {{ ld_product_url | json }} }
+    {%- endcapture -%}
+    {%- assign ld_crumbs = ld_crumbs | append: ld_crumb_next -%}
+  {%- endif -%}
+
+  {%- capture ld_breadcrumb_json -%}
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [{{ ld_crumbs }}]
+    }
+  {%- endcapture -%}
+  {%- assign ld_breadcrumb_json = ld_breadcrumb_json | replace: '</', '<\/' -%}
+{%- endif -%}
+
+{%- comment -%} ---------- Product + Offer (product pages) ---------- {%- endcomment -%}
+{%- if template.name == 'product' and product -%}
+  {%- unless ld_product_url -%}
+    {%- assign ld_product_fallback_url = ld_site_url | append: product.url -%}
+    {%- assign ld_product_url = canonical_url | default: ld_product_fallback_url -%}
+  {%- endunless -%}
+
+  {%- assign ld_variant = product.selected_or_first_available_variant -%}
+  {%- assign ld_available = product.available -%}
+  {%- if ld_variant -%}
+    {%- assign ld_available = ld_variant.available -%}
+  {%- endif -%}
+  {%- assign ld_availability = 'https://schema.org/OutOfStock' -%}
+  {%- if ld_available -%}
+    {%- assign ld_availability = 'https://schema.org/InStock' -%}
+  {%- endif -%}
+
+  {%- assign ld_price = product.price | money_without_currency | remove: ',' | strip -%}
+  {%- assign ld_description = product.description | strip_html | strip_newlines | truncate: 5000 -%}
+
+  {%- assign ld_images_json = '[]' -%}
+  {%- if product.featured_image -%}
+    {%- assign ld_image_url = product.featured_image | image_url: width: 1200 | prepend: 'https:' -%}
+    {%- capture ld_images_json -%}[{{ ld_image_url | json }}]{%- endcapture -%}
+  {%- endif -%}
+
+  {%- capture ld_product_json -%}
+    {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": {{ product.title | json }},
+      "url": {{ ld_product_url | json }},
+      "description": {{ ld_description | json }},
+      "image": {{ ld_images_json }},
+      {%- if product.vendor != blank -%}
+      "brand": { "@type": "Brand", "name": {{ product.vendor | json }} },
+      {%- endif -%}
+      "offers": {
+        "@type": "Offer",
+        "url": {{ ld_product_url | json }},
+        "priceCurrency": {{ shop.currency | json }},
+        "price": {{ ld_price | json }},
+        "availability": {{ ld_availability | json }}
+      }
+    }
+  {%- endcapture -%}
+  {%- assign ld_product_json = ld_product_json | replace: '</', '<\/' -%}
+{%- endif -%}
+
+<script type="application/ld+json">{{ ld_org_site_json }}</script>
+{%- if ld_show_breadcrumbs -%}
+<script type="application/ld+json">{{ ld_breadcrumb_json }}</script>
+{%- endif -%}
+{%- if template.name == 'product' and product -%}
+<script type="application/ld+json">{{ ld_product_json }}</script>
+{%- endif -%}

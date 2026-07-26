@@ -1,0 +1,82 @@
+{%- comment -%}
+  "You may also like" — product recommendations.
+
+  Renders an initially-empty placeholder grid with a `data-url` pointing at
+  Shopify's Section Rendering API (routes.product_recommendations_url). JS
+  (assets/product-recommendations.js) fetches that URL — which re-renders
+  *this* section with the `recommendations` object populated — and swaps the
+  returned grid markup into the placeholder. This round trip is required
+  because the `recommendations` Liquid object is only populated when a
+  request specifically hits that endpoint; a normal page render always sees
+  it empty. Degrades gracefully: no JS (or a failed/empty fetch) just leaves
+  the section hidden instead of showing broken markup.
+
+  Works on both the product page (uses `product.id`) and the cart page
+  (falls back to the last cart line item's product, since there's no single
+  "current product" there). Renders nothing if neither is available.
+
+  Generated per-customer products are hidden via the `seo.hidden` metafield
+  (set in worker/src/index.js for custom/community designs). Shopify's
+  recommendations engine doesn't know about that custom metafield, so any
+  recommended product with metafields.seo.hidden == 1 is skipped below.
+{%- endcomment -%}
+
+{%- liquid
+  assign rec_product_id = product.id
+  if rec_product_id == blank and cart.item_count > 0
+    assign last_item = cart.items | last
+    assign rec_product_id = last_item.product_id
+  endif
+-%}
+
+{%- if rec_product_id != blank -%}
+  {%- assign recommendations_url = routes.product_recommendations_url | append: '?section_id=' | append: section.id | append: '&product_id=' | append: rec_product_id | append: '&limit=4&intent=related' -%}
+
+  <div
+    class="product-recommendations"
+    id="product-recommendations"
+    data-url="{{ recommendations_url }}"
+    style="display:none"
+  >
+    <div class="section-header">
+      <h2 class="section-title glitch" data-text="You May Also Like">You May Also Like</h2>
+    </div>
+    <div class="product-grid product-recommendations__grid" id="product-recommendations-grid">
+      {%- if recommendations.performed -%}
+        {%- for rec_product in recommendations.products -%}
+          {%- assign rec_hidden = rec_product.metafields.seo.hidden | default: 0 -%}
+          {%- unless rec_hidden == 1 or rec_hidden == '1' -%}
+            {%- render 'product-card', product: rec_product -%}
+          {%- endunless -%}
+        {%- endfor -%}
+      {%- endif -%}
+    </div>
+  </div>
+
+  <script src="{{ 'product-recommendations.js' | asset_url }}" defer></script>
+{%- endif -%}
+
+{% stylesheet %}
+  .product-recommendations {
+    margin-top: 24px;
+    border-top: 1px solid var(--color-border);
+    padding-top: 16px;
+  }
+  .product-recommendations .section-header {
+    text-align: left;
+    margin-bottom: 1.5rem;
+  }
+  .product-recommendations .section-title {
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0;
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Product recommendations",
+  "settings": []
+}
+{% endschema %}
