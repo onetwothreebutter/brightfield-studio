@@ -69,3 +69,9 @@ namespace_id = "1004"
 #   SHOPIFY_STORE_DOMAIN       - e.g. brightfield-2.myshopify.com
 #   SHOPIFY_CUSTOM_DESIGN_CLIENT_ID     - custom-design app client ID (for Admin API product creation)
 #   SHOPIFY_CUSTOM_DESIGN_CLIENT_SECRET - custom-design app client secret (for Admin API product creation)
+#   DEVICE_ID_SECRET           - HMAC key used to sign client deviceIds (see
+#                                 signDeviceId/verifyDeviceToken in index.js, #544).
+#                                 Any long random string; not shared with any other
+#                                 system. Until this is set, device-token minting/
+#                                 verification silently no-ops (fail open) rather
+#                                 than hard-breaking /delete-design or /community/like.

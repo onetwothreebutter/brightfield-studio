@@ -280,6 +280,34 @@ describe('POST /save-preview', () => {
     expect([...env.MOCKUP_STAGING._store.keys()].some((k) => k.startsWith('device-designs/'))).toBe(false);
   });
 
+  // #544: first save for a never-claimed deviceId mints+persists a device
+  // token and returns it so the client can send it on future
+  // /delete-design and /community/like calls. See saveDesignEntry() in index.js.
+  it('mints and returns a deviceToken on first save when DEVICE_ID_SECRET is configured', async () => {
+    const env = makeEnv({ DEVICE_ID_SECRET: 'test-secret' });
+    const res = await worker.fetch(makeRequest('POST', '/save-preview', {
+      designImage: btoa('d'),
+      mockupImage: btoa('m'),
+      deviceId:    'dev-new',
+      shader:      'rise-shirt',
+    }), env);
+
+    const body = await res.json();
+    expect(body.deviceToken).toBeTruthy();
+    expect(env.MOCKUP_STAGING._store.has('device-tokens/dev-new.json')).toBe(true);
+  });
+
+  it('does not include deviceToken in the response when deviceId is absent', async () => {
+    const env = makeEnv({ DEVICE_ID_SECRET: 'test-secret' });
+    const res = await worker.fetch(makeRequest('POST', '/save-preview', {
+      designImage: btoa('d'),
+      mockupImage: btoa('m'),
+    }), env);
+
+    const body = await res.json();
+    expect(body.deviceToken).toBeUndefined();
+  });
+
   it('returns 413 when the raw body exceeds the size cap', async () => {
     const res = await worker.fetch(makeRequest('POST', '/save-preview', {
       designImage: 'A'.repeat(34_000_000),

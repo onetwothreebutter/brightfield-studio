@@ -237,6 +237,64 @@ describe('POST /generate-mockup — design saving', () => {
     expect(body.design_url).toContain('share.brightfield.studio/img/designs/');
   });
 
+  // ── Device token minting (#544) ─────────────────────────────────────────────
+  // First save for a deviceId mints+persists an HMAC claim (device-tokens/) and
+  // hands the token back so /delete-design and /community/like can be
+  // authorized later. See saveDesignEntry() / claimDeviceId() in index.js.
+
+  it('mints and returns a deviceToken on first save when DEVICE_ID_SECRET is configured', async () => {
+    const r2 = makeR2();
+    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
+      image: btoa('fake-png'),
+      variant_id: 4017,
+      deviceId: 'dev-new',
+      shader: 'echo-text',
+      productHandle: 'echo-text-shirt',
+      values: {},
+    }), makeEnv(r2, { DEVICE_ID_SECRET: 'test-secret' }));
+
+    const body = await res.json();
+    expect(body.deviceToken).toBeTruthy();
+
+    const claimCall = r2.put.mock.calls.find(([k]) => k === 'device-tokens/dev-new.json');
+    expect(claimCall).toBeDefined();
+    expect(JSON.parse(claimCall[1])).toMatchObject({ token: body.deviceToken });
+  });
+
+  it('does not mint a second token (or include deviceToken) once a deviceId is already claimed', async () => {
+    const r2 = makeR2();
+    r2._store.set('device-tokens/dev-existing.json', JSON.stringify({ token: 'old-token', claimedAt: 1 }));
+
+    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
+      image: btoa('fake-png'),
+      variant_id: 4017,
+      deviceId: 'dev-existing',
+      shader: 'echo-text',
+      productHandle: 'echo-text-shirt',
+      values: {},
+    }), makeEnv(r2, { DEVICE_ID_SECRET: 'test-secret' }));
+
+    const body = await res.json();
+    expect(body.deviceToken).toBeUndefined();
+    expect(r2.put.mock.calls.some(([k]) => k === 'device-tokens/dev-existing.json')).toBe(false);
+  });
+
+  it('omits deviceToken (fails open, no crash) when DEVICE_ID_SECRET is not configured', async () => {
+    const r2 = makeR2();
+    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
+      image: btoa('fake-png'),
+      variant_id: 4017,
+      deviceId: 'dev-nosecret',
+      shader: 'echo-text',
+      productHandle: 'echo-text-shirt',
+      values: {},
+    }), makeEnv(r2)); // no DEVICE_ID_SECRET override
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.deviceToken).toBeUndefined();
+  });
+
   // ── Rate limiting (RATE_LIMITER_GENERATE_MOCKUP binding) ────────────────────
 
   it('succeeds normally when the rate limiter reports under-limit', async () => {

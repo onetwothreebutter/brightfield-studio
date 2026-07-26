@@ -56,6 +56,26 @@ describe('getDeviceId()', () => {
   });
 });
 
+// ── getDeviceToken() / setDeviceToken() ──────────────────────────────────────
+
+describe('getDeviceToken() / setDeviceToken()', () => {
+  it('returns null when no token has been stored', () => {
+    expect(window.RecentDesigns.getDeviceToken()).toBeNull();
+  });
+
+  it('returns a token previously stored via setDeviceToken', () => {
+    window.RecentDesigns.setDeviceToken('abc123');
+    expect(window.RecentDesigns.getDeviceToken()).toBe('abc123');
+    expect(localStorage.getItem('brightfield_device_token')).toBe('abc123');
+  });
+
+  it('ignores a falsy value passed to setDeviceToken', () => {
+    window.RecentDesigns.setDeviceToken('abc123');
+    window.RecentDesigns.setDeviceToken(null);
+    expect(window.RecentDesigns.getDeviceToken()).toBe('abc123');
+  });
+});
+
 // ── fetchDesigns() ────────────────────────────────────────────────────────────
 
 describe('fetchDesigns()', () => {
@@ -151,7 +171,7 @@ describe('renderFilmstrip()', () => {
 // ── deleteDesign() ────────────────────────────────────────────────────────────
 
 describe('deleteDesign()', () => {
-  it('POSTs to /delete-design with id and deviceId', async () => {
+  it('POSTs to /delete-design with id, deviceId, and deviceToken', async () => {
     localStorage.setItem('brightfield_device_id', 'test-device-del');
     const mockFetch = vi.fn(async () => ({ json: async () => ({ ok: true }) }));
     vi.stubGlobal('fetch', mockFetch);
@@ -162,7 +182,7 @@ describe('deleteDesign()', () => {
       expect.stringContaining('/delete-design'),
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ id: 'design-123', deviceId: 'test-device-del' }),
+        body: JSON.stringify({ id: 'design-123', deviceId: 'test-device-del', deviceToken: null }),
       })
     );
   });
@@ -171,6 +191,36 @@ describe('deleteDesign()', () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network down'); }));
     const result = await window.RecentDesigns.deleteDesign('design-123');
     expect(result).toEqual({ ok: false });
+  });
+
+  // ── Device token (#544) ───────────────────────────────────────────────────
+  // See worker/src/index.js authorizeDeviceWrite(): /delete-design requires a
+  // signed deviceToken once a deviceId has been claimed, and returns a fresh
+  // one when it mints a first-time claim for a legacy deviceId.
+
+  it('sends the stored deviceToken from localStorage, if any', async () => {
+    localStorage.setItem('brightfield_device_id', 'test-device-del');
+    localStorage.setItem('brightfield_device_token', 'stored-token-abc');
+    const mockFetch = vi.fn(async () => ({ json: async () => ({ ok: true }) }));
+    vi.stubGlobal('fetch', mockFetch);
+
+    await window.RecentDesigns.deleteDesign('design-123');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/delete-design'),
+      expect.objectContaining({
+        body: JSON.stringify({ id: 'design-123', deviceId: 'test-device-del', deviceToken: 'stored-token-abc' }),
+      })
+    );
+  });
+
+  it('persists a deviceToken returned in the response', async () => {
+    localStorage.setItem('brightfield_device_id', 'test-device-del');
+    vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => ({ ok: true, deviceToken: 'new-token-xyz' }) })));
+
+    await window.RecentDesigns.deleteDesign('design-123');
+
+    expect(window.RecentDesigns.getDeviceToken()).toBe('new-token-xyz');
   });
 });
 

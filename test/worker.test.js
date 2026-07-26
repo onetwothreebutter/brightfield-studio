@@ -103,6 +103,38 @@ function makeAdminEnv(r2 = makeR2()) {
   };
 }
 
+// ── Device token (#544) helpers ─────────────────────────────────────────────
+// Mints an HMAC-SHA256(deviceId) token the same way worker/src/index.js's
+// signDeviceId() does, so tests can simulate a client that already holds a
+// valid (or, for negative tests, invalid/mismatched) deviceToken.
+
+const TEST_DEVICE_SECRET = 'test-device-secret';
+
+async function signDeviceIdToken(deviceId, secret = TEST_DEVICE_SECRET) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(deviceId));
+  return base64url(new Uint8Array(sig));
+}
+
+function makeDeviceEnv(r2 = makeR2()) {
+  return { MOCKUP_STAGING: r2, DEVICE_ID_SECRET: TEST_DEVICE_SECRET };
+}
+
+// Pre-seeds a claim record as if this deviceId had already saved a design and
+// been minted a token, matching claimDeviceId()'s device-tokens/{id}.json shape.
+async function seedDeviceClaim(env, deviceId, token) {
+  await env.MOCKUP_STAGING.put(
+    `device-tokens/${deviceId}.json`,
+    JSON.stringify({ token, claimedAt: 1700000000 }),
+  );
+}
+
 function bearerHeaders(token) {
   return { Authorization: `Bearer ${token}` };
 }
@@ -328,6 +360,77 @@ describe('POST /community/like', () => {
   it('returns 404 for unknown id', async () => {
     const res = await worker.fetch(post('/community/like', { id: 'no-such-id', deviceId: 'dev-1' }), env);
     expect(res.status).toBe(404);
+  });
+});
+
+// ── /community/like — device token authorization (#544) ────────────────────
+
+describe('POST /community/like — device token authorization', () => {
+  let env;
+  beforeEach(() => { env = makeDeviceEnv(); });
+
+  it('never-claimed deviceId: succeeds without a deviceToken and mints+persists a claim', async () => {
+    const { id } = await submitDesign(env);
+    const res = await worker.fetch(post('/community/like', { id, deviceId: 'legacy-dev' }), env);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.liked).toBe(true);
+    expect(body.deviceToken).toBeTruthy();
+
+    const claim = await env.MOCKUP_STAGING.get('device-tokens/legacy-dev.json');
+    expect(claim).toBeTruthy();
+    expect(JSON.parse(await claim.text())).toMatchObject({ token: body.deviceToken });
+  });
+
+  it('claimed deviceId without a deviceToken: rejected with 401, like not applied', async () => {
+    const { id } = await submitDesign(env);
+    const token = await signDeviceIdToken('claimed-dev');
+    await seedDeviceClaim(env, 'claimed-dev', token);
+
+    const res = await worker.fetch(post('/community/like', { id, deviceId: 'claimed-dev' }), env);
+    expect(res.status).toBe(401);
+
+    const submission = JSON.parse(await (await env.MOCKUP_STAGING.get(`community/submissions/${id}.json`)).text());
+    expect(submission.likes).toBe(0);
+  });
+
+  it('claimed deviceId with a wrong deviceToken: rejected with 401', async () => {
+    const { id } = await submitDesign(env);
+    await seedDeviceClaim(env, 'claimed-dev', await signDeviceIdToken('claimed-dev'));
+
+    const res = await worker.fetch(
+      post('/community/like', { id, deviceId: 'claimed-dev', deviceToken: 'not-the-right-token' }),
+      env
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('claimed deviceId with the correct deviceToken: succeeds, no new token minted', async () => {
+    const { id } = await submitDesign(env);
+    const token = await signDeviceIdToken('claimed-dev');
+    await seedDeviceClaim(env, 'claimed-dev', token);
+
+    const res = await worker.fetch(
+      post('/community/like', { id, deviceId: 'claimed-dev', deviceToken: token }),
+      env
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ likes: 1, liked: true });
+    expect(body.deviceToken).toBeUndefined();
+  });
+
+  it("a deviceToken signed for a different deviceId doesn't verify (not just == comparison)", async () => {
+    const { id } = await submitDesign(env);
+    const otherDevicesToken = await signDeviceIdToken('some-other-device');
+    await seedDeviceClaim(env, 'claimed-dev', await signDeviceIdToken('claimed-dev'));
+
+    const res = await worker.fetch(
+      post('/community/like', { id, deviceId: 'claimed-dev', deviceToken: otherDevicesToken }),
+      env
+    );
+    expect(res.status).toBe(401);
   });
 });
 
@@ -705,6 +808,71 @@ describe('POST /delete-design', () => {
   it('returns 400 when id or deviceId is missing', async () => {
     const res = await worker.fetch(post('/delete-design', { id: 'aaa' }), env);
     expect(res.status).toBe(400);
+  });
+});
+
+// ── /delete-design — device token authorization (#544) ──────────────────────
+// A spoofed deviceId used to let anyone delete another device's entire
+// gallery. See authorizeDeviceWrite() in worker/src/index.js.
+
+describe('POST /delete-design — device token authorization', () => {
+  let env;
+  beforeEach(() => { env = makeDeviceEnv(); });
+
+  it('never-claimed deviceId: succeeds without a deviceToken and mints+persists a claim', async () => {
+    await seedDesigns(env, 'legacy-dev', [{ id: 'aaa', shader: 'rise-shirt' }]);
+
+    const res = await worker.fetch(post('/delete-design', { id: 'aaa', deviceId: 'legacy-dev' }), env);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.deviceToken).toBeTruthy();
+
+    // The delete itself still went through during the migration window.
+    const remaining = JSON.parse(await (await env.MOCKUP_STAGING.get('device-designs/legacy-dev.json')).text());
+    expect(remaining).toHaveLength(0);
+
+    const claim = await env.MOCKUP_STAGING.get('device-tokens/legacy-dev.json');
+    expect(JSON.parse(await claim.text())).toMatchObject({ token: body.deviceToken });
+  });
+
+  it("claimed deviceId cannot be spoofed by another device's deviceId string alone", async () => {
+    // Simulates the exact attack in #544: attacker knows/guesses the victim's
+    // deviceId but never held its token, and tries to wipe the gallery.
+    await seedDesigns(env, 'victim-dev', [{ id: 'aaa', shader: 'rise-shirt' }]);
+    await seedDeviceClaim(env, 'victim-dev', await signDeviceIdToken('victim-dev'));
+
+    const res = await worker.fetch(post('/delete-design', { id: 'aaa', deviceId: 'victim-dev' }), env);
+    expect(res.status).toBe(401);
+
+    const remaining = JSON.parse(await (await env.MOCKUP_STAGING.get('device-designs/victim-dev.json')).text());
+    expect(remaining).toHaveLength(1); // untouched
+  });
+
+  it('claimed deviceId with a wrong deviceToken: rejected with 401', async () => {
+    await seedDesigns(env, 'victim-dev', [{ id: 'aaa', shader: 'rise-shirt' }]);
+    await seedDeviceClaim(env, 'victim-dev', await signDeviceIdToken('victim-dev'));
+
+    const res = await worker.fetch(
+      post('/delete-design', { id: 'aaa', deviceId: 'victim-dev', deviceToken: 'garbage' }),
+      env
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('claimed deviceId with the correct deviceToken: succeeds, no new token minted', async () => {
+    await seedDesigns(env, 'dev-1', [{ id: 'aaa', shader: 'rise-shirt' }]);
+    const token = await signDeviceIdToken('dev-1');
+    await seedDeviceClaim(env, 'dev-1', token);
+
+    const res = await worker.fetch(
+      post('/delete-design', { id: 'aaa', deviceId: 'dev-1', deviceToken: token }),
+      env
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ ok: true });
   });
 });
 
