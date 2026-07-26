@@ -1946,6 +1946,9 @@ dialog.mobile-nav[open]::backdrop {
     margin: 0;
     font-family: var(--font-body);
 }
+.mockup-modal__order-status:empty {
+    display: none;
+}
 .mockup-modal__order-status--error {
     color: #e05;
 }
