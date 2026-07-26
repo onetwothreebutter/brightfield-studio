@@ -1,0 +1,45 @@
+{% doc %}
+  Renders a star rating: visual stars (percentage-filled, so half/partial stars
+  render correctly) plus an accessible text equivalent. Renders nothing when
+  `count` is 0, so a product with no reviews yet shows no rating row at all
+  rather than an empty/zero one.
+
+  Shared by the product card (aggregate rating) and the product page reviews
+  section (both the aggregate summary and each individual review's own stars),
+  so the visual language for "N out of 5 stars" stays identical everywhere.
+
+  @param {number} average - Rating out of 5 (e.g. 4.5). Ignored when count is 0.
+  @param {number} count - Number of ratings behind this average. Always pass
+    this explicitly (e.g. `| default: 0` on a metafield read) — nothing
+    renders when it's 0, so a product with no reviews yet shows no rating row
+    at all. For a single review's own star row, pass `count: 1`.
+  @param {boolean} [hide_count] - When true, suppresses the trailing "(N)"
+    count text — used for an individual review's own star row, where showing
+    "(1)" next to every review would be noise.
+  @param {string} [size] - 'sm' (default) or 'lg'.
+  @param {string} [class] - Extra class(es) appended to the wrapper (e.g. for
+    layout spacing where this is used).
+
+  @example
+  {% render 'star-rating', average: product.metafields.custom.review_average.value, count: product.metafields.custom.review_count.value | default: 0 %}
+  {% render 'star-rating', average: entry.rating, count: 1, hide_count: true %}
+{% enddoc %}
+
+{%- assign _rating_count = count | default: 0 -%}
+
+{%- if _rating_count > 0 -%}
+  {%- assign _rating_average = average | default: 0 -%}
+  {%- assign _fill_percent = _rating_average | times: 20 | at_most: 100 | at_least: 0 -%}
+  <div class="star-rating{% if size == 'lg' %} star-rating--lg{% endif %}{% if class %} {{ class }}{% endif %}">
+    <span class="visually-hidden">
+      {{ _rating_average }} out of 5 stars{% unless hide_count %} ({{ _rating_count }} review{% if _rating_count != 1 %}s{% endif %}){% endunless %}
+    </span>
+    <span class="star-rating__visual" aria-hidden="true">
+      <span class="star-rating__track">★★★★★</span>
+      <span class="star-rating__fill" style="width: {{ _fill_percent }}%">★★★★★</span>
+    </span>
+    {%- unless hide_count -%}
+      <span class="star-rating__count" aria-hidden="true">({{ _rating_count }})</span>
+    {%- endunless -%}
+  </div>
+{%- endif -%}

@@ -39,6 +39,11 @@
 
     <div class="product-card__info">
       <h3 class="product-card__title">{{ product.title | escape }}</h3>
+      {%- render 'star-rating',
+        average: product.metafields.custom.review_average.value,
+        count: product.metafields.custom.review_count.value | default: 0,
+        class: 'product-card__rating'
+      -%}
       <p class="product-card__price">
         {%- if product.compare_at_price > product.price -%}
           <s class="product-card__compare-price">{{ product.compare_at_price | money }}</s>

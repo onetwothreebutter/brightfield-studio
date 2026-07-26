@@ -364,6 +364,12 @@ export default {
     if (method === 'POST' && pathname === '/community/reject')  return handleCommunityModerate(request, env, origin, 'rejected');
     if (method === 'GET'  && pathname.startsWith('/community/design/')) return handleCommunityDesign(request, env, origin, pathname.slice('/community/design/'.length));
 
+    if (method === 'POST' && pathname === '/reviews/submit')   return handleReviewsSubmit(request, env, origin);
+    if (method === 'GET'  && pathname === '/reviews/list')     return handleReviewsList(request, env, origin);
+    if (method === 'GET'  && pathname === '/reviews/pending')  return handleReviewsPending(request, env, origin);
+    if (method === 'POST' && pathname === '/reviews/approve')  return handleReviewsModerate(request, env, origin, 'approved');
+    if (method === 'POST' && pathname === '/reviews/reject')   return handleReviewsModerate(request, env, origin, 'rejected');
+
     if (method === 'POST' && pathname === '/save-shader-state')           return handleSaveShaderState(request, env, origin);
     if (method === 'GET'  && pathname.startsWith('/get-shader-state/'))   return handleGetShaderState(request, env, origin);
     if (method === 'POST' && pathname === '/create-share')                return handleCreateShare(request, env, origin);
@@ -1454,6 +1460,233 @@ async function handleCommunityDesign(request, env, origin, id) {
   if (!sub || sub.status !== 'approved') return new Response('Not found', { status: 404, headers });
   const { creatorEmail: _omit, ...sanitized } = sub;
   return new Response(JSON.stringify(rewriteLegacyImgUrls(env, sanitized)), { status: 200, headers });
+}
+
+// ── Reviews ──────────────────────────────────────────────────────────────────
+// Metafield-based reviews (see issue #548). Same shape as the community-design
+// flow above: an anonymous customer POSTs a submission, it's held as `pending`
+// in R2, and an admin approves/rejects it. Reviews additionally get synced —
+// on every approve/reject — onto the product's own metafields (custom.review_average,
+// custom.review_count, custom.review_entries) so the storefront (product page,
+// product card, and eventually Product JSON-LD) can render them with a plain
+// Liquid read instead of a live API call at page-render time.
+//
+// A Judge.me/Loox-style app was the "usual default" per the ticket, but
+// installing a third-party app requires interactive Partner/Admin access this
+// automated workflow doesn't have — see the PR description for that tradeoff.
+
+const REVIEW_NAME_MAX  = 80;
+const REVIEW_BODY_MAX  = 2000;
+const REVIEW_HANDLE_MAX = 200;
+// Most recent approved reviews synced onto the product metafield. Older
+// approved reviews still live in R2 (`reviews/list.json`) and count toward
+// the average/count, they just don't all get mirrored onto the metafield.
+const REVIEW_ENTRIES_LIMIT = 20;
+
+async function handleReviewsSubmit(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+
+  if (!(await checkRateLimit(env, 'RATE_LIMITER_REVIEWS_SUBMIT', request))) {
+    return rateLimitedResponse(headers);
+  }
+
+  const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
+
+  // Honeypot: a hidden field real customers never see or fill (see the
+  // submission form markup). A bot that fills every field gets a fake success
+  // response instead of a 400 — nothing is stored, but it doesn't learn that
+  // this field is the tell.
+  if (typeof body.company === 'string' && body.company.trim() !== '') {
+    return new Response(JSON.stringify({ id: crypto.randomUUID() }), { status: 201, headers });
+  }
+
+  const productHandle = typeof body.productHandle === 'string' ? body.productHandle.trim() : '';
+  const authorName     = typeof body.authorName === 'string' ? body.authorName.trim() : '';
+  const reviewBody      = typeof body.body === 'string' ? body.body.trim() : '';
+  const rating         = Number(body.rating);
+
+  if (!productHandle || productHandle.length > REVIEW_HANDLE_MAX) {
+    return new Response(JSON.stringify({ error: 'Missing or invalid productHandle' }), { status: 400, headers });
+  }
+  if (!authorName || authorName.length > REVIEW_NAME_MAX) {
+    return new Response(JSON.stringify({ error: `Name is required (max ${REVIEW_NAME_MAX} characters)` }), { status: 400, headers });
+  }
+  if (!reviewBody || reviewBody.length > REVIEW_BODY_MAX) {
+    return new Response(JSON.stringify({ error: `Review text is required (max ${REVIEW_BODY_MAX} characters)` }), { status: 400, headers });
+  }
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return new Response(JSON.stringify({ error: 'Rating must be a whole number from 1 to 5' }), { status: 400, headers });
+  }
+
+  const id = crypto.randomUUID();
+  const submission = {
+    id,
+    productHandle,
+    rating,
+    authorName,
+    body:      reviewBody,
+    createdAt: Math.floor(Date.now() / 1000),
+    status:    'pending',
+  };
+
+  await writeJson(env, `reviews/submissions/${id}.json`, submission);
+
+  const list = (await readJson(env, 'reviews/list.json')) || [];
+  list.unshift(id);
+  await writeJson(env, 'reviews/list.json', list);
+
+  return new Response(JSON.stringify({ id }), { status: 201, headers });
+}
+
+// Public: approved reviews for a single product, newest first.
+async function handleReviewsList(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+  const url = new URL(request.url);
+  const productHandle = url.searchParams.get('productHandle');
+  if (!productHandle) {
+    return new Response(JSON.stringify({ error: 'Missing productHandle' }), { status: 400, headers });
+  }
+
+  const list = (await readJson(env, 'reviews/list.json')) || [];
+  const ids = list.slice(0, 200);
+  const reviews = (
+    await Promise.all(ids.map(id => readJson(env, `reviews/submissions/${id}.json`)))
+  ).filter(r => r && r.status === 'approved' && r.productHandle === productHandle);
+
+  return new Response(JSON.stringify(reviews), { status: 200, headers });
+}
+
+// Admin: moderation queue, mirrors handleCommunityPending.
+async function handleReviewsPending(request, env, origin) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+  if (!await requireAdmin(request, env)) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
+  }
+
+  const url = new URL(request.url);
+  const statusFilter = url.searchParams.get('status') || 'pending';
+
+  const list = (await readJson(env, 'reviews/list.json')) || [];
+  const reviews = (
+    await Promise.all(list.map(id => readJson(env, `reviews/submissions/${id}.json`)))
+  ).filter(r => r && r.status === statusFilter);
+
+  return new Response(JSON.stringify(reviews), { status: 200, headers });
+}
+
+// Looks up a product's GID by handle — same query shape as
+// getDefaultVariantForHandle above, just returning the product id instead of
+// its default variant.
+async function getProductIdForHandle(env, handle) {
+  const data = await shopifyAdmin(env,
+    `query GetProductIdByHandle($handle: String!) {
+      productByHandle(handle: $handle) { id }
+    }`,
+    { handle }
+  );
+  return data?.data?.productByHandle?.id || null;
+}
+
+// Recomputes the approved-review aggregate for a product and writes it onto
+// the product's own metafields via metafieldsSet, so the storefront (product
+// page + product card) can render it with a plain Liquid metafield read.
+//
+// Entirely best-effort / non-fatal: the R2 submission record is the source of
+// truth for moderation state, so if this sync fails (missing Admin API creds,
+// transient Shopify error, unresolved handle) the caller still returns 200 —
+// the storefront numbers just lag until the next approve/reject on this
+// product. Also skips outright when Admin API credentials aren't configured
+// (e.g. local/test environments), the same fail-open shape as checkRateLimit.
+async function syncReviewMetafields(env, productHandle) {
+  if (!env.SHOPIFY_STORE_DOMAIN || !env.SHOPIFY_CUSTOM_DESIGN_CLIENT_ID || !env.SHOPIFY_CUSTOM_DESIGN_CLIENT_SECRET) {
+    return;
+  }
+
+  try {
+    const list = (await readJson(env, 'reviews/list.json')) || [];
+    const approved = (
+      await Promise.all(list.map(id => readJson(env, `reviews/submissions/${id}.json`)))
+    ).filter(r => r && r.status === 'approved' && r.productHandle === productHandle);
+
+    const count   = approved.length;
+    const average = count
+      ? Math.round((approved.reduce((sum, r) => sum + r.rating, 0) / count) * 10) / 10
+      : 0;
+    // `list.json` is unshifted on submit, so `approved` is already newest-first.
+    // created_at is written as an ISO 8601 string, not the raw Unix timestamp
+    // stored internally on the submission record — Shopify's Liquid `date`
+    // filter is only unambiguously documented to accept 'now'/'today' or a
+    // parseable date string, not a raw integer, and this value is rendered
+    // straight through `| date: ...` in the product page reviews section.
+    const entries = approved.slice(0, REVIEW_ENTRIES_LIMIT).map(r => ({
+      rating:     r.rating,
+      author:     r.authorName,
+      body:       r.body,
+      created_at: new Date(r.createdAt * 1000).toISOString(),
+    }));
+
+    const productId = await getProductIdForHandle(env, productHandle);
+    if (!productId) {
+      console.warn('[reviews] could not resolve product id for handle:', productHandle);
+      return;
+    }
+
+    const result = await shopifyAdmin(env,
+      `mutation SetReviewMetafields($metafields: [MetafieldsSetInput!]!) {
+        metafieldsSet(metafields: $metafields) {
+          metafields { id }
+          userErrors { field message }
+        }
+      }`,
+      {
+        metafields: [
+          { ownerId: productId, namespace: 'custom', key: 'review_average', type: 'number_decimal',         value: String(average) },
+          { ownerId: productId, namespace: 'custom', key: 'review_count',   type: 'number_integer',         value: String(count) },
+          { ownerId: productId, namespace: 'custom', key: 'review_entries', type: 'json',                   value: JSON.stringify(entries) },
+        ],
+      }
+    );
+    const userErrors = result?.data?.metafieldsSet?.userErrors;
+    if (userErrors?.length) {
+      console.warn('[reviews] metafieldsSet userErrors:', JSON.stringify(userErrors));
+    }
+  } catch (err) {
+    console.warn('[reviews] metafield sync failed (non-fatal):', err.message);
+  }
+}
+
+// Admin: approve/reject, mirrors handleCommunityModerate.
+async function handleReviewsModerate(request, env, origin, newStatus) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+  if (!await requireAdmin(request, env)) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
+  }
+
+  let body;
+  try { body = await request.json(); } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
+  }
+
+  const { id } = body;
+  if (!id) {
+    return new Response(JSON.stringify({ error: 'Missing id' }), { status: 400, headers });
+  }
+
+  const review = await readJson(env, `reviews/submissions/${id}.json`);
+  if (!review) {
+    return new Response(JSON.stringify({ error: 'Review not found' }), { status: 404, headers });
+  }
+
+  review.status = newStatus;
+  await writeJson(env, `reviews/submissions/${id}.json`, review);
+
+  // Re-syncs on both approve and reject: a re-moderation (e.g. un-approving a
+  // review that was already synced onto the product) needs the metafield to
+  // drop it too, not just future approvals to add it.
+  await syncReviewMetafields(env, review.productHandle);
+
+  return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
 }
 
 // ── Share page ───────────────────────────────────────────────────────────────

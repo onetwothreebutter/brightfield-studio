@@ -3508,3 +3508,223 @@ dialog.mobile-nav[open]::backdrop {
         width: 100%;
     }
 }
+
+/* ── Star rating (product card + product page reviews) ──────────────────── */
+.star-rating {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.product-card__rating {
+    margin-bottom: 0.35rem;
+}
+
+.star-rating__visual {
+    position: relative;
+    display: inline-block;
+    font-size: 0.8rem;
+    line-height: 1;
+    letter-spacing: 0.1em;
+}
+
+.star-rating--lg .star-rating__visual {
+    font-size: 1.15rem;
+}
+
+.star-rating__track {
+    color: var(--color-border);
+    white-space: nowrap;
+}
+
+.star-rating__fill {
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    color: var(--color-primary);
+}
+
+.star-rating__count {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+}
+
+/* ── Product page reviews ────────────────────────────────────────────────── */
+.product-reviews {
+    margin-top: 24px;
+    border-top: 1px solid var(--color-border);
+    padding-top: 24px;
+}
+
+.product-reviews__heading {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+    color: var(--color-text);
+}
+
+.product-reviews__summary {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.product-reviews__summary-text {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+}
+
+.product-reviews__list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+    padding: 0;
+    list-style: none;
+}
+
+.product-review {
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.product-review:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.product-review__header {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+.product-review__author {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.product-review__date {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+}
+
+.product-review__body {
+    font-size: 0.9375rem;
+    color: var(--color-text);
+    line-height: 1.6;
+    white-space: pre-line;
+    overflow-wrap: break-word;
+}
+
+/* ── Review submission form ──────────────────────────────────────────────── */
+.product-reviews__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    max-width: 480px;
+    margin-top: 1rem;
+}
+
+.product-reviews__form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.product-reviews__form-field label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+}
+
+.product-reviews__form-field input[type="text"],
+.product-reviews__form-field textarea {
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+    background: var(--color-surface-2);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.7rem;
+    width: 100%;
+    outline: none;
+    resize: vertical;
+    transition: border-color var(--transition-fast);
+}
+
+.product-reviews__form-field input[type="text"]:focus,
+.product-reviews__form-field textarea:focus {
+    border-color: var(--color-primary);
+}
+
+/* Star picker: the Liquid loop renders inputs 5,4,3,2,1 in DOM order (see
+   {% for i in (1..5) reversed %} in the reviews section), and row-reverse
+   displays them 1..5 left-to-right again — that reversal is what lets the
+   plain-CSS ~ sibling combinator below light up the hovered/checked star
+   and every lower-numbered star to its left, with no JS required. */
+.product-reviews__rating-input {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    font-size: 1.5rem;
+}
+
+.product-reviews__star-label {
+    cursor: pointer;
+    color: var(--color-border);
+    transition: color var(--transition-fast);
+}
+
+.product-reviews__star-label input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.product-reviews__star-label:hover,
+.product-reviews__star-label:hover ~ .product-reviews__star-label,
+.product-reviews__star-label:has(input:checked),
+.product-reviews__star-label:has(input:checked) ~ .product-reviews__star-label {
+    color: var(--color-primary);
+}
+
+.product-reviews__star-label input[type="radio"]:focus-visible + span {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* Honeypot: hidden from every user (sighted + assistive tech) — real
+   customers never see or fill this field, only automated form-fillers do. */
+.product-reviews__honeypot {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+.product-reviews__form-note {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+}
+
+.product-reviews__form-error {
+    font-size: 0.8125rem;
+    color: #e05;
+}
+
+.product-reviews__form-success {
+    font-size: 0.875rem;
+    color: var(--color-primary);
+    margin-top: 1rem;
+}

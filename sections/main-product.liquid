@@ -434,6 +434,122 @@
     </div>
     {%- endif -%}
 
+    {%- comment -%}
+      ── Reviews (issue #548, metafield-based) ──────────────────────────────
+      No review app is installed (see PR description for the Judge.me-vs-
+      metafield tradeoff), so reviews live entirely on product metafields:
+        custom.review_average — number_decimal, e.g. "4.3"
+        custom.review_count   — number_integer
+        custom.review_entries — json array of { rating, author, body, created_at }
+      These are written by the worker (worker/src/index.js, syncReviewMetafields)
+      each time an admin approves/rejects a pending submission — never written
+      from Liquid/the storefront directly.
+
+      review_average/review_count below are also exactly what issue #541's
+      Product JSON-LD (structured-data.liquid, not created yet) will want for
+      `aggregateRating.ratingValue` / `.reviewCount` — a follow-up patch there
+      can read the same two metafields straight off `product`.
+    {%- endcomment -%}
+    {%- assign review_count = product.metafields.custom.review_count.value | default: 0 -%}
+    {%- assign review_average = product.metafields.custom.review_average.value | default: 0 -%}
+    {%- comment -%}
+      Metafields of type `json` are auto-parsed by Liquid — `.value` is
+      already an array/hash here, not a JSON string. Piping it through
+      `parse_json` works today only because the metafield doesn't exist yet
+      (nil -> default '[]' string -> parse_json), but breaks with a Liquid
+      render error the moment the worker writes real entries.
+      https://shopify.dev/docs/api/liquid/objects/metafield
+    {%- endcomment -%}
+    {%- assign review_entries = product.metafields.custom.review_entries.value -%}
+
+    <div class="product-reviews" id="product-reviews">
+      <h2 class="product-reviews__heading">Reviews</h2>
+
+      <div class="product-reviews__summary">
+        {%- if review_count > 0 -%}
+          {%- render 'star-rating', average: review_average, count: review_count, size: 'lg' -%}
+          <p class="product-reviews__summary-text">
+            {{ review_average }} out of 5 based on {{ review_count }} review{% if review_count != 1 %}s{% endif %}
+          </p>
+        {%- else -%}
+          <p class="product-reviews__summary-text">No reviews yet — be the first to share your experience.</p>
+        {%- endif -%}
+      </div>
+
+      {%- if review_entries.size > 0 -%}
+        <ul class="product-reviews__list" role="list">
+          {%- for entry in review_entries -%}
+            <li class="product-review">
+              <div class="product-review__header">
+                {%- render 'star-rating', average: entry.rating, count: 1, hide_count: true -%}
+                <span class="product-review__author">{{ entry.author | escape }}</span>
+                {%- if entry.created_at -%}
+                  <span class="product-review__date">{{ entry.created_at | date: '%B %d, %Y' }}</span>
+                {%- endif -%}
+              </div>
+              <p class="product-review__body">{{ entry.body | escape }}</p>
+            </li>
+          {%- endfor -%}
+        </ul>
+      {%- endif -%}
+
+      <div class="product-reviews__form-wrap">
+        <button type="button" class="btn btn--outline btn--sm" id="review-form-toggle" aria-expanded="false" aria-controls="review-form">
+          Write a Review
+        </button>
+
+        <form class="product-reviews__form" id="review-form" style="display:none">
+          <div class="product-reviews__form-field">
+            <span id="review-rating-label">Rating</span>
+            <div
+              class="product-reviews__rating-input"
+              id="review-rating-input"
+              role="radiogroup"
+              aria-labelledby="review-rating-label"
+            >
+              {%- for i in (1..5) reversed -%}
+                <label class="product-reviews__star-label">
+                  <input type="radio" name="rating" value="{{ i }}" required>
+                  <span aria-hidden="true">★</span>
+                  <span class="visually-hidden">{{ i }} star{% if i != 1 %}s{% endif %}</span>
+                </label>
+              {%- endfor -%}
+            </div>
+          </div>
+
+          <div class="product-reviews__form-field">
+            <label for="review-name">Your name</label>
+            <input type="text" id="review-name" name="authorName" maxlength="80" autocomplete="name" required>
+          </div>
+
+          <div class="product-reviews__form-field">
+            <label for="review-body">Your review</label>
+            <textarea id="review-body" name="body" maxlength="2000" rows="4" required></textarea>
+          </div>
+
+          <!-- Honeypot: hidden from every user (see .product-reviews__honeypot in
+               theme.css). Real customers never see or fill this; a bot that fills
+               every field in the form does, and the worker silently no-ops on it. -->
+          <div class="product-reviews__honeypot" aria-hidden="true">
+            <label for="review-company">Company</label>
+            <input type="text" id="review-company" name="company" tabindex="-1" autocomplete="off">
+          </div>
+
+          <button type="submit" class="btn btn--primary btn--sm" id="review-submit" data-worker-url="https://brightfield-mockup-worker.eric-d-johnson.workers.dev">
+            Submit Review
+          </button>
+          <p class="product-reviews__form-error" id="review-error" role="alert" style="display:none">
+            Something went wrong submitting your review. Please try again.
+          </p>
+          <p class="product-reviews__form-note">Reviews are moderated before appearing publicly.</p>
+        </form>
+
+        <p class="product-reviews__form-success" id="review-success" style="display:none">
+          Thanks! Your review will appear after it's approved.
+        </p>
+      </div>
+    </div>
+
     {%- section 'product-recommendations' -%}
 
   </div>
@@ -2337,6 +2453,82 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     var w = entries[0].contentRect.width;
     gui.style.setProperty('--gui-max-h', (w * ratio) + 'px');
   }).observe(media);
+}());
+</script>
+
+<script>
+// ── Reviews: submission form ─────────────────────────────────────────────────
+// Unlike the shader "Preview on Shirt" / community-submit flow above, this runs
+// on every product page (reviews aren't shader-specific), so it's a small
+// self-contained fetch call rather than reusing fetchWithTimeout/workerUrl from
+// the shader-only IIFE, which never runs for non-shader products.
+(function () {
+  var toggle    = document.getElementById('review-form-toggle');
+  var form      = document.getElementById('review-form');
+  var success   = document.getElementById('review-success');
+  var errorEl   = document.getElementById('review-error');
+  var submitBtn = document.getElementById('review-submit');
+  if (!toggle || !form || !submitBtn) return;
+
+  var workerUrl = submitBtn.dataset.workerUrl;
+
+  toggle.addEventListener('click', function () {
+    var showing = form.style.display !== 'none';
+    form.style.display = showing ? 'none' : '';
+    toggle.setAttribute('aria-expanded', showing ? 'false' : 'true');
+  });
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (errorEl) errorEl.style.display = 'none';
+
+    var ratingInput = form.querySelector('input[name="rating"]:checked');
+    var rating      = ratingInput ? parseInt(ratingInput.value, 10) : null;
+    var authorName  = form.querySelector('#review-name').value.trim();
+    var reviewBody  = form.querySelector('#review-body').value.trim();
+    var company     = form.querySelector('#review-company').value; // honeypot — left blank by real users
+
+    if (!rating) {
+      if (errorEl) {
+        errorEl.textContent = 'Please choose a star rating.';
+        errorEl.style.display = '';
+      }
+      return;
+    }
+    if (!authorName || !reviewBody) return; // covered by native `required`, but guard anyway
+
+    submitBtn.disabled    = true;
+    submitBtn.textContent = 'Submitting…';
+
+    fetch(workerUrl + '/reviews/submit', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        productHandle: {{ product.handle | json }},
+        rating:        rating,
+        authorName:    authorName,
+        body:          reviewBody,
+        company:       company
+      })
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error('Submit failed');
+        return r.json();
+      })
+      .then(function () {
+        form.style.display   = 'none';
+        toggle.style.display = 'none';
+        if (success) success.style.display = '';
+      })
+      .catch(function () {
+        submitBtn.disabled    = false;
+        submitBtn.textContent = 'Submit Review';
+        if (errorEl) {
+          errorEl.textContent = 'Something went wrong submitting your review. Please try again.';
+          errorEl.style.display = '';
+        }
+      });
+  });
 }());
 </script>
 
