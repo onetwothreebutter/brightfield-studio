@@ -160,7 +160,7 @@
                   <span class="mockup-modal__price" id="mockup-modal-price">{{ default_variant.price | money }}</span>
                   <button id="mockup-modal-order" class="btn btn--primary btn--sm btn--full">Add to Cart</button>
                 </div>
-                <p class="mockup-modal__order-status" id="mockup-order-status" style="display:none"></p>
+                <p class="mockup-modal__order-status" id="mockup-order-status" role="status" aria-live="polite"></p>
 
                 <!-- Shown only after a successful add-to-cart — gallery submission is
                      secondary to the sale, so it only appears once the purchase path
@@ -1591,6 +1591,28 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   var printArea    = (btn.dataset.printArea || '0.20,0.15,0.60,0.68').split(',').map(Number);
   var _pendingDesign = null;
 
+  // orderStatus doubles as both the polite progress announcer ("Uploading your
+  // design…", "Finalizing your order…") and, on failure, an assertive inline
+  // error message — replacing a blocking alert() that screen readers can't
+  // associate with the flow. Routine progress updates just set .textContent
+  // (see below); setOrderError() flips the element to role="alert" so
+  // assistive tech announces it immediately, and setOrderStatus() flips it
+  // back to the polite default for the next attempt.
+  function setOrderStatus(msg) {
+    if (!orderStatus) return;
+    orderStatus.setAttribute('role', 'status');
+    orderStatus.setAttribute('aria-live', 'polite');
+    orderStatus.classList.remove('mockup-modal__order-status--error');
+    orderStatus.textContent = msg;
+  }
+  function setOrderError(msg) {
+    if (!orderStatus) return;
+    orderStatus.setAttribute('role', 'alert');
+    orderStatus.setAttribute('aria-live', 'assertive');
+    orderStatus.classList.add('mockup-modal__order-status--error');
+    orderStatus.textContent = msg;
+  }
+
   // Wraps fetch with a hard timeout via AbortController. Without this, a stalled
   // worker call or Shopify Admin API request left the customer on "Adding…" forever
   // with a disabled button and no way to recover except abandoning the page — the
@@ -1825,8 +1847,9 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   });
 
   modalOrder.addEventListener('click', function () {
+    setOrderStatus(''); // clear any error/status left over from a previous attempt
     if (!_pendingDesign) {
-      alert('Generate a preview first.');
+      setOrderError('Generate a preview first.');
       return;
     }
     // Captured once at click time, then read exclusively from here on — not from
@@ -1843,7 +1866,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     var variantEl  = document.querySelector('select[name="id"]') || document.querySelector('input[name="id"]');
     var shopifyVariantId = sizeSelect ? sizeSelect.value : (variantEl ? variantEl.value : null);
     if (!shopifyVariantId) {
-      alert('Could not determine variant. Please select a size and try again.');
+      setOrderError('Could not determine variant. Please select a size and try again.');
       return;
     }
 
@@ -1853,7 +1876,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     sp.className = 'btn-spinner';
     sp.setAttribute('aria-hidden', 'true');
     modalOrder.appendChild(sp);
-    if (orderStatus) { orderStatus.textContent = 'Uploading your design…'; orderStatus.style.display = ''; }
+    if (orderStatus) orderStatus.textContent = 'Uploading your design…';
 
     console.log('[add-to-cart] starting — shopifyVariantId:', shopifyVariantId);
     window.bfTrack('add_to_cart_start', { shader: '{{ shader_file }}' });
@@ -2060,7 +2083,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
               quantity: item.quantity || 1
             }]
           });
-          if (orderStatus) { orderStatus.textContent = ''; orderStatus.style.display = 'none'; }
+          if (orderStatus) orderStatus.textContent = '';
           modalOrder.style.display = 'none';
           if (modalSuccess) modalSuccess.style.display = '';
         });
@@ -2071,10 +2094,9 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         var msg = err.isTimeout
           ? 'This is taking longer than expected. Please try again.'
           : 'Could not add to cart: ' + err.message + ' — please try again or contact us.';
-        alert(msg);
+        setOrderError(msg);
         modalOrder.disabled = false;
         modalOrder.textContent = 'Add to Cart';
-        if (orderStatus) { orderStatus.textContent = ''; orderStatus.style.display = 'none'; }
       });
   });
 
