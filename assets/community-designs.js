@@ -109,15 +109,41 @@
   }
 
   // ── Fetch ────────────────────────────────────────────────────────────────────
+  // /community/list is paginated (see worker #551): each response covers a page
+  // of the full submission history (newest first) and, when more pages remain,
+  // carries the offset of the next one in the `X-Community-Next-Cursor` header.
+  // The shader/productHandle filter is applied server-side per page, so a design
+  // that matches but is older than the newest 100 submissions site-wide would be
+  // unreachable without walking forward — page forward until we have enough
+  // matches or run out of list, bounded so an empty result (e.g. a brand new
+  // product with no community designs yet) can't cause unbounded requests.
+  var COMMUNITY_LIST_MAX_RESULTS = 24;
+  var COMMUNITY_LIST_MAX_PAGES   = 10;
 
-  function fetchCommunityDesigns(shader, productHandle) {
+  function fetchCommunityListPage(shader, productHandle, cursor) {
     var params = [];
     if (shader)        params.push('shader='        + encodeURIComponent(shader));
     if (productHandle) params.push('productHandle=' + encodeURIComponent(productHandle));
+    if (cursor)        params.push('cursor='        + encodeURIComponent(cursor));
     var url = WORKER_URL + '/community/list' + (params.length ? '?' + params.join('&') : '');
-    return fetch(url)
-      .then(function (r) { return r.json(); })
-      .catch(function () { return []; });
+    return fetch(url).then(function (r) {
+      return r.json().then(function (items) {
+        return { items: items, nextCursor: r.headers.get('X-Community-Next-Cursor') };
+      });
+    });
+  }
+
+  function fetchCommunityDesigns(shader, productHandle) {
+    function walk(cursor, acc, pagesLeft) {
+      return fetchCommunityListPage(shader, productHandle, cursor).then(function (page) {
+        var combined = acc.concat(page.items);
+        if (combined.length >= COMMUNITY_LIST_MAX_RESULTS || !page.nextCursor || pagesLeft <= 1) {
+          return combined;
+        }
+        return walk(page.nextCursor, combined, pagesLeft - 1);
+      });
+    }
+    return walk(null, [], COMMUNITY_LIST_MAX_PAGES).catch(function () { return []; });
   }
 
   // ── Shared card actions builder ───────────────────────────────────────────────

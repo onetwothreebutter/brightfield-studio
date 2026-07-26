@@ -1281,6 +1281,50 @@ async function writeJson(env, key, data) {
 
 // ── Community handlers ───────────────────────────────────────────────────────
 
+const COMMUNITY_LIST_KEY               = 'community/list.json';
+const COMMUNITY_LIST_WRITE_RETRIES     = 5;
+const COMMUNITY_LIST_DEFAULT_PAGE_SIZE = 100;
+const COMMUNITY_LIST_MAX_PAGE_SIZE     = 200;
+
+// Prepends `id` to community/list.json using an R2 conditional write
+// (compare-and-swap) so two concurrent submissions can't silently clobber
+// each other. Without this, two requests could both read the same list,
+// each unshift their own id, and each write back — the second write wins
+// and the first id is dropped (see #551).
+//
+// Flow per attempt: read the current object (get its etag along with the
+// body), splice in the new id, then put() with `onlyIf` tied to that etag.
+// R2 returns null from put() on a precondition failure instead of throwing,
+// so a null result means another writer won the race in between our read
+// and write — re-read and retry. This endpoint isn't expected to see heavy
+// concurrent write contention, so a small bounded retry count is enough.
+async function appendToCommunityList(env, id) {
+  for (let attempt = 0; attempt < COMMUNITY_LIST_WRITE_RETRIES; attempt++) {
+    const existing = await env.MOCKUP_STAGING.get(COMMUNITY_LIST_KEY);
+    let list = [];
+    if (existing) {
+      try { list = JSON.parse(await existing.text()); } catch { list = []; }
+      if (!Array.isArray(list)) list = [];
+    }
+    list.unshift(id);
+
+    const putOptions = { httpMetadata: { contentType: 'application/json' } };
+    putOptions.onlyIf = existing
+      ? { etagMatches: existing.etag }
+      // Object didn't exist on our read — only create it if it's still
+      // absent (RFC 7232 `If-None-Match: *`, supported by R2's `onlyIf` via
+      // a Headers object). Guards the very first-ever write against a
+      // concurrent writer creating the key between our get() and put().
+      : new Headers({ 'If-None-Match': '*' });
+
+    const result = await env.MOCKUP_STAGING.put(COMMUNITY_LIST_KEY, JSON.stringify(list), putOptions);
+    if (result) return list;
+    // Precondition failed — another request updated the list concurrently.
+    // Loop around to re-read the fresh list + etag and retry.
+  }
+  throw new Error('community/list.json: exceeded retry limit under write contention');
+}
+
 async function handleCommunitySubmit(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
   const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
@@ -1312,21 +1356,51 @@ async function handleCommunitySubmit(request, env, origin) {
 
   await writeJson(env, `community/submissions/${id}.json`, submission);
 
-  const list = (await readJson(env, 'community/list.json')) || [];
-  list.unshift(id);
-  await writeJson(env, 'community/list.json', list);
+  try {
+    await appendToCommunityList(env, id);
+  } catch (err) {
+    // Submission JSON is already written and can still be found/moderated
+    // by id even though it isn't indexed yet — but it won't show up in
+    // /community/list or /community/pending until it's in the list, so
+    // surface the failure and let the client retry the submit.
+    console.error('[handleCommunitySubmit] appendToCommunityList failed:', err);
+    return new Response(JSON.stringify({ error: 'Failed to save submission, please try again' }), { status: 503, headers });
+  }
 
   return new Response(JSON.stringify({ id }), { status: 201, headers });
 }
 
 async function handleCommunityList(request, env, origin) {
-  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+  const headers = {
+    'Content-Type': 'application/json',
+    ...corsHeaders(origin),
+    // The pagination cursor rides in a custom response header (see below) so
+    // the response body stays a plain array — expose it explicitly, since
+    // browsers hide non-simple response headers from fetch() by default.
+    'Access-Control-Expose-Headers': 'X-Community-Next-Cursor',
+  };
   const url = new URL(request.url);
   const shaderFilter        = url.searchParams.get('shader');
   const productHandleFilter = url.searchParams.get('productHandle');
 
-  const list = (await readJson(env, 'community/list.json')) || [];
-  const ids = list.slice(0, 100);
+  // Pagination: `cursor` is an offset into the full (unfiltered) id list,
+  // `limit` is the page size. Defaults (cursor 0, limit 100) reproduce the
+  // old hardcoded `slice(0, 100)` behavior exactly. Previously that slice
+  // was unconditional, so any approved submission beyond the 100 most
+  // recent site-wide submissions could never be reached by the storefront
+  // (see #551) — callers now page forward via the `X-Community-Next-Cursor`
+  // response header until it's absent (no more pages).
+  const cursorParam = parseInt(url.searchParams.get('cursor'), 10);
+  const cursor = Number.isFinite(cursorParam) && cursorParam > 0 ? cursorParam : 0;
+  const limitParam = parseInt(url.searchParams.get('limit'), 10);
+  const limit = Number.isFinite(limitParam) && limitParam > 0
+    ? Math.min(limitParam, COMMUNITY_LIST_MAX_PAGE_SIZE)
+    : COMMUNITY_LIST_DEFAULT_PAGE_SIZE;
+
+  const list = (await readJson(env, COMMUNITY_LIST_KEY)) || [];
+  const ids = list.slice(cursor, cursor + limit);
+  const nextCursor = cursor + limit < list.length ? cursor + limit : null;
+  if (nextCursor != null) headers['X-Community-Next-Cursor'] = String(nextCursor);
 
   const submissions = (
     await Promise.all(ids.map(id => readJson(env, `community/submissions/${id}.json`)))
@@ -1386,7 +1460,7 @@ async function handleCommunityPending(request, env, origin) {
   const url = new URL(request.url);
   const statusFilter = url.searchParams.get('status') || 'pending';
 
-  const list = (await readJson(env, 'community/list.json')) || [];
+  const list = (await readJson(env, COMMUNITY_LIST_KEY)) || [];
   const submissions = (
     await Promise.all(list.map(id => readJson(env, `community/submissions/${id}.json`)))
   ).filter(s => s && s.status === statusFilter);

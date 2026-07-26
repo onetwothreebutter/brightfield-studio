@@ -3,20 +3,54 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import worker, { pickSizeVariant } from '../worker/src/index.js';
 
 // ── Mock R2 bucket ────────────────────────────────────────────────────────────
+// Models etags + conditional put() (the `onlyIf` option) so tests can exercise
+// the community/list.json compare-and-swap logic (#551) for real, rather than
+// just always succeeding regardless of what onlyIf says.
 
 function makeR2() {
-  const store = new Map();
+  const store = new Map(); // key -> string value (kept raw for _store compat)
+  const etags = new Map(); // key -> etag string
+  let etagCounter = 0;
+
+  function conditionsPass(key, onlyIf) {
+    if (!onlyIf) return true;
+    const exists = store.has(key);
+    const currentEtag = etags.get(key);
+
+    if (typeof Headers !== 'undefined' && onlyIf instanceof Headers) {
+      const ifNoneMatch = onlyIf.get('If-None-Match');
+      if (ifNoneMatch === '*') return !exists;
+      const ifMatch = onlyIf.get('If-Match');
+      if (ifMatch) return exists && currentEtag === ifMatch.replace(/^"|"$/g, '');
+      return true;
+    }
+
+    if (onlyIf.etagMatches != null) return exists && currentEtag === onlyIf.etagMatches;
+    if (onlyIf.etagDoesNotMatch != null) return !exists || currentEtag !== onlyIf.etagDoesNotMatch;
+    return true;
+  }
+
   return {
     async get(key) {
       if (!store.has(key)) return null;
       const val = store.get(key);
-      return { text: async () => val };
+      return { text: async () => val, etag: etags.get(key) };
     },
-    async put(key, value) {
+    async head(key) {
+      if (!store.has(key)) return null;
+      return { etag: etags.get(key) };
+    },
+    async put(key, value, options = {}) {
+      // Mirrors real R2: on a failed conditional, return null and don't write.
+      if (!conditionsPass(key, options.onlyIf)) return null;
       store.set(key, typeof value === 'string' ? value : String(value));
+      const etag = `etag-${++etagCounter}`;
+      etags.set(key, etag);
+      return { key, etag };
     },
     async delete(key) {
       store.delete(key);
+      etags.delete(key);
     },
     _store: store,
   };
@@ -212,6 +246,43 @@ describe('POST /community/submit', () => {
     );
     expect(res.status).toBe(400);
   });
+
+  // Regression test for #551: two submissions racing to read-modify-write
+  // community/list.json used to silently drop one id when the second write
+  // clobbered the first. The R2 conditional-write mock enforces onlyIf for
+  // real, so this only passes if appendToCommunityList() actually retries
+  // on a failed compare-and-swap instead of overwriting blind.
+  it('does not drop an id when two submissions race concurrently', async () => {
+    const results = await Promise.all([
+      submitDesign(env, { creatorName: 'Racer A' }),
+      submitDesign(env, { creatorName: 'Racer B' }),
+    ]);
+    const ids = results.map(r => r.id).sort();
+
+    const obj = await env.MOCKUP_STAGING.get('community/list.json');
+    const list = JSON.parse(await obj.text());
+    expect(list.length).toBe(2);
+    expect([...list].sort()).toEqual(ids);
+  });
+
+  it('does not drop an id across several concurrent submissions', async () => {
+    // Kept within the 5-retry budget (see COMMUNITY_LIST_WRITE_RETRIES): with
+    // zero network jitter, this in-memory mock makes every racer contend in
+    // lockstep each round, so an N-way dead-simultaneous tie can need up to
+    // N-1 retries for the last straggler — worse than the real-world
+    // contention (staggered by actual request latency) this retry count is
+    // sized for. 4 stays comfortably inside that budget while still proving
+    // more than a 2-way race resolves without dropping anyone.
+    const results = await Promise.all(
+      Array.from({ length: 4 }, (_, i) => submitDesign(env, { creatorName: `Racer ${i}` }))
+    );
+    const ids = results.map(r => r.id).sort();
+
+    const obj = await env.MOCKUP_STAGING.get('community/list.json');
+    const list = JSON.parse(await obj.text());
+    expect(list.length).toBe(4);
+    expect([...list].sort()).toEqual(ids);
+  });
 });
 
 // ── /community/list ───────────────────────────────────────────────────────────
@@ -283,6 +354,54 @@ describe('GET /community/list', () => {
     const results = await res.json();
     expect(results).toHaveLength(1);
     expect(results[0].productHandle).toBe('product-a');
+  });
+
+  // Pagination regression tests for #551: the old handler always sliced the
+  // first 100 ids, so any approved submission beyond the 100 most recent
+  // site-wide (regardless of filter) was permanently unreachable. Exercise
+  // the cursor/limit mechanism directly with a small ?limit= so the test
+  // doesn't need 100+ fixtures to prove pages beyond the first are reachable.
+  it('paginates via ?limit= and exposes X-Community-Next-Cursor when more results remain', async () => {
+    for (let i = 0; i < 3; i++) {
+      const { id } = await submitDesign(env, { creatorName: `Creator ${i}` });
+      await approveDesign(env, id, `product-${i}`);
+    }
+
+    const res = await worker.fetch(get('/community/list?limit=2'), env);
+    const results = await res.json();
+    expect(results).toHaveLength(2);
+    expect(res.headers.get('X-Community-Next-Cursor')).toBe('2');
+  });
+
+  it('omits X-Community-Next-Cursor on the last page and reaches items past the default 100-item window via ?cursor=', async () => {
+    for (let i = 0; i < 3; i++) {
+      const { id } = await submitDesign(env, { creatorName: `Creator ${i}` });
+      await approveDesign(env, id, `product-${i}`);
+    }
+
+    const first = await worker.fetch(get('/community/list?limit=2'), env);
+    const firstResults = await first.json();
+    const nextCursor = first.headers.get('X-Community-Next-Cursor');
+    expect(nextCursor).toBe('2');
+
+    const second = await worker.fetch(get(`/community/list?limit=2&cursor=${nextCursor}`), env);
+    const secondResults = await second.json();
+    expect(secondResults).toHaveLength(1);
+    expect(second.headers.get('X-Community-Next-Cursor')).toBeNull();
+
+    // The item on the second page is a design that a naive top-100 slice
+    // would still have found today (only 3 total) — the important part is
+    // that walking cursors surfaces every submission with no gaps/dupes.
+    const allIds = firstResults.concat(secondResults).map(r => r.id).sort();
+    expect(new Set(allIds).size).toBe(3);
+  });
+
+  it('default response (no cursor/limit) matches the old top-100 behavior with no next-cursor header', async () => {
+    const { id } = await submitDesign(env);
+    await approveDesign(env, id);
+    const res = await worker.fetch(get('/community/list'), env);
+    expect(await res.json()).toHaveLength(1);
+    expect(res.headers.get('X-Community-Next-Cursor')).toBeNull();
   });
 });
 
