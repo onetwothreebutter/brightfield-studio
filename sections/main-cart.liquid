@@ -3,6 +3,9 @@
 
     <h1 class="cart-page__title glitch" data-text="Your Cart">Your Cart</h1>
 
+    <div class="visually-hidden" aria-live="polite" aria-atomic="true" data-cart-status></div>
+    <p class="cart-error" data-cart-error role="alert" hidden></p>
+
     {%- if cart.item_count == 0 -%}
 
       <div class="cart-empty">
@@ -12,9 +15,14 @@
 
     {%- else -%}
 
-      <form action="/cart" method="post" class="cart-form">
+      <div class="cart-empty cart-empty--js" data-cart-empty-js hidden>
+        <p class="cart-empty__message">Your cart is empty.</p>
+        <a href="/collections/in-house-designs" class="btn btn--primary btn--lg">Shop the Collection</a>
+      </div>
 
-        <div class="cart-items">
+      <form action="/cart" method="post" class="cart-form" data-cart-form>
+
+        <div class="cart-items" data-cart-items>
           {%- for item in cart.items -%}
             {%- comment -%}
               Items added before the worker served images itself have _mockup_url
@@ -40,7 +48,7 @@
               {%- assign design_detail_url = '' -%}
             {%- endif -%}
 
-            <div class="cart-item">
+            <div class="cart-item" data-cart-item data-key="{{ item.key }}" data-line="{{ forloop.index }}" data-item-title="{{ item.product.title | escape }}">
 
               <a href="{{ design_detail_url | default: item.url }}" class="cart-item__image-link">
                 {%- if mockup_url != blank -%}
@@ -82,22 +90,39 @@
                 {%- elsif item.variant.title != 'Default Title' -%}
                   <p class="cart-item__variant">{{ item.variant.title }}</p>
                 {%- endif -%}
-                <p class="cart-item__price">{{ item.final_line_price | money }}</p>
+                <p class="cart-item__price" data-item-price data-line-price="{{ item.final_line_price }}">{{ item.final_line_price | money }}</p>
 
                 <div class="cart-item__qty">
-                  <label for="qty-{{ item.index }}" class="visually-hidden">Quantity</label>
-                  <input
-                    id="qty-{{ item.index }}"
-                    type="number"
-                    name="updates[]"
-                    value="{{ item.quantity }}"
-                    min="0"
-                    class="cart-item__qty-input"
-                  >
+                  <div class="cart-item__stepper" role="group" aria-label="Quantity for {{ item.product.title | escape }}">
+                    <button
+                      type="button"
+                      class="cart-item__qty-btn cart-item__qty-btn--decrease"
+                      data-qty-decrease
+                      aria-label="Decrease quantity"
+                    >&minus;</button>
+                    <label for="qty-{{ item.index }}" class="visually-hidden">Quantity for {{ item.product.title | escape }}</label>
+                    <input
+                      id="qty-{{ item.index }}"
+                      type="number"
+                      inputmode="numeric"
+                      name="updates[]"
+                      value="{{ item.quantity }}"
+                      min="0"
+                      class="cart-item__qty-input"
+                      data-qty-input
+                    >
+                    <button
+                      type="button"
+                      class="cart-item__qty-btn cart-item__qty-btn--increase"
+                      data-qty-increase
+                      aria-label="Increase quantity"
+                    >+</button>
+                  </div>
                   <a
                     href="{{ item.url_to_remove }}"
                     class="cart-item__remove"
-                    aria-label="Remove {{ item.product.title | escape }}"
+                    data-remove-item
+                    aria-label="Remove {{ item.product.title | escape }} from cart"
                   >Remove</a>
                 </div>
               </div>
@@ -106,10 +131,23 @@
           {%- endfor -%}
         </div>
 
+        <div class="cart-note">
+          <label for="CartNote" class="cart-note__label">Order note (optional)</label>
+          <textarea
+            id="CartNote"
+            name="note"
+            rows="3"
+            class="cart-note__textarea"
+            data-cart-note
+            placeholder="Add a note to your order…"
+          >{{ cart.note }}</textarea>
+          <p class="cart-note__status" data-cart-note-status aria-live="polite"></p>
+        </div>
+
         <div class="cart-footer">
           <div class="cart-subtotal">
             <span class="cart-subtotal__label">Subtotal</span>
-            <span class="cart-subtotal__price">{{ cart.total_price | money }}</span>
+            <span class="cart-subtotal__price" data-cart-subtotal>{{ cart.total_price | money }}</span>
           </div>
           <p class="cart-subtotal__note">Shipping and taxes calculated at checkout.</p>
           <div class="cart-actions">
@@ -128,6 +166,13 @@
 
   </div>
 </div>
+
+<script>
+  window._cartConfig = {
+    moneyFormat: {{ shop.money_format | json }}
+  };
+</script>
+<script src="{{ 'cart.js' | asset_url }}" defer></script>
 
 {% schema %}
 {
