@@ -300,6 +300,11 @@ h6 {
 
 .hero__poster {
     object-fit: cover;
+    opacity: 0;
+    transition: opacity 1.2s ease;
+}
+
+.hero__poster.is-loaded {
     opacity: 1;
 }
 

@@ -4,9 +4,15 @@
   var canvas = document.getElementById('hero-shader-canvas');
   if (!canvas) return;
 
+  var poster = document.getElementById('hero-poster');
+  function showPoster() {
+    if (poster) poster.classList.add('is-loaded');
+  }
+
   var gl = canvas.getContext('webgl2');
   if (!gl) {
     canvas.style.display = 'none';
+    showPoster();
     return;
   }
 
@@ -74,7 +80,10 @@
 
   var vert = compileShader(gl, vertSrc, gl.VERTEX_SHADER);
   var frag = compileShader(gl, fragSrc, gl.FRAGMENT_SHADER);
-  if (!vert || !frag) return;
+  if (!vert || !frag) {
+    showPoster();
+    return;
+  }
 
   var program = gl.createProgram();
   gl.attachShader(program, vert);
@@ -83,6 +92,7 @@
 
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     console.error('Hero shader link error:', gl.getProgramInfoLog(program));
+    showPoster();
     return;
   }
 
@@ -191,6 +201,8 @@
   }
   window.addEventListener('resize', resize);
   resize();
+
+  showPoster();
 
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
