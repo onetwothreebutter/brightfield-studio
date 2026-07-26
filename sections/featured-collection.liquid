@@ -19,7 +19,7 @@
     {%- if featured != blank -%}
       <div class="product-grid">
         {%- for product in featured_products limit: section.settings.products_to_show -%}
-          {% render 'product-card', product: product %}
+          {% render 'product-card', product: product, enable_slider: true %}
         {%- endfor -%}
       </div>
     {%- else -%}
@@ -46,6 +46,8 @@
 
   </div>
 </section>
+
+<script src="{{ 'product-card-slider.js' | asset_url }}" defer></script>
 
 {% schema %}
 {
