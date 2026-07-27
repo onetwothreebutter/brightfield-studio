@@ -1410,6 +1410,13 @@ export function parseCustomSku(sku) {
   return { prefix: m[1], timestamp: m[2], size: m[3] };
 }
 
+// A pending claim older than this is assumed to belong to a delivery whose
+// isolate crashed or was evicted before it could write a completed record or
+// clean up after itself — sized generously vs. this handler's real runtime
+// (an Admin GraphQL round trip plus a Printful order-create call), so a
+// still-active delivery should never actually cross it.
+const PRINTFUL_ORDER_CLAIM_STALE_MS = 2 * 60 * 1000;
+
 async function handleOrderPaidWebhook(request, env, ctx) {
   const headers = { 'Content-Type': 'application/json' };
   // No CORS headers: Shopify calls this server-to-server, not from a browser —
@@ -1440,14 +1447,71 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   }
 
   // Idempotency: Shopify redelivers webhooks on timeouts/non-2xx responses, and
-  // orders/paid can in principle fire more than once for the same order. If a
-  // Printful order was already created for this Shopify order, this delivery
-  // is a repeat — no-op rather than a duplicate fulfillment order.
+  // orders/paid can in principle fire more than once for the same order —
+  // including two deliveries landing genuinely concurrently. A naive
+  // read-then-write check (read "no existing record", do all the work, write
+  // the record at the end) has a TOCTOU race: both deliveries can read "not
+  // yet processed" before either has written anything, and both go on to
+  // submit a Printful order for the same Shopify order.
+  //
+  // Claim the key up front with an R2 conditional write — same compare-and-
+  // swap idiom as appendToCommunityList()'s community/list.json write (#551):
+  // `If-None-Match: *` so the put only succeeds if the key doesn't exist yet.
+  // The value starts as a `pending` placeholder and gets overwritten with the
+  // completed record (containing printfulOrderId) once the Printful order is
+  // actually created. Every exit path that isn't full success deletes the
+  // claim (best-effort) so a future redelivery isn't permanently blocked by
+  // an attempt that didn't finish.
   const idempotencyKey = `printful-orders/${shopifyOrderId}.json`;
-  const existing = await readJson(env, idempotencyKey);
-  if (existing) {
-    console.log('[order-paid] idempotency hit for Shopify order', shopifyOrderId, '— Printful order already created:', existing.printfulOrderId);
-    return new Response(JSON.stringify({ ok: true, alreadyProcessed: true, printfulOrderId: existing.printfulOrderId }), { status: 200, headers });
+  const releaseClaim = () => env.MOCKUP_STAGING.delete(idempotencyKey).catch((err) => {
+    console.error('[order-paid] failed to release idempotency claim for Shopify order', shopifyOrderId, ':', err.message);
+  });
+
+  const claimResult = await env.MOCKUP_STAGING.put(
+    idempotencyKey,
+    JSON.stringify({ status: 'pending', claimedAt: Date.now() }),
+    { httpMetadata: { contentType: 'application/json' }, onlyIf: new Headers({ 'If-None-Match': '*' }) }
+  );
+
+  if (!claimResult) {
+    // Another delivery already claimed (or completed) this order — read
+    // whatever's there now to decide how to respond.
+    const existingObj = await env.MOCKUP_STAGING.get(idempotencyKey);
+    let existing = null;
+    if (existingObj) {
+      try { existing = JSON.parse(await existingObj.text()); } catch { existing = null; }
+    }
+
+    if (existing?.printfulOrderId) {
+      console.log('[order-paid] idempotency hit for Shopify order', shopifyOrderId, '— Printful order already created:', existing.printfulOrderId);
+      return new Response(JSON.stringify({ ok: true, alreadyProcessed: true, printfulOrderId: existing.printfulOrderId }), { status: 200, headers });
+    }
+
+    const claimedAt = existing?.claimedAt;
+    const stale = typeof claimedAt !== 'number' || (Date.now() - claimedAt) > PRINTFUL_ORDER_CLAIM_STALE_MS;
+
+    if (!stale) {
+      // A delivery is genuinely in-flight right now — don't race it. Shopify
+      // redelivers non-2xx responses on its own schedule; by the time it
+      // does, the in-flight delivery will have finished and the branch above
+      // will short-circuit normally.
+      console.log('[order-paid] claim already in flight for Shopify order', shopifyOrderId, '— returning 409 for redelivery');
+      return new Response(JSON.stringify({ ok: false, retrying: true }), { status: 409, headers });
+    }
+
+    // Stale placeholder — the delivery that claimed it never finished.
+    // Reclaim via a conditional put tied to its etag so we don't stomp a
+    // fresh claim that appears between our get() and this put().
+    const reclaimResult = await env.MOCKUP_STAGING.put(
+      idempotencyKey,
+      JSON.stringify({ status: 'pending', claimedAt: Date.now() }),
+      { httpMetadata: { contentType: 'application/json' }, onlyIf: { etagMatches: existingObj.etag } }
+    );
+    if (!reclaimResult) {
+      console.log('[order-paid] lost the race reclaiming a stale claim for Shopify order', shopifyOrderId, '— returning 409 for redelivery');
+      return new Response(JSON.stringify({ ok: false, retrying: true }), { status: 409, headers });
+    }
+    // Fall through — we now own the claim.
   }
 
   // Re-fetch the order via the Admin API rather than trusting the webhook
@@ -1462,6 +1526,7 @@ async function handleOrderPaidWebhook(request, env, ctx) {
           id
           name
           email
+          displayFinancialStatus
           shippingAddress {
             firstName
             lastName
@@ -1495,13 +1560,26 @@ async function handleOrderPaidWebhook(request, env, ctx) {
     );
   } catch (err) {
     console.error('[order-paid] order lookup request failed:', err.message);
+    await releaseClaim();
     return new Response(JSON.stringify({ error: 'Could not look up order' }), { status: 502, headers });
   }
 
   const order = orderData?.data?.order;
   if (!order) {
     console.error('[order-paid] order lookup failed:', JSON.stringify(orderData));
+    await releaseClaim();
     return new Response(JSON.stringify({ error: 'Could not look up order' }), { status: 502, headers });
+  }
+
+  // The handler is registered on the orders/paid topic, but don't just trust
+  // that — verify the order's actual payment state before submitting
+  // anything to Printful. Don't persist a completed record here: an order in
+  // a non-PAID state now (e.g. PENDING, AUTHORIZED) may legitimately become
+  // PAID later and get redelivered, and it should be free to proceed then.
+  if (order.displayFinancialStatus !== 'PAID') {
+    console.warn('[order-paid] order', order.name, 'is not paid (financialStatus=' + order.displayFinancialStatus + ') — skipping Printful submission');
+    await releaseClaim();
+    return new Response(JSON.stringify({ error: 'Order is not paid', financialStatus: order.displayFinancialStatus }), { status: 422, headers });
   }
 
   const lineItems = (order.lineItems?.edges || []).map(e => e.node);
@@ -1512,12 +1590,14 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   // Acceptance criteria: non-custom orders are ignored entirely.
   if (!customLineItems.length) {
     console.log('[order-paid] no custom-design line items on order', order.name, '— ignoring');
+    await releaseClaim();
     return new Response(JSON.stringify({ ok: true, ignored: true }), { status: 200, headers });
   }
 
   const variantMap = await getPrintfulVariantMap(env);
   if (!variantMap) {
     console.error('[order-paid] could not load Printful size -> variant map for order', order.name);
+    await releaseClaim();
     return new Response(JSON.stringify({ error: 'Printful catalog lookup failed' }), { status: 502, headers });
   }
 
@@ -1563,12 +1643,14 @@ async function handleOrderPaidWebhook(request, env, ctx) {
     // fix on its own, so 422 rather than 502; each skip reason is logged above
     // for the merchant to resolve by hand.
     console.error('[order-paid] no valid custom line items to submit for order', order.name, JSON.stringify(skippedItems));
+    await releaseClaim();
     return new Response(JSON.stringify({ error: 'No valid custom line items', skipped: skippedItems }), { status: 422, headers });
   }
 
   const shipping = order.shippingAddress;
   if (!shipping) {
     console.error('[order-paid] order has custom line items but no shipping address:', order.name);
+    await releaseClaim();
     return new Response(JSON.stringify({ error: 'Missing shipping address' }), { status: 422, headers });
   }
 
@@ -1613,6 +1695,7 @@ async function handleOrderPaidWebhook(request, env, ctx) {
     }
   } catch (err) {
     console.error('[order-paid] Printful order creation failed for order', order.name, ':', err.message);
+    await releaseClaim();
     return new Response(JSON.stringify({ error: 'Printful order creation failed: ' + err.message }), { status: 502, headers });
   }
 
@@ -1625,8 +1708,10 @@ async function handleOrderPaidWebhook(request, env, ctx) {
     skus: customLineItems.map(li => li.sku),
     skipped: skippedItems.length ? skippedItems : undefined,
   };
-  // Persisted right after successful creation — this is what a future
-  // redelivery checks (above) to avoid submitting a duplicate Printful order.
+  // Overwrite the pending claim with the completed record — no `onlyIf`
+  // needed for this write since we already hold the claim (either the
+  // initial claim above, or a successful stale-claim reclaim). This is what
+  // a future redelivery's claim attempt (above) finds and short-circuits on.
   await writeJson(env, idempotencyKey, record).catch((err) => {
     console.error('[order-paid] failed to persist idempotency record for order', order.name, '— a redelivery could create a duplicate Printful order:', err.message);
   });
