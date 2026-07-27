@@ -281,7 +281,9 @@ async function handleServeImage(request, env, ctx) {
   width = Number.isFinite(width) && width > 0 ? Math.min(width, IMG_MAX_WIDTH) : 0;
 
   const cache = typeof caches !== 'undefined' ? caches.default : null;
-  const cacheKey = new Request(`${IMG_BASE}/${key}${width ? `?w=${width}` : ''}`);
+  // &rv= (resize-version) busts the edge cache when the resize transform changes,
+  // e.g. the v2 background-matte fix for the alpha-fringe halo on mockup thumbnails
+  const cacheKey = new Request(`${IMG_BASE}/${key}${width ? `?w=${width}&rv=2` : ''}`);
   if (cache) {
     const cached = await cache.match(cacheKey);
     if (cached) return cached;
@@ -300,10 +302,17 @@ async function handleServeImage(request, env, ctx) {
   let cacheable = !width;
   if (width && env.IMAGES) {
     try {
-      // Keep the source format: PNG mockups carry alpha (background-removed)
+      // Keep the source format: PNG mockups carry alpha (background-removed).
+      // Downscaling a segmented PNG leaves a light halo around the subject —
+      // the semi-transparent edge pixels from `segment: 'foreground'` still
+      // carry the original mockup backdrop color, and get smeared brighter by
+      // the resize. Matting onto the cart thumbnail's own background color
+      // (--color-surface-2, theme.css) bakes in the correct edge color instead
+      // of leaving it to whatever the browser composites over later. No-op for
+      // jpg mockups (no alpha channel).
       const resized = await env.IMAGES
         .input(body)
-        .transform({ width, fit: 'scale-down' })
+        .transform({ width, fit: 'scale-down', background: '#1a1a1a' })
         .output({ format: sourceType, quality: 82 });
       body = await resized.response().arrayBuffer();
       cacheable = true;

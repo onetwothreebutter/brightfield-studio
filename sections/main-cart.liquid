@@ -28,11 +28,12 @@
               Items added before the worker served images itself have _mockup_url
               pointing at the rate-limited pub-*.r2.dev domain — rewrite those to
               the worker's /img/ route. ?w=320 serves a real thumbnail (2x the
-              160px slot) instead of the 4–5 MB original.
+              160px slot) instead of the 4–5 MB original. &v=2 busts browsers'
+              cached copies of the pre-fix thumbnail (white alpha-fringe halo).
             {%- endcomment -%}
             {%- assign mockup_url = item.properties['_mockup_url'] | replace: 'https://pub-6029e26e344643f388b32734c4c2f53e.r2.dev/', 'https://share.brightfield.studio/img/' -%}
             {%- if mockup_url contains 'share.brightfield.studio/img/' -%}
-              {%- assign mockup_url = mockup_url | append: '?w=320' -%}
+              {%- assign mockup_url = mockup_url | append: '?w=320&v=2' -%}
             {%- endif -%}
             {%- if item.properties['_design_url'] != blank and item.properties['_source'] != 'inhouse' -%}
               {%- assign is_custom = item.properties['_design_url'] -%}
