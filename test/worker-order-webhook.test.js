@@ -27,16 +27,49 @@ afterEach(() => vi.unstubAllGlobals());
 const WEBHOOK_SECRET = 'test-webhook-secret';
 
 // ── R2 in-memory mock ─────────────────────────────────────────────────────────
+// Models etags + conditional put() (the `onlyIf` option), the same way
+// test/worker.test.js's mock does for the community/list.json compare-and-swap
+// (#551) — needed here to exercise handleOrderPaidWebhook's claim-then-complete
+// idempotency flow (#586 review: TOCTOU race in the original read-then-write
+// check) for real, rather than always succeeding regardless of what onlyIf says.
 function makeR2() {
   const store = new Map();
+  const etags = new Map(); // key -> etag string
+  let etagCounter = 0;
+
+  function conditionsPass(key, onlyIf) {
+    if (!onlyIf) return true;
+    const exists = store.has(key);
+    const currentEtag = etags.get(key);
+
+    if (typeof Headers !== 'undefined' && onlyIf instanceof Headers) {
+      const ifNoneMatch = onlyIf.get('If-None-Match');
+      if (ifNoneMatch === '*') return !exists;
+      const ifMatch = onlyIf.get('If-Match');
+      if (ifMatch) return exists && currentEtag === ifMatch.replace(/^"|"$/g, '');
+      return true;
+    }
+
+    if (onlyIf.etagMatches != null) return exists && currentEtag === onlyIf.etagMatches;
+    if (onlyIf.etagDoesNotMatch != null) return !exists || currentEtag !== onlyIf.etagDoesNotMatch;
+    return true;
+  }
+
   return {
     _store: store,
     get: vi.fn(async (key) => {
       if (!store.has(key)) return null;
-      return { text: async () => store.get(key) };
+      return { text: async () => store.get(key), etag: etags.get(key) };
     }),
-    put: vi.fn(async (key, value) => { store.set(key, typeof value === 'string' ? value : String(value)); }),
-    delete: vi.fn(async (key) => { store.delete(key); }),
+    put: vi.fn(async (key, value, options = {}) => {
+      // Mirrors real R2: on a failed conditional, return null and don't write.
+      if (!conditionsPass(key, options.onlyIf)) return null;
+      store.set(key, typeof value === 'string' ? value : String(value));
+      const etag = `etag-${++etagCounter}`;
+      etags.set(key, etag);
+      return { key, etag };
+    }),
+    delete: vi.fn(async (key) => { store.delete(key); etags.delete(key); }),
   };
 }
 
@@ -154,6 +187,7 @@ function defaultOrder(overrides = {}) {
     id: 'gid://shopify/Order/555000111',
     name: '#1042',
     email: 'buyer@example.com',
+    displayFinancialStatus: 'PAID',
     shippingAddress: {
       firstName: 'Jane',
       lastName: 'Doe',
@@ -414,6 +448,125 @@ describe('POST /webhook/order-paid — idempotency', () => {
 
     const orderCallsAfterSecond = fetchMock.calls.filter(c => c.url === 'https://api.printful.com/orders').length;
     expect(orderCallsAfterSecond).toBe(1); // unchanged — no duplicate order created
+  });
+
+  // Regression test for the #586 review's TOCTOU finding: two deliveries for
+  // the same order racing through the original read-then-write idempotency
+  // check could both read "not yet processed" and both submit a Printful
+  // order. The R2 conditional-write mock enforces onlyIf for real, so this
+  // only passes if handleOrderPaidWebhook actually claims the idempotency key
+  // up front instead of just checking-then-writing at the end.
+  it('creates only one Printful order when two deliveries race concurrently', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const [resA, resB] = await Promise.all([
+      worker.fetch(await webhookRequest({ id: 555000111 }), env),
+      worker.fetch(await webhookRequest({ id: 555000111 }), env),
+    ]);
+
+    const orderCalls = fetchMock.calls.filter(c => c.url === 'https://api.printful.com/orders').length;
+    expect(orderCalls).toBe(1); // never more than one Printful order created
+
+    const jsonA = await resA.json();
+    const jsonB = await resB.json();
+
+    // With this in-memory mock's synchronous execution and no real network
+    // latency, one delivery (A, invoked first) claims the key and runs the
+    // full handler to completion — including writing the completed record —
+    // before the other's own claim attempt happens. So B doesn't observe the
+    // pending placeholder at all; it finds the already-completed record and
+    // takes the plain idempotency-hit path (200, alreadyProcessed) rather
+    // than the 409-retry path (which is reached only when B's read lands
+    // while A's claim is still pending — exercised by the stale-claim test
+    // below via a pre-seeded pending record instead of true concurrency).
+    expect(resA.status).toBe(200);
+    expect(resB.status).toBe(200);
+    expect(jsonA.printfulOrderId).toBe(99881);
+    expect(jsonB.printfulOrderId).toBe(99881);
+    expect(jsonB.alreadyProcessed).toBe(true);
+
+    // The final idempotency record reflects the single successful order.
+    const stored = JSON.parse(env.MOCKUP_STAGING._store.get('printful-orders/555000111.json'));
+    expect(stored.printfulOrderId).toBe(99881);
+  });
+
+  // The concurrency test above never actually observes a pending (not yet
+  // completed) claim — in this mock's execution, the first delivery finishes
+  // and writes the completed record before the second even attempts its own
+  // claim. Cover the "genuinely in-flight" 409 branch directly instead, by
+  // pre-seeding a fresh (non-stale) pending claim as if a real concurrent
+  // delivery were still mid-flight.
+  it('returns 409 without creating a Printful order when a claim is actively in-flight', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await env.MOCKUP_STAGING.put(
+      'printful-orders/555000111.json',
+      JSON.stringify({ status: 'pending', claimedAt: Date.now() })
+    );
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json).toEqual({ ok: false, retrying: true });
+    expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
+  });
+
+  it('reclaims a stale pending claim and completes successfully', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    // Pre-seed a pending claim old enough to be considered abandoned (crashed
+    // isolate / evicted before finishing) — must not permanently block future
+    // redeliveries for this order.
+    await env.MOCKUP_STAGING.put(
+      'printful-orders/555000111.json',
+      JSON.stringify({ status: 'pending', claimedAt: Date.now() - 5 * 60 * 1000 })
+    );
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(json.printfulOrderId).toBe(99881);
+
+    const orderCalls = fetchMock.calls.filter(c => c.url === 'https://api.printful.com/orders').length;
+    expect(orderCalls).toBe(1);
+
+    const stored = JSON.parse(env.MOCKUP_STAGING._store.get('printful-orders/555000111.json'));
+    expect(stored.printfulOrderId).toBe(99881);
+  });
+});
+
+// ── POST /webhook/order-paid — payment verification ─────────────────────────
+
+describe('POST /webhook/order-paid — payment verification', () => {
+  it('returns 422 and does not submit to Printful when the order is not paid', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({ displayFinancialStatus: 'PENDING' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    const json = await res.json();
+
+    expect(res.status).toBe(422);
+    expect(json.error).toMatch(/not paid/i);
+    expect(json.financialStatus).toBe('PENDING');
+
+    expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
+
+    // The idempotency claim must be released, not left as a completed
+    // record — this order may legitimately become PAID later and should be
+    // free to proceed on a future redelivery.
+    expect(env.MOCKUP_STAGING._store.has('printful-orders/555000111.json')).toBe(false);
   });
 });
 
