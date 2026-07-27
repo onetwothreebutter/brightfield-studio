@@ -69,3 +69,17 @@ namespace_id = "1004"
 #   SHOPIFY_STORE_DOMAIN       - e.g. brightfield-2.myshopify.com
 #   SHOPIFY_CUSTOM_DESIGN_CLIENT_ID     - custom-design app client ID (for Admin API product creation)
 #   SHOPIFY_CUSTOM_DESIGN_CLIENT_SECRET - custom-design app client secret (for Admin API product creation)
+#   SHOPIFY_WEBHOOK_SECRET     - webhook signing secret for POST /webhook/order-paid
+#                                (orders/paid). Must match the secret configured when the
+#                                webhook subscription is registered in Shopify admin — see
+#                                handleOrderPaidWebhook()/verifyShopifyWebhookHmac() in
+#                                src/index.js. NOT the same secret as SHOPIFY_APP_CLIENT_SECRET:
+#                                webhook signing (base64 HMAC-SHA256 of the raw body, header
+#                                X-Shopify-Hmac-Sha256) is a different scheme from the App
+#                                Bridge session-token JWT that secret verifies.
+#
+# Optional vars/secrets:
+#   PRINTFUL_GARMENT_COLOR     - garment color used when mapping a custom-design order's SKU
+#                                size to a Printful catalog variant (see getPrintfulVariantMap()
+#                                in src/index.js). Defaults to 'Black' if unset. Only matters
+#                                once the storefront offers more than one garment color.
