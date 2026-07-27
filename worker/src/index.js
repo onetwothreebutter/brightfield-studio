@@ -2365,9 +2365,32 @@ async function saveDesignEntry(env, deviceId, entry) {
 //    R2 blob attached to a real order can only become orphaned if the
 //    product referencing it was deleted while genuinely orderless, which
 //    means no order ever pointed at it in the first place.
+//  - The orders(query: "sku:...") query that gcProductHasOrder() relies on
+//    only returns orders from the last ~60 days unless the app has the
+//    `read_all_orders` scope (see Shopify's Admin GraphQL orders docs). For a
+//    product old enough that this window is in question, an empty result
+//    doesn't prove "no order" — it may just mean the order is out of view.
+//    gcRunProductPass() gates on hasReadAllOrdersScope() +
+//    GC_ORDER_VISIBILITY_SAFE_DAYS below to keep (not delete) those products
+//    rather than trust a misleading empty result. See that constant's
+//    comment for the full explanation.
 
 // Named constant per project convention — see CLAUDE.md checklist ask for GC.
 const GC_PRODUCT_MAX_AGE_DAYS = 30;
+
+// Shopify's Admin GraphQL `orders` query only returns orders from the last 60
+// days unless the app has been granted the separately-approved
+// `read_all_orders` "protected customer data" scope (distinct from, and in
+// addition to, plain `read_orders`) — see
+// https://shopify.dev/docs/api/admin-graphql/latest/queries/orders. Without
+// that scope, gcProductHasOrder()'s empty-result-means-no-order logic is only
+// trustworthy for products created within that visible window; past it, an
+// empty result could mean "no order" OR "an order exists but is outside the
+// API's visibility window" — and this GC job cannot tell those apart. This is
+// a few days inside the real 60-day cutoff as a safety margin. See
+// hasReadAllOrdersScope() / its use in gcRunProductPass() below.
+const GC_ORDER_VISIBILITY_SAFE_DAYS = 55;
+
 // R2 blobs are swept more aggressively than products since most are pure
 // upload staging, but still well clear of any realistic in-flight checkout
 // (design upload -> create-product is a single request/response, seconds not
@@ -2466,6 +2489,50 @@ const GC_DELETE_PRODUCT_MUTATION = `
   }
 `;
 
+// Standard, stable introspection query for the installed app's currently-
+// granted access scopes — needs no special scope of its own to call. Used to
+// detect whether `read_all_orders` is granted (see GC_ORDER_VISIBILITY_SAFE_DAYS
+// above) so gcRunProductPass() knows whether the orders(query:) check below
+// can be trusted for products older than Shopify's 60-day default visibility
+// window.
+const GC_SCOPE_CHECK_QUERY = `
+  query GCScopeCheck {
+    currentAppInstallation {
+      accessScopes { handle }
+    }
+  }
+`;
+
+// Cached like _printfulSizes / _printfulLocationId above — check once per
+// isolate lifetime, reuse for every product in the pass rather than firing
+// an extra Admin API call per candidate. `null` means "not yet checked" so it
+// stays distinguishable from a checked-and-false result; a fresh import (as
+// tests do via vi.resetModules()) resets this the same way it resets those
+// other module-level caches.
+let _hasReadAllOrdersScope = null;
+
+// Returns whether the app currently has the read_all_orders scope granted.
+// Fails closed on any error or unexpected response shape — i.e. treats
+// "couldn't verify" the same as "scope absent", never the permissive case.
+async function hasReadAllOrdersScope(env) {
+  if (_hasReadAllOrdersScope !== null) return _hasReadAllOrdersScope;
+  try {
+    const data = await shopifyAdmin(env, GC_SCOPE_CHECK_QUERY);
+    if (data?.errors) {
+      throw new Error(`scope check query failed: ${JSON.stringify(data.errors)}`);
+    }
+    const scopes = data?.data?.currentAppInstallation?.accessScopes;
+    if (!Array.isArray(scopes)) {
+      throw new Error('unexpected currentAppInstallation.accessScopes shape');
+    }
+    _hasReadAllOrdersScope = scopes.some(s => s?.handle === 'read_all_orders');
+  } catch (err) {
+    console.warn('[hasReadAllOrdersScope] failed — treating scope as absent (fail closed):', err.message);
+    _hasReadAllOrdersScope = false;
+  }
+  return _hasReadAllOrdersScope;
+}
+
 // Returns true if ANY of the given SKUs appears on an existing order — a
 // single combined query rather than one per SKU, so checking a product with
 // several size variants still costs one Admin API call. Throws (rather than
@@ -2509,6 +2576,7 @@ async function gcRunProductPass(env, { dryRun }) {
   const result = { checked: 0, deleted: [], kept: [] };
   const referencedKeys = new Set();
   const cutoffMs = Date.now() - GC_PRODUCT_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+  const orderVisibilityCutoffMs = Date.now() - GC_ORDER_VISIBILITY_SAFE_DAYS * 24 * 60 * 60 * 1000;
 
   let cursor = null;
   do {
@@ -2544,6 +2612,13 @@ async function gcRunProductPass(env, { dryRun }) {
         reason = 'unparseable createdAt — kept for safety';
       } else if (createdAtMs > cutoffMs) {
         reason = 'not old enough';
+      } else if (createdAtMs < orderVisibilityCutoffMs && !(await hasReadAllOrdersScope(env))) {
+        // Older than Shopify's ~60-day default orders() visibility window and
+        // we can't prove the app has read_all_orders — an empty orders()
+        // result here would be indistinguishable from "no order exists", so
+        // don't even ask; fail closed and keep it. See
+        // GC_ORDER_VISIBILITY_SAFE_DAYS above.
+        reason = 'cannot verify — product older than the Admin API order-visibility window without read_all_orders scope';
       } else {
         try {
           eligible = !(await gcProductHasOrder(env, skus));

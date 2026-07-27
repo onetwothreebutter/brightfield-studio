@@ -98,11 +98,23 @@ namespace_id = "1004"
 #                                 verification silently no-ops (fail open) rather
 #                                 than hard-breaking /delete-design or /community/like.
 #
-# The SHOPIFY_CUSTOM_DESIGN_CLIENT_* app (above) additionally needs the
-# `read_orders` access scope for the GC job's per-SKU orders(query: "sku:...")
-# check (see runGc() in index.js) to succeed — verify this in Shopify admin
-# under the app's configuration before relying on GC_DRY_RUN=false. If the
-# scope is missing, that check fails closed (treated as "can't verify — keep
-# the product"), so a missing scope means GC silently deletes nothing rather
-# than deleting something it shouldn't — but it also means GC won't do its
-# job until the scope is granted.
+# The SHOPIFY_CUSTOM_DESIGN_CLIENT_* app (above) needs the `read_all_orders`
+# access scope — not just plain `read_orders` — to safely GC the full
+# historical backlog of custom-design/community-design products. Shopify's
+# Admin GraphQL `orders(query:)` only returns orders from the last ~60 days
+# without that separately-approved "protected customer data" scope (see
+# https://shopify.dev/docs/api/admin-graphql/latest/queries/orders), and this
+# GC job was written specifically to clean up products that have been
+# accumulating with no TTL for a long time — the first run against that
+# backlog is exactly the case most likely to include products (and orders)
+# well past 60 days old.
+#
+# Verify `read_all_orders` is granted in Shopify admin under the app's
+# configuration before relying on GC_DRY_RUN=false for the full backlog. The
+# code (see hasReadAllOrdersScope() / GC_ORDER_VISIBILITY_SAFE_DAYS in
+# index.js) checks this at runtime and fails closed either way: without the
+# scope, GC only has full confidence on products created within roughly the
+# last two months (GC_ORDER_VISIBILITY_SAFE_DAYS = 55 days, a safety margin
+# inside that ~60-day window) and conservatively keeps anything older until
+# the scope is granted — it does NOT assume the permissive case. With the
+# scope granted, this restriction doesn't apply and GC behaves as before.

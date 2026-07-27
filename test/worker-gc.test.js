@@ -97,17 +97,23 @@ function productNode({ id, createdAt, skus = [], designUrl = null, mockupUrl = n
   };
 }
 
-// Router-style fetch mock covering the OAuth token endpoint and the three
-// GraphQL operations runGc() makes: GCListCandidateProducts, GCCheckSkuOrders,
-// GCDeleteProduct.
+// Router-style fetch mock covering the OAuth token endpoint and the four
+// GraphQL operations runGc() makes: GCScopeCheck, GCListCandidateProducts,
+// GCCheckSkuOrders, GCDeleteProduct.
 //   products      — array of product nodes (single page unless `pageSize` given)
 //   ordersForSkus — function(skuQueryString) => boolean, decides whether the
 //                   combined `sku:"A" OR sku:"B"` query "matches" an order
 //   ordersQueryFails — if true, every orders query returns a GraphQL error
 //   deleteFails   — if true, every productDelete mutation fails
-function makeGcFetch({ products = [], pageSize = 250, ordersForSkus = () => false, ordersQueryFails = false, deleteFails = false } = {}) {
+//   hasReadAllOrders — whether the GCScopeCheck mock response includes
+//                   'read_all_orders' in currentAppInstallation.accessScopes
+//                   (default true — most tests aren't exercising this gate)
+//   scopeCheckFails — if true, the GCScopeCheck query itself returns a
+//                   GraphQL error (used to assert the fail-closed path)
+function makeGcFetch({ products = [], pageSize = 250, ordersForSkus = () => false, ordersQueryFails = false, deleteFails = false, hasReadAllOrders = true, scopeCheckFails = false } = {}) {
   const deleteCalls = [];
   const orderQueryCalls = [];
+  const scopeCheckCalls = [];
   const fn = vi.fn(async (url, opts = {}) => {
     const u = typeof url === 'string' ? url : url.toString();
     if (u.includes('/admin/oauth/access_token')) {
@@ -119,6 +125,17 @@ function makeGcFetch({ products = [], pageSize = 250, ordersForSkus = () => fals
     const body = JSON.parse(opts.body);
     const query = body.query || '';
     const variables = body.variables || {};
+
+    if (query.includes('GCScopeCheck')) {
+      scopeCheckCalls.push(true);
+      if (scopeCheckFails) {
+        return jsonRes({ errors: [{ message: 'Throttled' }] });
+      }
+      const handles = hasReadAllOrders ? ['read_orders', 'read_all_orders'] : ['read_orders'];
+      return jsonRes({
+        data: { currentAppInstallation: { accessScopes: handles.map(handle => ({ handle })) } },
+      });
+    }
 
     if (query.includes('GCListCandidateProducts')) {
       const cursor = variables.cursor ? Number(variables.cursor) : 0;
@@ -157,6 +174,7 @@ function makeGcFetch({ products = [], pageSize = 250, ordersForSkus = () => fals
   });
   fn.deleteCalls = deleteCalls;
   fn.orderQueryCalls = orderQueryCalls;
+  fn.scopeCheckCalls = scopeCheckCalls;
   return fn;
 }
 
@@ -313,6 +331,89 @@ describe('GET /admin/gc-dry-run — product pass', () => {
 
     expect(report.products.checked).toBe(3);
     expect(report.products.deleted).toHaveLength(3);
+  });
+});
+
+// ── GET /admin/gc-dry-run — order-visibility scope gate (issue: read_all_orders) ──
+//
+// Shopify's orders(query:) only returns orders from the last ~60 days unless
+// the app has the read_all_orders scope. For a product old enough that this
+// window is in question, an empty orders() result doesn't prove "no order" —
+// it may just be outside the visible window. These tests cover the
+// GC_ORDER_VISIBILITY_SAFE_DAYS (55) gate that keeps such products instead of
+// trusting a misleading empty result.
+
+describe('GET /admin/gc-dry-run — order-visibility scope gate', () => {
+  it('keeps (does not check orders for) a product older than the safe window when read_all_orders is NOT granted', async () => {
+    const shopifyFetch = makeGcFetch({
+      products: [productNode({ id: 20, createdAt: daysAgoIso(90), skus: ['CUSTOM-2020-M'] })],
+      ordersForSkus: () => false,
+      hasReadAllOrders: false,
+    });
+    vi.stubGlobal('fetch', shopifyFetch);
+
+    const res = await worker.fetch(getReq('/admin/gc-dry-run', adminHeaders()), makeEnv());
+    const report = await res.json();
+
+    expect(report.products.deleted).toHaveLength(0);
+    expect(report.products.kept).toHaveLength(1);
+    expect(report.products.kept[0].reason).toMatch(/cannot verify/);
+    expect(report.products.kept[0].reason).toMatch(/read_all_orders/);
+    // The per-SKU orders query must never even run for this product — the
+    // whole point of the gate is to skip a check that would be misleading.
+    expect(shopifyFetch.orderQueryCalls).toHaveLength(0);
+  });
+
+  it('still deletes (reports deletable) the same old, orderless product when read_all_orders IS granted', async () => {
+    const shopifyFetch = makeGcFetch({
+      products: [productNode({ id: 21, createdAt: daysAgoIso(90), skus: ['CUSTOM-2121-M'] })],
+      ordersForSkus: () => false,
+      hasReadAllOrders: true,
+    });
+    vi.stubGlobal('fetch', shopifyFetch);
+
+    const res = await worker.fetch(getReq('/admin/gc-dry-run', adminHeaders()), makeEnv());
+    const report = await res.json();
+
+    expect(report.products.kept).toHaveLength(0);
+    expect(report.products.deleted).toHaveLength(1);
+    expect(report.products.deleted[0].reason).toMatch(/no matching order, past age cutoff/);
+    // With the scope granted, the per-SKU check runs as before — no regression.
+    expect(shopifyFetch.orderQueryCalls).toHaveLength(1);
+  });
+
+  it('fails closed (keeps, cannot verify) when the scope-check query itself errors', async () => {
+    const shopifyFetch = makeGcFetch({
+      products: [productNode({ id: 22, createdAt: daysAgoIso(90), skus: ['CUSTOM-2222-M'] })],
+      ordersForSkus: () => false,
+      scopeCheckFails: true,
+    });
+    vi.stubGlobal('fetch', shopifyFetch);
+
+    const res = await worker.fetch(getReq('/admin/gc-dry-run', adminHeaders()), makeEnv());
+    const report = await res.json();
+
+    expect(report.products.deleted).toHaveLength(0);
+    expect(report.products.kept).toHaveLength(1);
+    expect(report.products.kept[0].reason).toMatch(/cannot verify/);
+    expect(shopifyFetch.orderQueryCalls).toHaveLength(0);
+  });
+
+  it('does not gate a product that is past GC_PRODUCT_MAX_AGE_DAYS but still younger than the safe window, even without read_all_orders', async () => {
+    const shopifyFetch = makeGcFetch({
+      products: [productNode({ id: 23, createdAt: daysAgoIso(40), skus: ['CUSTOM-2323-M'] })],
+      ordersForSkus: () => false,
+      hasReadAllOrders: false,
+    });
+    vi.stubGlobal('fetch', shopifyFetch);
+
+    const res = await worker.fetch(getReq('/admin/gc-dry-run', adminHeaders()), makeEnv());
+    const report = await res.json();
+
+    expect(report.products.kept).toHaveLength(0);
+    expect(report.products.deleted).toHaveLength(1);
+    expect(report.products.deleted[0].reason).toMatch(/no matching order, past age cutoff/);
+    expect(shopifyFetch.orderQueryCalls).toHaveLength(1);
   });
 });
 
