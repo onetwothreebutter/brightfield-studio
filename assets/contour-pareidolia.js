@@ -136,7 +136,7 @@
     '  // last stretch before the true boundary (in place of a hard inside/',
     '  // outside cut) so only the screen-space-accurate outlineMask traces the',
     '  // visible edge, and Outline Width alone controls its thickness.',
-    '  float edgeFade    = smoothstep(0.0, u_contour_spacing * 0.15, -sdOuter);',
+    '  float edgeFade    = smoothstep(0.0, sqrt(u_contour_width) * 0.4, -sdOuter);',
     '  float lineMask     = max(isoMask * edgeFade, outlineMask);',
     '',
     '  float t = clamp(elevation * 0.5 + 0.5, 0.0, 1.0);',
