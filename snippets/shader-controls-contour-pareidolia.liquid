@@ -21,6 +21,8 @@ var controls = [
   { key: 'u_contour_spacing', label: 'Spacing', type: 'range', min: 0.005, max: 0.4, step: 0.005, value: 0.12,
     tip: 'Elevation interval between contour lines.' },
   { key: 'u_contour_width', label: 'Line Width', type: 'range', min: 0.001, max: 0.03, step: 0.001, value: 0.025 },
+  { key: 'u_outline_width', label: 'Outline Width', type: 'range', min: 0, max: 1, step: 0.01, value: 0.83,
+    tip: 'Thickness of the outer border tracing the hills\' footprint.' },
   // ── Color Palette ──────────────────────────────────────────────────────────
   { type: 'header', label: 'Color Palette' },
   { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
