@@ -24,6 +24,7 @@
     '// Contour lines',
     'uniform float u_contour_spacing;',
     'uniform float u_contour_width;',
+    'uniform float u_outline_width;',
     '',
     '// Palette — cosine (mode 0) or 4-stop (mode 1), driven by elevation',
     'uniform float u_color_mode;',
@@ -127,7 +128,7 @@
     '  float sdOuter    = min(d1, min(d2, d3));',
     '  float insideUnion = 1.0 - step(0.0, sdOuter);',
     '  float aaOuter    = max(fwidth(sdOuter), aaFixed) + 0.0005;',
-    '  float outlineMask = 1.0 - smoothstep(u_contour_width, u_contour_width + aaOuter, abs(sdOuter));',
+    '  float outlineMask = 1.0 - smoothstep(u_outline_width, u_outline_width + aaOuter, abs(sdOuter));',
     '  float lineMask     = max(isoMask * insideUnion, outlineMask);',
     '',
     '  float t = clamp(elevation * 0.5 + 0.5, 0.0, 1.0);',
@@ -210,6 +211,7 @@
         hill3Height:     gl.getUniformLocation(program, 'u_hill3_height'),
         contourSpacing:  gl.getUniformLocation(program, 'u_contour_spacing'),
         contourWidth:    gl.getUniformLocation(program, 'u_contour_width'),
+        outlineWidth:    gl.getUniformLocation(program, 'u_outline_width'),
         colorMode:       gl.getUniformLocation(program, 'u_color_mode'),
         palA:            gl.getUniformLocation(program, 'u_a'),
         palB:            gl.getUniformLocation(program, 'u_b'),
@@ -252,6 +254,7 @@
       gl.uniform1f(u.hill3Height, v.u_hill3_height != null ? v.u_hill3_height : -0.6);
       gl.uniform1f(u.contourSpacing, v.u_contour_spacing != null ? v.u_contour_spacing : 0.12);
       gl.uniform1f(u.contourWidth, v.u_contour_width != null ? v.u_contour_width : 0.025);
+      gl.uniform1f(u.outlineWidth, v.u_outline_width != null ? v.u_outline_width : 0.025);
       gl.uniform1f(u.colorMode, parseFloat(v.u_color_mode || '0'));
       gl.uniform3fv(u.palA, v.u_a || [0.5, 0.5, 0.5]);
       gl.uniform3fv(u.palB, v.u_b || [0.5, 0.5, 0.5]);
