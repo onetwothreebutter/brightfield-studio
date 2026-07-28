@@ -532,6 +532,7 @@ async function handleGenerateMockup(request, env, origin) {
 
     // 5. Keep the design file in R2 — merchant needs the URL to submit to Printful when fulfilling
     // 6. Save design entry for the device gallery (best-effort)
+    let deviceToken = null;
     if (deviceId) {
       const entry = {
         id: crypto.randomUUID(),
@@ -542,11 +543,14 @@ async function handleGenerateMockup(request, env, origin) {
         values: values || {},
         timestamp: Math.floor(Date.now() / 1000),
       };
-      await saveDesignEntry(env, deviceId, entry).catch(() => {});
+      deviceToken = await saveDesignEntry(env, deviceId, entry).catch(() => null);
     }
 
     const responseBody = { mockup_url: mockupUrl, design_url: imageUrl };
     if (downloadUrl) responseBody.download_url = downloadUrl;
+    // First-claim token for this deviceId (#544) — client persists it and sends
+    // it back on future /delete-design and /community/like calls.
+    if (deviceToken) responseBody.deviceToken = deviceToken;
     return new Response(JSON.stringify(responseBody), { status: 200, headers });
 
   } catch (err) {
@@ -638,6 +642,7 @@ async function handleSavePreview(request, env, origin) {
   const checkoutImageUrl = checkoutKey ? imgUrl(checkoutKey) : null;
 
   let savedId = null;
+  let deviceToken = null;
   if (deviceId) {
     savedId = crypto.randomUUID();
     const entry = {
@@ -649,10 +654,14 @@ async function handleSavePreview(request, env, origin) {
       values: values || {},
       timestamp: Math.floor(Date.now() / 1000),
     };
-    await saveDesignEntry(env, deviceId, entry).catch(() => {});
+    deviceToken = await saveDesignEntry(env, deviceId, entry).catch(() => null);
   }
 
-  return new Response(JSON.stringify({ design_url: designUrl, mockup_url: mockupUrl, checkout_image_url: checkoutImageUrl, id: savedId }), { status: 200, headers });
+  const responseBody = { design_url: designUrl, mockup_url: mockupUrl, checkout_image_url: checkoutImageUrl, id: savedId };
+  // First-claim token for this deviceId (#544) — client persists it and sends
+  // it back on future /delete-design and /community/like calls.
+  if (deviceToken) responseBody.deviceToken = deviceToken;
+  return new Response(JSON.stringify(responseBody), { status: 200, headers });
 }
 
 // Picks the size variant matching requestedSize (a Size option value like 'M'); falls back to the first variant.
@@ -1188,9 +1197,17 @@ async function handleDeleteDesign(request, env, origin) {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
   }
 
-  const { id, deviceId } = body;
+  const { id, deviceId, deviceToken } = body;
   if (!id || !deviceId) {
     return new Response(JSON.stringify({ error: 'Missing id or deviceId' }), { status: 400, headers });
+  }
+
+  // #544: deviceId is client-supplied — require a signed deviceToken once this
+  // deviceId has been claimed, so one device can't wipe another's gallery by
+  // guessing/spoofing its UUID. See authorizeDeviceWrite() above.
+  const auth = await authorizeDeviceWrite(env, deviceId, deviceToken);
+  if (!auth.ok) {
+    return new Response(JSON.stringify({ error: 'Invalid or missing deviceToken' }), { status: 401, headers });
   }
 
   const key = `device-designs/${deviceId}.json`;
@@ -1205,7 +1222,9 @@ async function handleDeleteDesign(request, env, origin) {
     httpMetadata: { contentType: 'application/json' },
   });
 
-  return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+  const responseBody = { ok: true };
+  if (auth.newToken) responseBody.deviceToken = auth.newToken;
+  return new Response(JSON.stringify(responseBody), { status: 200, headers });
 }
 
 // ── Community helpers ────────────────────────────────────────────────────────
@@ -1288,6 +1307,106 @@ async function writeJson(env, key, data) {
   });
 }
 
+// ── Device tokens (HMAC-signed deviceId) ─────────────────────────────────────
+// `deviceId` (assets/recent-designs.js getDeviceId()) is a client-generated
+// UUID stored in localStorage — pure client state the worker never used to
+// verify. Because it's used as an R2 key namespace (device-designs/{id}.json)
+// and a like-dedup key (community/likes/{submissionId}/{id}), a spoofed
+// deviceId let anyone wipe another device's gallery or inflate/deflate a
+// community submission's like count (#544).
+//
+// Fix: the first time a deviceId is used to save something (saveDesignEntry,
+// called from handleGenerateMockup / handleSavePreview), the worker mints an
+// HMAC-SHA256(deviceId) token and persists a "claim" record for that deviceId
+// at device-tokens/{deviceId}.json. From then on, writes keyed on that
+// deviceId (handleDeleteDesign, handleCommunityLike) require a valid
+// deviceToken. DeviceIds that were already in use before this fix (no claim
+// record yet) get a one-time migration grace period: the first
+// delete/like request succeeds without a token, and mints+persists a claim
+// right then so the deviceId is locked to signature verification afterward.
+
+function bytesToBase64Url(bytes) {
+  let binary = '';
+  bytes.forEach(b => { binary += String.fromCharCode(b); });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlToBytes(s) {
+  const b64 = s.replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+}
+
+// Returns a base64url HMAC-SHA256(deviceId) token, or null if DEVICE_ID_SECRET
+// isn't configured (e.g. not yet set via `wrangler secret put` — fail open so
+// deploys before the secret is set don't hard-break these endpoints).
+async function signDeviceId(env, deviceId) {
+  if (!deviceId || !env.DEVICE_ID_SECRET) return null;
+  try {
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(env.DEVICE_ID_SECRET),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(deviceId));
+    return bytesToBase64Url(new Uint8Array(sig));
+  } catch {
+    return null;
+  }
+}
+
+// Constant-time verification (crypto.subtle.verify, not === on strings) that
+// `token` is a valid HMAC-SHA256(deviceId) — same pattern as
+// verifyShopifySessionToken above.
+async function verifyDeviceToken(env, deviceId, token) {
+  if (!deviceId || !token || !env.DEVICE_ID_SECRET) return false;
+  try {
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(env.DEVICE_ID_SECRET),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+    return await crypto.subtle.verify('HMAC', key, base64UrlToBytes(token), new TextEncoder().encode(deviceId));
+  } catch {
+    return false;
+  }
+}
+
+async function getDeviceClaim(env, deviceId) {
+  return readJson(env, `device-tokens/${deviceId}.json`);
+}
+
+// Mints and persists a claim record for deviceId. Best-effort: returns null
+// (and writes nothing) if signing isn't available, e.g. DEVICE_ID_SECRET
+// hasn't been configured yet.
+async function claimDeviceId(env, deviceId) {
+  const token = await signDeviceId(env, deviceId);
+  if (!token) return null;
+  await writeJson(env, `device-tokens/${deviceId}.json`, { token, claimedAt: Math.floor(Date.now() / 1000) });
+  return token;
+}
+
+// Authorization gate for /delete-design and /community/like. Returns
+// { ok: true, newToken } — newToken is non-null only when a fresh claim was
+// just minted and should be handed back to the client — or { ok: false } if
+// an existing claim's token wasn't supplied or didn't verify.
+async function authorizeDeviceWrite(env, deviceId, deviceToken) {
+  const claim = await getDeviceClaim(env, deviceId);
+  if (!claim) {
+    // Never-claimed deviceId: legacy pre-fix device (or DEVICE_ID_SECRET not
+    // yet configured). Allow this one request through and upgrade it to a
+    // claimed deviceId going forward.
+    return { ok: true, newToken: await claimDeviceId(env, deviceId) };
+  }
+  if (!(await verifyDeviceToken(env, deviceId, deviceToken))) {
+    return { ok: false, newToken: null };
+  }
+  return { ok: true, newToken: null };
+}
+
 // ── Community handlers ───────────────────────────────────────────────────────
 
 async function handleCommunitySubmit(request, env, origin) {
@@ -1358,9 +1477,17 @@ async function handleCommunityLike(request, env, origin) {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
   }
 
-  const { id, deviceId } = body;
+  const { id, deviceId, deviceToken } = body;
   if (!id || !deviceId) {
     return new Response(JSON.stringify({ error: 'Missing id or deviceId' }), { status: 400, headers });
+  }
+
+  // #544: deviceId is client-supplied — require a signed deviceToken once this
+  // deviceId has been claimed, so one device can't inflate/deflate another
+  // submission's like count by spoofing deviceIds. See authorizeDeviceWrite().
+  const auth = await authorizeDeviceWrite(env, deviceId, deviceToken);
+  if (!auth.ok) {
+    return new Response(JSON.stringify({ error: 'Invalid or missing deviceToken' }), { status: 401, headers });
   }
 
   const submission = await readJson(env, `community/submissions/${id}.json`);
@@ -1383,7 +1510,9 @@ async function handleCommunityLike(request, env, origin) {
   }
 
   await writeJson(env, `community/submissions/${id}.json`, submission);
-  return new Response(JSON.stringify({ likes: submission.likes, liked }), { status: 200, headers });
+  const responseBody = { likes: submission.likes, liked };
+  if (auth.newToken) responseBody.deviceToken = auth.newToken;
+  return new Response(JSON.stringify(responseBody), { status: 200, headers });
 }
 
 async function handleCommunityPending(request, env, origin) {
@@ -2181,6 +2310,11 @@ async function handleRemoveBg(request, env, origin) {
 
 // ── Device design gallery ────────────────────────────────────────────────────
 
+// Saves a design entry for this deviceId's gallery, and — if this deviceId
+// has never been claimed before — mints and persists its device-token claim
+// (see "Device tokens" section above, #544). Returns the newly minted token
+// (for the caller to hand back to the client) or null when either a claim
+// already existed or DEVICE_ID_SECRET isn't configured yet.
 async function saveDesignEntry(env, deviceId, entry) {
   const key = `device-designs/${deviceId}.json`;
   let designs = [];
@@ -2194,4 +2328,8 @@ async function saveDesignEntry(env, deviceId, entry) {
   await env.MOCKUP_STAGING.put(key, JSON.stringify(designs), {
     httpMetadata: { contentType: 'application/json' },
   });
+
+  const existingClaim = await getDeviceClaim(env, deviceId);
+  if (existingClaim) return null;
+  return claimDeviceId(env, deviceId);
 }

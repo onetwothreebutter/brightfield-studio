@@ -77,7 +77,7 @@ afterEach(() => {
 // ── toggleLike() ──────────────────────────────────────────────────────────────
 
 describe('toggleLike()', () => {
-  it('POSTs to /community/like with id and deviceId', async () => {
+  it('POSTs to /community/like with id, deviceId, and deviceToken', async () => {
     const mockFetch = vi.fn(async () => ({ json: async () => ({ likes: 4, liked: true }) }));
     vi.stubGlobal('fetch', mockFetch);
 
@@ -87,7 +87,7 @@ describe('toggleLike()', () => {
       expect.objectContaining({ method: 'POST' })
     );
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-    expect(body).toEqual({ id: 'abc-123', deviceId: 'device-xyz' });
+    expect(body).toEqual({ id: 'abc-123', deviceId: 'device-xyz', deviceToken: null });
   });
 
   it('returns { likes, liked } from response', async () => {
@@ -100,6 +100,30 @@ describe('toggleLike()', () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
     const result = await window.CommunityDesigns.toggleLike('abc-123', 'dev-1');
     expect(result).toBeNull();
+  });
+
+  // ── Device token (#544) ───────────────────────────────────────────────────
+  // See worker/src/index.js authorizeDeviceWrite(): /community/like requires a
+  // signed deviceToken once a deviceId has been claimed, and returns a fresh
+  // one when it mints a first-time claim for a legacy deviceId.
+
+  it('sends the stored deviceToken (via RecentDesigns), if any', async () => {
+    window.RecentDesigns.setDeviceToken('stored-token-abc');
+    const mockFetch = vi.fn(async () => ({ json: async () => ({ likes: 1, liked: true }) }));
+    vi.stubGlobal('fetch', mockFetch);
+
+    await window.CommunityDesigns.toggleLike('abc-123', 'device-xyz');
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.deviceToken).toBe('stored-token-abc');
+  });
+
+  it('persists a deviceToken returned in the response', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => ({ likes: 1, liked: true, deviceToken: 'new-token-xyz' }) })));
+
+    await window.CommunityDesigns.toggleLike('abc-123', 'device-xyz');
+
+    expect(window.CommunityDesigns.getDeviceToken()).toBe('new-token-xyz');
   });
 });
 

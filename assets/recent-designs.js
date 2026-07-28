@@ -1,6 +1,12 @@
 (function () {
   var WORKER_URL = 'https://brightfield-mockup-worker.eric-d-johnson.workers.dev';
   var DEVICE_KEY = 'brightfield_device_id';
+  // Signed HMAC token for DEVICE_KEY, minted by the worker the first time this
+  // deviceId saves a design (/generate-mockup or /save-preview response) and
+  // required on /delete-design and /community/like from then on (#544 —
+  // prevents spoofing another device's deviceId to delete its designs or
+  // tamper with its likes).
+  var TOKEN_KEY = 'brightfield_device_token';
   var RESTORE_KEY = 'brightfield_restore';
 
   var _confirmModal = null;
@@ -82,6 +88,19 @@
     return id;
   }
 
+  function getDeviceToken() {
+    try { return localStorage.getItem(TOKEN_KEY) || null; } catch (e) { return null; }
+  }
+
+  // Persists a deviceToken minted by the worker (returned from /generate-mockup,
+  // /save-preview, /delete-design, or /community/like — see #544). Called
+  // whenever a response includes one, so a legacy deviceId gets upgraded the
+  // moment it's claimed.
+  function setDeviceToken(token) {
+    if (!token) return;
+    try { localStorage.setItem(TOKEN_KEY, token); } catch (e) {}
+  }
+
   function fetchDesigns(shader) {
     var deviceId = getDeviceId();
     var url = WORKER_URL + '/list-designs?deviceId=' + encodeURIComponent(deviceId);
@@ -109,9 +128,13 @@
     return fetch(WORKER_URL + '/delete-design', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: id, deviceId: deviceId }),
+      body: JSON.stringify({ id: id, deviceId: deviceId, deviceToken: getDeviceToken() }),
     })
       .then(function (r) { return r.json(); })
+      .then(function (result) {
+        if (result && result.deviceToken) setDeviceToken(result.deviceToken);
+        return result;
+      })
       .catch(function () { return { ok: false }; });
   }
 
@@ -297,6 +320,8 @@
 
   window.RecentDesigns = {
     getDeviceId: getDeviceId,
+    getDeviceToken: getDeviceToken,
+    setDeviceToken: setDeviceToken,
     fetchDesigns: fetchDesigns,
     deleteDesign: deleteDesign,
     renderFilmstrip: renderFilmstrip,

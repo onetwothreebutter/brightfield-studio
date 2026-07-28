@@ -1647,6 +1647,10 @@
         .then(function (r) { return r.json(); })
         .then(function (data) {
           if (!data.design_url) throw new Error(data.error || 'Upload failed');
+          // First-claim device token (#544) — persist it so later
+          // /delete-design and /community/like calls can prove ownership of
+          // this deviceId. See RecentDesigns.setDeviceToken.
+          if (data.deviceToken && window.RecentDesigns) window.RecentDesigns.setDeviceToken(data.deviceToken);
           currentDesignUrl = data.design_url;
           _lastMockupData = {
             mockupUrl:        data.mockup_url,

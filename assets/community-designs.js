@@ -22,6 +22,26 @@
     return id;
   }
 
+  // Signed deviceId token (#544) — delegates to RecentDesigns when it's loaded
+  // (the normal case, since recent-designs.js is the canonical owner of
+  // brightfield_device_token) with a localStorage fallback so this module also
+  // works standalone.
+  function getDeviceToken() {
+    if (window.RecentDesigns && window.RecentDesigns.getDeviceToken) {
+      return window.RecentDesigns.getDeviceToken();
+    }
+    try { return localStorage.getItem('brightfield_device_token') || null; } catch (e) { return null; }
+  }
+
+  function setDeviceToken(token) {
+    if (!token) return;
+    if (window.RecentDesigns && window.RecentDesigns.setDeviceToken) {
+      window.RecentDesigns.setDeviceToken(token);
+      return;
+    }
+    try { localStorage.setItem('brightfield_device_token', token); } catch (e) {}
+  }
+
   // ── Liked set ────────────────────────────────────────────────────────────────
 
   function getLikedSet() {
@@ -45,9 +65,13 @@
     return fetch(WORKER_URL + '/community/like', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ id: id, deviceId: deviceId })
+      body:    JSON.stringify({ id: id, deviceId: deviceId, deviceToken: getDeviceToken() })
     })
       .then(function (r) { return r.json(); })
+      .then(function (result) {
+        if (result && result.deviceToken) setDeviceToken(result.deviceToken);
+        return result;
+      })
       .catch(function () { return null; });
   }
 
@@ -415,6 +439,8 @@
     groupByShader:         groupByShader,
     toggleLike:            toggleLike,
     getDeviceId:           getDeviceId,
+    getDeviceToken:        getDeviceToken,
+    setDeviceToken:        setDeviceToken,
     getLikedSet:           getLikedSet,
     setLikedSet:           setLikedSet,
   };
