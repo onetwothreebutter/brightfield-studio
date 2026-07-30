@@ -27,12 +27,12 @@
       <div class="hero__ctas">
         {%- if section.settings.cta_url != blank -%}
           <a href="{{ section.settings.cta_url }}" class="btn btn--primary btn--lg">
-            {{ section.settings.cta_label | default: 'Shop the Collection' | escape }}
+            {{ section.settings.cta_label | default: 'Shop Now' | escape }}
           </a>
         {%- endif -%}
         {%- if section.settings.cta2_url != blank -%}
           <a href="{{ section.settings.cta2_url }}" class="btn btn--outline btn--lg">
-            {{ section.settings.cta2_label | default: 'Make it Yours' | escape }}
+            {{ section.settings.cta2_label | default: 'Discover' | escape }}
           </a>
         {%- endif -%}
       </div>
@@ -54,19 +54,20 @@
       "type": "text",
       "id": "eyebrow",
       "label": "Eyebrow text",
-      "default": "Wearable Shader Art"
+      "default": "Part Art, Part Code"
     },
     {
       "type": "text",
       "id": "heading",
       "label": "Heading",
-      "info": "Leave blank to use store name"
+      "info": "Leave blank to use store name",
+      "default": "Source Code for Your Shirt"
     },
     {
       "type": "textarea",
       "id": "subheading",
       "label": "Subheading",
-      "default": "T-shirts generated from WebGL shaders. Every design is a living program."
+      "default": "We use code to generate and discover artistic t‑shirt designs."
     },
     {
       "type": "url",
@@ -77,7 +78,7 @@
       "type": "text",
       "id": "cta_label",
       "label": "Button label",
-      "default": "Shop the Collection"
+      "default": "Shop Now"
     },
     {
       "type": "url",
@@ -88,7 +89,7 @@
       "type": "text",
       "id": "cta2_label",
       "label": "Second button label",
-      "default": "Make it Yours"
+      "default": "Discover"
     }
   ],
   "presets": [
