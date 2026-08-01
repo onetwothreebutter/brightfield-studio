@@ -95,13 +95,6 @@ var controls = [
 var customAfterBuild = function () {
   var presets = COSINE_PRESETS;
 
-  function toHex(v) {
-    return '#' + v.map(function (x) {
-      var b = Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16);
-      return b.length === 1 ? '0' + b : b;
-    }).join('');
-  }
-
   // Keys for each visibility group
   var cosineKeys = ['_et_palette_preset', 'u_a', 'u_b', 'u_c', 'u_d'];
   var stopKeys   = ['_et_4color_preset', 'u_color0', 'u_color1', 'u_color2', 'u_color3'];
@@ -147,13 +140,7 @@ var customAfterBuild = function () {
     presetSel.addEventListener('change', function () {
       var p = presets[this.value];
       if (!p) return;
-      var keys = ['u_a', 'u_b', 'u_c', 'u_d'];
-      var vals = [p.a, p.b, p.c, p.d];
-      keys.forEach(function (key, i) {
-        window._shaderState.values[key] = vals[i];
-        var inp = document.querySelector('[data-param-key="' + key + '"]');
-        if (inp) inp.value = toHex(vals[i]);
-      });
+      applyColors([['u_a', p.a], ['u_b', p.b], ['u_c', p.c], ['u_d', p.d]]);
     });
   }
 };

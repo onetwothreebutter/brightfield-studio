@@ -62,12 +62,7 @@ var FOUR_STOP_PRESETS = {
   'Golden Summer Fields':       { c0: [0.612, 0.673, 0.431], c1: [0.877, 0.887, 0.646], c2: [0.969, 0.887, 0.663], c3: [0.666, 0.374, 0.173] },
 };
 
-function toHex(v) {
-  return '#' + v.map(function (x) {
-    var b = Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16);
-    return b.length === 1 ? '0' + b : b;
-  }).join('');
-}
+{% render 'shader-color-utils' %}
 
 // Vivid hex color at a given hue (0–1), fixed high saturation + brightness —
 // avoids the muddy/dull tones a fully uniform-random hex can land on.
@@ -95,25 +90,43 @@ function cosinePalette(t, a, b, c, d) {
   });
 }
 
+// Preview-only: preset curve/stop values are already display-space (not
+// stored linear uniforms), so hex-ify directly with no gamma step — unlike
+// toHex(), which assumes its input is linear and gamma-encodes it back.
+function previewHex(v) {
+  return '#' + v.map(function (x) {
+    var b = Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16);
+    return b.length === 1 ? '0' + b : b;
+  }).join('');
+}
+
 // Preview gradients for the tappable swatch pickers — 6-stop sample of the
 // cosine curve for palette presets, direct 4 stops for 4-stop presets.
 function cosinePresetGradient(p) {
   var stops = [0, 0.2, 0.4, 0.6, 0.8, 1.0].map(function (t) {
-    return toHex(cosinePalette(t, p.a, p.b, p.c, p.d));
+    return previewHex(cosinePalette(t, p.a, p.b, p.c, p.d));
   });
   return 'linear-gradient(135deg, ' + stops.join(', ') + ')';
 }
 
 function fourStopPresetGradient(p) {
-  return 'linear-gradient(135deg, ' + [p.c0, p.c1, p.c2, p.c3].map(toHex).join(', ') + ')';
+  return 'linear-gradient(135deg, ' + [p.c0, p.c1, p.c2, p.c3].map(previewHex).join(', ') + ')';
 }
 
+// keyValPairs values are sRGB-intent [r,g,b] arrays (same convention as a hex
+// swatch, e.g. preset color entries) for literal color keys — linearize
+// before storing so they match what the picker's own input handler would
+// have produced for the same color. Palette-coefficient keys (see
+// PALETTE_COEFF_KEYS) pass through unchanged since they're formula inputs,
+// not colors.
 function applyColors(keyValPairs) {
   keyValPairs.forEach(function (pair) {
-    window._shaderState.values[pair[0]] = pair[1];
-    var inp = document.querySelector('[data-param-key="' + pair[0] + '"]');
+    var key = pair[0];
+    var stored = PALETTE_COEFF_KEYS[key] ? pair[1] : pair[1].map(srgbToLinear);
+    window._shaderState.values[key] = stored;
+    var inp = document.querySelector('[data-param-key="' + key + '"]');
     if (inp) {
-      inp.value = toHex(pair[1]);
+      inp.value = toHex(stored, key);
       inp.dispatchEvent(new Event('input', { bubbles: true }));
     }
   });
