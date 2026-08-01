@@ -2823,6 +2823,10 @@ dialog.mobile-nav[open]::backdrop {
     border-color: var(--color-primary);
     box-shadow: 0 0 0 2px var(--color-primary-dim);
 }
+.shader-control__swatch:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
 
 @media (max-width: 900px) {
     /* Taller rows so fingers don't need to be pixel-precise */
