@@ -49,17 +49,31 @@ var FOUR_STOP_PRESETS = {
   'Jamaica':       { c0: [0.0,   0.608, 0.227], c1: [0.996, 0.820, 0.0  ], c2: [0.102, 0.102, 0.102], c3: [0.0,   0.608, 0.227] },
 };
 
-// Shaders gamma-encode finalColor with pow(x, 1/2.2) before output, so uniform
-// colors must be supplied pre-linearized (pow(x, 2.2)) for the picker's sRGB
-// hex to round-trip correctly. These are exact inverses of one another.
+// Shaders gamma-encode finalColor with pow(x, 1/2.2) before output, so literal
+// color uniforms (u_color0-3, u_outline_color, u_text_color, ...) must be
+// supplied pre-linearized (pow(x, 2.2)) for the picker's sRGB hex to
+// round-trip correctly. These are exact inverses of one another.
 function srgbToLinear(c) { return Math.pow(c, 2.2); }
 function linearToSrgb(c) { return Math.pow(c, 1 / 2.2); }
 
-// v is a linear-space [r,g,b] uniform value; returns the sRGB hex a user would
-// see in the color picker for that value.
-function toHex(v) {
+// u_a/u_b/u_c/u_d (and u_palette_a-d) are cosine-palette curve coefficients —
+// cosinePalette(t,a,b,c,d) = a + b*cos(2π(c*t+d)) — not literal colors. c/d
+// routinely exceed [0,1] or go negative (e.g. Cyberpunk's c:[2,1,0], Coral
+// Reef's b:[.5,-.15,-.175]), and the sRGB<->linear transform below is only
+// valid for values that represent a real linear-space color, so these keys
+// must bypass it and pass straight through (as they did pre-gamma-fix).
+var PALETTE_COEFF_KEYS = {
+  u_a: true, u_b: true, u_c: true, u_d: true,
+  u_palette_a: true, u_palette_b: true, u_palette_c: true, u_palette_d: true
+};
+
+// v is a [r,g,b] uniform value (linear-space, unless key is a palette
+// coefficient); returns the sRGB hex a user would see in the color picker.
+function toHex(v, key) {
+  var raw = PALETTE_COEFF_KEYS[key];
   return '#' + v.map(function (x) {
-    var b = Math.round(Math.max(0, Math.min(1, linearToSrgb(x))) * 255).toString(16);
+    var enc = raw ? x : linearToSrgb(x);
+    var b = Math.round(Math.max(0, Math.min(1, enc)) * 255).toString(16);
     return b.length === 1 ? '0' + b : b;
   }).join('');
 }
@@ -85,15 +99,19 @@ function vividHex(hue) {
 }
 
 // keyValPairs values are sRGB-intent [r,g,b] arrays (same convention as a hex
-// swatch, e.g. preset color entries) — linearize before storing so they match
-// what the picker's own input handler would have produced for the same color.
+// swatch, e.g. preset color entries) for literal color keys — linearize
+// before storing so they match what the picker's own input handler would
+// have produced for the same color. Palette-coefficient keys (see
+// PALETTE_COEFF_KEYS) pass through unchanged since they're formula inputs,
+// not colors.
 function applyColors(keyValPairs) {
   keyValPairs.forEach(function (pair) {
-    var linear = pair[1].map(srgbToLinear);
-    window._shaderState.values[pair[0]] = linear;
-    var inp = document.querySelector('[data-param-key="' + pair[0] + '"]');
+    var key = pair[0];
+    var stored = PALETTE_COEFF_KEYS[key] ? pair[1] : pair[1].map(srgbToLinear);
+    window._shaderState.values[key] = stored;
+    var inp = document.querySelector('[data-param-key="' + key + '"]');
     if (inp) {
-      inp.value = toHex(linear);
+      inp.value = toHex(stored, key);
       inp.dispatchEvent(new Event('input', { bubbles: true }));
     }
   });
