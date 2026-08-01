@@ -103,6 +103,15 @@ var customAfterBuild = function () {
     ]);
   }
 
+  function applyQuadPreset(p) {
+    applyColors([
+      ['u_quad0', p.c0],
+      ['u_quad1', p.c1],
+      ['u_quad2', p.c2],
+      ['u_quad3', p.c3],
+    ]);
+  }
+
   // Apply default on load so shader matches pickers.
   applyCosinePreset(COSINE_PRESETS['Rainbow']);
 
@@ -120,15 +129,6 @@ var customAfterBuild = function () {
       var p = FOUR_STOP_PRESETS[this.value];
       if (p) apply4ColorPreset(p);
     });
-  }
-
-  function applyQuadPreset(p) {
-    applyColors([
-      ['u_quad0', p.c0],
-      ['u_quad1', p.c1],
-      ['u_quad2', p.c2],
-      ['u_quad3', p.c3],
-    ]);
   }
 
   var quadPresetSel = document.querySelector('[data-param-key="_fc_quad_preset"]');

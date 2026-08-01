@@ -926,6 +926,15 @@ SHADERS['four-circles'] = {
     { key: 'u_color1', label: 'Color 2', type: 'color', stopDependent: true, value: '#ffcc00' },
     { key: 'u_color2', label: 'Color 3', type: 'color', stopDependent: true, value: '#00ccff' },
     { key: 'u_color3', label: 'Color 4', type: 'color', stopDependent: true, value: '#aa00ff' },
+    { key: '_fc_quad_preset', label: 'Preset', type: 'select', quadDependent: true, value: 'Neon',
+      options: [
+        { label: 'Neon',     value: 'Neon'     }, { label: 'Retro',    value: 'Retro'    },
+        { label: 'Sunset',   value: 'Sunset'   }, { label: 'Aurora',   value: 'Aurora'   },
+        { label: 'Dusk',     value: 'Dusk'     }, { label: 'Midnight', value: 'Midnight' },
+        { label: 'Ember',    value: 'Ember'    }, { label: 'Obsidian', value: 'Obsidian' },
+        { label: 'Velvet',   value: 'Velvet'   },
+      ]
+    },
     { key: 'u_quad0', label: 'Top Left',     type: 'color', quadDependent: true, value: '#d10000' },
     { key: 'u_quad1', label: 'Top Right',    type: 'color', quadDependent: true, value: '#003087' },
     { key: 'u_quad2', label: 'Bottom Left',  type: 'color', quadDependent: true, value: '#ffd700' },
@@ -1054,6 +1063,15 @@ SHADERS['four-circles'] = {
         var p = fourStopPresets[this.value]; if (!p) return;
         setColor('u_color0', p.c0); setColor('u_color1', p.c1);
         setColor('u_color2', p.c2); setColor('u_color3', p.c3);
+      });
+    }
+
+    var quadSel = document.querySelector('[data-param-key="_fc_quad_preset"]');
+    if (quadSel) {
+      quadSel.addEventListener('change', function () {
+        var p = fourStopPresets[this.value]; if (!p) return;
+        setColor('u_quad0', p.c0); setColor('u_quad1', p.c1);
+        setColor('u_quad2', p.c2); setColor('u_quad3', p.c3);
       });
     }
 
