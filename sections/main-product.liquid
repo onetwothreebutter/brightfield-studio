@@ -2366,9 +2366,14 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   var copyBtn    = document.getElementById('inhouse-copy-btn');
   var turnoffBtn = document.getElementById('inhouse-turnoff-btn');
 
-  function rgbToHex(v) {
+  // window._shaderState.values stores literal colors in linear space (see
+  // srgbToLinear/PALETTE_COEFF_KEYS above) — convert back to sRGB so the
+  // copied hex matches what belongs in a control's `value:` field.
+  function rgbToHex(v, key) {
+    var raw = PALETTE_COEFF_KEYS[key];
     return '#' + v.map(function (c) {
-      return Math.round(Math.max(0, Math.min(1, c)) * 255).toString(16).padStart(2, '0');
+      var enc = raw ? c : linearToSrgb(c);
+      return Math.round(Math.max(0, Math.min(1, enc)) * 255).toString(16).padStart(2, '0');
     }).join('');
   }
 
@@ -2377,7 +2382,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     var vals = window._shaderState.values;
     return Object.keys(vals).map(function (k) {
       var v = vals[k];
-      var display = Array.isArray(v) ? ("'" + rgbToHex(v) + "'")
+      var display = Array.isArray(v) ? ("'" + rgbToHex(v, k) + "'")
                   : typeof v === 'string' ? ("'" + v + "'")
                   : v;
       return k + ': ' + display;
