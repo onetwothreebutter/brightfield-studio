@@ -9,7 +9,7 @@ var controls = [
     ]
   },
   // Cosine palette controls
-  { key: '_rs_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, noRandomize: true, value: 'Rainbow',
+  { key: '_rs_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, noRandomize: true, value: 'Rainbow', swatchPreview: 'cosine',
     options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
   { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',

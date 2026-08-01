@@ -883,6 +883,57 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
 
       row.appendChild(sel);
       controlEls.push({ ctrl: ctrl, el: sel });
+
+      // Palette/4-stop presets: render as tappable swatches instead of the
+      // dropdown. `sel` stays in the DOM (hidden) as the source of truth —
+      // randomize/restore/share all already set its value + dispatch
+      // 'change', so the swatch UI just mirrors it instead of duplicating
+      // that wiring.
+      if (ctrl.swatchPreview) {
+        sel.className += ' shader-control__select--swatch-source';
+        sel.tabIndex = -1;
+        sel.setAttribute('aria-hidden', 'true');
+
+        var presetsMap  = ctrl.swatchPreview === 'fourstop' ? FOUR_STOP_PRESETS : COSINE_PRESETS;
+        var gradientFor = ctrl.swatchPreview === 'fourstop' ? fourStopPresetGradient : cosinePresetGradient;
+
+        var swatchScroll = document.createElement('div');
+        swatchScroll.className = 'shader-control__swatch-scroll';
+
+        var swatchBtns = {};
+        ctrl.options.forEach(function (opt) {
+          var preset = presetsMap[opt.value];
+          if (!preset) return;
+
+          var swatchBtn = document.createElement('button');
+          swatchBtn.type = 'button';
+          swatchBtn.className = 'shader-control__swatch';
+          swatchBtn.style.background = gradientFor(preset);
+          swatchBtn.title = opt.label;
+          swatchBtn.setAttribute('aria-label', opt.label);
+          swatchBtn.setAttribute('aria-pressed', opt.value === sel.value ? 'true' : 'false');
+          swatchBtn.classList.toggle('is-selected', opt.value === sel.value);
+
+          swatchBtn.addEventListener('click', function () {
+            if (sel.value === opt.value) return;
+            sel.value = opt.value;
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+
+          swatchBtns[opt.value] = swatchBtn;
+          swatchScroll.appendChild(swatchBtn);
+        });
+
+        sel.addEventListener('change', function () {
+          Object.keys(swatchBtns).forEach(function (v) {
+            var isSelected = v === sel.value;
+            swatchBtns[v].classList.toggle('is-selected', isSelected);
+            swatchBtns[v].setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+          });
+        });
+
+        row.appendChild(swatchScroll);
+      }
     }
 
     if (ctrl.paletteDependent)   paletteDependentRows.push(row);

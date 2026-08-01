@@ -2792,6 +2792,43 @@ dialog.mobile-nav[open]::backdrop {
     border-color: var(--color-primary);
 }
 
+.shader-control__select--swatch-source {
+    display: none;
+}
+
+.shader-control__swatch-scroll {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding: 0.35rem 0.1rem 0.15rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+.shader-control__swatch {
+    flex: 0 0 auto;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    padding: 0;
+    border: 2px solid var(--color-border);
+    outline: none;
+    cursor: pointer;
+    transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+.shader-control__swatch:hover {
+    transform: scale(1.08);
+}
+.shader-control__swatch.is-selected {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-dim);
+}
+.shader-control__swatch:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
 @media (max-width: 900px) {
     /* Taller rows so fingers don't need to be pixel-precise */
     .shader-control {
@@ -2824,6 +2861,12 @@ dialog.mobile-nav[open]::backdrop {
     .shader-control__color {
         padding: 0.45rem 0.4rem;
         min-height: 2.75rem;
+    }
+
+    /* Palette preset swatches: easier to tap */
+    .shader-control__swatch {
+        width: 2.75rem;
+        height: 2.75rem;
     }
 
     /* Text inputs */

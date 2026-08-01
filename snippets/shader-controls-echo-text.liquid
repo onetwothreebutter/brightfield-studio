@@ -36,7 +36,7 @@ var controls = [
     ]
   },
   // Cosine palette controls (shown/hidden by customAfterBuild)
-  { key: '_et_palette_preset', label: 'Preset', type: 'select', value: 'Rainbow',
+  { key: '_et_palette_preset', label: 'Preset', type: 'select', value: 'Rainbow', swatchPreview: 'cosine',
     options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
   { key: 'u_a', label: 'Palette A', type: 'color', value: '#ad6da7',
@@ -48,7 +48,7 @@ var controls = [
   { key: 'u_d', label: 'Palette D', type: 'color', value: '#0054ab',
     tip: 'Phase — shifts the starting hue of the color cycle.' },
   // 4-stop colors (shown/hidden by customAfterBuild)
-  { key: '_et_4color_preset', label: 'Preset', type: 'select', value: 'Neon',
+  { key: '_et_4color_preset', label: 'Preset', type: 'select', value: 'Neon', swatchPreview: 'fourstop',
     options: Object.keys(FOUR_STOP_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
   { key: 'u_color0', label: 'Color 1 (Top)',    type: 'color', value: '#ff3366' },
