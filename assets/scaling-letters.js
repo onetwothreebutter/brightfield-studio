@@ -557,7 +557,7 @@
 
   window.ShaderBase.create({
     animateValues:  true,
-    instantKeys:    ['u_opacity', 'u_distress_0', 'u_distress_scale_0', 'u_distress_1', 'u_distress_scale_1', 'u_distress_2', 'u_distress_scale_2', 'u_distress_3', 'u_distress_scale_3', 'u_grain_mode', 'u_distress_falloff', 'u_grid_aspect', 'u_invert', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right', 'u_vignette_anchor_x', 'u_vignette_anchor_y'],
+    instantKeys:    ['u_opacity', 'u_distress_0', 'u_distress_scale_0', 'u_distress_1', 'u_distress_scale_1', 'u_distress_2', 'u_distress_scale_2', 'u_distress_3', 'u_distress_scale_3', 'u_grain_mode', 'u_halftone_shape', 'u_distress_falloff', 'u_grid_aspect', 'u_invert', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right', 'u_vignette_anchor_x', 'u_vignette_anchor_y'],
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
@@ -626,6 +626,7 @@
         distressFalloff: gl.getUniformLocation(program, 'u_distress_falloff'),
         halftoneAngle:   gl.getUniformLocation(program, 'u_halftone_angle'),
         halftoneLuma:    gl.getUniformLocation(program, 'u_halftone_luma'),
+        halftoneShape:   gl.getUniformLocation(program, 'u_halftone_shape'),
         // Internal letter-texture state (not uniform locations).
         _texCanvases:    texCanvases,
         _texCtxs:        texCtxs,
@@ -723,6 +724,7 @@
       gl.uniform1f(u.distressFalloff, v.u_distress_falloff != null ? v.u_distress_falloff       : 0.0);
       gl.uniform1f(u.halftoneAngle, (v.u_halftone_angle != null ? v.u_halftone_angle : 45.0) * Math.PI / 180.0);
       gl.uniform1f(u.halftoneLuma,  v.u_halftone_luma  != null ? v.u_halftone_luma  : 0.0);
+      gl.uniform1f(u.halftoneShape, v.u_halftone_shape != null ? parseFloat(v.u_halftone_shape) : 0.0);
     },
   });
 }());
