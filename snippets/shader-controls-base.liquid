@@ -149,6 +149,12 @@ var FINISH_CONTROLS_PRE = [
   { key: 'u_halftone_angle',   label: 'Angle',        type: 'range', min: 0, max: 180,  step: 1,    value: 45,  noRandomize: true, grainDependent: 4 },
   { key: 'u_halftone_luma',   label: 'Luma Drive',   type: 'range', min: 0, max: 1,    step: 0.01, value: 0.0, noRandomize: true, grainDependent: 4,
     tip: 'At 1, dot size follows brightness — brighter areas get bigger dots. At 0, all dots are the same size.' },
+  { key: 'u_halftone_shape', label: 'Dot Shape',   type: 'select', value: '0', noRandomize: true, grainDependent: 4,
+    options: [
+      { label: 'Circle',  value: '0' },
+      { label: 'Square',  value: '1' },
+      { label: 'Diamond', value: '2' }
+    ] },
   { key: 'u_distress_falloff', label: 'Edge Falloff', type: 'range', min: 0, max: 1, step: 0.05, value: 0.0, noRandomize: true,
     tip: 'At 0, distress is uniform. At 1, distress concentrates at edges and corners.' },
 ];

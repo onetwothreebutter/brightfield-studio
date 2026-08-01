@@ -205,7 +205,7 @@
     stateKey:       '_demoState',
     exportKey:      '_demoExport',
     animateValues:  true,
-    instantKeys:    ['textX', 'textY', 'textFontSize', 'outlineWidth', 'u_opacity', 'u_distress_0', 'u_distress_scale_0', 'u_distress_1', 'u_distress_scale_1', 'u_distress_2', 'u_distress_scale_2', 'u_distress_3', 'u_distress_scale_3', 'u_distress_4', 'u_distress_scale_4', 'u_halftone_angle', 'u_halftone_luma', 'u_grain_mode', 'u_distress_falloff', 'u_pos_x', 'u_pos_y', 'u_scale', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right', 'u_vignette_anchor_x', 'u_vignette_anchor_y'],
+    instantKeys:    ['textX', 'textY', 'textFontSize', 'outlineWidth', 'u_opacity', 'u_distress_0', 'u_distress_scale_0', 'u_distress_1', 'u_distress_scale_1', 'u_distress_2', 'u_distress_scale_2', 'u_distress_3', 'u_distress_scale_3', 'u_distress_4', 'u_distress_scale_4', 'u_halftone_angle', 'u_halftone_luma', 'u_grain_mode', 'u_halftone_shape', 'u_distress_falloff', 'u_pos_x', 'u_pos_y', 'u_scale', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right', 'u_vignette_anchor_x', 'u_vignette_anchor_y'],
     fragSrc:        fragSrc,
 
     setup: function (gl, program) {
@@ -246,6 +246,7 @@
         distressFalloff: loc('u_distress_falloff'),
         halftoneAngle:   loc('u_halftone_angle'),
         halftoneLuma:    loc('u_halftone_luma'),
+        halftoneShape:   loc('u_halftone_shape'),
         posX:                loc('u_pos_x'),
         posY:                loc('u_pos_y'),
         scale:               loc('u_scale'),
@@ -293,6 +294,7 @@
       gl.uniform1f(u.distressFalloff,  v.u_distress_falloff != null ? v.u_distress_falloff : 0.0);
       gl.uniform1f(u.halftoneAngle, (v.u_halftone_angle != null ? v.u_halftone_angle : 45.0) * Math.PI / 180.0);
       gl.uniform1f(u.halftoneLuma,  v.u_halftone_luma  != null ? v.u_halftone_luma  : 0.0);
+      gl.uniform1f(u.halftoneShape, v.u_halftone_shape != null ? parseFloat(v.u_halftone_shape) : 0.0);
       gl.uniform1f(u.posX,          v.u_pos_x          != null ? v.u_pos_x          : 0.0);
       gl.uniform1f(u.posY,          v.u_pos_y          != null ? v.u_pos_y          : 0.0);
       gl.uniform1f(u.scale,         v.u_scale          != null ? v.u_scale          : 1.0);

@@ -226,6 +226,7 @@
         distressFalloff: gl.getUniformLocation(program, 'u_distress_falloff'),
         halftoneAngle:   gl.getUniformLocation(program, 'u_halftone_angle'),
         halftoneLuma:    gl.getUniformLocation(program, 'u_halftone_luma'),
+        halftoneShape:   gl.getUniformLocation(program, 'u_halftone_shape'),
         vignetteTop:     gl.getUniformLocation(program, 'u_vignette_top'),
         vignetteBottom:  gl.getUniformLocation(program, 'u_vignette_bottom'),
         vignetteLeft:    gl.getUniformLocation(program, 'u_vignette_left'),
@@ -270,6 +271,7 @@
       gl.uniform1f(u.distressFalloff, v.u_distress_falloff != null ? v.u_distress_falloff : 0.0);
       gl.uniform1f(u.halftoneAngle, (v.u_halftone_angle != null ? v.u_halftone_angle : 45.0) * Math.PI / 180.0);
       gl.uniform1f(u.halftoneLuma, v.u_halftone_luma != null ? v.u_halftone_luma : 0.0);
+      gl.uniform1f(u.halftoneShape, v.u_halftone_shape != null ? parseFloat(v.u_halftone_shape) : 0.0);
       gl.uniform1f(u.vignetteTop, v.u_vignette_top != null ? v.u_vignette_top : 0.0);
       gl.uniform1f(u.vignetteBottom, v.u_vignette_bottom != null ? v.u_vignette_bottom : 0.0);
       gl.uniform1f(u.vignetteLeft, v.u_vignette_left != null ? v.u_vignette_left : 0.0);
