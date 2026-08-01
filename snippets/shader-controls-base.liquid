@@ -49,9 +49,17 @@ var FOUR_STOP_PRESETS = {
   'Jamaica':       { c0: [0.0,   0.608, 0.227], c1: [0.996, 0.820, 0.0  ], c2: [0.102, 0.102, 0.102], c3: [0.0,   0.608, 0.227] },
 };
 
+// Shaders gamma-encode finalColor with pow(x, 1/2.2) before output, so uniform
+// colors must be supplied pre-linearized (pow(x, 2.2)) for the picker's sRGB
+// hex to round-trip correctly. These are exact inverses of one another.
+function srgbToLinear(c) { return Math.pow(c, 2.2); }
+function linearToSrgb(c) { return Math.pow(c, 1 / 2.2); }
+
+// v is a linear-space [r,g,b] uniform value; returns the sRGB hex a user would
+// see in the color picker for that value.
 function toHex(v) {
   return '#' + v.map(function (x) {
-    var b = Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16);
+    var b = Math.round(Math.max(0, Math.min(1, linearToSrgb(x))) * 255).toString(16);
     return b.length === 1 ? '0' + b : b;
   }).join('');
 }
@@ -76,12 +84,16 @@ function vividHex(hue) {
   }).join('');
 }
 
+// keyValPairs values are sRGB-intent [r,g,b] arrays (same convention as a hex
+// swatch, e.g. preset color entries) — linearize before storing so they match
+// what the picker's own input handler would have produced for the same color.
 function applyColors(keyValPairs) {
   keyValPairs.forEach(function (pair) {
-    window._shaderState.values[pair[0]] = pair[1];
+    var linear = pair[1].map(srgbToLinear);
+    window._shaderState.values[pair[0]] = linear;
     var inp = document.querySelector('[data-param-key="' + pair[0] + '"]');
     if (inp) {
-      inp.value = toHex(pair[1]);
+      inp.value = toHex(linear);
       inp.dispatchEvent(new Event('input', { bubbles: true }));
     }
   });
