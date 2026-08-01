@@ -672,6 +672,8 @@
 
 <script>
 (function () {
+  {% render 'shader-color-utils' %}
+
   // ── Preset data ────────────────────────────────────────────────────────────
   // Each preset is self-contained: mode 0 = cosine (a/b/c/d), mode 1 = 4-stop (c0–c3).
   // Synced with COSINE_PRESETS / FOUR_STOP_PRESETS in shader-controls-base.liquid.
@@ -882,17 +884,17 @@
     setMode(p.mode);
     if (p.mode === 0) {
       v.u_palette_a = p.a; v.u_palette_b = p.b; v.u_palette_c = p.c; v.u_palette_d = p.d;
-      if (paletteAInput) paletteAInput.value = rgbToHex(v.u_palette_a, 'u_palette_a');
-      if (paletteBInput) paletteBInput.value = rgbToHex(v.u_palette_b, 'u_palette_b');
-      if (paletteCInput) paletteCInput.value = rgbToHex(v.u_palette_c, 'u_palette_c');
-      if (paletteDInput) paletteDInput.value = rgbToHex(v.u_palette_d, 'u_palette_d');
+      if (paletteAInput) paletteAInput.value = toHex(v.u_palette_a, 'u_palette_a');
+      if (paletteBInput) paletteBInput.value = toHex(v.u_palette_b, 'u_palette_b');
+      if (paletteCInput) paletteCInput.value = toHex(v.u_palette_c, 'u_palette_c');
+      if (paletteDInput) paletteDInput.value = toHex(v.u_palette_d, 'u_palette_d');
     } else {
       v.u_color0 = p.c0.map(srgbToLinear); v.u_color1 = p.c1.map(srgbToLinear);
       v.u_color2 = p.c2.map(srgbToLinear); v.u_color3 = p.c3.map(srgbToLinear);
-      if (color0Input) color0Input.value = rgbToHex(v.u_color0);
-      if (color1Input) color1Input.value = rgbToHex(v.u_color1);
-      if (color2Input) color2Input.value = rgbToHex(v.u_color2);
-      if (color3Input) color3Input.value = rgbToHex(v.u_color3);
+      if (color0Input) color0Input.value = toHex(v.u_color0);
+      if (color1Input) color1Input.value = toHex(v.u_color1);
+      if (color2Input) color2Input.value = toHex(v.u_color2);
+      if (color3Input) color3Input.value = toHex(v.u_color3);
     }
     if (colorModeSel) {
       colorModeSel.value = String(p.mode);
@@ -952,41 +954,11 @@
     dotsWrap.style.display = 'none';
   }
 
-  // Shader gamma-encodes finalColor with pow(x, 1/2.2) before output, so
-  // literal color uniforms must be supplied pre-linearized for the picker's
-  // sRGB hex to round-trip correctly. These are exact inverses of one another.
-  function srgbToLinear(c) { return Math.pow(c, 2.2); }
-  function linearToSrgb(c) { return Math.pow(c, 1 / 2.2); }
-
-  // u_palette_a-d are cosine-palette curve coefficients (see cosinePalette in
-  // homepage-demo-shader.js), not literal colors — they routinely go outside
-  // [0,1] or negative, so they must bypass the sRGB<->linear transform below.
-  var PALETTE_COEFF_KEYS = { u_palette_a: true, u_palette_b: true, u_palette_c: true, u_palette_d: true };
-
-  function hexToRgb(hex, key) {
-    var vals = [
-      parseInt(hex.slice(1, 3), 16) / 255,
-      parseInt(hex.slice(3, 5), 16) / 255,
-      parseInt(hex.slice(5, 7), 16) / 255,
-    ];
-    return PALETTE_COEFF_KEYS[key] ? vals : vals.map(srgbToLinear);
-  }
-
-  // arr is a [r,g,b] uniform value (linear-space, unless key is a palette coefficient).
-  function rgbToHex(arr, key) {
-    var raw = PALETTE_COEFF_KEYS[key];
-    return '#' + arr.map(function (x) {
-      var enc = raw ? x : linearToSrgb(x);
-      var b = Math.round(Math.max(0, Math.min(1, enc)) * 255).toString(16);
-      return b.length === 1 ? '0' + b : b;
-    }).join('');
-  }
-
   function encodeState(values) {
     var out = {};
     Object.keys(values).forEach(function (k) {
       var v = values[k];
-      out[k] = Array.isArray(v) ? rgbToHex(v, k) : v;
+      out[k] = Array.isArray(v) ? toHex(v, k) : v;
     });
     return btoa(JSON.stringify(out)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
@@ -1850,14 +1822,14 @@
       if (triWidthInput)        { triWidthInput.value       = v.u_tri_width;            triWidthDisp.textContent         = v.u_tri_width; }
       if (centerCircleEnabledBtn) { var ccOn = !!v.u_center_circle_enabled; centerCircleEnabledBtn.dataset.on = ccOn ? '1' : '0'; centerCircleEnabledBtn.textContent = ccOn ? 'On' : 'Off'; centerCircleEnabledBtn.classList.toggle('is-on', ccOn); }
       if (colorModeSel)           colorModeSel.value = v.u_color_mode;
-      if (paletteAInput)          paletteAInput.value = rgbToHex(v.u_palette_a, 'u_palette_a');
-      if (paletteBInput)          paletteBInput.value = rgbToHex(v.u_palette_b, 'u_palette_b');
-      if (paletteCInput)          paletteCInput.value = rgbToHex(v.u_palette_c, 'u_palette_c');
-      if (paletteDInput)          paletteDInput.value = rgbToHex(v.u_palette_d, 'u_palette_d');
-      if (color0Input)            color0Input.value   = rgbToHex(v.u_color0);
-      if (color1Input)            color1Input.value   = rgbToHex(v.u_color1);
-      if (color2Input)            color2Input.value   = rgbToHex(v.u_color2);
-      if (color3Input)            color3Input.value   = rgbToHex(v.u_color3);
+      if (paletteAInput)          paletteAInput.value = toHex(v.u_palette_a, 'u_palette_a');
+      if (paletteBInput)          paletteBInput.value = toHex(v.u_palette_b, 'u_palette_b');
+      if (paletteCInput)          paletteCInput.value = toHex(v.u_palette_c, 'u_palette_c');
+      if (paletteDInput)          paletteDInput.value = toHex(v.u_palette_d, 'u_palette_d');
+      if (color0Input)            color0Input.value   = toHex(v.u_color0);
+      if (color1Input)            color1Input.value   = toHex(v.u_color1);
+      if (color2Input)            color2Input.value   = toHex(v.u_color2);
+      if (color3Input)            color3Input.value   = toHex(v.u_color3);
       if (textInput)              textInput.value     = v.text || '';
       if (textFontSel)            textFontSel.value   = v.textFont || 'Oswald';
       if (textSizeInput)        { textSizeInput.value = v.textFontSize;                 textSizeDisp.textContent         = v.textFontSize; }
@@ -1865,10 +1837,10 @@
       if (textYInput)           { textYInput.value    = v.textY;                        textYDisp.textContent            = v.textY; }
       if (enableTextBtn)        { var txtOn = !!v.text; enableTextBtn.dataset.on = txtOn ? '1' : '0'; enableTextBtn.textContent = txtOn ? 'On' : 'Off'; enableTextBtn.classList.toggle('is-on', txtOn); }
       if (useTextColorBtn)      { var utcOn = !!v.u_use_text_color; useTextColorBtn.dataset.on = utcOn ? '1' : '0'; useTextColorBtn.textContent = utcOn ? 'On' : 'Off'; useTextColorBtn.classList.toggle('is-on', utcOn); if (textColorRow) textColorRow.style.display = utcOn ? 'grid' : 'none'; }
-      if (textColorInput)         textColorInput.value = rgbToHex(v.u_text_color);
+      if (textColorInput)         textColorInput.value = toHex(v.u_text_color);
       if (outlineBtn)           { var olOn = !!v.outlineEnabled; outlineBtn.dataset.on = olOn ? '1' : '0'; outlineBtn.textContent = olOn ? 'On' : 'Off'; outlineBtn.classList.toggle('is-on', olOn); if (outlineWidthRow) outlineWidthRow.style.display = olOn ? 'grid' : 'none'; if (outlineColorRow) outlineColorRow.style.display = olOn ? 'grid' : 'none'; }
       if (outlineWidthInput)    { outlineWidthInput.value   = v.outlineWidth;           outlineWidthDisp.textContent     = v.outlineWidth; }
-      if (outlineColorInput)      outlineColorInput.value   = rgbToHex(v.u_outline_color);
+      if (outlineColorInput)      outlineColorInput.value   = toHex(v.u_outline_color);
       if (opacityInput)         { opacityInput.value        = v.u_opacity;              opacityDisp.textContent          = parseFloat(v.u_opacity).toFixed(2); }
       if (grainModeSelect)      { var _gm = v.u_grain_mode != null ? Math.round(v.u_grain_mode) : 0; grainModeSelect.value = String(_gm); applyGrainVisibility(_gm); }
       [0, 1, 2, 3].forEach(function (g) {
