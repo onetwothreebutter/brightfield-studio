@@ -3,12 +3,12 @@
     "hero": {
       "type": "hero",
       "settings": {
-        "eyebrow": "Wearable Shader Art",
-        "heading": "",
-        "subheading": "T-shirts generated from WebGL shaders. Every design is a living program.",
-        "cta_label": "Shop the Collection",
+        "eyebrow": "Part Art, Part Code",
+        "heading": "Source Code for Your Shirt",
+        "subheading": "We use code to generate and discover artistic t‑shirt designs.",
+        "cta_label": "Shop Now",
         "cta_url": "/collections/in-house-designs",
-        "cta2_label": "Make it Yours",
+        "cta2_label": "Discover",
         "cta2_url": "/#shader-demo"
       }
     },

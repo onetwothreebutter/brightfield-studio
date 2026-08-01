@@ -108,20 +108,17 @@
         </div>
 
         {%- comment -%}
-          Default size selection: prefer M over the first variant (XS). With a
-          no-returns policy an accidental-XS order is a straight loss, so never
-          preselect the smallest size. An explicit ?variant= deep link
-          (product.selected_variant) still wins.
+          No size is preselected — the shopper must explicitly choose one
+          (validated on submit below). With a no-returns policy, an
+          accidental default-size order is a straight loss. An explicit
+          ?variant= deep link (product.selected_variant) still wins, since
+          that reflects an intentional choice rather than a default.
+          default_variant is used only where a variant value is structurally
+          required (price display, single-variant products) — never to mark
+          a size as pre-checked.
         {%- endcomment -%}
         {%- assign default_variant = product.selected_or_first_available_variant -%}
-        {%- unless product.selected_variant -%}
-          {%- for v in product.variants -%}
-            {%- if v.available and v.option1 == 'M' -%}
-              {%- assign default_variant = v -%}
-              {%- break -%}
-            {%- endif -%}
-          {%- endfor -%}
-        {%- endunless -%}
+        {%- assign preselected_variant = product.selected_variant -%}
 
         <!-- Shader panel — only shown when product has a shader-[file] tag -->
         {%- if shader_file -%}
@@ -143,11 +140,12 @@
                   <div class="mockup-modal__size">
                     <label class="mockup-modal__size-label" for="mockup-size-select">Size</label>
                     <select id="mockup-size-select" class="mockup-modal__size-select">
+                      <option value="" selected disabled>Select a size</option>
                       {%- for variant in product.variants -%}
                         <option
                           value="{{ variant.id }}"
                           data-price="{{ variant.price | money | escape }}"
-                          {% if variant.id == default_variant.id %}selected{% endif %}
+                          {% if preselected_variant and variant.id == preselected_variant.id %}selected{% endif %}
                           {% unless variant.available %}disabled{% endunless %}
                         >
                           {{ variant.title }}
@@ -236,7 +234,7 @@
                           type="radio"
                           name="options[{{ option.name | escape }}]"
                           value="{{ value | escape }}"
-                          {% if default_variant.options[opt_idx] == value %}checked{% endif %}
+                          {% if preselected_variant and preselected_variant.options[opt_idx] == value %}checked{% endif %}
                         >
                         <span>{{ value | escape }}</span>
                       </label>
@@ -245,12 +243,15 @@
                 </fieldset>
               {%- endfor -%}
 
+              <p class="variant-error" id="variant-error" role="alert" tabindex="-1" style="display:none">Please select a size.</p>
+
               <select name="id" class="variant-select visually-hidden">
+                <option value="" selected>Select a size</option>
                 {%- for variant in product.variants -%}
                   <option
                     value="{{ variant.id }}"
                     data-variant-title="{{ variant.title | escape }}"
-                    {% if variant.id == default_variant.id %}selected{% endif %}
+                    {% if preselected_variant and variant.id == preselected_variant.id %}selected{% endif %}
                     {% unless variant.available %}disabled{% endunless %}
                   >
                     {{ variant.title }}
@@ -316,6 +317,7 @@
         (function () {
           var form        = document.querySelector('#product-order-form form');
           var variantSel  = form && form.querySelector('select.variant-select');
+          var errorEl     = document.getElementById('variant-error');
           if (!form || !variantSel) return;
 
           function syncVariant() {
@@ -329,13 +331,40 @@
             for (var i = 0; i < options.length; i++) {
               if (options[i].dataset.variantTitle === title) {
                 variantSel.value = options[i].value;
+                hideVariantError();
                 return;
               }
             }
           }
 
+          function showVariantError() {
+            if (!errorEl) return;
+            errorEl.style.display = '';
+            errorEl.focus();
+            form.querySelectorAll('.variant-fieldset').forEach(function (fs) {
+              if (!fs.querySelector('input[type="radio"]:checked')) {
+                fs.classList.add('variant-fieldset--invalid');
+              }
+            });
+          }
+
+          function hideVariantError() {
+            if (!errorEl || errorEl.style.display === 'none') return;
+            errorEl.style.display = 'none';
+            form.querySelectorAll('.variant-fieldset').forEach(function (fs) {
+              fs.classList.remove('variant-fieldset--invalid');
+            });
+          }
+
           form.querySelectorAll('input[type="radio"]').forEach(function (radio) {
             radio.addEventListener('change', syncVariant);
+          });
+
+          form.addEventListener('submit', function (e) {
+            if (!variantSel.value) {
+              e.preventDefault();
+              showVariantError();
+            }
           });
         })();
         </script>
@@ -883,6 +912,57 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
 
       row.appendChild(sel);
       controlEls.push({ ctrl: ctrl, el: sel });
+
+      // Palette/4-stop presets: render as tappable swatches instead of the
+      // dropdown. `sel` stays in the DOM (hidden) as the source of truth —
+      // randomize/restore/share all already set its value + dispatch
+      // 'change', so the swatch UI just mirrors it instead of duplicating
+      // that wiring.
+      if (ctrl.swatchPreview) {
+        sel.className += ' shader-control__select--swatch-source';
+        sel.tabIndex = -1;
+        sel.setAttribute('aria-hidden', 'true');
+
+        var presetsMap  = ctrl.swatchPreview === 'fourstop' ? FOUR_STOP_PRESETS : COSINE_PRESETS;
+        var gradientFor = ctrl.swatchPreview === 'fourstop' ? fourStopPresetGradient : cosinePresetGradient;
+
+        var swatchScroll = document.createElement('div');
+        swatchScroll.className = 'shader-control__swatch-scroll';
+
+        var swatchBtns = {};
+        ctrl.options.forEach(function (opt) {
+          var preset = presetsMap[opt.value];
+          if (!preset) return;
+
+          var swatchBtn = document.createElement('button');
+          swatchBtn.type = 'button';
+          swatchBtn.className = 'shader-control__swatch';
+          swatchBtn.style.background = gradientFor(preset);
+          swatchBtn.title = opt.label;
+          swatchBtn.setAttribute('aria-label', opt.label);
+          swatchBtn.setAttribute('aria-pressed', opt.value === sel.value ? 'true' : 'false');
+          swatchBtn.classList.toggle('is-selected', opt.value === sel.value);
+
+          swatchBtn.addEventListener('click', function () {
+            if (sel.value === opt.value) return;
+            sel.value = opt.value;
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+
+          swatchBtns[opt.value] = swatchBtn;
+          swatchScroll.appendChild(swatchBtn);
+        });
+
+        sel.addEventListener('change', function () {
+          Object.keys(swatchBtns).forEach(function (v) {
+            var isSelected = v === sel.value;
+            swatchBtns[v].classList.toggle('is-selected', isSelected);
+            swatchBtns[v].setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+          });
+        });
+
+        row.appendChild(swatchScroll);
+      }
     }
 
     if (ctrl.paletteDependent)   paletteDependentRows.push(row);

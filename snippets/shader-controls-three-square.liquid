@@ -18,7 +18,7 @@ var controls = [
   { key: 'u_global_gradient', label: 'Global Gradient', type: 'toggle', value: 0,
     tip: 'Off = each square has its own gradient. On = gradient spans all squares.' },
   // Cosine palette controls (hidden when 4-Stop mode is on)
-  { key: '_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
+  { key: '_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow', swatchPreview: 'cosine',
     options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
   { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
@@ -30,7 +30,7 @@ var controls = [
   { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab',
     tip: 'Phase — shifts the starting hue of the color cycle.' },
   // 4-stop color controls (hidden when cosine/palette mode is on)
-  { key: '_ts_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Retro',
+  { key: '_ts_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Retro', swatchPreview: 'fourstop',
     options: Object.keys(FOUR_STOP_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
   { key: 'u_color0', label: 'Color 1', type: 'color', stopDependent: true, value: '#e8491d' },

@@ -12,7 +12,7 @@ const scriptMatch = liquid.match(/<script>\s*(\(function\s*\(\)\s*\{[\s\S]*?vari
 if (!scriptMatch) throw new Error('Could not find variant sync script in main-product.liquid');
 const variantSyncSrc = scriptMatch[1];
 
-function buildForm(variants) {
+function buildForm(variants, { preselectFirst = true } = {}) {
   // variants: [{ id, options: ['Small', 'Red'], available: true }, ...]
   // options: array of unique option names, e.g. ['Size', 'Color']
   const optionNames = Object.keys(variants[0].options);
@@ -32,29 +32,39 @@ function buildForm(variants) {
       radio.type = 'radio';
       radio.name = `options[${optName}]`;
       radio.value = val;
-      if (i === 0) radio.checked = true; // first is selected by default
+      if (preselectFirst && i === 0) radio.checked = true; // first is selected by default
       label.appendChild(radio);
       fieldset.appendChild(label);
     }
     form.appendChild(fieldset);
   }
 
+  // Error message (mirrors #variant-error in the real markup)
+  const errorEl = document.createElement('p');
+  errorEl.id = 'variant-error';
+  errorEl.style.display = 'none';
+  form.appendChild(errorEl);
+
   // Hidden variant select
   const select = document.createElement('select');
   select.name = 'id';
   select.className = 'variant-select visually-hidden';
+  const blankOpt = document.createElement('option');
+  blankOpt.value = '';
+  if (!preselectFirst) blankOpt.selected = true;
+  select.appendChild(blankOpt);
   for (const [i, v] of variants.entries()) {
     const opt = document.createElement('option');
     opt.value = String(v.id);
     opt.dataset.variantTitle = Object.values(v.options).join(' / ');
     if (!v.available) opt.disabled = true;
-    if (i === 0) opt.selected = true;
+    if (preselectFirst && i === 0) opt.selected = true;
     select.appendChild(opt);
   }
   form.appendChild(select);
   wrapper.appendChild(form);
   document.body.appendChild(wrapper);
-  return { form, select, wrapper };
+  return { form, select, wrapper, errorEl };
 }
 
 function runScript() {
@@ -154,6 +164,50 @@ describe('two options (size + color)', () => {
     pickRadio(form, 'Size', 'M');
     pickRadio(form, 'Color', 'White');
     expect(select.value).toBe('203');
+  });
+});
+
+// ── submit validation (no size preselected) ─────────────────────────────────────
+
+describe('submit validation', () => {
+  const variants = [
+    { id: 100, options: { Size: 'XS' }, available: true },
+    { id: 101, options: { Size: 'S'  }, available: true },
+    { id: 102, options: { Size: 'M'  }, available: true },
+    { id: 103, options: { Size: 'L'  }, available: true },
+  ];
+
+  function submit(form) {
+    const evt = new Event('submit', { bubbles: true, cancelable: true });
+    const notCancelled = form.dispatchEvent(evt);
+    return !notCancelled; // true if preventDefault() was called
+  }
+
+  it('blocks submission and shows the error when no size is selected', () => {
+    const { form, errorEl } = buildForm(variants, { preselectFirst: false });
+    runScript();
+    expect(submit(form)).toBe(true);
+    expect(errorEl.style.display).not.toBe('none');
+    expect(form.querySelector('.variant-fieldset').classList.contains('variant-fieldset--invalid')).toBe(true);
+  });
+
+  it('allows submission once a size is selected', () => {
+    const { form, errorEl } = buildForm(variants, { preselectFirst: false });
+    runScript();
+    pickRadio(form, 'Size', 'M');
+    expect(submit(form)).toBe(false);
+    expect(errorEl.style.display).toBe('none');
+  });
+
+  it('clears the error once a size is picked after a failed submit', () => {
+    const { form, errorEl } = buildForm(variants, { preselectFirst: false });
+    runScript();
+    submit(form);
+    expect(form.querySelector('.variant-fieldset').classList.contains('variant-fieldset--invalid')).toBe(true);
+
+    pickRadio(form, 'Size', 'S');
+    expect(errorEl.style.display).toBe('none');
+    expect(form.querySelector('.variant-fieldset').classList.contains('variant-fieldset--invalid')).toBe(false);
   });
 });
 

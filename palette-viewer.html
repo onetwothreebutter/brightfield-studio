@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Palette Viewer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #111;
+    color: #eee;
+    font-family: 'IBM Plex Mono', 'Menlo', monospace;
+    font-size: 12px;
+    padding: 24px 32px 64px;
+  }
+
+  h1 {
+    font-size: 16px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #eee;
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    color: #666;
+    margin-bottom: 28px;
+  }
+
+  h2 {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #0cf;
+    border-bottom: 1px solid #2a2a2a;
+    padding-bottom: 8px;
+    margin: 32px 0 16px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+  }
+
+  .card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 4px;
+    padding: 10px;
+    cursor: grab;
+    transition: border-color 0.15s;
+  }
+  .card:hover { border-color: #0cf; }
+  .card:active { cursor: grabbing; }
+
+  .swatch {
+    height: 48px;
+    border-radius: 3px;
+    margin-bottom: 8px;
+  }
+
+  .stops {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+
+  .stop {
+    height: 22px;
+    width: 100%;
+    border: none;
+    border-radius: 2px;
+    padding: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .stop::-webkit-color-swatch-wrapper { padding: 0; border-radius: 2px; }
+  .stop::-webkit-color-swatch { border: none; border-radius: 2px; }
+  .stop::-moz-color-swatch { border: none; border-radius: 2px; }
+
+  .name {
+    color: #ccc;
+  }
+
+  .copied-flag {
+    color: #0cf;
+    font-size: 10px;
+    visibility: hidden;
+  }
+  .card.copied .copied-flag { visibility: visible; }
+  .card.copied .name { visibility: hidden; }
+
+  .grid-4up {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+
+  .shader-preview {
+    background: #000;
+    border: 1px solid #2a2a2a;
+    border-radius: 4px;
+    aspect-ratio: 3 / 4;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .shader-preview.drag-over {
+    border-color: #0cf;
+    box-shadow: inset 0 0 0 2px rgba(0, 204, 255, 0.35);
+  }
+  .shader-preview canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .preview-select {
+    width: 100%;
+    margin-top: 8px;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 3px;
+    color: #0cf;
+    font-family: inherit;
+    font-size: 12px;
+    padding: 4px 8px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<h1>Color Palettes</h1>
+<div class="subtitle">All COSINE_PRESETS and FOUR_STOP_PRESETS from snippets/shader-controls-base.liquid — click a card to copy its JS entry, or drag a four-stop swatch to preview an edit.</div>
+
+<h2>Cosine Palettes</h2>
+<div class="grid" id="cosine-grid"></div>
+
+<h2>Four-Stop Palettes</h2>
+<div class="grid" id="fourstop-grid"></div>
+
+<h2>Trending (coolors.co)</h2>
+<div class="subtitle" style="margin-bottom: 16px;">Top 10 from coolors.co/palettes/trending, pulled 2026-07-30 — for comparison only, not wired into any shader.</div>
+<div class="grid" id="trending-grid"></div>
+
+<h2>Contour Pareidolia — 4-Up Preview</h2>
+<div class="subtitle" style="margin-bottom: 16px;">assets/contour-pareidolia.js rendered live. Pick a palette from a dropdown, or drag any card from above onto a preview.</div>
+<div class="grid-4up" id="contour-4up"></div>
+
+<script src="assets/shader-base.js"></script>
+<script>
+// Kept in sync manually with snippets/shader-controls-base.liquid
+var COSINE_PRESETS = {
+  'Rainbow':   { a: [0.5,  0.5,  0.5 ], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.0,   0.33,  0.67]  },
+  'Cool Blue': { a: [0.5,  0.5,  0.5 ], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.263, 0.416, 0.557] },
+  'Neon Heat': { a: [0.5,  0.5,  0.5 ], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 1.0], d: [0.3,   0.2,   0.2  ] },
+  'Cyberpunk': { a: [0.5,  0.5,  0.5 ], b: [0.5, 0.5, 0.5], c: [2.0, 1.0, 0.0], d: [0.5,   0.2,   0.25 ] },
+  'Golden':    { a: [0.5,  0.5,  0.5 ], b: [0.5, 0.5, 0.5], c: [1.0, 1.0, 0.5], d: [0.8,   0.9,   0.3  ] },
+  'Synthwave': { a: [0.5,  0.2,  0.7 ], b: [0.5, 0.4, 0.3], c: [0.8, 1.0, 1.2], d: [0.5,   0.25,  0.65 ] },
+  'Pastel':    { a: [0.75, 0.65, 0.75], b: [0.2, 0.2, 0.2], c: [1.0, 1.0, 1.0], d: [0.0,   0.33,  0.67 ] },
+  'Arctic':    { a: [0.5,  0.6,  0.7 ], b: [0.3, 0.3, 0.3], c: [1.0, 0.8, 0.5], d: [0.0,   0.1,   0.3  ] },
+  'Mexican':   { a: [0.70, 0.25, 0.55], b: [0.5, 0.35, 0.3], c: [1.0, 1.0, 0.8], d: [0.0,   0.25,  0.60 ] },
+  'Inferno':   { a: [0.8,  0.3,  0.1 ], b: [0.5, 0.4,  0.2], c: [1.0, 1.0, 2.0], d: [0.0,   0.1,   0.25 ] },
+  'Ocean':     { a: [0.2,  0.5,  0.6 ], b: [0.2, 0.3,  0.4], c: [1.0, 1.0, 1.0], d: [0.0,   0.15,  0.3  ] },
+  'Vaporwave': { a: [0.6,  0.3,  0.7 ], b: [0.4, 0.3,  0.3], c: [1.0, 2.0, 1.0], d: [0.0,   0.5,   0.25 ] },
+  'Acid':      { a: [0.5,  0.6,  0.0 ], b: [0.5, 0.4,  0.2], c: [2.0, 1.0, 1.0], d: [0.0,   0.25,  0.0  ] },
+  'Warm Earth':{ a: [0.8,  0.5,  0.4 ], b: [0.2, 0.4,  0.2], c: [2.0, 1.0, 1.0], d: [0.0,   0.25,  0.25 ] },
+  'Violet':    { a: [0.4,  0.3,  0.6 ], b: [0.3, 0.2,  0.4], c: [1.0, 1.0, 1.0], d: [0.0,   0.1,   0.0  ] },
+  'Coral Reef':      { a: [0.500, 0.650, 0.575], b: [0.500,  -0.150, -0.175], c: [1.0, 1.0, 1.0], d: [0.0, 0.0, 0.0] },
+  'Sakura':          { a: [0.540, 0.500, 0.485], b: [0.440,   0.250,  0.335], c: [1.0, 1.0, 1.0], d: [0.0, 0.0, 0.0] },
+  'Terracotta':      { a: [0.825, 0.575, 0.420], b: [-0.105, -0.225, -0.180], c: [1.0, 1.0, 1.0], d: [0.0, 0.0, 0.0] },
+  'Lavender Field':  { a: [0.775, 0.660, 0.635], b: [-0.155, -0.140,  0.185], c: [1.0, 1.0, 1.0], d: [0.0, 0.0, 0.0] },
+  'Bioluminescent':  { a: [0.090, 0.500, 0.435], b: [-0.060, -0.450, -0.315], c: [1.0, 1.0, 1.0], d: [0.0, 0.0, 0.0] },
+  'Holographic':     { a: [0.5,   0.5,   0.5  ], b: [0.5,     0.5,    0.5  ], c: [3.0, 2.0, 1.0], d: [0.0, 0.1, 0.2] },
+};
+
+var FOUR_STOP_PRESETS = {
+  'Neon':     { c0: [1.0,  0.2,   0.4  ], c1: [1.0,  0.8,   0.0  ], c2: [0.0,  0.8,   1.0  ], c3: [0.667, 0.0,   1.0  ] },
+  'Retro':    { c0: [0.91, 0.286, 0.114], c1: [0.788, 0.627, 0.188], c2: [0.176, 0.541, 0.369], c3: [0.102, 0.153, 0.267] },
+  'Sunset':   { c0: [1.0,  0.318, 0.184], c1: [0.867, 0.141, 0.463], c2: [0.541, 0.169, 0.886], c3: [0.098, 0.098, 0.439] },
+  'Aurora':   { c0: [0.0,  1.0,   0.533], c1: [0.0,   0.898, 1.0  ], c2: [0.486, 0.302, 1.0  ], c3: [0.878, 0.251, 0.984] },
+  'Dusk':     { c0: [1.0,  0.6,   0.4  ], c1: [1.0,   0.369, 0.384], c2: [0.8,   0.169, 0.369], c3: [0.459, 0.227, 0.533] },
+  'Midnight': { c0: [0.04, 0.12,  0.30 ], c1: [0.02,  0.22,  0.32 ], c2: [0.14,  0.06,  0.32 ], c3: [0.06,  0.04,  0.16 ] },
+  'Ember':    { c0: [0.58, 0.14,  0.02 ], c1: [0.35,  0.06,  0.04 ], c2: [0.16,  0.04,  0.06 ], c3: [0.05,  0.03,  0.02 ] },
+  'Obsidian': { c0: [0.06, 0.04,  0.04 ], c1: [0.22,  0.04,  0.28 ], c2: [0.04,  0.16,  0.22 ], c3: [0.08,  0.04,  0.14 ] },
+  'Velvet':   { c0: [0.30, 0.04,  0.08 ], c1: [0.45,  0.06,  0.14 ], c2: [0.22,  0.04,  0.22 ], c3: [0.08,  0.04,  0.08 ] },
+  'Mexican':  { c0: [0.894, 0.0,  0.486], c1: [1.0,   0.420, 0.0  ], c2: [0.0,   0.773, 0.804], c3: [0.545, 0.102, 0.545] },
+  'Viridis':       { c0: [0.267, 0.005, 0.329], c1: [0.192, 0.406, 0.556], c2: [0.208, 0.718, 0.475], c3: [0.992, 0.906, 0.144] },
+  'Teal & Orange': { c0: [0.039, 0.239, 0.227], c1: [0.122, 0.714, 0.651], c2: [1.0,   0.569, 0.259], c3: [0.761, 0.255, 0.047] },
+  'Ice Cream':     { c0: [1.0,   0.702, 0.776], c1: [1.0,   0.953, 0.769], c2: [0.710, 0.918, 0.843], c3: [0.780, 0.702, 1.0  ] },
+  'Jamaica':       { c0: [0.0,   0.608, 0.227], c1: [0.996, 0.820, 0.0  ], c2: [0.102, 0.102, 0.102], c3: [0.0,   0.608, 0.227] },
+};
+
+// Snapshot from coolors.co/palettes/trending, 2026-07-30 — plain sRGB hex,
+// unlike the linear-space presets above. Reference only.
+var TRENDING_PALETTES = [
+  { name: 'Olive Garden Feast',            hexes: ['#606c38', '#283618', '#fefae0', '#dda15e', '#bc6c25'] },
+  { name: 'Pastel Dreamland Adventure',    hexes: ['#cdb4db', '#ffc8dd', '#ffafcc', '#bde0fe', '#a2d2ff'] },
+  { name: 'Fiery Ocean',                   hexes: ['#780000', '#c1121f', '#fdf0d5', '#003049', '#669bbc'] },
+  { name: 'Ocean Blue Serenity',           hexes: ['#03045e', '#023e8a', '#0077b6', '#0096c7', '#00b4d8', '#48cae4', '#90e0ef', '#ade8f4', '#caf0f8'] },
+  { name: 'Ocean Sunset',                  hexes: ['#001219', '#005f73', '#0a9396', '#94d2bd', '#e9d8a6', '#ee9b00', '#ca6702', '#bb3e03', '#ae2012', '#9b2226'] },
+  { name: 'Refreshing Summer Fun',         hexes: ['#8ecae6', '#219ebc', '#023047', '#ffb703', '#fb8500'] },
+  { name: 'Sunny Beach Day',               hexes: ['#264653', '#2a9d8f', '#e9c46a', '#f4a261', '#e76f51'] },
+  { name: 'Soft Lavender',                 hexes: ['#22223b', '#4a4e69', '#9a8c98', '#c9ada7', '#f2e9e4'] },
+  { name: 'Fresh Greens',                  hexes: ['#386641', '#6a994e', '#a7c957', '#f2e8cf', '#bc4749'] },
+  { name: 'Golden Summer Fields',          hexes: ['#ccd5ae', '#e9edc9', '#fefae0', '#faedcd', '#d4a373'] },
+];
+
+// Same gamma pass every shader applies to linear color before display
+// (see "Gamma encoding" convention in CLAUDE.md): pow(color, 1/2.2).
+function gammaHex(rgb) {
+  return '#' + rgb.map(function (x) {
+    var encoded = Math.pow(Math.max(x, 0), 1 / 2.2);
+    var b = Math.round(Math.max(0, Math.min(1, encoded)) * 255).toString(16);
+    return b.length === 1 ? '0' + b : b;
+  }).join('');
+}
+
+function cosineColorAt(t, p) {
+  return [0, 1, 2].map(function (i) {
+    return p.a[i] + p.b[i] * Math.cos(6.28318 * (p.c[i] * t + p.d[i]));
+  });
+}
+
+function cosineGradientCss(p) {
+  var steps = 32;
+  var stops = [];
+  for (var i = 0; i <= steps; i++) {
+    var t = i / steps;
+    stops.push(gammaHex(cosineColorAt(t, p)) + ' ' + (t * 100).toFixed(2) + '%');
+  }
+  return 'linear-gradient(90deg, ' + stops.join(', ') + ')';
+}
+
+function fourStopGradientCss(hex) {
+  var positions = [0, 33.33, 66.67, 100];
+  return 'linear-gradient(90deg, ' + hex.map(function (h, i) { return h + ' ' + positions[i] + '%'; }).join(', ') + ')';
+}
+
+// Inverse of gammaHex: a native <input type="color"> value is sRGB, so
+// convert back to the linear space the presets and shaders store/consume.
+function hexToLinear(hex) {
+  return [1, 3, 5].map(function (i) {
+    return Math.pow(parseInt(hex.slice(i, i + 2), 16) / 255, 2.2);
+  });
+}
+
+function jsEntry(name, preset) {
+  return "'" + name + "': " + JSON.stringify(preset);
+}
+
+// Reduce an arbitrary-length palette to 4 evenly-spaced linear-space stops so
+// it can be dropped onto a 4-up preview's u_color0..3 (4-stop mode). Treats
+// the hexes as stops of a piecewise gradient and resamples, blending between
+// neighbors, rather than snapping to the nearest swatch — snapping silently
+// drops a color for any 5-stop input (every trending palette does this: 4
+// evenly-rounded picks out of 5 always skip index 2, the middle swatch).
+function fourStopsFromPalette(hexes) {
+  var linearStops = hexes.map(hexToLinear);
+  var n = linearStops.length;
+  if (n === 4) return linearStops;
+  return [0, 1, 2, 3].map(function (i) {
+    var pos = (i / 3) * (n - 1);
+    var lo = Math.floor(pos), hi = Math.ceil(pos), frac = pos - lo;
+    if (lo === hi) return linearStops[lo];
+    return linearStops[lo].map(function (v, k) { return v + (linearStops[hi][k] - v) * frac; });
+  });
+}
+
+function buildCard(name, gradientCss, copyText, dragPayload) {
+  var card = document.createElement('div');
+  card.className = 'card';
+  card.draggable = true;
+
+  var swatch = document.createElement('div');
+  swatch.className = 'swatch';
+  swatch.style.background = gradientCss;
+
+  var label = document.createElement('div');
+  label.className = 'name';
+  label.textContent = name;
+
+  var flag = document.createElement('div');
+  flag.className = 'copied-flag';
+  flag.textContent = 'Copied JS entry';
+
+  card.appendChild(swatch);
+  card.appendChild(label);
+  card.appendChild(flag);
+
+  card.addEventListener('dragstart', function (e) {
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('application/json', JSON.stringify(dragPayload));
+  });
+
+  card.addEventListener('click', function () {
+    navigator.clipboard.writeText(copyText);
+    card.classList.add('copied');
+    setTimeout(function () { card.classList.remove('copied'); }, 900);
+  });
+
+  return card;
+}
+
+function buildFourStopCard(name, preset) {
+  var linear = [preset.c0, preset.c1, preset.c2, preset.c3].map(function (rgb) { return rgb.slice(); });
+
+  var card = document.createElement('div');
+  card.className = 'card';
+  card.draggable = true;
+
+  var swatch = document.createElement('div');
+  swatch.className = 'swatch';
+
+  function refresh() {
+    swatch.style.background = fourStopGradientCss(linear.map(gammaHex));
+  }
+
+  card.addEventListener('dragstart', function (e) {
+    e.dataTransfer.effectAllowed = 'copy';
+    var payload = { type: 'fourstop', name: name, c0: linear[0], c1: linear[1], c2: linear[2], c3: linear[3] };
+    e.dataTransfer.setData('application/json', JSON.stringify(payload));
+  });
+
+  var stopsRow = document.createElement('div');
+  stopsRow.className = 'stops';
+  linear.forEach(function (rgb, i) {
+    var input = document.createElement('input');
+    input.type = 'color';
+    input.className = 'stop';
+    input.value = gammaHex(rgb);
+    input.addEventListener('click', function (e) { e.stopPropagation(); });
+    input.addEventListener('input', function () {
+      linear[i] = hexToLinear(input.value);
+      refresh();
+    });
+    stopsRow.appendChild(input);
+  });
+  refresh();
+
+  var label = document.createElement('div');
+  label.className = 'name';
+  label.textContent = name;
+
+  var flag = document.createElement('div');
+  flag.className = 'copied-flag';
+  flag.textContent = 'Copied JS entry';
+
+  card.appendChild(swatch);
+  card.appendChild(stopsRow);
+  card.appendChild(label);
+  card.appendChild(flag);
+
+  card.addEventListener('click', function () {
+    var rounded = linear.map(function (rgb) {
+      return rgb.map(function (x) { return Math.round(x * 1000) / 1000; });
+    });
+    var edited = { c0: rounded[0], c1: rounded[1], c2: rounded[2], c3: rounded[3] };
+    navigator.clipboard.writeText(jsEntry(name, edited));
+    card.classList.add('copied');
+    setTimeout(function () { card.classList.remove('copied'); }, 900);
+  });
+
+  return card;
+}
+
+function buildTrendingCard(name, hexes) {
+  var card = document.createElement('div');
+  card.className = 'card';
+  card.draggable = true;
+
+  var swatch = document.createElement('div');
+  swatch.className = 'swatch';
+  swatch.style.display = 'flex';
+  swatch.style.overflow = 'hidden';
+  hexes.forEach(function (hex) {
+    var band = document.createElement('div');
+    band.style.flex = '1';
+    band.style.background = hex;
+    band.title = hex;
+    swatch.appendChild(band);
+  });
+
+  var label = document.createElement('div');
+  label.className = 'name';
+  label.textContent = name;
+
+  var flag = document.createElement('div');
+  flag.className = 'copied-flag';
+  flag.textContent = 'Copied JS entry';
+
+  card.appendChild(swatch);
+  card.appendChild(label);
+  card.appendChild(flag);
+
+  card.addEventListener('dragstart', function (e) {
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('application/json', JSON.stringify({ type: 'trending', name: name, hexes: hexes }));
+  });
+
+  card.addEventListener('click', function () {
+    navigator.clipboard.writeText("'" + name + "': " + JSON.stringify(hexes));
+    card.classList.add('copied');
+    setTimeout(function () { card.classList.remove('copied'); }, 900);
+  });
+
+  return card;
+}
+
+var cosineGrid = document.getElementById('cosine-grid');
+Object.keys(COSINE_PRESETS).forEach(function (name) {
+  var preset = COSINE_PRESETS[name];
+  var dragPayload = { type: 'cosine', name: name, a: preset.a, b: preset.b, c: preset.c, d: preset.d };
+  cosineGrid.appendChild(buildCard(name, cosineGradientCss(preset), jsEntry(name, preset), dragPayload));
+});
+
+var fourStopGrid = document.getElementById('fourstop-grid');
+Object.keys(FOUR_STOP_PRESETS).forEach(function (name) {
+  fourStopGrid.appendChild(buildFourStopCard(name, FOUR_STOP_PRESETS[name]));
+});
+
+var trendingGrid = document.getElementById('trending-grid');
+TRENDING_PALETTES.forEach(function (p) {
+  trendingGrid.appendChild(buildTrendingCard(p.name, p.hexes));
+});
+
+// contour-pareidolia.js hardcodes canvasId/stateKey to its ShaderBase.create()
+// defaults ('shader-canvas' / '_shaderState'), so running 4 live instances at
+// once means loading the source once and re-injecting a unique canvasId/
+// stateKey/exportKey per copy before executing it as its own <script>.
+var CONTOUR_4UP_PALETTES = ['Rainbow', 'Cool Blue', 'Neon Heat', 'Cyberpunk'];
+
+fetch('assets/contour-pareidolia.js').then(function (r) { return r.text(); }).then(function (src) {
+  var grid = document.getElementById('contour-4up');
+  CONTOUR_4UP_PALETTES.forEach(function (name, i) {
+    var preset = COSINE_PRESETS[name];
+    var canvasId = 'contour-4up-' + i;
+    var stateKey = '_contour4upState' + i;
+
+    var cell = document.createElement('div');
+    var preview = document.createElement('div');
+    preview.className = 'shader-preview';
+    var canvas = document.createElement('canvas');
+    canvas.id = canvasId;
+    preview.appendChild(canvas);
+
+    var select = document.createElement('select');
+    select.className = 'preview-select';
+
+    var cosineGroup = document.createElement('optgroup');
+    cosineGroup.label = 'Cosine';
+    Object.keys(COSINE_PRESETS).forEach(function (presetName) {
+      var option = document.createElement('option');
+      option.value = presetName;
+      option.textContent = presetName;
+      if (presetName === name) option.selected = true;
+      cosineGroup.appendChild(option);
+    });
+    select.appendChild(cosineGroup);
+
+    var fourStopGroup = document.createElement('optgroup');
+    fourStopGroup.label = 'Four-Stop';
+    Object.keys(FOUR_STOP_PRESETS).forEach(function (presetName) {
+      var option = document.createElement('option');
+      option.value = 'fourstop:' + presetName;
+      option.textContent = presetName;
+      fourStopGroup.appendChild(option);
+    });
+    select.appendChild(fourStopGroup);
+
+    // Trending palettes are resampled to 4 stops on selection (fourStopsFromPalette)
+    // rather than stored pre-reduced, since the raw hexes are still needed for the
+    // Trending grid's own solid-band swatches above.
+    var trendingGroup = document.createElement('optgroup');
+    trendingGroup.label = 'Trending';
+    TRENDING_PALETTES.forEach(function (p) {
+      var option = document.createElement('option');
+      option.value = 'trending:' + p.name;
+      option.textContent = p.name;
+      trendingGroup.appendChild(option);
+    });
+    select.appendChild(trendingGroup);
+
+    var customOption = null;
+    function clearCustomOption() {
+      if (customOption) { customOption.remove(); customOption = null; }
+    }
+
+    function applyCosine(presetName) {
+      var chosen = COSINE_PRESETS[presetName];
+      clearCustomOption();
+      window[stateKey].values.u_color_mode = 0;
+      window[stateKey].values.u_a = chosen.a;
+      window[stateKey].values.u_b = chosen.b;
+      window[stateKey].values.u_c = chosen.c;
+      window[stateKey].values.u_d = chosen.d;
+      select.value = presetName;
+    }
+
+    function setFourStopUniforms(stops) {
+      window[stateKey].values.u_color_mode = 1;
+      window[stateKey].values.u_color0 = stops[0];
+      window[stateKey].values.u_color1 = stops[1];
+      window[stateKey].values.u_color2 = stops[2];
+      window[stateKey].values.u_color3 = stops[3];
+    }
+
+    // Used for dropped four-stop/trending palettes, which (once a card's
+    // sliders are edited, or a >4-color trending palette is resampled) may not
+    // match any listed <option> exactly — insert a transient one so the
+    // dropdown reflects what's actually showing.
+    function applyFourStop(label, stops) {
+      clearCustomOption();
+      customOption = document.createElement('option');
+      customOption.value = '__custom__';
+      customOption.textContent = label;
+      customOption.selected = true;
+      select.insertBefore(customOption, select.firstChild);
+      setFourStopUniforms(stops);
+    }
+
+    select.addEventListener('change', function () {
+      var value = select.value;
+      if (value === '__custom__') return; // only ever set programmatically
+      if (value.indexOf('fourstop:') === 0) {
+        clearCustomOption();
+        setFourStopUniforms(Object.values(FOUR_STOP_PRESETS[value.slice('fourstop:'.length)]));
+      } else if (value.indexOf('trending:') === 0) {
+        var trendingName = value.slice('trending:'.length);
+        var palette = TRENDING_PALETTES.filter(function (p) { return p.name === trendingName; })[0];
+        clearCustomOption();
+        setFourStopUniforms(fourStopsFromPalette(palette.hexes));
+      } else {
+        applyCosine(value);
+      }
+    });
+
+    preview.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      preview.classList.add('drag-over');
+    });
+    preview.addEventListener('dragleave', function () {
+      preview.classList.remove('drag-over');
+    });
+    preview.addEventListener('drop', function (e) {
+      e.preventDefault();
+      preview.classList.remove('drag-over');
+      var raw = e.dataTransfer.getData('application/json');
+      if (!raw) return;
+      var payload = JSON.parse(raw);
+      if (payload.type === 'cosine') {
+        applyCosine(payload.name);
+      } else if (payload.type === 'fourstop') {
+        applyFourStop(payload.name + ' (4-stop)', [payload.c0, payload.c1, payload.c2, payload.c3]);
+      } else if (payload.type === 'trending') {
+        applyFourStop(payload.name + ' (trending)', fourStopsFromPalette(payload.hexes));
+      }
+    });
+
+    cell.appendChild(preview);
+    cell.appendChild(select);
+    grid.appendChild(cell);
+
+    window[stateKey] = { values: { u_a: preset.a, u_b: preset.b, u_c: preset.c, u_d: preset.d } };
+
+    var instanced = src.replace(
+      'window.ShaderBase.create({',
+      "window.ShaderBase.create({ canvasId: '" + canvasId + "', stateKey: '" + stateKey + "', exportKey: '_contour4upExport" + i + "',"
+    );
+    var script = document.createElement('script');
+    script.textContent = instanced;
+    document.body.appendChild(script);
+  });
+});
+</script>
+</body>
+</html>

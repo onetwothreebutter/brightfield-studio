@@ -10,7 +10,7 @@ var controls = [
   { type: 'header', label: 'Color Palette' },
   { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 1,
     tip: 'Off = cosine palette. On = 4-stop linear gradient from top to bottom.' },
-  { key: '_lc_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
+  { key: '_lc_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow', swatchPreview: 'cosine',
     options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
   { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
@@ -21,7 +21,7 @@ var controls = [
     tip: 'Frequency — how many times the palette cycles per channel.' },
   { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab',
     tip: 'Phase — shifts the starting hue of the color cycle.' },
-  { key: '_lc_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
+  { key: '_lc_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon', swatchPreview: 'fourstop',
     options: Object.keys(FOUR_STOP_PRESETS).map(function (k) { return { label: k, value: k }; })
   },
   { key: 'u_color0', label: 'Color 1 (Top)',    type: 'color', stopDependent: true, value: '#ff3366' },

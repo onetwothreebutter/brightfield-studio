@@ -106,6 +106,17 @@
     '// aaFixed: 0.0 for the per-fragment path (fwidth-based AA); a small fixed',
     '// half-width when sampling at halftone cell positions.',
     'vec4 designEval(vec2 uv, float aaFixed) {',
+    '  // The 2×2 quadrant grid below tiles infinitely via floor/fract, so once',
+    '  // u_scale/u_pos_x/u_pos_y push uv outside the base [0,1] square, mask it',
+    '  // out instead of letting the pattern repeat.',
+    '  float aaBoundsX = max(fwidth(uv.x), aaFixed);',
+    '  float aaBoundsY = max(fwidth(uv.y), aaFixed);',
+    '  float boundsMask =',
+    '    smoothstep(-aaBoundsX, aaBoundsX, uv.x) *',
+    '    (1.0 - smoothstep(1.0 - aaBoundsX, 1.0 + aaBoundsX, uv.x)) *',
+    '    smoothstep(-aaBoundsY, aaBoundsY, uv.y) *',
+    '    (1.0 - smoothstep(1.0 - aaBoundsY, 1.0 + aaBoundsY, uv.y));',
+    '',
     '  // Quadrant indices: cellX/Y ∈ {0, 1}',
     '  float cellX   = floor(uv.x * 2.0);',
     '  float cellY   = floor(uv.y * 2.0);',
@@ -206,7 +217,7 @@
     '  vec3 finalColor  = mix(mix(layerColor, u_outline_color, wordStroke), wordFillCol, wordFill);',
     '',
     '  float wordA = clamp(wordFill + wordStroke, 0.0, 1.0);',
-    '  return vec4(finalColor, max(shapeMask, wordA));',
+    '  return vec4(finalColor, max(shapeMask, wordA) * boundsMask);',
     '}',
     '',
     'void main() {',
@@ -251,7 +262,7 @@
 
   window.ShaderBase.create({
     animateValues:  true,
-    instantKeys:    ['u_opacity', 'u_distress_0', 'u_distress_scale_0', 'u_distress_1', 'u_distress_scale_1', 'u_distress_2', 'u_distress_scale_2', 'u_distress_3', 'u_distress_scale_3', 'u_grain_mode', 'u_distress_falloff', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right', 'u_vignette_anchor_x', 'u_vignette_anchor_y'],
+    instantKeys:    ['u_opacity', 'u_distress_0', 'u_distress_scale_0', 'u_distress_1', 'u_distress_scale_1', 'u_distress_2', 'u_distress_scale_2', 'u_distress_3', 'u_distress_scale_3', 'u_grain_mode', 'u_halftone_shape', 'u_distress_falloff', 'u_vignette_top', 'u_vignette_bottom', 'u_vignette_left', 'u_vignette_right', 'u_vignette_anchor_x', 'u_vignette_anchor_y'],
     fragSrc: fragSrc,
 
     setup: function (gl, program) {
@@ -295,6 +306,7 @@
         distressFalloff: gl.getUniformLocation(program, 'u_distress_falloff'),
         halftoneAngle:   gl.getUniformLocation(program, 'u_halftone_angle'),
         halftoneLuma:    gl.getUniformLocation(program, 'u_halftone_luma'),
+        halftoneShape:   gl.getUniformLocation(program, 'u_halftone_shape'),
         posX:            gl.getUniformLocation(program, 'u_pos_x'),
         posY:          gl.getUniformLocation(program, 'u_pos_y'),
         scale:         gl.getUniformLocation(program, 'u_scale'),
@@ -378,6 +390,7 @@
       gl.uniform1f(u.distressFalloff,  v.u_distress_falloff != null ? v.u_distress_falloff : 0.0);
       gl.uniform1f(u.halftoneAngle, (v.u_halftone_angle != null ? v.u_halftone_angle : 45.0) * Math.PI / 180.0);
       gl.uniform1f(u.halftoneLuma,  v.u_halftone_luma  != null ? v.u_halftone_luma  : 0.0);
+      gl.uniform1f(u.halftoneShape, v.u_halftone_shape != null ? parseFloat(v.u_halftone_shape) : 0.0);
       gl.uniform1f(u.posX,             v.u_pos_x            != null ? v.u_pos_x            : 0.0);
       gl.uniform1f(u.posY,          v.u_pos_y          != null ? v.u_pos_y          : 0.0);
       gl.uniform1f(u.scale,         v.u_scale          != null ? v.u_scale          : 1.0);

@@ -242,11 +242,17 @@ var FINISH_CONTROLS_PRE = [
   { key: 'u_distress_scale_2', label: 'Line Density', type: 'range', min: 10, max: 600, step: 1,    value: 80,   noRandomize: true, grainDependent: 2 },
   { key: 'u_distress_3',       label: 'Amount',       type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.0,  noRandomize: true, grainDependent: 3 },
   { key: 'u_distress_scale_3', label: 'Line Density', type: 'range', min: 10, max: 600, step: 1,    value: 80,   noRandomize: true, grainDependent: 3 },
-  { key: 'u_distress_4',       label: 'Amount',       type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.42, noRandomize: true, grainDependent: 4 },
-  { key: 'u_distress_scale_4', label: 'Dot Size',     type: 'range', min: 10, max: 600, step: 1,    value: 91,   noRandomize: true, grainDependent: 4 },
+  { key: 'u_distress_4',       label: 'Fill Amount',  type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.42, noRandomize: true, grainDependent: 4 },
+  { key: 'u_distress_scale_4', label: 'Spacing',      type: 'range', min: 10, max: 600, step: 1,    value: 91,   noRandomize: true, grainDependent: 4 },
   { key: 'u_halftone_angle',   label: 'Angle',        type: 'range', min: 0, max: 180,  step: 1,    value: 45,   noRandomize: true, grainDependent: 4 },
   { key: 'u_halftone_luma',    label: 'Luma Drive',   type: 'range', min: 0, max: 1,    step: 0.01, value: 1.0,  noRandomize: true, grainDependent: 4,
     tip: 'At 1, dot size follows brightness — brighter areas get bigger dots. At 0, all dots are the same size.' },
+  { key: 'u_halftone_shape',   label: 'Dot Shape',    type: 'select', value: '0', noRandomize: true, grainDependent: 4,
+    options: [
+      { label: 'Circle',  value: '0' },
+      { label: 'Square',  value: '1' },
+      { label: 'Diamond', value: '2' },
+    ] },
   { key: 'u_distress_falloff', label: 'Edge Falloff', type: 'range', min: 0, max: 1,    step: 0.05, value: 0.0,  noRandomize: true,
     tip: 'At 0, grain is uniform. At 1, it concentrates toward edges and corners.' },
 ];
@@ -930,6 +936,15 @@ SHADERS['four-circles'] = {
     { key: 'u_color1', label: 'Color 2', type: 'color', stopDependent: true, value: '#ffcc00' },
     { key: 'u_color2', label: 'Color 3', type: 'color', stopDependent: true, value: '#00ccff' },
     { key: 'u_color3', label: 'Color 4', type: 'color', stopDependent: true, value: '#aa00ff' },
+    { key: '_fc_quad_preset', label: 'Preset', type: 'select', quadDependent: true, value: 'Neon',
+      options: [
+        { label: 'Neon',     value: 'Neon'     }, { label: 'Retro',    value: 'Retro'    },
+        { label: 'Sunset',   value: 'Sunset'   }, { label: 'Aurora',   value: 'Aurora'   },
+        { label: 'Dusk',     value: 'Dusk'     }, { label: 'Midnight', value: 'Midnight' },
+        { label: 'Ember',    value: 'Ember'    }, { label: 'Obsidian', value: 'Obsidian' },
+        { label: 'Velvet',   value: 'Velvet'   },
+      ]
+    },
     { key: 'u_quad0', label: 'Top Left',     type: 'color', quadDependent: true, value: '#d10000' },
     { key: 'u_quad1', label: 'Top Right',    type: 'color', quadDependent: true, value: '#003087' },
     { key: 'u_quad2', label: 'Bottom Left',  type: 'color', quadDependent: true, value: '#ffd700' },
@@ -1059,6 +1074,15 @@ SHADERS['four-circles'] = {
         var p = fourStopPresets[this.value]; if (!p) return;
         setColor('u_color0', p.c0); setColor('u_color1', p.c1);
         setColor('u_color2', p.c2); setColor('u_color3', p.c3);
+      });
+    }
+
+    var quadSel = document.querySelector('[data-param-key="_fc_quad_preset"]');
+    if (quadSel) {
+      quadSel.addEventListener('change', function () {
+        var p = fourStopPresets[this.value]; if (!p) return;
+        setColor('u_quad0', p.c0); setColor('u_quad1', p.c1);
+        setColor('u_quad2', p.c2); setColor('u_quad3', p.c3);
       });
     }
 

@@ -47,6 +47,19 @@ var FOUR_STOP_PRESETS = {
   'Teal & Orange': { c0: [0.039, 0.239, 0.227], c1: [0.122, 0.714, 0.651], c2: [1.0,   0.569, 0.259], c3: [0.761, 0.255, 0.047] },
   'Ice Cream':     { c0: [1.0,   0.702, 0.776], c1: [1.0,   0.953, 0.769], c2: [0.710, 0.918, 0.843], c3: [0.780, 0.702, 1.0  ] },
   'Jamaica':       { c0: [0.0,   0.608, 0.227], c1: [0.996, 0.820, 0.0  ], c2: [0.102, 0.102, 0.102], c3: [0.0,   0.608, 0.227] },
+  // Trending, from coolors.co/palettes/trending (pulled 2026-07-30). Source
+  // palettes have 5-10 stops; resampled to 4 by interpolating along the
+  // piecewise gradient (not nearest-4 snapping, which silently drops colors).
+  'Olive Garden Feast':         { c0: [0.117, 0.151, 0.036], c1: [0.342, 0.341, 0.254], c2: [0.817, 0.562, 0.325], c3: [0.511, 0.151, 0.014] },
+  'Pastel Dreamland Adventure': { c0: [0.619, 0.465, 0.715], c1: [1.0,   0.536, 0.691], c2: [0.678, 0.647, 0.865], c3: [0.369, 0.652, 1.0  ] },
+  'Fiery Ocean':                { c0: [0.19,  0.0,   0.0  ], c1: [0.689, 0.294, 0.231], c2: [0.328, 0.309, 0.267], c3: [0.133, 0.334, 0.511] },
+  'Ocean Blue Serenity':        { c0: [0.0,   0.0,   0.111], c1: [0.0,   0.27,  0.545], c2: [0.136, 0.65,  0.81 ], c3: [0.599, 0.875, 0.941] },
+  'Ocean Sunset':               { c0: [0.0,   0.003, 0.006], c1: [0.302, 0.652, 0.517], c2: [0.599, 0.136, 0.0  ], c3: [0.334, 0.012, 0.015] },
+  'Refreshing Summer Fun':      { c0: [0.276, 0.599, 0.797], c1: [0.007, 0.241, 0.361], c2: [0.667, 0.33,  0.02 ], c3: [0.966, 0.239, 0.0  ] },
+  'Sunny Beach Day':            { c0: [0.015, 0.058, 0.085], c1: [0.286, 0.416, 0.235], c2: [0.878, 0.433, 0.128], c3: [0.805, 0.16,  0.08 ] },
+  'Soft Lavender':              { c0: [0.012, 0.012, 0.04 ], c1: [0.154, 0.138, 0.201], c2: [0.505, 0.373, 0.37 ], c3: [0.891, 0.82,  0.782] },
+  'Fresh Greens':               { c0: [0.036, 0.133, 0.049], c1: [0.228, 0.414, 0.081], c2: [0.726, 0.739, 0.453], c3: [0.511, 0.06,  0.064] },
+  'Golden Summer Fields':       { c0: [0.612, 0.673, 0.431], c1: [0.877, 0.887, 0.646], c2: [0.969, 0.887, 0.663], c3: [0.666, 0.374, 0.173] },
 };
 
 {% render 'shader-color-utils' %}
@@ -69,6 +82,35 @@ function vividHex(hue) {
   return '#' + [r, g, b].map(function (c) {
     return Math.round(c * 255).toString(16).padStart(2, '0');
   }).join('');
+}
+
+function cosinePalette(t, a, b, c, d) {
+  return [0, 1, 2].map(function (i) {
+    return a[i] + b[i] * Math.cos(6.28318 * (c[i] * t + d[i]));
+  });
+}
+
+// Preview-only: preset curve/stop values are already display-space (not
+// stored linear uniforms), so hex-ify directly with no gamma step — unlike
+// toHex(), which assumes its input is linear and gamma-encodes it back.
+function previewHex(v) {
+  return '#' + v.map(function (x) {
+    var b = Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16);
+    return b.length === 1 ? '0' + b : b;
+  }).join('');
+}
+
+// Preview gradients for the tappable swatch pickers — 6-stop sample of the
+// cosine curve for palette presets, direct 4 stops for 4-stop presets.
+function cosinePresetGradient(p) {
+  var stops = [0, 0.2, 0.4, 0.6, 0.8, 1.0].map(function (t) {
+    return previewHex(cosinePalette(t, p.a, p.b, p.c, p.d));
+  });
+  return 'linear-gradient(135deg, ' + stops.join(', ') + ')';
+}
+
+function fourStopPresetGradient(p) {
+  return 'linear-gradient(135deg, ' + [p.c0, p.c1, p.c2, p.c3].map(previewHex).join(', ') + ')';
 }
 
 // keyValPairs values are sRGB-intent [r,g,b] arrays (same convention as a hex
@@ -115,11 +157,17 @@ var FINISH_CONTROLS_PRE = [
   { key: 'u_distress_scale_2', label: 'Line Density', type: 'range', min: 10, max: 4000, step: 1,    value: 2000, noRandomize: true, grainDependent: 2 },
   { key: 'u_distress_3',       label: 'Amount',       type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.43, noRandomize: true, grainDependent: 3 },
   { key: 'u_distress_scale_3', label: 'Line Density', type: 'range', min: 10, max: 800, step: 1,    value: 331, noRandomize: true, grainDependent: 3 },
-  { key: 'u_distress_4',       label: 'Amount',       type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.79, noRandomize: true, grainDependent: 4 },
-  { key: 'u_distress_scale_4', label: 'Dot Size',     type: 'range', min: 10, max: 600, step: 1,    value: 287,  noRandomize: true, grainDependent: 4 },
+  { key: 'u_distress_4',       label: 'Fill Amount',  type: 'range', min: 0, max: 0.85, step: 0.01, value: 0.79, noRandomize: true, grainDependent: 4 },
+  { key: 'u_distress_scale_4', label: 'Spacing',      type: 'range', min: 10, max: 600, step: 1,    value: 287,  noRandomize: true, grainDependent: 4 },
   { key: 'u_halftone_angle',   label: 'Angle',        type: 'range', min: 0, max: 180,  step: 1,    value: 45,  noRandomize: true, grainDependent: 4 },
   { key: 'u_halftone_luma',   label: 'Luma Drive',   type: 'range', min: 0, max: 1,    step: 0.01, value: 0.0, noRandomize: true, grainDependent: 4,
     tip: 'At 1, dot size follows brightness — brighter areas get bigger dots. At 0, all dots are the same size.' },
+  { key: 'u_halftone_shape', label: 'Dot Shape',   type: 'select', value: '0', noRandomize: true, grainDependent: 4,
+    options: [
+      { label: 'Circle',  value: '0' },
+      { label: 'Square',  value: '1' },
+      { label: 'Diamond', value: '2' }
+    ] },
   { key: 'u_distress_falloff', label: 'Edge Falloff', type: 'range', min: 0, max: 1, step: 0.05, value: 0.0, noRandomize: true,
     tip: 'At 0, distress is uniform. At 1, distress concentrates at edges and corners.' },
 ];
