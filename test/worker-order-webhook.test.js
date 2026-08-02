@@ -13,13 +13,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // module-level `let` variables, not per-request state. Re-importing the module
 // fresh for every test (instead of importing once at the top) keeps those
 // caches from leaking between tests.
-let worker, parseCustomSku;
+let worker, parseCustomSku, classifyLineItem;
 
 beforeEach(async () => {
   vi.resetModules();
   const mod = await import('../worker/src/index.js');
   worker = mod.default;
   parseCustomSku = mod.parseCustomSku;
+  classifyLineItem = mod.classifyLineItem;
 });
 
 afterEach(() => vi.unstubAllGlobals());
@@ -221,6 +222,19 @@ function defaultOrder(overrides = {}) {
   };
 }
 
+// A regular (non-custom, non-community) catalog line item carrying a
+// printful.variant_id *variant* metafield — the in-house routing signal.
+function inhouseLineItem(overrides = {}) {
+  return {
+    sku: 'TEE-BLK-M',
+    quantity: 1,
+    title: 'Rise Shirt (Black, M)',
+    product: { id: 'gid://shopify/Product/8001', metafield: null },
+    variant: { id: 'gid://shopify/ProductVariant/9001', metafield: { value: '4917503' } },
+    ...overrides,
+  };
+}
+
 // ── parseCustomSku ───────────────────────────────────────────────────────────
 
 describe('parseCustomSku', () => {
@@ -239,6 +253,34 @@ describe('parseCustomSku', () => {
   it('returns null for non-string input', () => {
     expect(parseCustomSku(undefined)).toBeNull();
     expect(parseCustomSku(null)).toBeNull();
+  });
+});
+
+// ── classifyLineItem ─────────────────────────────────────────────────────────
+
+describe('classifyLineItem', () => {
+  it('classifies a custom SKU as custom, even with a variant metafield also present', () => {
+    const li = { sku: 'CUSTOM-1699999999999-M', variant: { metafield: { value: '4917503' } } };
+    const cls = classifyLineItem(li);
+    expect(cls.type).toBe('custom');
+    expect(cls.skuInfo).toEqual({ prefix: 'CUSTOM', timestamp: '1699999999999', size: 'M' });
+  });
+
+  it('classifies a valid numeric printful.variant_id metafield as inhouse', () => {
+    const cls = classifyLineItem(inhouseLineItem());
+    expect(cls).toEqual({ type: 'inhouse', printfulVariantId: 4917503 });
+  });
+
+  it('classifies a missing metafield as unrecognized', () => {
+    expect(classifyLineItem(inhouseLineItem({ variant: null })).type).toBe('unrecognized');
+    expect(classifyLineItem(inhouseLineItem({ variant: { metafield: null } })).type).toBe('unrecognized');
+    expect(classifyLineItem(inhouseLineItem({ variant: { metafield: { value: '' } } })).type).toBe('unrecognized');
+  });
+
+  it('classifies a non-numeric or non-positive metafield value as inhouse-invalid', () => {
+    expect(classifyLineItem(inhouseLineItem({ variant: { metafield: { value: 'not-a-number' } } })).type).toBe('inhouse-invalid');
+    expect(classifyLineItem(inhouseLineItem({ variant: { metafield: { value: '0' } } })).type).toBe('inhouse-invalid');
+    expect(classifyLineItem(inhouseLineItem({ variant: { metafield: { value: '-5' } } })).type).toBe('inhouse-invalid');
   });
 });
 
@@ -424,6 +466,107 @@ describe('POST /webhook/order-paid — happy path', () => {
     const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
     expect(res.status).toBe(200);
     expect(fetchMock.calls.printfulOrderBody.items[0].variant_id).toBe(5099);
+  });
+});
+
+// ── POST /webhook/order-paid — in-house line items ──────────────────────────
+
+describe('POST /webhook/order-paid — in-house line items', () => {
+  it('creates a Printful order item with sync_variant_id and no files for a valid metafield', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({ lineItems: { edges: [{ node: inhouseLineItem() }] } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(200);
+
+    // No catalog lookup needed for a pure in-house order — the metafield
+    // already carries the resolved Printful sync variant id.
+    expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/products/71')).toBe(false);
+
+    const item = fetchMock.calls.printfulOrderBody.items[0];
+    expect(item.sync_variant_id).toBe(4917503);
+    expect(item.quantity).toBe(1);
+    expect(item.files).toBeUndefined();
+  });
+
+  it('ignores an order whose only line item has no printful.variant_id metafield (ordinary catalog item)', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({ lineItems: { edges: [{ node: inhouseLineItem({ variant: null }) }] } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.ignored).toBe(true);
+    expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
+  });
+
+  it('returns 422 with a clear reason when the printful.variant_id metafield is invalid, not a silent ignore', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({
+        lineItems: { edges: [{ node: inhouseLineItem({ variant: { metafield: { value: 'not-a-number' } } }) }] },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.skipped[0].reason).toMatch(/invalid printful\.variant_id metafield/);
+    expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
+  });
+
+  it('submits a single Printful order covering both a custom and an in-house line item', async () => {
+    const env = makeEnv();
+    const customNode = {
+      sku: 'CUSTOM-1699999999999-M',
+      quantity: 1,
+      title: 'Custom Dot Rise',
+      product: { id: 'gid://shopify/Product/9001', metafield: { value: 'https://share.brightfield.studio/img/designs/abc.png' } },
+    };
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({ lineItems: { edges: [{ node: customNode }, { node: inhouseLineItem() }] } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(200);
+
+    const items = fetchMock.calls.printfulOrderBody.items;
+    expect(items).toHaveLength(2);
+
+    const customItem = items.find(i => i.variant_id != null);
+    const inhouseItem = items.find(i => i.sync_variant_id != null);
+    expect(customItem.files[0].image_url).toBe('https://share.brightfield.studio/img/designs/abc.png');
+    expect(inhouseItem.sync_variant_id).toBe(4917503);
+    expect(inhouseItem.files).toBeUndefined();
+
+    // One order, one idempotency record covering both SKUs.
+    expect(fetchMock.calls.filter(c => c.url === 'https://api.printful.com/orders').length).toBe(1);
+    const stored = JSON.parse(env.MOCKUP_STAGING._store.get('printful-orders/555000111.json'));
+    expect(stored.skus.sort()).toEqual(['CUSTOM-1699999999999-M', 'TEE-BLK-M'].sort());
+    expect(stored.lineItemTypes).toEqual({ custom: 1, inhouse: 1 });
+  });
+
+  it('treats a deleted-variant line item (variant is null) as unrecognized rather than crashing', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({
+        lineItems: { edges: [{ node: { sku: 'TEE-BLK-M', quantity: 1, title: 'Rise Shirt', product: { id: 'gid://shopify/Product/8001', metafield: null }, variant: null } }] },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.ignored).toBe(true);
   });
 });
 

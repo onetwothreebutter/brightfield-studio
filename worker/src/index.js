@@ -1548,6 +1548,29 @@ export function parseCustomSku(sku) {
   return { prefix: m[1], timestamp: m[2], size: m[3] };
 }
 
+// Classifies an order line item as 'custom' (SKU-prefixed, print file comes
+// from the product's custom.design_url metafield), 'inhouse' (a regular,
+// merchant-configured product identified by a printful.variant_id *variant*
+// metafield — see docs/in-house-products.md for how the merchant sets this),
+// 'inhouse-invalid' (that metafield is present but not a usable id, which
+// should fail loudly rather than silently fall through to 'unrecognized'),
+// or 'unrecognized' (an ordinary catalog item with neither signal — ignored,
+// same as today). SKU match is checked first so a line item can never
+// satisfy both.
+export function classifyLineItem(li) {
+  const skuInfo = parseCustomSku(li.sku);
+  if (skuInfo) return { type: 'custom', skuInfo };
+
+  const raw = li.variant?.metafield?.value;
+  if (raw == null || raw === '') return { type: 'unrecognized' };
+
+  const printfulVariantId = parseInt(raw, 10);
+  if (!Number.isFinite(printfulVariantId) || printfulVariantId <= 0) {
+    return { type: 'inhouse-invalid', raw };
+  }
+  return { type: 'inhouse', printfulVariantId };
+}
+
 // A pending claim older than this is assumed to belong to a delivery whose
 // isolate crashed or was evicted before it could write a completed record or
 // clean up after itself — sized generously vs. this handler's real runtime
@@ -1689,6 +1712,10 @@ async function handleOrderPaidWebhook(request, env, ctx) {
                   id
                   metafield(namespace: "custom", key: "design_url") { value }
                 }
+                variant {
+                  id
+                  metafield(namespace: "printful", key: "variant_id") { value }
+                }
               }
             }
           }
@@ -1721,19 +1748,25 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   }
 
   const lineItems = (order.lineItems?.edges || []).map(e => e.node);
-  const customLineItems = lineItems
-    .map(li => ({ ...li, skuInfo: parseCustomSku(li.sku) }))
-    .filter(li => li.skuInfo);
+  const classified = lineItems.map(li => ({ ...li, cls: classifyLineItem(li) }));
+  const relevant = classified.filter(li => li.cls.type !== 'unrecognized');
 
-  // Acceptance criteria: non-custom orders are ignored entirely.
-  if (!customLineItems.length) {
-    console.log('[order-paid] no custom-design line items on order', order.name, '— ignoring');
+  // Acceptance criteria: orders with nothing Printful-relevant (no custom/
+  // community SKU and no printful.variant_id metafield on any line item) are
+  // ignored entirely.
+  if (!relevant.length) {
+    console.log('[order-paid] no custom-design or in-house line items on order', order.name, '— ignoring');
     await releaseClaim();
     return new Response(JSON.stringify({ ok: true, ignored: true }), { status: 200, headers });
   }
 
-  const variantMap = await getPrintfulVariantMap(env);
-  if (!variantMap) {
+  // The size -> catalog-variant lookup only matters for custom/community
+  // items — in-house items carry their own resolved Printful sync-variant id
+  // directly via the printful.variant_id metafield, so skip the extra round
+  // trip for orders that don't need it.
+  const needsVariantMap = relevant.some(li => li.cls.type === 'custom');
+  const variantMap = needsVariantMap ? await getPrintfulVariantMap(env) : null;
+  if (needsVariantMap && !variantMap) {
     console.error('[order-paid] could not load Printful size -> variant map for order', order.name);
     await releaseClaim();
     return new Response(JSON.stringify({ error: 'Printful catalog lookup failed' }), { status: 502, headers });
@@ -1741,53 +1774,67 @@ async function handleOrderPaidWebhook(request, env, ctx) {
 
   const printfulItems = [];
   const skippedItems = [];
-  for (const li of customLineItems) {
-    const designUrl = li.product?.metafield?.value;
-    const printfulVariantId = variantMap[li.skuInfo.size];
-    if (!designUrl) {
-      console.error('[order-paid] line item missing design_url metafield, skipping:', li.sku, li.product?.id);
-      skippedItems.push({ sku: li.sku, reason: 'missing design_url metafield' });
-      continue;
+  for (const li of relevant) {
+    if (li.cls.type === 'custom') {
+      const designUrl = li.product?.metafield?.value;
+      const printfulVariantId = variantMap[li.cls.skuInfo.size];
+      if (!designUrl) {
+        console.error('[order-paid] line item missing design_url metafield, skipping:', li.sku, li.product?.id);
+        skippedItems.push({ sku: li.sku, reason: 'missing design_url metafield' });
+        continue;
+      }
+      if (!printfulVariantId) {
+        console.error('[order-paid] no Printful variant for size, skipping:', li.cls.skuInfo.size, li.sku);
+        skippedItems.push({ sku: li.sku, reason: `no Printful variant for size ${li.cls.skuInfo.size}` });
+        continue;
+      }
+      printfulItems.push({
+        variant_id: printfulVariantId,
+        quantity: li.quantity || 1,
+        // Same files/position shape as the mockup-task call in
+        // handleGenerateMockup above — Printful's order file-attachment shape
+        // mirrors the mockup-generator one.
+        files: [{
+          placement: 'front',
+          image_url: designUrl,
+          position: {
+            area_width:  PRINT_WIDTH,
+            area_height: PRINT_HEIGHT,
+            width:       PRINT_WIDTH,
+            height:      PRINT_HEIGHT,
+            top:  0,
+            left: 0,
+          },
+        }],
+      });
+    } else if (li.cls.type === 'inhouse') {
+      // No files[]: printful.variant_id points at a Printful *sync* variant
+      // (set up via the native catalog-sync app), which already has its
+      // print file attached server-side — unlike custom/community items,
+      // there's no per-order design upload to attach here.
+      printfulItems.push({
+        sync_variant_id: li.cls.printfulVariantId,
+        quantity: li.quantity || 1,
+      });
+    } else if (li.cls.type === 'inhouse-invalid') {
+      console.error('[order-paid] invalid printful.variant_id metafield value, skipping:', li.cls.raw, li.sku);
+      skippedItems.push({ sku: li.sku, reason: `invalid printful.variant_id metafield value: ${li.cls.raw}` });
     }
-    if (!printfulVariantId) {
-      console.error('[order-paid] no Printful variant for size, skipping:', li.skuInfo.size, li.sku);
-      skippedItems.push({ sku: li.sku, reason: `no Printful variant for size ${li.skuInfo.size}` });
-      continue;
-    }
-    printfulItems.push({
-      variant_id: printfulVariantId,
-      quantity: li.quantity || 1,
-      // Same files/position shape as the mockup-task call in
-      // handleGenerateMockup above — Printful's order file-attachment shape
-      // mirrors the mockup-generator one.
-      files: [{
-        placement: 'front',
-        image_url: designUrl,
-        position: {
-          area_width:  PRINT_WIDTH,
-          area_height: PRINT_HEIGHT,
-          width:       PRINT_WIDTH,
-          height:      PRINT_HEIGHT,
-          top:  0,
-          left: 0,
-        },
-      }],
-    });
   }
 
   if (!printfulItems.length) {
-    // Every custom line item had a data problem (missing metafield / unmapped
-    // size) — nothing valid to submit. Not something a Shopify redelivery would
-    // fix on its own, so 422 rather than 502; each skip reason is logged above
-    // for the merchant to resolve by hand.
-    console.error('[order-paid] no valid custom line items to submit for order', order.name, JSON.stringify(skippedItems));
+    // Every Printful-relevant line item had a data problem (missing/invalid
+    // metafield, unmapped size) — nothing valid to submit. Not something a
+    // Shopify redelivery would fix on its own, so 422 rather than 502; each
+    // skip reason is logged above for the merchant to resolve by hand.
+    console.error('[order-paid] no valid line items to submit for order', order.name, JSON.stringify(skippedItems));
     await releaseClaim();
-    return new Response(JSON.stringify({ error: 'No valid custom line items', skipped: skippedItems }), { status: 422, headers });
+    return new Response(JSON.stringify({ error: 'No valid line items', skipped: skippedItems }), { status: 422, headers });
   }
 
   const shipping = order.shippingAddress;
   if (!shipping) {
-    console.error('[order-paid] order has custom line items but no shipping address:', order.name);
+    console.error('[order-paid] order has Printful-relevant line items but no shipping address:', order.name);
     await releaseClaim();
     return new Response(JSON.stringify({ error: 'Missing shipping address' }), { status: 422, headers });
   }
@@ -1843,7 +1890,14 @@ async function handleOrderPaidWebhook(request, env, ctx) {
     shopifyOrderName: order.name,
     printfulOrderId,
     createdAt: Date.now(),
-    skus: customLineItems.map(li => li.sku),
+    skus: relevant.map(li => li.sku),
+    // Breakdown by classification, so a merchant inspecting this record (or
+    // R2 directly) can tell what kind of order this was without having to
+    // cross-reference SKUs against Printful.
+    lineItemTypes: relevant.reduce((acc, li) => {
+      acc[li.cls.type] = (acc[li.cls.type] || 0) + 1;
+      return acc;
+    }, {}),
     skipped: skippedItems.length ? skippedItems : undefined,
   };
   // Overwrite the pending claim with the completed record — no `onlyIf`
