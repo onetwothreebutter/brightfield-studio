@@ -1583,16 +1583,65 @@ const PRINTFUL_ORDER_CLAIM_STALE_MS = 2 * 60 * 1000;
 // partially fulfilled (see the hasNextPage check in handleOrderPaidWebhook).
 const ORDER_LINE_ITEM_PAGE_SIZE = 100;
 
+// Cap on the webhook body. This endpoint is public and unauthenticated until
+// the HMAC check passes, and that check has to run over the whole body — so
+// without a cap anyone can make the worker buffer and HMAC an arbitrarily
+// large payload for free. An orders/paid payload is a few tens of KB even
+// with a full page of line items; 256 KB is generous headroom.
+const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
+
+// Where a refusal that needs a human is recorded. The 422 paths below release
+// the idempotency claim so a redelivery can succeed once the underlying data
+// is fixed — but if nobody fixes it, Shopify eventually stops redelivering and
+// the order is simply never fulfilled, with nothing but a log line to show for
+// it. That's a regression against the manual workflow this replaces, where a
+// human was in the loop and would notice. These records are the durable trace:
+// one object per stuck order, listable from R2 (or the admin UI) to answer
+// "did anything paid fail to reach Printful?".
+//
+// Written only for refusals whose cause is the order's own data and that will
+// not clear on their own. Deliberately NOT written for: non-PAID orders (a
+// PENDING/AUTHORIZED order may legitimately become PAID and get redelivered),
+// or 502s from Shopify/Printful (transient upstream failures that retry into
+// success). The key is overwritten on each attempt, so a fixed-then-refused-
+// again order doesn't accumulate objects.
+async function recordFulfillmentFailure(env, shopifyOrderId, detail) {
+  await writeJson(env, `printful-orders-failed/${shopifyOrderId}.json`, {
+    shopifyOrderId,
+    failedAt: Date.now(),
+    ...detail,
+  }).catch((err) => {
+    console.error('[order-paid] failed to persist failure record for Shopify order', shopifyOrderId, ':', err.message);
+  });
+}
+
 async function handleOrderPaidWebhook(request, env, ctx) {
   const headers = { 'Content-Type': 'application/json' };
   // No CORS headers: Shopify calls this server-to-server, not from a browser —
   // this endpoint is authenticated via HMAC (below), not Origin.
+
+  // Reject an oversized body before reading it where the sender declared its
+  // length. Content-Length is advisory (it can be absent on a chunked request,
+  // or simply lie), so the actual byte count is re-checked after the read —
+  // this just avoids buffering the obvious cases at all.
+  const declaredLength = parseInt(request.headers.get('Content-Length'), 10);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_WEBHOOK_BODY_BYTES) {
+    console.warn('[order-paid] rejected: body larger than', MAX_WEBHOOK_BODY_BYTES, 'bytes (Content-Length:', declaredLength + ')');
+    return new Response(JSON.stringify({ error: 'Payload too large' }), { status: 413, headers });
+  }
 
   // HMAC verification must run over the exact raw body bytes, so read text()
   // (not json()) first — a Request body stream can only be consumed once, and
   // parsing to JSON and re-stringifying it would not reliably reproduce the
   // same bytes Shopify signed (key order, whitespace, unicode escaping).
   const rawBody = await request.text();
+  // Byte length, not string length: a body of multi-byte characters is bigger
+  // on the wire than its character count suggests.
+  const actualLength = new TextEncoder().encode(rawBody).length;
+  if (actualLength > MAX_WEBHOOK_BODY_BYTES) {
+    console.warn('[order-paid] rejected: body larger than', MAX_WEBHOOK_BODY_BYTES, 'bytes (actual:', actualLength + ')');
+    return new Response(JSON.stringify({ error: 'Payload too large' }), { status: 413, headers });
+  }
   const hmacHeader = request.headers.get('X-Shopify-Hmac-Sha256');
   const validHmac = await verifyShopifyWebhookHmac(rawBody, hmacHeader, env.SHOPIFY_WEBHOOK_SECRET);
   if (!validHmac) {
@@ -1781,6 +1830,11 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   if (order.lineItems?.pageInfo?.hasNextPage) {
     console.error('[order-paid] order', order.name, 'has more than', ORDER_LINE_ITEM_PAGE_SIZE, 'line items — refusing rather than fulfilling only the first page');
     await releaseClaim();
+    await recordFulfillmentFailure(env, shopifyOrderId, {
+      shopifyOrderName: order.name,
+      reason: 'too many line items',
+      detail: `order has more than ${ORDER_LINE_ITEM_PAGE_SIZE} line items — needs manual fulfillment in Printful`,
+    });
     return new Response(JSON.stringify({
       error: `Order has more than ${ORDER_LINE_ITEM_PAGE_SIZE} line items — needs manual fulfillment`,
       lineItemLimit: ORDER_LINE_ITEM_PAGE_SIZE,
@@ -1880,6 +1934,12 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   if (skippedItems.length || !printfulItems.length) {
     console.error('[order-paid] refusing to partially fulfill order', order.name, '— unusable line items:', JSON.stringify(skippedItems));
     await releaseClaim();
+    await recordFulfillmentFailure(env, shopifyOrderId, {
+      shopifyOrderName: order.name,
+      reason: 'unusable line items',
+      detail: 'refused rather than partially fulfilling — fix the offending product/variant metafield, then replay the webhook',
+      skipped: skippedItems,
+    });
     return new Response(JSON.stringify({ error: 'No valid line items', skipped: skippedItems }), { status: 422, headers });
   }
 
@@ -1887,6 +1947,11 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   if (!shipping) {
     console.error('[order-paid] order has Printful-relevant line items but no shipping address:', order.name);
     await releaseClaim();
+    await recordFulfillmentFailure(env, shopifyOrderId, {
+      shopifyOrderName: order.name,
+      reason: 'missing shipping address',
+      detail: 'order has Printful-relevant line items but no shipping address to send them to',
+    });
     return new Response(JSON.stringify({ error: 'Missing shipping address' }), { status: 422, headers });
   }
 
@@ -1925,10 +1990,16 @@ async function handleOrderPaidWebhook(request, env, ctx) {
       body: JSON.stringify(printfulOrderBody),
     });
     printfulJson = await printfulRes.json();
-    console.log('[order-paid] Printful order-create response:', JSON.stringify(printfulJson));
     if (printfulJson.code !== 200) {
+      // Only the failure branch logs the response body, and only via the thrown
+      // message — see below for why the success response must not be dumped.
       throw new Error(printfulJson.result || printfulJson.error || JSON.stringify(printfulJson));
     }
+    // Log the id and status code, never the whole response: Printful echoes the
+    // full `recipient` block back on success (name, street address, phone,
+    // email), so dumping it here would write a customer's home address into
+    // Cloudflare's logs on every single order.
+    console.log('[order-paid] Printful order-create ok (code', printfulJson.code + ', id', printfulJson.result?.id + ', status', printfulJson.result?.status + ')');
   } catch (err) {
     console.error('[order-paid] Printful order creation failed for order', order.name, ':', err.message);
     await releaseClaim();
@@ -1969,6 +2040,13 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   // a future redelivery's claim attempt (above) finds and short-circuits on.
   await writeJson(env, idempotencyKey, record).catch((err) => {
     console.error('[order-paid] failed to persist idempotency record for order', order.name, '— a redelivery could create a duplicate Printful order:', err.message);
+  });
+
+  // Clear any failure record from an earlier refused attempt: this order just
+  // fulfilled completely, so leaving one behind would keep a resolved problem
+  // sitting in the "needs a human" list forever. No-op when there isn't one.
+  await env.MOCKUP_STAGING.delete(`printful-orders-failed/${shopifyOrderId}.json`).catch((err) => {
+    console.error('[order-paid] failed to clear failure record for order', order.name, ':', err.message);
   });
 
   console.log('[order-paid] created Printful draft order', printfulOrderId, 'for Shopify order', order.name);
@@ -2981,7 +3059,15 @@ const GC_REFERENCE_CHECKED_PREFIXES = ['designs/', 'mockups/'];
 //     survive a client-side retry window (minutes), not days.
 const GC_AGE_ONLY_PREFIXES = ['product-images/', 'checkouts/', 'create-product-keys/'];
 
-// Deliberately NOT swept, despite being one of the six R2 prefixes this
+// Also deliberately NOT swept: printful-orders/ (order fulfillment idempotency
+// records) and printful-orders-failed/ (orders refused as needing a human —
+// see recordFulfillmentFailure). Both are small JSON objects written at most
+// once per order, and both are load-bearing indefinitely: deleting an
+// idempotency record would let a late Shopify redelivery submit a duplicate
+// Printful order, and deleting a failure record would erase the only durable
+// trace that a paid order never got fulfilled.
+//
+// Deliberately NOT swept, despite being one of the R2 prefixes this
 // product family writes to: shader-states/ backs the standalone "Copy Link"
 // share feature (save-shader-state / get-shader-state, used from
 // homepage-shader-demo.liquid and main-product.liquid) — durable share links

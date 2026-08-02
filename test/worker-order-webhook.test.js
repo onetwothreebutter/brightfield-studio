@@ -940,6 +940,172 @@ describe('POST /webhook/order-paid — partial fulfillment', () => {
   });
 });
 
+// ── POST /webhook/order-paid — failure records ──────────────────────────────
+// A 422 refusal releases the idempotency claim so a fixed order can be
+// redelivered — but if nobody fixes it, Shopify stops redelivering and the
+// paid order is never fulfilled. These records are the only durable trace that
+// that happened; without them the sole signal is a console line nobody reads.
+
+describe('POST /webhook/order-paid — failure records', () => {
+  const FAILED_KEY = 'printful-orders-failed/555000111.json';
+
+  function failureRecord(env) {
+    const raw = env.MOCKUP_STAGING._store.get(FAILED_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  it('records a durable failure when an order is refused for unusable line items', async () => {
+    const env = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch({
+      order: defaultOrder({ lineItems: { edges: [
+        { node: { sku: 'CUSTOM-1700000000000-L', quantity: 1, title: 'Custom Dot Rise 2',
+                  product: { id: 'gid://shopify/Product/9002', metafield: null } } },
+      ] } }),
+    }));
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(422);
+
+    const rec = failureRecord(env);
+    expect(rec).not.toBeNull();
+    expect(rec.reason).toBe('unusable line items');
+    expect(rec.shopifyOrderName).toBe('#1042');
+    expect(rec.skipped[0].sku).toBe('CUSTOM-1700000000000-L');
+    expect(typeof rec.failedAt).toBe('number');
+  });
+
+  it('records a failure for a missing shipping address and for page overflow', async () => {
+    const noAddress = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch({ order: defaultOrder({ shippingAddress: null }) }));
+    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), noAddress)).status).toBe(422);
+    expect(failureRecord(noAddress).reason).toBe('missing shipping address');
+
+    const overflow = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch({
+      order: defaultOrder({ lineItems: { pageInfo: { hasNextPage: true }, edges: defaultOrder().lineItems.edges } }),
+    }));
+    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), overflow)).status).toBe(422);
+    expect(failureRecord(overflow).reason).toBe('too many line items');
+  });
+
+  it('does not record a failure for a not-yet-paid order or an upstream outage', async () => {
+    // Transient by nature: a PENDING order may legitimately become PAID and be
+    // redelivered, and a 502 retries into success — neither needs a human.
+    const unpaid = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch({ order: defaultOrder({ displayFinancialStatus: 'PENDING' }) }));
+    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), unpaid)).status).toBe(422);
+    expect(failureRecord(unpaid)).toBeNull();
+
+    const outage = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch({ printfulOrderFails: true }));
+    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), outage)).status).toBe(502);
+    expect(failureRecord(outage)).toBeNull();
+  });
+
+  it('clears the failure record once the fixed order fulfills', async () => {
+    const env = makeEnv();
+    const brokenOrder = defaultOrder({ lineItems: { edges: [
+      { node: { sku: 'CUSTOM-1700000000000-L', quantity: 1, title: 'Custom Dot Rise 2',
+                product: { id: 'gid://shopify/Product/9002', metafield: null } } },
+    ] } });
+    vi.stubGlobal('fetch', makeUpstreamFetch({ order: brokenOrder }));
+    await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(failureRecord(env)).not.toBeNull();
+
+    // Merchant fixes the metafield; Shopify redelivers.
+    vi.stubGlobal('fetch', makeUpstreamFetch({ order: defaultOrder() }));
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+
+    expect(res.status).toBe(200);
+    // A resolved problem must not stay in the "needs a human" list.
+    expect(failureRecord(env)).toBeNull();
+  });
+});
+
+// ── POST /webhook/order-paid — logging hygiene ──────────────────────────────
+
+describe('POST /webhook/order-paid — logging', () => {
+  it('never logs the recipient block Printful echoes back on success', async () => {
+    const env = makeEnv();
+    vi.stubGlobal('fetch', vi.fn(async (url, opts = {}) => {
+      const u = typeof url === 'string' ? url : url.toString();
+      if (u.includes('/admin/oauth/access_token')) return jsonRes({ access_token: 't', expires_in: 3600 });
+      if (u === 'https://api.printful.com/products/71') return jsonRes({ result: { variants: [{ id: 4017, size: 'M', color: 'Black' }] } });
+      if (u === 'https://api.printful.com/orders') {
+        // Printful's real success response echoes the full recipient.
+        return jsonRes({ code: 200, result: { id: 99881, status: 'draft', recipient: {
+          name: 'Jane Doe', address1: '123 Main St', city: 'Portland', zip: '97201',
+          phone: '5035551234', email: 'buyer@example.com',
+        } } });
+      }
+      if (u.includes('/admin/api/')) return jsonRes({ data: { order: defaultOrder() } });
+      throw new Error('Unmocked fetch in test: ' + u);
+    }));
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+      expect(res.status).toBe(200);
+
+      const logged = logSpy.mock.calls.map(args => args.join(' ')).join('\n');
+      expect(logged).not.toMatch(/123 Main St/);
+      expect(logged).not.toMatch(/5035551234/);
+      expect(logged).not.toMatch(/buyer@example\.com/);
+      // The operationally useful part is still there.
+      expect(logged).toMatch(/99881/);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+});
+
+// ── POST /webhook/order-paid — body size cap ────────────────────────────────
+// The HMAC check has to run over the whole body, so an uncapped read lets an
+// unauthenticated caller make the worker buffer and hash anything it sends.
+
+describe('POST /webhook/order-paid — body size cap', () => {
+  it('rejects an oversized body on Content-Length alone, before reading it', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const req = await webhookRequest({ id: 555000111 });
+    // A lying Content-Length is enough — the point is to bail before the read.
+    const headers = new Headers(req.headers);
+    headers.set('Content-Length', String(4 * 1024 * 1024));
+    const res = await worker.fetch(
+      new Request(req.url, { method: 'POST', headers, body: await req.text() }),
+      env
+    );
+
+    expect(res.status).toBe(413);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an oversized body whose Content-Length is absent or understated', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    // Correctly signed, so this can only be caught by the post-read byte check.
+    const res = await worker.fetch(
+      await webhookRequest({ id: 555000111, padding: 'x'.repeat(300 * 1024) }),
+      env
+    );
+
+    expect(res.status).toBe(413);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts a normal-sized signed payload', async () => {
+    const env = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch());
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(200);
+  });
+});
+
 // ── POST /webhook/order-paid — failure / skip paths ─────────────────────────
 
 describe('POST /webhook/order-paid — failure and skip paths', () => {
