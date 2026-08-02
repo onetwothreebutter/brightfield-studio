@@ -13,7 +13,7 @@ var controls = [
   { type: 'header', label: 'Scribble' },
   { key: 'u_stroke_count', label: 'Stroke Count', type: 'range', min: 1, max: 48, step: 1, value: 14,
     tip: 'How many overlapping hand-traced passes build up the scribble. Higher = denser, more capped for performance.' },
-  { key: 'u_stroke_width', label: 'Stroke Width', type: 'range', min: 0.01, max: 0.15, step: 0.005, value: 0.05 },
+  { key: 'u_stroke_width', label: 'Stroke Width', type: 'range', min: 0.001, max: 0.15, step: 0.001, value: 0.05 },
   { key: 'u_jitter_outer', label: 'Outer Messiness', type: 'range', min: 0, max: 0.06, step: 0.001, value: 0.018,
     tip: 'How far each pass wanders near the glyph\'s outer silhouette.' },
   { key: 'u_jitter_inner', label: 'Inner Tightness', type: 'range', min: 0, max: 0.06, step: 0.001, value: 0.006,
