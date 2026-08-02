@@ -1643,7 +1643,11 @@ async function handleOrderPaidWebhook(request, env, ctx) {
       try { existing = JSON.parse(await existingObj.text()); } catch { existing = null; }
     }
 
-    if (existing?.printfulOrderId) {
+    // Completion is marked by an explicit `status`, not by the presence of
+    // printfulOrderId — see the record written at the end of this handler for
+    // why. `printfulOrderId` is still accepted as a completion signal so that
+    // any record written before that marker existed is still honoured.
+    if (existing?.status === 'completed' || existing?.printfulOrderId) {
       console.log('[order-paid] idempotency hit for Shopify order', shopifyOrderId, '— Printful order already created:', existing.printfulOrderId);
       return new Response(JSON.stringify({ ok: true, alreadyProcessed: true, printfulOrderId: existing.printfulOrderId }), { status: 200, headers });
     }
@@ -1822,12 +1826,23 @@ async function handleOrderPaidWebhook(request, env, ctx) {
     }
   }
 
-  if (!printfulItems.length) {
-    // Every Printful-relevant line item had a data problem (missing/invalid
-    // metafield, unmapped size) — nothing valid to submit. Not something a
-    // Shopify redelivery would fix on its own, so 422 rather than 502; each
-    // skip reason is logged above for the merchant to resolve by hand.
-    console.error('[order-paid] no valid line items to submit for order', order.name, JSON.stringify(skippedItems));
+  // All-or-nothing: if *any* Printful-relevant line item had a data problem
+  // (missing/invalid metafield, unmapped size), submit nothing.
+  //
+  // Submitting just the valid subset would silently under-fulfill a paid
+  // order — the customer paid for two shirts and receives one — and because
+  // the success path writes the completed idempotency record, that shortfall
+  // would be permanent: every redelivery afterwards short-circuits on
+  // `alreadyProcessed` and the missing item is never revisited. The only
+  // trace would be a `skipped` field in an R2 object nobody reads.
+  //
+  // Refusing the whole order instead keeps it recoverable: the claim is
+  // released, so once the merchant fixes the offending product's metafield,
+  // Shopify's own redelivery (or a manual replay) fulfills the order
+  // completely. 422 rather than 502 because the upstreams are healthy — it's
+  // the order's own data that needs a human.
+  if (skippedItems.length || !printfulItems.length) {
+    console.error('[order-paid] refusing to partially fulfill order', order.name, '— unusable line items:', JSON.stringify(skippedItems));
     await releaseClaim();
     return new Response(JSON.stringify({ error: 'No valid line items', skipped: skippedItems }), { status: 422, headers });
   }
@@ -1885,7 +1900,20 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   }
 
   const printfulOrderId = printfulJson.result?.id;
+  if (printfulOrderId == null) {
+    // Printful accepted the order (code 200) but didn't hand back an id.
+    // Nothing to do about it here — the order *was* created, so we must still
+    // record completion or a redelivery would submit it twice — but flag it,
+    // since the merchant has no id to look the draft up by.
+    console.error('[order-paid] Printful accepted order', order.name, 'but returned no result.id — recording completion anyway to prevent a duplicate submission');
+  }
   const record = {
+    // Explicit completion marker. Do NOT infer this from printfulOrderId
+    // being present: when Printful returns no result.id (above), that key is
+    // dropped by JSON.stringify, and a record indistinguishable from a claim
+    // with no `claimedAt` is treated as stale by the reclaim path — which
+    // would resubmit the order to Printful a second time.
+    status: 'completed',
     shopifyOrderId,
     shopifyOrderName: order.name,
     printfulOrderId,
@@ -1898,7 +1926,6 @@ async function handleOrderPaidWebhook(request, env, ctx) {
       acc[li.cls.type] = (acc[li.cls.type] || 0) + 1;
       return acc;
     }, {}),
-    skipped: skippedItems.length ? skippedItems : undefined,
   };
   // Overwrite the pending claim with the completed record — no `onlyIf`
   // needed for this write since we already hold the claim (either the
@@ -1909,7 +1936,8 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   });
 
   console.log('[order-paid] created Printful draft order', printfulOrderId, 'for Shopify order', order.name);
-  return new Response(JSON.stringify({ ok: true, printfulOrderId, skipped: skippedItems }), { status: 200, headers });
+  // No `skipped` on this path: reaching here means nothing was skipped.
+  return new Response(JSON.stringify({ ok: true, printfulOrderId }), { status: 200, headers });
 }
 
 // ── Community handlers ───────────────────────────────────────────────────────

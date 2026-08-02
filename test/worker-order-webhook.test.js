@@ -159,6 +159,11 @@ function makeUpstreamFetch(overrides = {}) {
       if (overrides.printfulOrderFails) {
         return jsonRes({ code: 400, result: 'Invalid recipient' });
       }
+      if (overrides.printfulOrderOmitsId) {
+        // Accepted (code 200) but no result.id — the shape that used to make
+        // the completed record indistinguishable from a stale claim.
+        return jsonRes({ code: 200, result: { external_id: body.external_id, status: 'draft' } });
+      }
       return jsonRes({ code: 200, result: { id: 99881, external_id: body.external_id, status: 'draft' } });
     }
 
@@ -635,6 +640,47 @@ describe('POST /webhook/order-paid — idempotency', () => {
     expect(stored.printfulOrderId).toBe(99881);
   });
 
+  // Regression test: completion used to be inferred from the record carrying a
+  // printfulOrderId. When Printful accepts an order but returns no result.id,
+  // JSON.stringify drops that key — leaving a completed record that has no
+  // `claimedAt` either, which the reclaim path below classifies as a stale
+  // claim and reprocesses, submitting the same order to Printful twice.
+  it('does not resubmit on redelivery when Printful returned no order id', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({ printfulOrderOmitsId: true });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const first = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(first.status).toBe(200);
+
+    const stored = JSON.parse(env.MOCKUP_STAGING._store.get('printful-orders/555000111.json'));
+    expect(stored.status).toBe('completed');
+    expect(stored.printfulOrderId).toBeUndefined();
+
+    const second = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(second.status).toBe(200);
+    expect((await second.json()).alreadyProcessed).toBe(true);
+
+    // The whole point: still exactly one Printful order.
+    expect(fetchMock.calls.filter(c => c.url === 'https://api.printful.com/orders').length).toBe(1);
+  });
+
+  it('still honours a legacy record that predates the explicit status marker', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await env.MOCKUP_STAGING.put(
+      'printful-orders/555000111.json',
+      JSON.stringify({ shopifyOrderId: 555000111, printfulOrderId: 99881, createdAt: Date.now() })
+    );
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(200);
+    expect((await res.json()).alreadyProcessed).toBe(true);
+    expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
+  });
+
   // The concurrency test above never actually observes a pending (not yet
   // completed) claim — in this mock's execution, the first delivery finishes
   // and writes the completed record before the second even attempts its own
@@ -710,6 +756,90 @@ describe('POST /webhook/order-paid — payment verification', () => {
     // record — this order may legitimately become PAID later and should be
     // free to proceed on a future redelivery.
     expect(env.MOCKUP_STAGING._store.has('printful-orders/555000111.json')).toBe(false);
+  });
+});
+
+// ── POST /webhook/order-paid — partial-fulfillment refusal ──────────────────
+// An order is submitted to Printful in full or not at all. Submitting only the
+// valid subset would under-fulfill a paid order permanently: the success path
+// writes the completed idempotency record, so every later redelivery
+// short-circuits on `alreadyProcessed` and the dropped item is never revisited.
+
+describe('POST /webhook/order-paid — partial fulfillment', () => {
+  function mixedValidAndBrokenOrder() {
+    return defaultOrder({
+      lineItems: { edges: [
+        { node: {
+          sku: 'CUSTOM-1699999999999-M',
+          quantity: 1,
+          title: 'Custom Dot Rise',
+          product: { id: 'gid://shopify/Product/9001', metafield: { value: 'https://share.brightfield.studio/img/designs/abc.png' } },
+        } },
+        { node: {
+          sku: 'CUSTOM-1700000000000-L',
+          quantity: 1,
+          title: 'Custom Dot Rise 2',
+          product: { id: 'gid://shopify/Product/9002', metafield: null }, // no design_url
+        } },
+      ] },
+    });
+  }
+
+  it('submits nothing when one of several line items is unusable', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({ order: mixedValidAndBrokenOrder() });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    const json = await res.json();
+
+    expect(res.status).toBe(422);
+    expect(json.skipped[0].sku).toBe('CUSTOM-1700000000000-L');
+    // The valid sibling item must not have been submitted on its own.
+    expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
+  });
+
+  it('leaves the order recoverable — no idempotency record, and a later redelivery succeeds once fixed', async () => {
+    const env = makeEnv();
+    const broken = makeUpstreamFetch({ order: mixedValidAndBrokenOrder() });
+    vi.stubGlobal('fetch', broken);
+
+    await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    // Claim released: nothing recorded, so the order isn't permanently stuck.
+    expect(env.MOCKUP_STAGING._store.has('printful-orders/555000111.json')).toBe(false);
+
+    // Merchant fixes the missing metafield; Shopify redelivers.
+    const fixedOrder = mixedValidAndBrokenOrder();
+    fixedOrder.lineItems.edges[1].node.product.metafield = { value: 'https://share.brightfield.studio/img/designs/def.png' };
+    const fixed = makeUpstreamFetch({ order: fixedOrder });
+    vi.stubGlobal('fetch', fixed);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(200);
+    // Now the whole order goes through — both items, one Printful order.
+    expect(fixed.calls.printfulOrderBody.items).toHaveLength(2);
+    expect(fixed.calls.filter(c => c.url === 'https://api.printful.com/orders').length).toBe(1);
+  });
+
+  it('refuses a mixed order where the in-house item has an invalid metafield', async () => {
+    const env = makeEnv();
+    const customNode = {
+      sku: 'CUSTOM-1699999999999-M',
+      quantity: 1,
+      title: 'Custom Dot Rise',
+      product: { id: 'gid://shopify/Product/9001', metafield: { value: 'https://share.brightfield.studio/img/designs/abc.png' } },
+    };
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({ lineItems: { edges: [
+        { node: customNode },
+        { node: inhouseLineItem({ variant: { metafield: { value: 'not-a-number' } } }) },
+      ] } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(422);
+    expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
   });
 });
 
