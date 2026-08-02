@@ -1578,6 +1578,11 @@ export function classifyLineItem(li) {
 // still-active delivery should never actually cross it.
 const PRINTFUL_ORDER_CLAIM_STALE_MS = 2 * 60 * 1000;
 
+// How many line items the order lookup fetches. This handler does not
+// paginate; an order exceeding this is refused outright rather than
+// partially fulfilled (see the hasNextPage check in handleOrderPaidWebhook).
+const ORDER_LINE_ITEM_PAGE_SIZE = 100;
+
 async function handleOrderPaidWebhook(request, env, ctx) {
   const headers = { 'Content-Type': 'application/json' };
   // No CORS headers: Shopify calls this server-to-server, not from a browser —
@@ -1652,28 +1657,41 @@ async function handleOrderPaidWebhook(request, env, ctx) {
       return new Response(JSON.stringify({ ok: true, alreadyProcessed: true, printfulOrderId: existing.printfulOrderId }), { status: 200, headers });
     }
 
-    const claimedAt = existing?.claimedAt;
-    const stale = typeof claimedAt !== 'number' || (Date.now() - claimedAt) > PRINTFUL_ORDER_CLAIM_STALE_MS;
+    // The key can also be *gone* by the time we read it: the delivery that
+    // beat us to the claim released it (every exit path that isn't full
+    // success does) in the window between our put failing and this get. That
+    // isn't a stale claim — there's no record and no etag to condition a
+    // reclaim on — so retry the same If-None-Match claim instead. Whoever
+    // wins that retry owns the key; the loser returns 409 and lets Shopify
+    // redeliver.
+    const reclaimCondition = existingObj
+      ? { etagMatches: existingObj.etag }
+      : new Headers({ 'If-None-Match': '*' });
 
-    if (!stale) {
-      // A delivery is genuinely in-flight right now — don't race it. Shopify
-      // redelivers non-2xx responses on its own schedule; by the time it
-      // does, the in-flight delivery will have finished and the branch above
-      // will short-circuit normally.
-      console.log('[order-paid] claim already in flight for Shopify order', shopifyOrderId, '— returning 409 for redelivery');
-      return new Response(JSON.stringify({ ok: false, retrying: true }), { status: 409, headers });
+    if (existingObj) {
+      const claimedAt = existing?.claimedAt;
+      const stale = typeof claimedAt !== 'number' || (Date.now() - claimedAt) > PRINTFUL_ORDER_CLAIM_STALE_MS;
+
+      if (!stale) {
+        // A delivery is genuinely in-flight right now — don't race it. Shopify
+        // redelivers non-2xx responses on its own schedule; by the time it
+        // does, the in-flight delivery will have finished and the branch above
+        // will short-circuit normally.
+        console.log('[order-paid] claim already in flight for Shopify order', shopifyOrderId, '— returning 409 for redelivery');
+        return new Response(JSON.stringify({ ok: false, retrying: true }), { status: 409, headers });
+      }
+      // Stale placeholder — the delivery that claimed it never finished.
+      // Reclaim via a conditional put tied to its etag so we don't stomp a
+      // fresh claim that appears between our get() and this put().
     }
 
-    // Stale placeholder — the delivery that claimed it never finished.
-    // Reclaim via a conditional put tied to its etag so we don't stomp a
-    // fresh claim that appears between our get() and this put().
     const reclaimResult = await env.MOCKUP_STAGING.put(
       idempotencyKey,
       JSON.stringify({ status: 'pending', claimedAt: Date.now() }),
-      { httpMetadata: { contentType: 'application/json' }, onlyIf: { etagMatches: existingObj.etag } }
+      { httpMetadata: { contentType: 'application/json' }, onlyIf: reclaimCondition }
     );
     if (!reclaimResult) {
-      console.log('[order-paid] lost the race reclaiming a stale claim for Shopify order', shopifyOrderId, '— returning 409 for redelivery');
+      console.log('[order-paid] lost the race reclaiming the idempotency key for Shopify order', shopifyOrderId, '— returning 409 for redelivery');
       return new Response(JSON.stringify({ ok: false, retrying: true }), { status: 409, headers });
     }
     // Fall through — we now own the claim.
@@ -1706,7 +1724,8 @@ async function handleOrderPaidWebhook(request, env, ctx) {
             phone
           }
           customer { firstName lastName email }
-          lineItems(first: 100) {
+          lineItems(first: ${ORDER_LINE_ITEM_PAGE_SIZE}) {
+            pageInfo { hasNextPage }
             edges {
               node {
                 sku
@@ -1749,6 +1768,23 @@ async function handleOrderPaidWebhook(request, env, ctx) {
     console.warn('[order-paid] order', order.name, 'is not paid (financialStatus=' + order.displayFinancialStatus + ') — skipping Printful submission');
     await releaseClaim();
     return new Response(JSON.stringify({ error: 'Order is not paid', financialStatus: order.displayFinancialStatus }), { status: 422, headers });
+  }
+
+  // The line-item query fetches a single page. If the order has more, the
+  // items beyond it were never seen here — classifying only what came back
+  // would submit a subset and then write the completed idempotency record,
+  // permanently under-fulfilling a paid order: exactly the failure the
+  // all-or-nothing check below exists to prevent, just triggered by item
+  // count instead of bad item data. Refuse the whole order instead so it
+  // stays recoverable (claim released, redelivery re-runs it) once someone
+  // pages through it manually or this handler learns to paginate.
+  if (order.lineItems?.pageInfo?.hasNextPage) {
+    console.error('[order-paid] order', order.name, 'has more than', ORDER_LINE_ITEM_PAGE_SIZE, 'line items — refusing rather than fulfilling only the first page');
+    await releaseClaim();
+    return new Response(JSON.stringify({
+      error: `Order has more than ${ORDER_LINE_ITEM_PAGE_SIZE} line items — needs manual fulfillment`,
+      lineItemLimit: ORDER_LINE_ITEM_PAGE_SIZE,
+    }), { status: 422, headers });
   }
 
   const lineItems = (order.lineItems?.edges || []).map(e => e.node);

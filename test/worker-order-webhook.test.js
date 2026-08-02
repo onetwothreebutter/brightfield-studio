@@ -731,6 +731,66 @@ describe('POST /webhook/order-paid — idempotency', () => {
     const stored = JSON.parse(env.MOCKUP_STAGING._store.get('printful-orders/555000111.json'));
     expect(stored.printfulOrderId).toBe(99881);
   });
+
+  // Regression test: the claim can be *gone* by the time the losing delivery
+  // reads it, because every exit path that isn't full success releases it —
+  // and the ignore path (ordinary catalog order) claims and releases within
+  // milliseconds, so this window is routine, not exotic. The reclaim path
+  // used to dereference the missing record's etag unconditionally, throwing a
+  // TypeError out of the handler and 500ing the request with no log line.
+  it('re-claims the key when the previous claim was released mid-read, instead of crashing', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    // A concurrent delivery holds the claim, so our conditional put fails...
+    await env.MOCKUP_STAGING.put(
+      'printful-orders/555000111.json',
+      JSON.stringify({ status: 'pending', claimedAt: Date.now() })
+    );
+    // ...and releases it in the window before we read it back.
+    const realGet = env.MOCKUP_STAGING.get;
+    env.MOCKUP_STAGING.get = vi.fn(async (key) => {
+      env.MOCKUP_STAGING.get = realGet; // only the first read races
+      await env.MOCKUP_STAGING.delete(key);
+      return null;
+    });
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.printfulOrderId).toBe(99881);
+    expect(fetchMock.calls.filter(c => c.url === 'https://api.printful.com/orders').length).toBe(1);
+
+    const stored = JSON.parse(env.MOCKUP_STAGING._store.get('printful-orders/555000111.json'));
+    expect(stored.status).toBe('completed');
+  });
+
+  it('returns 409 rather than racing when another delivery re-claims a released key first', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await env.MOCKUP_STAGING.put(
+      'printful-orders/555000111.json',
+      JSON.stringify({ status: 'pending', claimedAt: Date.now() })
+    );
+    // The key is released before our read, then immediately re-claimed by a
+    // third delivery before our own retry lands — our retry must lose.
+    const realGet = env.MOCKUP_STAGING.get;
+    env.MOCKUP_STAGING.get = vi.fn(async (key) => {
+      env.MOCKUP_STAGING.get = realGet;
+      await env.MOCKUP_STAGING.delete(key);
+      await env.MOCKUP_STAGING.put(key, JSON.stringify({ status: 'pending', claimedAt: Date.now() }));
+      return null;
+    });
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ ok: false, retrying: true });
+    expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
+  });
 });
 
 // ── POST /webhook/order-paid — payment verification ─────────────────────────
@@ -819,6 +879,43 @@ describe('POST /webhook/order-paid — partial fulfillment', () => {
     // Now the whole order goes through — both items, one Printful order.
     expect(fixed.calls.printfulOrderBody.items).toHaveLength(2);
     expect(fixed.calls.filter(c => c.url === 'https://api.printful.com/orders').length).toBe(1);
+  });
+
+  // Same invariant, triggered by item count rather than item data: the order
+  // lookup fetches one page of line items, so an order with more than that
+  // would have submitted only the first page and then written the completed
+  // idempotency record — permanently under-fulfilling it.
+  it('refuses an order whose line items overflow a single lookup page', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({
+        lineItems: { pageInfo: { hasNextPage: true }, edges: defaultOrder().lineItems.edges },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    const json = await res.json();
+
+    expect(res.status).toBe(422);
+    expect(json.error).toMatch(/more than 100 line items/);
+    // Nothing submitted, and the claim released so a fix-and-replay can work.
+    expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
+    expect(env.MOCKUP_STAGING._store.has('printful-orders/555000111.json')).toBe(false);
+  });
+
+  it('proceeds normally when the line items fit in a single page', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({
+        lineItems: { pageInfo: { hasNextPage: false }, edges: defaultOrder().lineItems.edges },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(200);
+    expect(fetchMock.calls.printfulOrderBody.items).toHaveLength(1);
   });
 
   it('refuses a mixed order where the in-house item has an invalid metafield', async () => {
