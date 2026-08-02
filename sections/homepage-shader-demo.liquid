@@ -1681,7 +1681,7 @@
       }
       var shopifyVariantId = mockupSizeEl ? mockupSizeEl.value : null;
       if (!shopifyVariantId) {
-        setOrderError('Could not determine variant. Please select a size and try again.');
+        setOrderError('Please choose a size');
         return;
       }
       mockupOrder.disabled    = true;

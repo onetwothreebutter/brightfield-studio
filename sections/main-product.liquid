@@ -2013,7 +2013,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     var variantEl  = document.querySelector('select[name="id"]') || document.querySelector('input[name="id"]');
     var shopifyVariantId = sizeSelect ? sizeSelect.value : (variantEl ? variantEl.value : null);
     if (!shopifyVariantId) {
-      setOrderError('Could not determine variant. Please select a size and try again.');
+      setOrderError('Please choose a size');
       return;
     }
 
