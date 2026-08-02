@@ -1,10 +1,14 @@
 # In-house products
 
-An "in-house" product is a merchant-designed listing with a fixed shader
-look — as opposed to a **custom** or **community** product, which is
+An "in-house" product is a merchant-designed listing with fixed shader
+look(s) — as opposed to a **custom** or **community** product, which is
 generated dynamically from a customer's own design via
 `worker POST /create-product`. In-house products are ordinary Shopify
 products the merchant creates and configures by hand.
+
+A product can carry **one** design (the values baked into its shader snippet)
+or **several** (saved value sets in a metafield, chosen by a Design product
+option). See "Multiple designs on one product" below.
 
 ## End-to-end setup
 
@@ -39,19 +43,89 @@ products the merchant creates and configures by hand.
 
 5. **Publish the product.**
 
+## Multiple designs on one product
+
+One product can offer several fixed designs — all rendered by that product's
+single `shader-[file]` tag, differing only in their saved control values.
+(A design on a *different* shader needs a different product: `ShaderBase.create()`
+binds one canvas at script load and has no teardown path.)
+
+1. **Add a `Design` product option** in Shopify, one value per design. Variants
+   become Design x Size. The option may be named anything — the storefront finds
+   it by matching option values against the design entries, not by name.
+
+2. **Save each design's values** in the product's `custom.inhouse_designs`
+   metafield (namespace `custom`, key `inhouse_designs`, type JSON), a list of:
+
+   ```json
+   [
+     {
+       "option": "Chladni Bloom",
+       "shader": "chladni",
+       "values": { "u_freq": 7.5, "u_rotation": 0.7854, "u_a": [0.5, 0.5, 0.5] }
+     }
+   ]
+   ```
+
+   - `option` must match the Design option value **exactly** — that string is
+     the join key.
+   - `shader` must match the product's `shader-` tag. A mismatched entry is
+     skipped entirely (the shader falls back to its snippet defaults) rather
+     than applied partially, which would produce a hybrid look that's very hard
+     to trace back to a typo here.
+   - `values` is copied verbatim into `window._shaderState.values`, so it uses
+     that shape rather than anything more readable: **colours are `[r,g,b]`
+     floats** (literal colours in linear space, palette coefficients `u_a`–`u_d`
+     passed straight through — see `snippets/shader-color-utils.liquid`) and
+     **`toRadians` controls are in radians** (`0.7854`, not `45`). Don't
+     hand-convert these; produce them with the Design Assistant's **Copy design
+     JSON** button, which emits a ready-to-paste entry.
+
+3. **Give each design its own Printful product** (step 3 above) and set
+   `printful.variant_id` on **every** Design x Size variant (step 4). This is
+   where the work multiplies: 4 designs x 6 sizes is 24 sync variant ids copied
+   by hand.
+
+4. **Assign each design's image to its variants** so the media gallery, the
+   `og:image` on a `?variant=` deep link, and the schema.org `image` all follow
+   the shopper's selection. `custom.mockup_url` is per-product and can only ever
+   depict one design — leave it unset here, or it will contradict the selection.
+
+The storefront reads all of this in `sections/main-product.liquid`, with the
+pure selection logic in `assets/inhouse-designs.js` (`pickDesign`,
+`mergeDesignValues`, `findDesignOption`). A product with no metafield renders
+exactly as before.
+
 ## How order routing works
 
 At add-to-cart, an in-house product's line item gets
 `properties[_source] = inhouse`, from a hidden input in the product form in
-`sections/main-product.liquid`. This is cosmetic only — `main-cart.liquid`
-reads it to suppress the "custom design" badge in the cart — and plays no
-role in Printful routing.
-The actual routing signal read by the `orders/paid` webhook is the
-`printful.variant_id` variant metafield from step 4 above
-(`classifyLineItem()` in `worker/src/index.js`). A line item with that
-metafield submits to Printful as `{ sync_variant_id, quantity }` — no
-`files[]` — since the print file is already attached to the sync variant
-from step 3, unlike custom/community items which upload a design per order.
+`sections/main-product.liquid`. It suppresses the "custom design" badge in the
+cart (`sections/main-cart.liquid:38`), and it is also the signal that a line
+item was *meant* to reach Printful: if it carries `_source = inhouse` but no
+`printful.variant_id`, `classifyLineItem()` (`worker/src/index.js`) reports it
+as `inhouse-unconfigured` instead of treating it as an ordinary catalog item.
+Without that check a forgotten metafield — the likeliest mistake once a product
+has 24 variants — would silently never be fulfilled.
+
+The routing signal itself is the `printful.variant_id` variant metafield from
+step 4 above. A line item with it submits to Printful as
+`{ sync_variant_id, quantity }` — no `files[]` — since the print file is already
+attached to the sync variant from step 3, unlike custom/community items which
+upload a design per order.
+
+### When something is misconfigured
+
+If **any** relevant line item is unusable (missing/invalid `printful.variant_id`,
+missing `design_url`, unmapped size), the webhook submits **nothing** for that
+order — partial fulfillment would silently under-ship a paid order and the
+completed idempotency record would make it permanent.
+
+It answers Shopify with **422** and writes no completed idempotency record, so
+the order stays recoverable: fix the offending metafield and Shopify's own
+redelivery (or a manual replay) fulfills it in full. It also writes a durable
+failure record — see "Checking nothing got stuck" below. To catch these early,
+**watch the Worker logs for `MISCONFIGURED`**.
 
 ## One-time infrastructure setup
 
@@ -87,7 +161,9 @@ individual steps.
 
 5. **Only then, disable Printful's native automatic order-routing for in-house
    products.** Doing this before step 4 passes leaves a window where neither
-   path fulfills a paid order. Doing it after is just cleanup.
+   path fulfills a paid order. Doing it after is just cleanup. Switch off the
+   automatic *order routing* only — the product sync must stay connected, since
+   disconnecting it invalidates every `sync_variant_id` the metafields point at.
 
 ### Checking nothing got stuck
 

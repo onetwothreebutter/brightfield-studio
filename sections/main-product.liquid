@@ -12,6 +12,12 @@
 {%- endif -%}
 
 {%- if shader_file -%}
+{%- comment -%}
+  Loaded without defer, unlike the shader scripts at the bottom of this file:
+  the inline shader-GUI script calls window.InhouseDesigns synchronously while
+  building the initial shader state, so it has to already be there.
+{%- endcomment -%}
+<script src="{{ 'inhouse-designs.js' | asset_url }}"></script>
 <style>
 .anim-settings-toast {
   position: fixed;
@@ -145,6 +151,7 @@
                         <option
                           value="{{ variant.id }}"
                           data-price="{{ variant.price | money | escape }}"
+                          data-variant-title="{{ variant.title | escape }}"
                           {% if preselected_variant and variant.id == preselected_variant.id %}selected{% endif %}
                           {% unless variant.available %}disabled{% endunless %}
                         >
@@ -251,6 +258,8 @@
                   <option
                     value="{{ variant.id }}"
                     data-variant-title="{{ variant.title | escape }}"
+                    data-price="{{ variant.price | money | escape }}"
+                    {% if variant.featured_image %}data-image="{{ variant.featured_image | image_url: width: 900 }}"{% endif %}
                     {% if preselected_variant and variant.id == preselected_variant.id %}selected{% endif %}
                     {% unless variant.available %}disabled{% endunless %}
                   >
@@ -322,9 +331,11 @@
 
           function syncVariant() {
             var selectedOptions = [];
+            var complete = true;
             form.querySelectorAll('.variant-fieldset').forEach(function (fs) {
               var checked = fs.querySelector('input[type="radio"]:checked');
               if (checked) selectedOptions.push(checked.value);
+              else complete = false;
             });
             var title = selectedOptions.join(' / ');
             var options = variantSel.querySelectorAll('option');
@@ -335,10 +346,32 @@
                 return;
               }
             }
+            // No variant matches the current combination — either the shopper
+            // hasn't finished choosing, or this product has more than one
+            // option (Design x Size) and this particular combination doesn't
+            // exist. Clearing is what makes the second case safe: leaving the
+            // previous value in place would let the submit guard below pass
+            // and add the *previously* selected variant — i.e. a different
+            // design than the one on screen.
+            variantSel.value = '';
+            if (complete) showVariantError();
           }
 
           function showVariantError() {
             if (!errorEl) return;
+            // Name the option that's actually missing — with more than one
+            // option ("Design", "Size") the old fixed "select a size" copy
+            // could point at the wrong one. When every option is chosen but
+            // no variant matched, the combination itself doesn't exist.
+            var missing = [];
+            form.querySelectorAll('.variant-fieldset').forEach(function (fs) {
+              if (fs.querySelector('input[type="radio"]:checked')) return;
+              var legend = fs.querySelector('.variant-label');
+              missing.push(legend ? legend.textContent.trim().toLowerCase() : 'option');
+            });
+            errorEl.textContent = missing.length
+              ? 'Please select a ' + missing.join(' and a ') + '.'
+              : 'That combination isn’t available. Please choose another.';
             errorEl.style.display = '';
             errorEl.focus();
             form.querySelectorAll('.variant-fieldset').forEach(function (fs) {
@@ -691,6 +724,61 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     if (!c.key) return;
     values[c.key] = c.type === 'color' ? hexToRgb(c.value, c.key) : (c.toRadians ? c.value * Math.PI / 180 : c.value);
   });
+
+  // ── In-house designs ────────────────────────────────────────────────────────
+  // A product can carry several fixed merchant designs — saved value sets for
+  // this same shader, one per value of a "Design" product option (see
+  // docs/in-house-products.md). Merging the active one into `values` *here*,
+  // before the state object is built, means the canvas renders the right design
+  // on first paint with no visible tween, and the Customize tab starts from it.
+  // Products with no metafield keep rendering the shader snippet's own defaults.
+  // Normalised to an array: a metafield created with the wrong type (a text
+  // field rather than JSON) arrives here as a string, which would otherwise
+  // pass the truthiness checks below while behaving nothing like a list.
+  var INHOUSE_DESIGNS = {{ product.metafields.custom.inhouse_designs.value | json }};
+  if (!Array.isArray(INHOUSE_DESIGNS)) {
+    if (INHOUSE_DESIGNS) console.warn('[inhouse-designs] custom.inhouse_designs is not a JSON array — ignoring');
+    INHOUSE_DESIGNS = [];
+  }
+  var PRODUCT_OPTIONS = [
+    {%- for option in product.options_with_values -%}
+    { name: {{ option.name | json }}, values: {{ option.values | json }} }{% unless forloop.last %},{% endunless %}
+    {%- endfor -%}
+  ];
+  // Option values of the ?variant= deep-linked variant, or null when there
+  // isn't one (the default — this theme deliberately preselects no size).
+  var PRESELECTED_OPTIONS = {{ preselected_variant.options | json }};
+
+  var inhouseHelpers = window.InhouseDesigns || null;
+  var designOption   = null;
+  var activeDesign   = null;
+  var restoredDesignOption = null; // set by the share/gallery restore below
+  window._inhouseDesigns = INHOUSE_DESIGNS; // read by the design assistant below
+
+  if (inhouseHelpers && INHOUSE_DESIGNS.length) {
+    designOption = inhouseHelpers.findDesignOption(PRODUCT_OPTIONS, INHOUSE_DESIGNS);
+    // An explicit ?variant= deep link picks the design; otherwise the first
+    // entry renders. (Unlike Size, leaving Design unchosen isn't an option —
+    // the canvas has to draw *something*, so the radio is preselected to match
+    // further down rather than leaving the shopper looking at an unlabelled
+    // design.)
+    var wanted = null;
+    if (designOption && Array.isArray(PRESELECTED_OPTIONS)) {
+      PRESELECTED_OPTIONS.forEach(function (v) {
+        if (designOption.values.indexOf(v) !== -1) wanted = v;
+      });
+    }
+    if (wanted == null) wanted = INHOUSE_DESIGNS[0] && INHOUSE_DESIGNS[0].option;
+
+    activeDesign = inhouseHelpers.pickDesign(INHOUSE_DESIGNS, wanted, '{{ shader_file }}');
+    if (activeDesign) {
+      inhouseHelpers.mergeDesignValues(values, activeDesign.values);
+    } else if (wanted != null) {
+      console.warn('[inhouse-designs] no usable design entry for "' + wanted +
+        '" — falling back to the shader defaults. Check the option value and the `shader` field.');
+    }
+  }
+
   window._shaderState = { values: values, textDirty: true{% if is_community_design and submission_id != blank %}, holdReveal: true{% endif %} };
 
   // Pre-populate restore key from ?bfr= share param (set by Worker share page)
@@ -704,7 +792,11 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     } catch (e) {}
   }());
 
-  // Restore saved design if user clicked a gallery card
+  // Restore saved design if user clicked a gallery card.
+  //
+  // Precedence: a restore always wins over the in-house design merged above —
+  // the shopper followed a link to see *that* design, not this product's
+  // default. Keep this block after the merge if it ever moves.
   (function () {
     var raw = localStorage.getItem('brightfield_restore');
     if (!raw) return;
@@ -718,6 +810,11 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         }
       });
       window._shaderState.textDirty = true;
+      // The share was customized from one of this product's designs — point
+      // the Design option at it so the canvas, the checked radio and the
+      // variant that Add to Cart would buy all agree. Recorded for the
+      // switcher below, which does the DOM work once the form exists.
+      if (saved.design) restoredDesignOption = saved.design;
       if (saved.creatorName) {
         document.querySelectorAll('.product-title').forEach(function (titleEl) {
           var remixEl = document.createElement('p');
@@ -1143,6 +1240,242 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     glowSpread: 10
   };
 
+  // ── Shared value applier ────────────────────────────────────────────────────
+  // Applies a saved value set to the live shader state *and* the GUI inputs,
+  // tweening numeric values into place. Used both by the recent-designs
+  // filmstrip (clicking a card) and by the in-house design switcher, which need
+  // identical behaviour — the alternative was a third hand-rolled copy of this
+  // loop.
+  //
+  // opts: { tween: bool (default true), onDone: fn }
+  function applyShaderValues(endValues, opts) {
+    opts = opts || {};
+    var fa        = window._animationSettings || {};
+    var duration  = opts.tween === false ? 0 : (fa.tweenDuration || 900);
+    var onDone    = opts.onDone;
+    var startValues = JSON.parse(JSON.stringify(window._shaderState.values));
+
+    function ctrlFor(key) {
+      return controls.find(function (c) { return c.key === key; });
+    }
+
+    function updateControlsUI(key, val) {
+      var input = document.querySelector('[data-param-key="' + key + '"]');
+      if (!input) return;
+
+      if (input.type === 'range') {
+        input.value = val;
+        var display = input.parentNode.querySelector('.shader-control__value');
+        if (display) display.textContent = val.toFixed((input.step || '1').includes('.') ? (input.step || '1').split('.')[1].length : 0);
+      } else if (input.tagName === 'SELECT') {
+        // Value only — the `change` dispatch happens once up front (below), not
+        // on every tween frame, so a palette preset can't re-fire mid-tween.
+        input.value = val;
+      } else if (input.classList.contains('shader-control__toggle')) {
+        var isOn = val === 1;
+        input.dataset.on = isOn ? '1' : '0';
+        input.textContent = isOn ? 'On' : 'Off';
+        input.classList.toggle('is-on', isOn);
+      } else if (input.classList.contains('shader-control__color')) {
+        // val is a [r,g,b] uniform value — key-aware, since literal colours are
+        // stored linear while palette coefficients pass through untouched
+        // (snippets/shader-color-utils.liquid).
+        input.value = toHex(val, key);
+      } else if (input.classList.contains('shader-control__text-input')) {
+        input.value = val;
+        window._shaderState.values[key] = val;
+        window._shaderState.textDirty = true;
+      }
+    }
+
+    // Selects go first and get a real `change` event: grain-dependent row
+    // visibility, the cosine/4-stop preset handlers and customAfterBuild wiring
+    // all listen for it, so setting .value alone leaves the panel showing rows
+    // for the previous design. Order matters — a preset select's handler writes
+    // colours, so it has to run *before* the colour values below, not after.
+    Object.keys(endValues).forEach(function (k) {
+      if (!(k in startValues)) return;
+      var input = document.querySelector('[data-param-key="' + k + '"]');
+      if (!input || input.tagName !== 'SELECT') return;
+      window._shaderState.values[k] = endValues[k];
+      input.value = endValues[k];
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    function finish() {
+      if (typeof applyPaletteVisibility === 'function') applyPaletteVisibility();
+      window._shaderState.textDirty = true;
+      if (typeof onDone === 'function') onDone();
+    }
+
+    if (duration <= 0) {
+      Object.keys(endValues).forEach(function (k) {
+        if (!(k in startValues)) return;
+        var end = endValues[k];
+        window._shaderState.values[k] = Array.isArray(end) ? end.slice() : end;
+        var displayVal = window._shaderState.values[k];
+        var ctrl = ctrlFor(k);
+        if (ctrl && ctrl.toRadians && typeof displayVal === 'number') displayVal = displayVal * 180 / Math.PI;
+        updateControlsUI(k, displayVal);
+      });
+      finish();
+      return;
+    }
+
+    var startTime = performance.now();
+    function animate(now) {
+      var progress = Math.min((now - startTime) / duration, 1);
+      var e = 1 - Math.pow(1 - progress, 3); // ease out cubic
+
+      Object.keys(endValues).forEach(function (k) {
+        if (!(k in startValues)) return;
+        var start = startValues[k];
+        var end   = endValues[k];
+
+        if (Array.isArray(start) && Array.isArray(end)) {
+          window._shaderState.values[k] = [
+            start[0] + (end[0] - start[0]) * e,
+            start[1] + (end[1] - start[1]) * e,
+            start[2] + (end[2] - start[2]) * e
+          ];
+        } else if (typeof start === 'number' && typeof end === 'number') {
+          window._shaderState.values[k] = start + (end - start) * e;
+        } else if (progress === 1) {
+          window._shaderState.values[k] = end; // string or boolean-ish
+        }
+
+        if (progress === 1 || Math.random() > 0.8) {
+          var displayVal = window._shaderState.values[k];
+          var ctrl = ctrlFor(k);
+          if (ctrl && ctrl.toRadians && typeof displayVal === 'number') {
+            displayVal = displayVal * 180 / Math.PI;
+          }
+          updateControlsUI(k, displayVal);
+        }
+      });
+
+      window._shaderState.textDirty = true;
+
+      if (progress < 1) requestAnimationFrame(animate);
+      else finish();
+    }
+    requestAnimationFrame(animate);
+  }
+  window._applyShaderValues = applyShaderValues;
+
+  // ── In-house design switcher ────────────────────────────────────────────────
+  // Changing the Design radio tweens the canvas to that design's saved values,
+  // and keeps the rest of the page (main image, price) pointing at the variant
+  // the shopper would actually buy.
+  (function () {
+    if (!designOption || !INHOUSE_DESIGNS.length) return;
+
+    var form = document.querySelector('#product-order-form form');
+    if (!form) return;
+    var radios = form.querySelectorAll('input[type="radio"][name="options[' + designOption.name + ']"]');
+    if (!radios.length) return;
+
+    var mainImg    = document.querySelector('.product-media__image');
+    var priceEl    = document.querySelector('.product-price');
+    var variantSel = form.querySelector('select.variant-select');
+
+    // Reflect the design that's already on the canvas. Done here rather than in
+    // Liquid so the checked radio can never disagree with the values that were
+    // merged into the shader state at init.
+    //
+    // A share/gallery restore overrode those values, so it also decides the
+    // selection — otherwise the shopper sees the shared design but would buy
+    // this product's default one.
+    if (restoredDesignOption) {
+      var restored = inhouseHelpers.pickDesign(INHOUSE_DESIGNS, restoredDesignOption, '{{ shader_file }}');
+      if (restored) activeDesign = restored;
+    }
+    var anyChecked = false;
+    radios.forEach(function (r) { if (r.checked) anyChecked = true; });
+    if ((!anyChecked || restoredDesignOption) && activeDesign) {
+      radios.forEach(function (r) { r.checked = (r.value === activeDesign.option); });
+    }
+
+    // The "Preview on Shirt" modal picks a size for the customize flow. Its
+    // list is every variant, which on a multi-design product means entries like
+    // "Chladni Bloom / M" repeated once per design — so narrow it to the design
+    // currently on screen and label the options with just the size.
+    var sizeSelect = document.getElementById('mockup-size-select');
+    var sizeOptionsHtml = sizeSelect ? sizeSelect.innerHTML : null;
+
+    function filterMockupSizes(designValue) {
+      if (!sizeSelect || sizeOptionsHtml == null) return;
+      sizeSelect.innerHTML = sizeOptionsHtml;
+      Array.prototype.slice.call(sizeSelect.options).forEach(function (opt) {
+        var title = opt.dataset.variantTitle;
+        if (!title) return; // the "Select a size" placeholder
+        var parts = title.split(' / ');
+        var idx = parts.indexOf(designValue);
+        if (idx === -1) {
+          opt.remove();
+          return;
+        }
+        parts.splice(idx, 1);
+        opt.textContent = parts.join(' / ') || title;
+      });
+      sizeSelect.value = '';
+    }
+
+    function selectedVariantOption() {
+      if (!variantSel || !variantSel.value) return null;
+      var opts = variantSel.querySelectorAll('option');
+      for (var i = 0; i < opts.length; i++) {
+        if (opts[i].value === variantSel.value) return opts[i];
+      }
+      return null;
+    }
+
+    // Image and price follow the *variant*, which only resolves once every
+    // option is chosen — before that there's nothing unambiguous to show, so
+    // leave what's on screen alone rather than flashing a wrong price.
+    function syncVariantMedia() {
+      var opt = selectedVariantOption();
+      if (!opt) return;
+      if (mainImg && opt.dataset.image) {
+        mainImg.src = opt.dataset.image;
+        document.querySelectorAll('.product-thumb').forEach(function (t) {
+          t.classList.toggle('is-active', t.dataset.full === opt.dataset.image);
+        });
+      }
+      if (priceEl && opt.dataset.price) priceEl.textContent = opt.dataset.price;
+    }
+
+    radios.forEach(function (radio) {
+      radio.addEventListener('change', function () {
+        if (!this.checked) return;
+        var next = inhouseHelpers.pickDesign(INHOUSE_DESIGNS, this.value, '{{ shader_file }}');
+        if (!next) {
+          console.warn('[inhouse-designs] no usable design entry for "' + this.value + '"');
+          return;
+        }
+        activeDesign = next;
+        applyShaderValues(next.values);
+        filterMockupSizes(next.option);
+        window.bfTrack('product_inhouse_design_switch', {
+          shader: '{{ shader_file }}',
+          design: next.option
+        });
+        // The variant-sync script's own change listener runs independently;
+        // read the result rather than duplicating its matching logic.
+        setTimeout(syncVariantMedia, 0);
+      });
+    });
+
+    // Keep media in step when the *size* changes too — with Design x Size a
+    // size change moves to a different variant, hence a different image/price.
+    form.querySelectorAll('input[type="radio"]').forEach(function (radio) {
+      radio.addEventListener('change', function () { setTimeout(syncVariantMedia, 0); });
+    });
+
+    if (activeDesign) filterMockupSizes(activeDesign.option);
+    syncVariantMedia();
+  }());
+
   // Load product-specific recent designs filmstrip
   document.addEventListener('DOMContentLoaded', function () {
     var rdContainer = document.getElementById('product-recent-designs-container');
@@ -1165,90 +1498,8 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     }
     var currentDesigns = [];
     function onCardClick(design, cardElement) {
-        var startValues = JSON.parse(JSON.stringify(window._shaderState.values));
-        var endValues = design.values;
-        var duration = window._animationSettings.tweenDuration;
-        var startTime;
-
-        function updateControlsUI(key, val) {
-          // Update the range/color/toggle inputs in the DOM
-          var input = document.querySelector('[data-param-key="' + key + '"]');
-          if (!input) return;
-
-          if (input.type === 'range') {
-            input.value = val;
-            var display = input.parentNode.querySelector('.shader-control__value');
-            if (display) display.textContent = val.toFixed((input.step || '1').includes('.') ? (input.step || '1').split('.')[1].length : 0);
-          } else if (input.tagName === 'SELECT') {
-            input.value = val;
-          } else if (input.classList.contains('shader-control__toggle')) {
-            var isOn = val === 1;
-            input.dataset.on = isOn ? '1' : '0';
-            input.textContent = isOn ? 'On' : 'Off';
-            input.classList.toggle('is-on', isOn);
-          } else if (input.classList.contains('shader-control__color')) {
-            // val is [r,g,b]
-            var hex = '#' + val.map(function(c) {
-              var s = Math.round(c * 255).toString(16);
-              return s.length === 1 ? '0' + s : s;
-            }).join('');
-            input.value = hex;
-          } else if (input.classList.contains('shader-control__text-input')) {
-            input.value = val;
-            window._shaderState.values[key] = val;
-            window._shaderState.textDirty = true;
-          }
-        }
-
         function startValuesAnimation() {
-          var startTime = performance.now();
-          function animate(now) {
-            var elapsed = now - startTime;
-            var progress = Math.min(elapsed / duration, 1);
-            // Ease out cubic
-            var e = 1 - Math.pow(1 - progress, 3);
-
-            Object.keys(endValues).forEach(function (k) {
-              if (!(k in startValues)) return;
-              var start = startValues[k];
-              var end = endValues[k];
-
-              if (Array.isArray(start) && Array.isArray(end)) {
-                // Color [r,g,b]
-                window._shaderState.values[k] = [
-                  start[0] + (end[0] - start[0]) * e,
-                  start[1] + (end[1] - start[1]) * e,
-                  start[2] + (end[2] - start[2]) * e
-                ];
-              } else if (typeof start === 'number' && typeof end === 'number') {
-                window._shaderState.values[k] = start + (end - start) * e;
-              } else {
-                // String or boolean-ish
-                if (progress === 1) window._shaderState.values[k] = end;
-              }
-
-              // Update UI at the end or occasionally
-              if (progress === 1 || Math.random() > 0.8) {
-                var displayVal = window._shaderState.values[k];
-                // Convert back from radians if necessary for the UI input
-                var ctrl = controls.find(function(c) { return c.key === k; });
-                if (ctrl && ctrl.toRadians && typeof displayVal === 'number') {
-                  displayVal = displayVal * 180 / Math.PI;
-                }
-                updateControlsUI(k, displayVal);
-              }
-            });
-
-            window._shaderState.textDirty = true;
-
-            if (progress < 1) {
-              requestAnimationFrame(animate);
-            } else {
-              if (typeof applyPaletteVisibility === 'function') applyPaletteVisibility();
-              showToast();
-            }
-          }
-          requestAnimationFrame(animate);
+          applyShaderValues(design.values, { onDone: showToast });
         }
 
         var shaderTab = document.querySelector('[data-tab="shader"]');
@@ -1258,6 +1509,9 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         var img = cardElement ? cardElement.querySelector('img') : null;
         var target = document.getElementById('shader-canvas');
         var targetContainer = document.querySelector('.media-panel[data-panel="shader"]');
+        // Read before scheduleTween() so the no-image early return below can't
+        // hit it while it's still an unassigned hoisted var.
+        var fa = window._animationSettings;
 
         function scheduleTween() {
           if (fa.tweenDelay <= 0) { startValuesAnimation(); }
@@ -1279,7 +1533,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         clone.style.width = imgRect.width + 'px';
         clone.style.height = imgRect.height + 'px';
         clone.style.zIndex = '9999';
-        var fa = window._animationSettings;
         var tSec = (fa.flyTranslateDuration / 1000) + 's';
         var sSec = (fa.flyScaleDuration     / 1000) + 's';
         clone.style.transition = [
@@ -1549,6 +1802,11 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
         shader:        '{{ shader_file }}',
         productHandle: '{{ product.handle }}',
         values:        window._shaderState ? window._shaderState.values : {},
+        // Which in-house design this was customized from, when the product has
+        // several. Without it, following the share link back renders the shared
+        // values while the Design radio and the variant in the buy form still
+        // point at the product's default design.
+        design:        activeDesign ? activeDesign.option : null,
       }),
     })
     .then(function (r) { return r.json(); })
@@ -2414,13 +2672,22 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       '<div class="inhouse-assistant__body">' +
         '<ol class="inhouse-assistant__steps">' +
           '<li>Tune the shader using the controls panel</li>' +
-          '<li>Click <strong>Copy</strong> below and paste into<br><code>snippets/shader-controls-{{ shader_file }}.liquid</code></li>' +
-          '<li>Replace each control\'s <code>value:</code> field with the copied values</li>' +
-          '<li>Run <code>npm run push</code> to deploy</li>' +
+          '<li>Name the design, then <strong>Copy design JSON</strong></li>' +
+          '<li>Paste it into this product\'s <code>custom.inhouse_designs</code> metafield (a JSON array — add it alongside any existing entries)</li>' +
+          '<li>Add a matching <em>Design</em> option value on the product, then set <code>printful.variant_id</code> on each new variant</li>' +
           '<li>Verify on the live page (no <code>?new-inhouse-design</code>)</li>' +
         '</ol>' +
         '<div class="inhouse-assistant__values-header">' +
-          '<span class="inhouse-assistant__values-label">Current values</span>' +
+          '<label class="inhouse-assistant__values-label" for="inhouse-design-name">Design name</label>' +
+          '<input type="text" id="inhouse-design-name" class="inhouse-assistant__name-input" placeholder="e.g. Chladni Bloom">' +
+        '</div>' +
+        '<div class="inhouse-assistant__values-header">' +
+          '<span class="inhouse-assistant__values-label">Design entry</span>' +
+          '<button id="inhouse-copy-json-btn" class="btn btn--primary btn--sm">Copy design JSON</button>' +
+        '</div>' +
+        '<pre id="inhouse-design-json" class="inhouse-assistant__values"></pre>' +
+        '<div class="inhouse-assistant__values-header">' +
+          '<span class="inhouse-assistant__values-label">Snippet defaults</span>' +
           '<button id="inhouse-copy-btn" class="btn btn--outline btn--sm">Copy</button>' +
         '</div>' +
         '<pre id="inhouse-values" class="inhouse-assistant__values"></pre>' +
@@ -2437,6 +2704,21 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   var valuesEl   = document.getElementById('inhouse-values');
   var copyBtn    = document.getElementById('inhouse-copy-btn');
   var turnoffBtn = document.getElementById('inhouse-turnoff-btn');
+  var jsonEl     = document.getElementById('inhouse-design-json');
+  var jsonBtn    = document.getElementById('inhouse-copy-json-btn');
+  var nameInput  = document.getElementById('inhouse-design-name');
+
+  // Prefill from the Design option the shopper-facing form is showing, so
+  // re-tuning an existing design copies back under the same name.
+  (function () {
+    if (!nameInput) return;
+    var checked = document.querySelector('#product-order-form .variant-fieldset input[type="radio"]:checked');
+    var designs = window._inhouseDesigns || [];
+    if (!checked || !designs.length) return;
+    for (var i = 0; i < designs.length; i++) {
+      if (designs[i] && designs[i].option === checked.value) { nameInput.value = checked.value; return; }
+    }
+  }());
 
   // window._shaderState.values stores literal colors in linear space (see
   // srgbToLinear/PALETTE_COEFF_KEYS in shader-color-utils.liquid) — toHex
@@ -2454,8 +2736,24 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     }).join('\n');
   }
 
+  // A metafield entry, unlike the snippet-defaults output above, is copied
+  // verbatim into and out of window._shaderState.values — so the values go in
+  // raw: colours stay [r,g,b] in whatever space their uniform expects and
+  // toRadians controls stay in radians. Running them through toHex here would
+  // collapse exactly the per-key distinctions shader-color-utils exists to
+  // keep, and the applier would have no way to undo it.
+  function getDesignJson() {
+    if (!window._shaderState) return '// shader not loaded yet';
+    return JSON.stringify({
+      option: (nameInput && nameInput.value.trim()) || 'Untitled Design',
+      shader: '{{ shader_file }}',
+      values: window._shaderState.values
+    }, null, 2);
+  }
+
   function refresh() {
     if (valuesEl) valuesEl.textContent = getFormattedValues();
+    if (jsonEl)   jsonEl.textContent   = getDesignJson();
   }
 
   function open() {
@@ -2486,6 +2784,18 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
       setTimeout(function () { copyBtn.textContent = 'Copy'; }, 2000);
     });
   });
+
+  if (nameInput) nameInput.addEventListener('input', refresh);
+
+  if (jsonBtn) {
+    jsonBtn.addEventListener('click', function () {
+      if (!jsonEl) return;
+      navigator.clipboard.writeText(getDesignJson()).then(function () {
+        jsonBtn.textContent = 'Copied!';
+        setTimeout(function () { jsonBtn.textContent = 'Copy design JSON'; }, 2000);
+      });
+    });
+  }
 
   setInterval(function () {
     if (!modal.classList.contains('inhouse-assistant--hidden')) refresh();

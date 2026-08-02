@@ -1551,20 +1551,39 @@ export function parseCustomSku(sku) {
 // metafield — see docs/in-house-products.md for how the merchant sets this),
 // 'inhouse-invalid' (that metafield is present but not a usable id, which
 // should fail loudly rather than silently fall through to 'unrecognized'),
-// or 'unrecognized' (an ordinary catalog item with neither signal — ignored,
-// same as today). SKU match is checked first so a line item can never
+// 'inhouse-unconfigured' (the storefront marked it as an in-house purchase but
+// no metafield is set at all — the same "needs a human" class as the two
+// above), or 'unrecognized' (an ordinary catalog item with no signal —
+// ignored, same as today). SKU match is checked first so a line item can never
 // satisfy both.
+//
+// The 'inhouse-unconfigured' case exists because a product can now carry
+// several designs as Design x Size variants, multiplying the number of
+// variants needing a printful.variant_id — and a forgotten one used to look
+// exactly like an ordinary catalog item, so a paid order silently never
+// reached Printful. properties[_source] = inhouse (set by the storefront
+// add-to-cart form, sections/main-product.liquid) is what distinguishes them.
+// Community/custom products also carry that property, but they match the SKU
+// branch above first and never reach this check.
 export function classifyLineItem(li) {
   const skuInfo = parseCustomSku(li.sku);
   if (skuInfo) return { type: 'custom', skuInfo };
 
   const raw = li.variant?.metafield?.value;
-  if (raw == null) return { type: 'unrecognized' };
+  const isInhouse = (li.customAttributes || []).some(
+    a => a?.key === '_source' && a?.value === 'inhouse'
+  );
+
+  if (raw == null) {
+    return isInhouse ? { type: 'inhouse-unconfigured' } : { type: 'unrecognized' };
+  }
 
   // Whitespace-only is treated the same as empty (metafield never set) rather
   // than as a broken value — an absent signal, not a merchant mistake.
   const trimmed = String(raw).trim();
-  if (trimmed === '') return { type: 'unrecognized' };
+  if (trimmed === '') {
+    return isInhouse ? { type: 'inhouse-unconfigured' } : { type: 'unrecognized' };
+  }
 
   // Strict digits-only, deliberately not parseInt(): parseInt stops at the
   // first non-digit and returns what it got, so '4917503 (Black / M)' would
@@ -1951,6 +1970,11 @@ async function handleOrderPaidWebhook(request, env, ctx) {
                 # only as a fallback for a response somehow lacking this one.
                 currentQuantity
                 title
+                # properties[_source] from the storefront add-to-cart form —
+                # 'inhouse' marks a line item that is *supposed* to route to
+                # Printful, which is what lets a missing printful.variant_id be
+                # reported as a misconfiguration instead of silently ignored.
+                customAttributes { key value }
                 product {
                   id
                   metafield(namespace: "custom", key: "design_url") { value }
@@ -2119,6 +2143,9 @@ async function handleOrderPaidWebhook(request, env, ctx) {
     } else if (li.cls.type === 'inhouse-invalid') {
       console.error('[order-paid] invalid printful.variant_id metafield value, skipping:', li.cls.raw, li.sku);
       skippedItems.push({ sku: li.sku, reason: `invalid printful.variant_id metafield value: ${li.cls.raw}` });
+    } else if (li.cls.type === 'inhouse-unconfigured') {
+      console.error('[order-paid] in-house line item has no printful.variant_id metafield, skipping:', li.sku, li.variant?.id);
+      skippedItems.push({ sku: li.sku, reason: 'in-house line item with no printful.variant_id metafield' });
     }
   }
 
@@ -2133,12 +2160,16 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   // trace would be a `skipped` field in an R2 object nobody reads.
   //
   // Refusing the whole order instead keeps it recoverable: the claim is
-  // released, so once the merchant fixes the offending product's metafield,
-  // Shopify's own redelivery (or a manual replay) fulfills the order
-  // completely. 422 rather than 502 because the upstreams are healthy — it's
-  // the order's own data that needs a human.
+  // released and no completed idempotency record is written, so once the
+  // merchant fixes the offending product's metafield, Shopify's own redelivery
+  // (or a manual replay) fulfills the order completely. 422 rather than 502
+  // because the upstreams are healthy — it's the order's own data that needs a
+  // human. Multi-design products raise the stakes: Design x Size multiplies the
+  // variants needing a printful.variant_id, so a forgotten one is a routine
+  // mistake rather than a rare one. Grep Worker logs for MISCONFIGURED, and see
+  // the failure record at printful-orders-failed/{orderId}.json.
   if (skippedItems.length || !printfulItems.length) {
-    console.error('[order-paid] refusing to partially fulfill order', order.name, '— unusable line items:', JSON.stringify(skippedItems));
+    console.error('[order-paid][MISCONFIGURED] refusing to partially fulfill order', order.name, '— unusable line items:', JSON.stringify(skippedItems));
     await recordFulfillmentFailure(env, shopifyOrderId, {
       shopifyOrderName: order.name,
       reason: 'unusable line items',
@@ -2760,7 +2791,13 @@ async function handleShare(request, env, id) {
     const desc     = escHtml('Customize your own design at Brightfield Studio');
     const shareUrl = escHtml('https://share.brightfield.studio/' + id);
     const imageUrl = escHtml(rewriteLegacyImgUrl(env, meta.imageUrl || ''));
-    const restorePayload = btoa(JSON.stringify({ values: meta.values, shader: meta.shader }));
+    const restorePayload = btoa(JSON.stringify({
+      values: meta.values,
+      shader: meta.shader,
+      // Absent on shares created before multi-design products existed; the
+      // storefront treats a missing design as "leave the selection alone".
+      ...(meta.design ? { design: meta.design } : {}),
+    }));
     const productUrl = 'https://brightfield.studio/products/' + encodeURIComponent(meta.productHandle || '')
       + '?bfr=' + encodeURIComponent(restorePayload) + '#shader';
     return new Response(buildShareHtml(title, desc, shareUrl, imageUrl, productUrl), {
@@ -3103,7 +3140,7 @@ async function handleCreateShare(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
   const { body, error, status } = await readLimitedJson(request, MAX_SINGLE_IMAGE_BODY_BYTES);
   if (error) return new Response(JSON.stringify({ error }), { status, headers });
-  const { image, shader, productHandle, values } = body;
+  const { image, shader, productHandle, values, design } = body;
   if (!image || !productHandle) {
     return new Response(JSON.stringify({ error: 'Missing image or productHandle' }), { status: 400, headers });
   }
@@ -3113,6 +3150,12 @@ async function handleCreateShare(request, env, origin) {
   if (typeof productHandle !== 'string' || productHandle.length > 256 ||
       (shader != null && (typeof shader !== 'string' || shader.length > 256))) {
     return new Response(JSON.stringify({ error: 'Invalid shader or productHandle' }), { status: 400, headers });
+  }
+  // Optional: which in-house design the share was customized from, so that
+  // following the share link back can reselect it (see handleShare). Old
+  // clients don't send it and old shares don't have it — both stay valid.
+  if (design != null && (typeof design !== 'string' || design.length > 256)) {
+    return new Response(JSON.stringify({ error: 'Invalid design' }), { status: 400, headers });
   }
   if (values != null && (!isPlainObject(values) || JSON.stringify(values).length > MAX_STATE_BYTES)) {
     return new Response(JSON.stringify({ error: 'Invalid values' }), { status: 400, headers });
@@ -3137,6 +3180,7 @@ async function handleCreateShare(request, env, origin) {
     shader:        shader        || '',
     productHandle: productHandle || '',
     values:        values        || {},
+    design:        design        || '',
     imageUrl,
     timestamp:     Math.floor(Date.now() / 1000),
   });
