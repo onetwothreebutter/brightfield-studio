@@ -145,8 +145,9 @@ function makeUpstreamFetch(overrides = {}) {
             { id: 4020, size: 'L', color: 'Black' },
             { id: 4030, size: 'XL', color: 'Black' },
             // 3XL only exists in White in this mocked catalog (no Black
-            // variant) — exercises the any-color fallback fill in
-            // getPrintfulVariantMap() when the target color is missing a size.
+            // variant) — exercises getPrintfulVariantMap() leaving a size the
+            // target color doesn't offer unmapped, rather than substituting
+            // another color's variant.
             { id: 5099, size: '3XL', color: 'White' },
           ],
         },
@@ -492,10 +493,12 @@ describe('POST /webhook/order-paid — happy path', () => {
     expect(fetchMock.calls.printfulOrderBody.items[0].variant_id).toBe(4010);
   });
 
-  it('falls back to a non-target color when the target color has no variant for that size', async () => {
+  it('refuses rather than substituting another color when the target color has no variant for that size', async () => {
     // 3XL only exists as White (5099) in the mocked catalog — no Black variant
-    // at all — so getPrintfulVariantMap()'s pass-2 fallback should fill it in
-    // rather than treating the size as unmapped.
+    // at all. Shipping the White one would send the customer a garment they
+    // didn't buy, so the size stays unmapped and the order takes the same
+    // all-or-nothing refusal as any other unusable line item: 422, nothing
+    // submitted to Printful, and a durable record so someone notices.
     const env = makeEnv();
     const fetchMock = makeUpstreamFetch({
       order: defaultOrder({
@@ -510,8 +513,16 @@ describe('POST /webhook/order-paid — happy path', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
-    expect(res.status).toBe(200);
-    expect(fetchMock.calls.printfulOrderBody.items[0].variant_id).toBe(5099);
+    expect(res.status).toBe(422);
+    expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
+
+    const failure = JSON.parse(env.MOCKUP_STAGING._store.get('printful-orders-failed/555000111.json'));
+    expect(failure.reason).toBe('unusable line items');
+    expect(failure.skipped[0].reason).toBe('no Printful variant for size 3XL');
+
+    // Recoverable, not permanent: no completed idempotency record, so a
+    // redelivery re-runs the order once the catalog gains the Black variant.
+    expect(env.MOCKUP_STAGING._store.has('printful-orders/555000111.json')).toBe(false);
   });
 });
 
@@ -1365,6 +1376,66 @@ describe('POST /webhook/order-paid — failure records', () => {
     expect(res.status).toBe(200);
     // A resolved problem must not stay in the "needs a human" list.
     expect(failureRecord(env)).toBeNull();
+  });
+
+  it('clears the failure record when the order stops being Printful-relevant at all', async () => {
+    // The other way a refusal gets resolved: rather than fixing the bad
+    // printful.variant_id, the merchant removes it (or the customer refunds
+    // the offending items away). The redelivery then takes the ignore path
+    // instead of the success path — which used to leave the old record
+    // stranded forever, since nothing on that path cleared it and no later
+    // delivery ever would.
+    const env = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch({
+      order: defaultOrder({ lineItems: { edges: [
+        { node: inhouseLineItem({ variant: { id: 'gid://shopify/ProductVariant/9001', metafield: { value: 'not-an-id' } } }) },
+      ] } }),
+    }));
+    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), env)).status).toBe(422);
+    expect(failureRecord(env).reason).toBe('unusable line items');
+
+    // Metafield removed — now an ordinary catalog item this handler ignores.
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({ lineItems: { edges: [
+        { node: inhouseLineItem({ variant: { id: 'gid://shopify/ProductVariant/9001', metafield: null } }) },
+      ] } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).ignored).toBe(true);
+    expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
+    expect(failureRecord(env)).toBeNull();
+  });
+
+  it('clears the failure record before releasing the claim, mirroring the write path', async () => {
+    // Same ordering argument as the write: releasing first would let a
+    // concurrent redelivery re-record a failure that this delivery is in the
+    // middle of clearing.
+    const env = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch({
+      order: defaultOrder({ lineItems: { edges: [
+        { node: inhouseLineItem({ variant: { id: 'gid://shopify/ProductVariant/9001', metafield: { value: 'not-an-id' } } }) },
+      ] } }),
+    }));
+    await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+
+    const del = env.MOCKUP_STAGING.delete;
+    del.mockClear();
+
+    vi.stubGlobal('fetch', makeUpstreamFetch({
+      order: defaultOrder({ lineItems: { edges: [
+        { node: inhouseLineItem({ variant: { id: 'gid://shopify/ProductVariant/9001', metafield: null } }) },
+      ] } }),
+    }));
+    await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+
+    const keys = del.mock.calls.map(c => c[0]);
+    expect(keys).toEqual([
+      'printful-orders-failed/555000111.json',
+      'printful-orders/555000111.json',
+    ]);
   });
 });
 

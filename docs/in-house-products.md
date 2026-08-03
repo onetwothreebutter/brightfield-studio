@@ -91,13 +91,18 @@ individual steps.
 
 ### Checking nothing got stuck
 
-An order the webhook refuses (bad metafield, missing shipping address, more
-than 100 line items) is recorded at `printful-orders-failed/{orderId}.json` in
-the worker's R2 bucket, and cleared automatically if a later redelivery
-succeeds. Listing that prefix answers "did anything paid fail to reach
-Printful?" — it should normally be empty. Successful orders leave an
+An order the webhook refuses (bad metafield, missing shipping address, a
+custom-design size Printful doesn't stock in the garment color, more than 100
+line items) is recorded at `printful-orders-failed/{orderId}.json` in the
+worker's R2 bucket. Listing that prefix answers "did anything paid fail to
+reach Printful?" — it should normally be empty. Successful orders leave an
 idempotency record at `printful-orders/{orderId}.json`; neither prefix is
 garbage-collected.
+
+Records clear themselves once the order stops needing attention — either a
+later redelivery fulfills it, or the order stops being Printful-relevant at all
+(the metafield was removed rather than fixed, or the offending items were
+refunded). So anything still listed is genuinely outstanding.
 
 Orders **Printful itself rejects** land in the same place, with
 `reason: "Printful rejected the order"` and Printful's own diagnostic in

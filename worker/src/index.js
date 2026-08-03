@@ -162,21 +162,18 @@ async function getPrintfulVariantMap(env) {
     const variants = data?.result?.variants || [];
     const targetColor = (env.PRINTFUL_GARMENT_COLOR || DEFAULT_PRINTFUL_GARMENT_COLOR).toLowerCase();
 
+    // Target color only. A size the target color doesn't offer is deliberately
+    // left unmapped rather than filled in from whatever color happens to have
+    // it: an unmapped size refuses the whole order (see the skippedItems check
+    // in handleOrderPaidWebhook), which is recoverable and leaves a durable
+    // printful-orders-failed/ record, whereas substituting a color would ship
+    // the customer a garment they didn't buy — with a console.warn as the only
+    // trace, exactly the silent-shortfall failure this handler refuses
+    // everywhere else. Filtering by color also keeps two variants sharing a
+    // size from colliding.
     const map = {};
-    // Pass 1: only the target color, so two variants sharing a size (different
-    // colors) never collide.
     for (const v of variants) {
       if (v.size && v.id != null && (v.color || '').toLowerCase() === targetColor) {
-        map[v.size] = v.id;
-      }
-    }
-    // Pass 2: fill any size missing from the target color (e.g. a color that
-    // doesn't offer every size) from whatever color is available, so a gap in
-    // one color's size run doesn't silently drop an order — better to fulfill
-    // in a slightly-off color than fail outright. Logged so it's noticeable.
-    for (const v of variants) {
-      if (v.size && v.id != null && !(v.size in map)) {
-        console.warn('[getPrintfulVariantMap] no', targetColor, 'variant for size', v.size, '— falling back to color', v.color);
         map[v.size] = v.id;
       }
     }
@@ -1684,6 +1681,26 @@ async function recordFulfillmentFailure(env, shopifyOrderId, detail) {
   });
 }
 
+// Clears the failure record for an order that no longer needs a human. No-op
+// when there isn't one.
+//
+// Called from both terminal non-failure outcomes, not just the fulfilled one:
+// an order can also stop needing attention by ceasing to be this handler's
+// business at all. A merchant can resolve a refusal by *removing* the offending
+// printful.variant_id rather than fixing it, and a customer can refund the
+// offending items to zero — both leave the redelivery on the ignore path, which
+// would otherwise strand the old record forever. Since docs/in-house-products.md
+// tells the merchant that prefix should normally be empty, a record that can
+// never clear itself is worse than no record: it trains them to ignore the list.
+//
+// Like recordFulfillmentFailure, call this while the claim is still held — the
+// same ordering argument applies in reverse.
+async function clearFulfillmentFailure(env, shopifyOrderId, context) {
+  await env.MOCKUP_STAGING.delete(`printful-orders-failed/${shopifyOrderId}.json`).catch((err) => {
+    console.error('[order-paid] failed to clear failure record for', context, ':', err.message);
+  });
+}
+
 // Builds the diagnostic message for a rejected Printful order-create. Two
 // things this does that `printfulJson.result || JSON.stringify(printfulJson)`
 // did not:
@@ -2011,6 +2028,9 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   // ignored entirely.
   if (!relevant.length) {
     console.log('[order-paid] no custom-design or in-house line items on order', order.name, '— ignoring');
+    // This order has nothing for Printful, so any failure record from an
+    // earlier attempt describes a problem that no longer exists.
+    await clearFulfillmentFailure(env, shopifyOrderId, `order ${order.name}`);
     await releaseClaim();
     return new Response(JSON.stringify({ ok: true, ignored: true }), { status: 200, headers });
   }
@@ -2246,11 +2266,8 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   });
 
   // Clear any failure record from an earlier refused attempt: this order just
-  // fulfilled completely, so leaving one behind would keep a resolved problem
-  // sitting in the "needs a human" list forever. No-op when there isn't one.
-  await env.MOCKUP_STAGING.delete(`printful-orders-failed/${shopifyOrderId}.json`).catch((err) => {
-    console.error('[order-paid] failed to clear failure record for order', order.name, ':', err.message);
-  });
+  // fulfilled completely, so the problem it described is resolved.
+  await clearFulfillmentFailure(env, shopifyOrderId, `order ${order.name}`);
 
   console.log('[order-paid] created Printful draft order', printfulOrderId, 'for Shopify order', order.name);
   // No `skipped` on this path: reaching here means nothing was skipped.
