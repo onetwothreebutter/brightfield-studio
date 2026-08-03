@@ -18,9 +18,14 @@
     'uniform float u_tick_count;',
     'uniform float u_tick_length;',
     'uniform float u_tick_width;',
+    'uniform float u_width_gradient;',
+    'uniform float u_width_gradient_strength;',
+    'uniform float u_width_gradient_rotation;',
     'uniform float u_tick_phase;',
     'uniform float u_tick_major_every;',
     'uniform float u_tick_major_scale;',
+    'uniform float u_gap_size;',
+    'uniform float u_gap_position;',
     '',
     '// Inner disc — offset in aspect-corrected space so X and Y move equally',
     'uniform float u_inner_radius;',
@@ -113,14 +118,40 @@
     '  float tangential = angFrac * (6.28318530 / max(u_tick_count, 1.0)) * r;',
     '  float isMajor    = step(mod(floor(slot), max(u_tick_major_every, 1.0)), 0.5);',
     '  float len        = mix(u_tick_length, u_tick_length * u_tick_major_scale, isMajor);',
+    '',
+    '  // Where this tick sits around the dial, as a fraction of a turn. Taken',
+    '  // from the tick\'s own center slot so it is constant across the whole mark',
+    '  // — both the width gradient and the gap key off it, which is what keeps a',
+    '  // single tick from being tapered or sliced along its own angular span.',
+    '  float tickTurn   = (floor(slot) + 0.5 - u_tick_phase) / max(u_tick_count, 1.0);',
+    '',
+    '  // Width gradient: thinnest at the gradient origin, widening symmetrically',
+    '  // in both directions to its thickest 180 degrees away. Rotation moves the',
+    '  // thin point — 0 puts it at 12 o\'clock (turn 0.25), increasing clockwise,',
+    '  // matching the gap. turnDist is 0 at the origin and 1 opposite it, so the',
+    '  // two ends are controlled independently: Width Gradient thins the near end',
+    '  // below Tick Width, Strength thickens the far end above it. At the',
+    '  // defaults (0 and 1) the mix collapses to 1.0 and every tick is uniform.',
+    '  float gradTurn   = 0.25 - u_width_gradient_rotation;',
+    '  float turnDist   = abs(fract(tickTurn - gradTurn + 0.5) - 0.5) * 2.0;',
+    '  float tickWidth  = u_tick_width * mix(1.0 - u_width_gradient, u_width_gradient_strength, turnDist);',
+    '',
     '  // The radial term is what keeps the middle open: near r=0 the tangential',
     '  // term collapses for every angle, so only |r - ringRadius| > len*0.5',
     '  // excludes the center. Very short ring radius + very long ticks will',
     '  // deliberately let the ticks merge through the middle.',
-    '  float tickSDF    = max(tangential - u_tick_width * 0.5,',
+    '  float tickSDF    = max(tangential - tickWidth * 0.5,',
     '                         abs(r - u_ring_radius) - len * 0.5);',
     '  float aaTick     = max(fwidth(tickSDF) * 0.5, aaFixed);',
     '  float tickMask   = 1.0 - smoothstep(-aaTick, aaTick, tickSDF);',
+    '',
+    '  // Gap: an angular wedge with no ticks. Keyed off the tick center too, so',
+    '  // a tick is either fully drawn or fully gone — a wedge tested per-fragment',
+    '  // would slice marks in half at the gap edges. Position 0 puts the gap at',
+    '  // 12 o\'clock and increases clockwise.',
+    '  float gapTurn    = 0.25 - u_gap_position;',
+    '  float gapDist    = abs(fract(tickTurn - gapTurn + 0.5) - 0.5);',
+    '  tickMask        *= step(u_gap_size / 720.0, gapDist);',
     '',
     '  // Inner disc — offset in the same aspect-corrected space as p',
     '  float innerSDF   = length(p - vec2(u_inner_x, u_inner_y)) - u_inner_radius;',
@@ -224,9 +255,14 @@
         tickCount:        gl.getUniformLocation(program, 'u_tick_count'),
         tickLength:       gl.getUniformLocation(program, 'u_tick_length'),
         tickWidth:        gl.getUniformLocation(program, 'u_tick_width'),
+        widthGradient:    gl.getUniformLocation(program, 'u_width_gradient'),
+        widthGradStrength: gl.getUniformLocation(program, 'u_width_gradient_strength'),
+        widthGradRotation: gl.getUniformLocation(program, 'u_width_gradient_rotation'),
         tickPhase:        gl.getUniformLocation(program, 'u_tick_phase'),
         tickMajorEvery:   gl.getUniformLocation(program, 'u_tick_major_every'),
         tickMajorScale:   gl.getUniformLocation(program, 'u_tick_major_scale'),
+        gapSize:          gl.getUniformLocation(program, 'u_gap_size'),
+        gapPosition:      gl.getUniformLocation(program, 'u_gap_position'),
         innerRadius:      gl.getUniformLocation(program, 'u_inner_radius'),
         innerX:           gl.getUniformLocation(program, 'u_inner_x'),
         innerY:           gl.getUniformLocation(program, 'u_inner_y'),
@@ -272,9 +308,14 @@
       gl.uniform1f(u.tickCount,      v.u_tick_count       != null ? v.u_tick_count       : 48.0);
       gl.uniform1f(u.tickLength,     v.u_tick_length      != null ? v.u_tick_length      : 0.05);
       gl.uniform1f(u.tickWidth,      v.u_tick_width       != null ? v.u_tick_width       : 0.010);
+      gl.uniform1f(u.widthGradient,  v.u_width_gradient   != null ? v.u_width_gradient   : 0.0);
+      gl.uniform1f(u.widthGradStrength, v.u_width_gradient_strength != null ? v.u_width_gradient_strength : 1.0);
+      gl.uniform1f(u.widthGradRotation, v.u_width_gradient_rotation != null ? v.u_width_gradient_rotation : 0.0);
       gl.uniform1f(u.tickPhase,      v.u_tick_phase       != null ? v.u_tick_phase       : 0.0);
       gl.uniform1f(u.tickMajorEvery, v.u_tick_major_every != null ? v.u_tick_major_every : 5.0);
       gl.uniform1f(u.tickMajorScale, v.u_tick_major_scale != null ? v.u_tick_major_scale : 1.8);
+      gl.uniform1f(u.gapSize,        v.u_gap_size         != null ? v.u_gap_size         : 0.0);
+      gl.uniform1f(u.gapPosition,    v.u_gap_position     != null ? v.u_gap_position     : 0.0);
       gl.uniform1f(u.innerRadius,    v.u_inner_radius     != null ? v.u_inner_radius     : 0.16);
       gl.uniform1f(u.innerX,         v.u_inner_x          != null ? v.u_inner_x          : 0.0);
       gl.uniform1f(u.innerY,         v.u_inner_y          != null ? v.u_inner_y          : 0.0);
