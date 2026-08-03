@@ -98,3 +98,13 @@ succeeds. Listing that prefix answers "did anything paid fail to reach
 Printful?" — it should normally be empty. Successful orders leave an
 idempotency record at `printful-orders/{orderId}.json`; neither prefix is
 garbage-collected.
+
+Orders **Printful itself rejects** land in the same place, with
+`reason: "Printful rejected the order"` and Printful's own diagnostic in
+`detail`. These are worth checking first after the cutover, because the common
+causes are setup mistakes rather than one-off bad orders: a
+`printful.variant_id` holding a catalog variant id instead of a sync variant
+id (the step-4 mixup — it's all digits, so the webhook can't catch it before
+submitting), or a shipping address Shopify stored without a province code.
+A rejection is retried by Shopify like any other failure, so fixing the cause
+lets a redelivery fulfill the order and clear the record.

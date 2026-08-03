@@ -161,6 +161,18 @@ function makeUpstreamFetch(overrides = {}) {
       if (overrides.printfulOrderFails) {
         return jsonRes({ code: 400, result: 'Invalid recipient' });
       }
+      if (overrides.printfulOrderRejectsWithRecipient) {
+        // Printful echoes the recipient block back on some rejections — the
+        // shape formatPrintfulError() has to strip before the message reaches
+        // the logs, the 502 body, or the failure record.
+        return jsonRes({
+          code: 400,
+          result: {
+            reason: 'Invalid shipping destination',
+            recipient: body.recipient,
+          },
+        });
+      }
       if (overrides.printfulOrderOmitsId) {
         // Accepted (code 200) but no result.id — the shape that used to make
         // the completed record indistinguishable from a stale claim.
@@ -1016,18 +1028,96 @@ describe('POST /webhook/order-paid — failure records', () => {
     expect(failureRecord(overflow).reason).toBe('too many line items');
   });
 
-  it('does not record a failure for a not-yet-paid order or an upstream outage', async () => {
+  it('does not record a failure for a not-yet-paid order or a call that never completed', async () => {
     // Transient by nature: a PENDING order may legitimately become PAID and be
-    // redelivered, and a 502 retries into success — neither needs a human.
+    // redelivered, and a call that never reached a verdict may well succeed on
+    // the next try — neither needs a human.
     const unpaid = makeEnv();
     vi.stubGlobal('fetch', makeUpstreamFetch({ order: defaultOrder({ displayFinancialStatus: 'PENDING' }) }));
     expect((await worker.fetch(await webhookRequest({ id: 555000111 }), unpaid)).status).toBe(422);
     expect(failureRecord(unpaid)).toBeNull();
 
-    const outage = makeEnv();
+    const printfulDown = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch({ printfulOrderTransportFails: true }));
+    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), printfulDown)).status).toBe(502);
+    expect(failureRecord(printfulDown)).toBeNull();
+
+    const shopifyDown = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch({ orderLookupTransportFails: true }));
+    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), shopifyDown)).status).toBe(502);
+    expect(failureRecord(shopifyDown)).toBeNull();
+  });
+
+  it('records a durable failure when Printful rejects the order, despite the 502', async () => {
+    // A rejection is not an outage. Printful answered and evaluated this
+    // specific order — and the usual reasons it says no (a state_code it won't
+    // accept, a catalog variant id where a sync variant id belongs, an
+    // external_id a previous delivery already consumed) are permanent
+    // properties of the order that no redelivery will change. Without a record
+    // here, Shopify exhausts its retries and the paid order is gone with
+    // nothing but a log line.
+    const env = makeEnv();
     vi.stubGlobal('fetch', makeUpstreamFetch({ printfulOrderFails: true }));
-    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), outage)).status).toBe(502);
-    expect(failureRecord(outage)).toBeNull();
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(502);
+
+    const rec = failureRecord(env);
+    expect(rec).not.toBeNull();
+    expect(rec.reason).toBe('Printful rejected the order');
+    expect(rec.shopifyOrderName).toBe('#1042');
+    expect(rec.printfulCode).toBe(400);
+    // The diagnostic Printful gave is what makes the record actionable.
+    expect(rec.detail).toContain('Invalid recipient');
+  });
+
+  it('clears a Printful-rejection failure record once a redelivery succeeds', async () => {
+    const env = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch({ printfulOrderFails: true }));
+    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), env)).status).toBe(502);
+    expect(failureRecord(env)).not.toBeNull();
+
+    // The rejection released the claim, so a redelivery is free to retry — and
+    // once whatever Printful objected to is fixed, it fulfills and the record
+    // must not linger.
+    vi.stubGlobal('fetch', makeUpstreamFetch({}));
+    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), env)).status).toBe(200);
+    expect(failureRecord(env)).toBeNull();
+  });
+
+  it('does not leak the recipient into the failure record when Printful echoes it back', async () => {
+    // Same redaction the 502 body and the logs get — this record is one more
+    // place a customer's street address must not land.
+    const env = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch({ printfulOrderRejectsWithRecipient: true }));
+
+    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), env)).status).toBe(502);
+
+    const rec = failureRecord(env);
+    expect(rec.reason).toBe('Printful rejected the order');
+    expect(JSON.stringify(rec)).not.toContain('123 Main St');
+    expect(JSON.stringify(rec)).not.toContain('5035551234');
+  });
+
+  it('writes the failure record before releasing the claim', async () => {
+    // Ordering, not just presence. Releasing first opens a window where a
+    // concurrent redelivery claims the order, fulfills it, and deletes a
+    // failure record that hasn't been written yet — after which this write
+    // recreates it, leaving a "needs a human" record for an order that
+    // actually reached Printful. Holding the claim across the write closes it.
+    const env = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch({ order: defaultOrder({ shippingAddress: null }) }));
+
+    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), env)).status).toBe(422);
+
+    const put = env.MOCKUP_STAGING.put;
+    const del = env.MOCKUP_STAGING.delete;
+    const failWriteIdx = put.mock.calls.findIndex(([key]) => key === FAILED_KEY);
+    const claimDeleteIdx = del.mock.calls.findIndex(([key]) => key === 'printful-orders/555000111.json');
+    expect(failWriteIdx).toBeGreaterThanOrEqual(0);
+    expect(claimDeleteIdx).toBeGreaterThanOrEqual(0);
+    expect(put.mock.invocationCallOrder[failWriteIdx])
+      .toBeLessThan(del.mock.invocationCallOrder[claimDeleteIdx]);
   });
 
   it('clears the failure record once the fixed order fulfills', async () => {

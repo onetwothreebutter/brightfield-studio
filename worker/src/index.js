@@ -1615,11 +1615,20 @@ const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
 // "did anything paid fail to reach Printful?".
 //
 // Written only for refusals whose cause is the order's own data and that will
-// not clear on their own. Deliberately NOT written for: non-PAID orders (a
-// PENDING/AUTHORIZED order may legitimately become PAID and get redelivered),
-// or 502s from Shopify/Printful (transient upstream failures that retry into
-// success). The key is overwritten on each attempt, so a fixed-then-refused-
-// again order doesn't accumulate objects.
+// not clear on their own — which includes a Printful order-create rejection
+// (Printful answered and evaluated this order; see that catch block), even
+// though that path returns 502. Deliberately NOT written for: non-PAID orders
+// (a PENDING/AUTHORIZED order may legitimately become PAID and get
+// redelivered), or calls that never completed at all against Shopify or
+// Printful (transient, no verdict reached, retries into success). The key is
+// overwritten on each attempt, so a fixed-then-refused-again order doesn't
+// accumulate objects.
+//
+// Always call this BEFORE releaseClaim(), never after. Releasing first opens a
+// window where a concurrent redelivery claims the order, fulfills it, and
+// clears the failure record that hasn't been written yet — after which this
+// write recreates it, leaving a stuck-order record for an order that actually
+// reached Printful. Writing while the claim is still held closes that window.
 async function recordFulfillmentFailure(env, shopifyOrderId, detail) {
   await writeJson(env, `printful-orders-failed/${shopifyOrderId}.json`, {
     shopifyOrderId,
@@ -1907,12 +1916,12 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   // pages through it manually or this handler learns to paginate.
   if (order.lineItems?.pageInfo?.hasNextPage) {
     console.error('[order-paid] order', order.name, 'has more than', ORDER_LINE_ITEM_PAGE_SIZE, 'line items — refusing rather than fulfilling only the first page');
-    await releaseClaim();
     await recordFulfillmentFailure(env, shopifyOrderId, {
       shopifyOrderName: order.name,
       reason: 'too many line items',
       detail: `order has more than ${ORDER_LINE_ITEM_PAGE_SIZE} line items — needs manual fulfillment in Printful`,
     });
+    await releaseClaim();
     return new Response(JSON.stringify({
       error: `Order has more than ${ORDER_LINE_ITEM_PAGE_SIZE} line items — needs manual fulfillment`,
       lineItemLimit: ORDER_LINE_ITEM_PAGE_SIZE,
@@ -2011,25 +2020,25 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   // the order's own data that needs a human.
   if (skippedItems.length || !printfulItems.length) {
     console.error('[order-paid] refusing to partially fulfill order', order.name, '— unusable line items:', JSON.stringify(skippedItems));
-    await releaseClaim();
     await recordFulfillmentFailure(env, shopifyOrderId, {
       shopifyOrderName: order.name,
       reason: 'unusable line items',
       detail: 'refused rather than partially fulfilling — fix the offending product/variant metafield, then replay the webhook',
       skipped: skippedItems,
     });
+    await releaseClaim();
     return new Response(JSON.stringify({ error: 'No valid line items', skipped: skippedItems }), { status: 422, headers });
   }
 
   const shipping = order.shippingAddress;
   if (!shipping) {
     console.error('[order-paid] order has Printful-relevant line items but no shipping address:', order.name);
-    await releaseClaim();
     await recordFulfillmentFailure(env, shopifyOrderId, {
       shopifyOrderName: order.name,
       reason: 'missing shipping address',
       detail: 'order has Printful-relevant line items but no shipping address to send them to',
     });
+    await releaseClaim();
     return new Response(JSON.stringify({ error: 'Missing shipping address' }), { status: 422, headers });
   }
 
@@ -2058,6 +2067,10 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   };
 
   let printfulJson;
+  // Set when Printful *answered* and its answer was a rejection, as opposed to
+  // the call never completing (DNS/TLS/timeout, or a body that isn't JSON).
+  // The two need different handling — see the catch block.
+  let printfulRejectedWithCode = null;
   try {
     const printfulRes = await fetch(`${PRINTFUL_API}/orders`, {
       method:  'POST',
@@ -2069,6 +2082,7 @@ async function handleOrderPaidWebhook(request, env, ctx) {
     });
     printfulJson = await printfulRes.json();
     if (printfulJson.code !== 200) {
+      printfulRejectedWithCode = printfulJson.code ?? printfulRes.status;
       // Only the failure branch surfaces the response body, and only via the
       // thrown message — see below for why the success response must not be
       // dumped, and formatPrintfulError() for what gets stripped out of it.
@@ -2081,6 +2095,29 @@ async function handleOrderPaidWebhook(request, env, ctx) {
     console.log('[order-paid] Printful order-create ok (code', printfulJson.code + ', id', printfulJson.result?.id + ', status', printfulJson.result?.status + ')');
   } catch (err) {
     console.error('[order-paid] Printful order creation failed for order', order.name, ':', err.message);
+    // A rejection is not an outage. If Printful answered at all, it evaluated
+    // this specific order and said no — and the reasons it says no are mostly
+    // permanent properties of the order that no number of redeliveries will
+    // change: a state_code Printful won't accept (the recipient mapping above
+    // falls back to the full province name when Shopify has no provinceCode,
+    // which Printful rejects for US/CA), a printful.variant_id holding a
+    // catalog variant id instead of a sync variant id (digits-only, so
+    // classifyLineItem can't catch it), or an external_id a previous delivery
+    // already consumed. Those need the same durable trace as the 422 refusals:
+    // otherwise Shopify exhausts its retries and the paid order is gone with
+    // nothing but a log line, which is the failure mode recordFulfillmentFailure
+    // exists to prevent.
+    //
+    // A call that never completed is different — no verdict was reached, the
+    // next redelivery may well succeed — so it stays unrecorded, as before.
+    if (printfulRejectedWithCode !== null) {
+      await recordFulfillmentFailure(env, shopifyOrderId, {
+        shopifyOrderName: order.name,
+        reason: 'Printful rejected the order',
+        detail: err.message,
+        printfulCode: printfulRejectedWithCode,
+      });
+    }
     await releaseClaim();
     return new Response(JSON.stringify({ error: 'Printful order creation failed: ' + err.message }), { status: 502, headers });
   }
