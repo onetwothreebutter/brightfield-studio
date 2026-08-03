@@ -1586,6 +1586,51 @@ export function classifyLineItem(li) {
   return { type: 'inhouse', printfulVariantId };
 }
 
+// ── Financial status (Shopify OrderDisplayFinancialStatus) ──────────────────
+// Three groups, because they need three different answers — and the difference
+// that matters is not "is it PAID" but "will this order leave this state on
+// its own?".
+//
+// PARTIALLY_REFUNDED is fulfillable, not a refusal: the order *was* paid, part
+// of it was given back, and whatever wasn't refunded still has to be produced.
+// Lumping it in with the not-yet-paid states dropped it silently and forever —
+// it never transitions back to PAID, so no redelivery ever rescues it, and the
+// not-yet-paid path deliberately writes no failure record. Which units are
+// still owed is fulfillableQuantity()'s job, not this check's.
+const FULFILLABLE_FINANCIAL_STATUSES = new Set(['PAID', 'PARTIALLY_REFUNDED']);
+
+// May still become PAID and get redelivered, so refuse quietly and leave the
+// order free to proceed later — a failure record here would be noise for
+// something no human needs to touch.
+const PENDING_FINANCIAL_STATUSES = new Set(['PENDING', 'AUTHORIZED', 'PARTIALLY_PAID']);
+
+// Terminal, and not fulfilling is the correct final answer — the customer has
+// their money back or the payment never landed. Also quiet: nothing is stuck.
+const SETTLED_UNPAID_FINANCIAL_STATUSES = new Set(['REFUNDED', 'VOIDED', 'EXPIRED']);
+
+// Anything in none of those three sets is a status this code has never seen
+// (Shopify added an enum value, or the field came back null). That is exactly
+// when a human should look, so it refuses *and* records — guessing which of
+// the three groups it belongs to is how orders go missing quietly.
+
+// How many units of a line item to actually produce.
+//
+// `quantity` is what the customer originally ordered and never changes;
+// `currentQuantity` subtracts units refunded or removed afterwards. Printful
+// should be told the latter — on a redelivery after a partial refund,
+// `quantity` prints garments the customer no longer paid for.
+//
+// Returns null when neither field is a usable count, rather than guessing.
+// The previous `li.quantity || 1` guessed twice over: it mapped a legitimate 0
+// (every unit refunded) to one garment, and a missing field to one garment.
+// A quantity we can't determine is a data problem, and this handler's standing
+// rule for those is to refuse the whole order, not to invent a value.
+export function fulfillableQuantity(li) {
+  if (Number.isInteger(li?.currentQuantity) && li.currentQuantity >= 0) return li.currentQuantity;
+  if (Number.isInteger(li?.quantity) && li.quantity >= 0) return li.quantity;
+  return null;
+}
+
 // A pending claim older than this is assumed to belong to a delivery whose
 // isolate crashed or was evicted before it could write a completed record or
 // clean up after itself — sized generously vs. this handler's real runtime
@@ -1866,6 +1911,10 @@ async function handleOrderPaidWebhook(request, env, ctx) {
               node {
                 sku
                 quantity
+                # Units still owed after any refunds/removals — see
+                # fulfillableQuantity(). The plain quantity field above is kept
+                # only as a fallback for a response somehow lacking this one.
+                currentQuantity
                 title
                 product {
                   id
@@ -1896,14 +1945,32 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   }
 
   // The handler is registered on the orders/paid topic, but don't just trust
-  // that — verify the order's actual payment state before submitting
-  // anything to Printful. Don't persist a completed record here: an order in
-  // a non-PAID state now (e.g. PENDING, AUTHORIZED) may legitimately become
-  // PAID later and get redelivered, and it should be free to proceed then.
-  if (order.displayFinancialStatus !== 'PAID') {
-    console.warn('[order-paid] order', order.name, 'is not paid (financialStatus=' + order.displayFinancialStatus + ') — skipping Printful submission');
+  // that — verify the order's actual payment state before submitting anything
+  // to Printful. Never persist a *completed* record on any of these paths: an
+  // order that isn't fulfillable now may become fulfillable later and get
+  // redelivered, and it should be free to proceed then.
+  const financialStatus = order.displayFinancialStatus;
+  if (!FULFILLABLE_FINANCIAL_STATUSES.has(financialStatus)) {
+    const expectedNonPayment = PENDING_FINANCIAL_STATUSES.has(financialStatus)
+      || SETTLED_UNPAID_FINANCIAL_STATUSES.has(financialStatus);
+
+    console.warn('[order-paid] order', order.name, 'is not fulfillable (financialStatus=' + financialStatus + ') — skipping Printful submission');
+
+    // An unrecognized status is the one case here that needs a human: this
+    // code can't tell whether the order will resolve itself or is being
+    // dropped for good, and dropping a paid order for good is the failure
+    // these records exist to catch.
+    if (!expectedNonPayment) {
+      await recordFulfillmentFailure(env, shopifyOrderId, {
+        shopifyOrderName: order.name,
+        reason: 'unrecognized financial status',
+        detail: `order.displayFinancialStatus was ${JSON.stringify(financialStatus)}, which this handler does not classify — check the order and fulfill it manually if it was paid`,
+        financialStatus,
+      });
+    }
+
     await releaseClaim();
-    return new Response(JSON.stringify({ error: 'Order is not paid', financialStatus: order.displayFinancialStatus }), { status: 422, headers });
+    return new Response(JSON.stringify({ error: 'Order is not paid', financialStatus }), { status: 422, headers });
   }
 
   // The line-item query fetches a single page. If the order has more, the
@@ -1929,8 +1996,15 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   }
 
   const lineItems = (order.lineItems?.edges || []).map(e => e.node);
-  const classified = lineItems.map(li => ({ ...li, cls: classifyLineItem(li) }));
-  const relevant = classified.filter(li => li.cls.type !== 'unrecognized');
+  const classified = lineItems.map(li => ({ ...li, cls: classifyLineItem(li), fulfillQty: fulfillableQuantity(li) }));
+
+  // Drop line items with nothing left to produce (every unit refunded or
+  // removed) *before* the relevance check, so a partially-refunded order whose
+  // only Printful-relevant items were the refunded ones is ignored rather than
+  // refused as "no valid line items" — nothing is stuck, there's just nothing
+  // to make. A null quantity is deliberately kept: that's a data problem and
+  // has to reach the all-or-nothing refusal below rather than vanish here.
+  const relevant = classified.filter(li => li.cls.type !== 'unrecognized' && li.fulfillQty !== 0);
 
   // Acceptance criteria: orders with nothing Printful-relevant (no custom/
   // community SKU and no printful.variant_id metafield on any line item) are
@@ -1956,6 +2030,13 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   const printfulItems = [];
   const skippedItems = [];
   for (const li of relevant) {
+    // Checked once here for every classification: an item we can't count is
+    // as unusable as one we can't map, and refusing beats printing a guess.
+    if (li.fulfillQty == null) {
+      console.error('[order-paid] line item has no usable quantity, skipping:', li.sku);
+      skippedItems.push({ sku: li.sku, reason: 'no usable quantity on line item' });
+      continue;
+    }
     if (li.cls.type === 'custom') {
       const designUrl = li.product?.metafield?.value;
       const printfulVariantId = variantMap[li.cls.skuInfo.size];
@@ -1971,7 +2052,7 @@ async function handleOrderPaidWebhook(request, env, ctx) {
       }
       printfulItems.push({
         variant_id: printfulVariantId,
-        quantity: li.quantity || 1,
+        quantity: li.fulfillQty,
         // Same files/position shape as the mockup-task call in
         // handleGenerateMockup above — Printful's order file-attachment shape
         // mirrors the mockup-generator one.
@@ -1995,7 +2076,7 @@ async function handleOrderPaidWebhook(request, env, ctx) {
       // there's no per-order design upload to attach here.
       printfulItems.push({
         sync_variant_id: li.cls.printfulVariantId,
-        quantity: li.quantity || 1,
+        quantity: li.fulfillQty,
       });
     } else if (li.cls.type === 'inhouse-invalid') {
       console.error('[order-paid] invalid printful.variant_id metafield value, skipping:', li.cls.raw, li.sku);

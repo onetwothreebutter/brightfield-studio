@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // module-level `let` variables, not per-request state. Re-importing the module
 // fresh for every test (instead of importing once at the top) keeps those
 // caches from leaking between tests.
-let worker, parseCustomSku, classifyLineItem;
+let worker, parseCustomSku, classifyLineItem, fulfillableQuantity;
 
 beforeEach(async () => {
   vi.resetModules();
@@ -21,6 +21,7 @@ beforeEach(async () => {
   worker = mod.default;
   parseCustomSku = mod.parseCustomSku;
   classifyLineItem = mod.classifyLineItem;
+  fulfillableQuantity = mod.fulfillableQuantity;
 });
 
 afterEach(() => vi.unstubAllGlobals());
@@ -856,6 +857,233 @@ describe('POST /webhook/order-paid — payment verification', () => {
     // record — this order may legitimately become PAID later and should be
     // free to proceed on a future redelivery.
     expect(env.MOCKUP_STAGING._store.has('printful-orders/555000111.json')).toBe(false);
+  });
+
+  // Regression test: the gate used to be `displayFinancialStatus !== 'PAID'`,
+  // which caught PARTIALLY_REFUNDED along with the not-yet-paid states. That
+  // is a paid order with unrefunded items still to produce, and it never
+  // transitions back to PAID — so it was refused on every redelivery until
+  // Shopify gave up, and the not-yet-paid path deliberately writes no failure
+  // record, so it went missing in silence.
+  it('fulfills a PARTIALLY_REFUNDED order rather than refusing it', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({ displayFinancialStatus: 'PARTIALLY_REFUNDED' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(200);
+    expect((await res.json()).printfulOrderId).toBe(99881);
+    expect(fetchMock.calls.printfulOrderBody.items).toHaveLength(1);
+  });
+
+  it('refuses the settled-unpaid states quietly — nothing is stuck', async () => {
+    // Refunded/voided/expired orders are correctly not fulfilled, and no human
+    // needs to look: the customer has their money back or it never landed.
+    for (const status of ['REFUNDED', 'VOIDED', 'EXPIRED']) {
+      const env = makeEnv();
+      vi.stubGlobal('fetch', makeUpstreamFetch({ order: defaultOrder({ displayFinancialStatus: status }) }));
+
+      const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+      expect(res.status, status).toBe(422);
+      expect(env.MOCKUP_STAGING._store.has('printful-orders-failed/555000111.json'), status).toBe(false);
+    }
+  });
+
+  it('refuses the not-yet-paid states quietly — they may still become payable', async () => {
+    for (const status of ['PENDING', 'AUTHORIZED', 'PARTIALLY_PAID']) {
+      const env = makeEnv();
+      vi.stubGlobal('fetch', makeUpstreamFetch({ order: defaultOrder({ displayFinancialStatus: status }) }));
+
+      const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+      expect(res.status, status).toBe(422);
+      expect(env.MOCKUP_STAGING._store.has('printful-orders-failed/555000111.json'), status).toBe(false);
+    }
+  });
+
+  it('records a failure for a financial status it does not recognize', async () => {
+    // A status in none of the three groups can't be classified as "will
+    // resolve itself" or "correctly unfulfilled" — and guessing the first is
+    // how a paid order gets dropped for good. Refuse, but leave a trace.
+    const env = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch({
+      order: defaultOrder({ displayFinancialStatus: 'SOME_NEW_SHOPIFY_STATUS' }),
+    }));
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(422);
+
+    const rec = JSON.parse(env.MOCKUP_STAGING._store.get('printful-orders-failed/555000111.json'));
+    expect(rec.reason).toBe('unrecognized financial status');
+    expect(rec.financialStatus).toBe('SOME_NEW_SHOPIFY_STATUS');
+    // Still released, so a redelivery can succeed if the status resolves.
+    expect(env.MOCKUP_STAGING._store.has('printful-orders/555000111.json')).toBe(false);
+  });
+
+  it('records a failure when the financial status is missing entirely', async () => {
+    const env = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch({ order: defaultOrder({ displayFinancialStatus: null }) }));
+
+    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), env)).status).toBe(422);
+    expect(JSON.parse(env.MOCKUP_STAGING._store.get('printful-orders-failed/555000111.json')).reason)
+      .toBe('unrecognized financial status');
+  });
+});
+
+// ── fulfillableQuantity ─────────────────────────────────────────────────────
+// `quantity` is what was ordered and never changes; `currentQuantity` subtracts
+// units refunded or removed afterwards. Printful must be told the latter, or a
+// redelivery after a partial refund prints garments nobody paid for.
+
+describe('fulfillableQuantity', () => {
+  it('prefers currentQuantity over the originally-ordered quantity', () => {
+    expect(fulfillableQuantity({ quantity: 3, currentQuantity: 1 })).toBe(1);
+  });
+
+  it('falls back to quantity when currentQuantity is absent', () => {
+    expect(fulfillableQuantity({ quantity: 2 })).toBe(2);
+    expect(fulfillableQuantity({ quantity: 2, currentQuantity: null })).toBe(2);
+  });
+
+  it('reports zero for a line item whose every unit was refunded', () => {
+    // Not 1. `li.quantity || 1` used to turn this into a printed garment.
+    expect(fulfillableQuantity({ quantity: 2, currentQuantity: 0 })).toBe(0);
+    expect(fulfillableQuantity({ quantity: 0 })).toBe(0);
+  });
+
+  it('returns null rather than guessing when neither field is usable', () => {
+    expect(fulfillableQuantity({})).toBeNull();
+    expect(fulfillableQuantity({ quantity: 'two' })).toBeNull();
+    expect(fulfillableQuantity({ quantity: 1.5 })).toBeNull();
+    expect(fulfillableQuantity({ quantity: -1 })).toBeNull();
+    expect(fulfillableQuantity(null)).toBeNull();
+  });
+});
+
+// ── POST /webhook/order-paid — refunded quantities ──────────────────────────
+
+describe('POST /webhook/order-paid — refunded quantities', () => {
+  it('submits the current quantity, not the originally-ordered one', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({
+        displayFinancialStatus: 'PARTIALLY_REFUNDED',
+        lineItems: { edges: [{ node: {
+          sku: 'CUSTOM-1699999999999-M',
+          quantity: 3,
+          currentQuantity: 1, // two of the three were refunded
+          title: 'Custom Dot Rise',
+          product: { id: 'gid://shopify/Product/9001', metafield: { value: 'https://share.brightfield.studio/img/designs/abc.png' } },
+        } }] },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(200);
+    expect(fetchMock.calls.printfulOrderBody.items[0].quantity).toBe(1);
+  });
+
+  it('drops a fully-refunded line item and still fulfills its siblings', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({
+        displayFinancialStatus: 'PARTIALLY_REFUNDED',
+        lineItems: { edges: [
+          { node: {
+            sku: 'CUSTOM-1699999999999-M', quantity: 1, currentQuantity: 0, title: 'Refunded item',
+            product: { id: 'gid://shopify/Product/9001', metafield: { value: 'https://share.brightfield.studio/img/designs/abc.png' } },
+          } },
+          { node: inhouseLineItem({ currentQuantity: 2 }) },
+        ] },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(200);
+
+    // The refunded item is absent — not refused, and not printed at qty 1.
+    const items = fetchMock.calls.printfulOrderBody.items;
+    expect(items).toHaveLength(1);
+    expect(items[0].sync_variant_id).toBe(4917503);
+    expect(items[0].quantity).toBe(2);
+
+    const stored = JSON.parse(env.MOCKUP_STAGING._store.get('printful-orders/555000111.json'));
+    expect(stored.skus).toEqual(['TEE-BLK-M']);
+  });
+
+  it('ignores an order whose only Printful-relevant items were fully refunded', async () => {
+    // Nothing to produce is not the same as something being wrong: this must
+    // not land in the "needs a human" list.
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({
+        displayFinancialStatus: 'PARTIALLY_REFUNDED',
+        lineItems: { edges: [{ node: {
+          sku: 'CUSTOM-1699999999999-M', quantity: 1, currentQuantity: 0, title: 'Refunded item',
+          product: { id: 'gid://shopify/Product/9001', metafield: { value: 'https://share.brightfield.studio/img/designs/abc.png' } },
+        } }] },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(200);
+    expect((await res.json()).ignored).toBe(true);
+    expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
+    expect(env.MOCKUP_STAGING._store.has('printful-orders-failed/555000111.json')).toBe(false);
+  });
+
+  it('refuses the whole order when a line item has no usable quantity', async () => {
+    // Same all-or-nothing rule as an unmappable size: refuse rather than
+    // invent a count and print a guess.
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({
+        lineItems: { edges: [{ node: {
+          sku: 'CUSTOM-1699999999999-M', quantity: null, title: 'Custom Dot Rise',
+          product: { id: 'gid://shopify/Product/9001', metafield: { value: 'https://share.brightfield.studio/img/designs/abc.png' } },
+        } }] },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(422);
+    expect((await res.json()).skipped[0].reason).toMatch(/no usable quantity/);
+    expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
+    expect(JSON.parse(env.MOCKUP_STAGING._store.get('printful-orders-failed/555000111.json')).reason)
+      .toBe('unusable line items');
+  });
+
+  it('still uses quantity when the order response carries no currentQuantity', async () => {
+    // Backwards compatibility with a response shape lacking the newer field.
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({
+        lineItems: { edges: [{ node: {
+          sku: 'CUSTOM-1699999999999-M', quantity: 4, title: 'Custom Dot Rise',
+          product: { id: 'gid://shopify/Product/9001', metafield: { value: 'https://share.brightfield.studio/img/designs/abc.png' } },
+        } }] },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(fetchMock.calls.printfulOrderBody.items[0].quantity).toBe(4);
+  });
+
+  it('asks Shopify for currentQuantity', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+
+    const lookup = fetchMock.calls.find(c => c.url.includes('/admin/api/'));
+    expect(JSON.parse(lookup.opts.body).query).toContain('currentQuantity');
   });
 });
 

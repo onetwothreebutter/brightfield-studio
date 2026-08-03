@@ -108,3 +108,25 @@ id (the step-4 mixup — it's all digits, so the webhook can't catch it before
 submitting), or a shipping address Shopify stored without a province code.
 A rejection is retried by Shopify like any other failure, so fixing the cause
 lets a redelivery fulfill the order and clear the record.
+
+A third `reason` you may see is `"unrecognized financial status"`. The webhook
+fulfills orders whose `displayFinancialStatus` is `PAID` or
+`PARTIALLY_REFUNDED`, and quietly declines the states that either resolve
+themselves (`PENDING`, `AUTHORIZED`, `PARTIALLY_PAID`) or are correctly never
+fulfilled (`REFUNDED`, `VOIDED`, `EXPIRED`). Anything else — a value Shopify
+added later, say — can't be sorted into either group, so it is refused *and*
+recorded rather than guessed at. Check whether the order was actually paid and
+fulfill it by hand if so.
+
+## Refunds
+
+A refund issued before the webhook runs (or before a redelivery of it) reduces
+what gets produced: the handler submits each line item's `currentQuantity` —
+units still owed after refunds and removals — not the quantity originally
+ordered. An item refunded down to zero is dropped from the Printful order, and
+an order whose only Printful-relevant items were all refunded is ignored
+outright, leaving no failure record: there is simply nothing to make.
+
+Refunds issued *after* the draft reaches Printful are not tracked here. The
+draft still needs cancelling in the Printful dashboard by hand — which the
+merchant is reviewing before confirming anyway.
