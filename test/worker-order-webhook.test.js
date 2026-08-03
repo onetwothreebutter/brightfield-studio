@@ -36,6 +36,11 @@ const WEBHOOK_SECRET = 'test-webhook-secret';
 // would pass against a handler with no idempotency at all. Needed to exercise
 // handleOrderPaidWebhook's claim-then-complete flow (#586 review: TOCTOU race
 // in the original read-then-write check) for real.
+//
+// What it cannot do is confirm that *real* R2 behaves this way: it implements
+// the semantics the handler assumes, so a claim written against a conditional
+// form R2 doesn't honour would still pass every test here. See the comment at
+// the claim's `onlyIf` in src/index.js for which form is correct and why.
 function makeR2() {
   const store = new Map();
   const etags = new Map(); // key -> etag string

@@ -1831,6 +1831,19 @@ async function handleOrderPaidWebhook(request, env, ctx) {
     }
   };
 
+  // The Headers form, not the tidier-looking `onlyIf: { etagDoesNotMatch: '*' }`
+  // — that one is actively broken. workerd parses a wildcard passed through the
+  // R2Conditional object as a *strong* etag (cloudflare/workerd#2572), so the
+  // condition evaluates backwards, every put succeeds, and this claim silently
+  // stops guarding anything: two concurrent deliveries both "win" and submit
+  // the same order to Printful twice. The header path parses wildcards
+  // correctly (R2 bindings gained strong/weak/wildcard etag parsing for
+  // conditional headers in the 2023-06-16 runtime release). A failed condition
+  // returns null rather than throwing, which is what !claimResult below tests.
+  //
+  // Nothing in the test suite can catch a regression here — the R2 mock
+  // implements the semantics this code assumes — so verify against real R2
+  // (`wrangler dev --remote`) if this line ever changes.
   const claimResult = await env.MOCKUP_STAGING.put(
     idempotencyKey,
     claimValue(),
@@ -1862,6 +1875,11 @@ async function handleOrderPaidWebhook(request, env, ctx) {
     // reclaim on — so retry the same If-None-Match claim instead. Whoever
     // wins that retry owns the key; the loser returns 409 and lets Shopify
     // redeliver.
+    //
+    // Note the two forms are not interchangeable here. `etagMatches` holds a
+    // concrete etag, which the R2Conditional object handles correctly; the
+    // wildcard has to go through Headers for the reason given at the initial
+    // claim above (cloudflare/workerd#2572).
     const reclaimCondition = existingObj
       ? { etagMatches: existingObj.etag }
       : new Headers({ 'If-None-Match': '*' });
