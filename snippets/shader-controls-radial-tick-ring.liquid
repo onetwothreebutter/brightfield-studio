@@ -1,0 +1,133 @@
+var controls = [
+  // ── Ring ───────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Ring' },
+  // The design space is (uv - 0.5) * vec2(aspect, 1.0), so on the 3:4 canvas the
+  // horizontal half-extent is aspect/2 = 0.375 while the vertical one is 0.5 — a
+  // circle past 0.375 runs off the left and right edges only. Ticks straddle the
+  // radius, so the ring closes when radius + tickLength * majorScale / 2 <= 0.375.
+  // 0.33 with the default 0.05 length and 1.8 major scale lands exactly on that
+  // limit: the major tips graze the side edges without any chord being cut off.
+  // Larger values are still useful (a full-bleed cropped ring), just not a circle.
+  { key: 'u_ring_radius',      label: 'Ring Radius',       type: 'range', min: 0.05,  max: 0.5,  step: 0.01,  value: 0.33, noRandomize: true,
+    tip: 'Above about 0.33 the ring runs off the left and right edges — the canvas is taller than it is wide.' },
+  { key: 'u_tick_count',       label: 'Tick Count',        type: 'range', min: 4,     max: 180,  step: 1,     value: 48 },
+  { key: 'u_tick_length',      label: 'Tick Length',       type: 'range', min: 0.005, max: 0.25, step: 0.005, value: 0.05 },
+  { key: 'u_tick_width',       label: 'Tick Width',        type: 'range', min: 0.002, max: 0.08, step: 0.002, value: 0.010 },
+  { key: 'u_width_gradient',   label: 'Width Gradient',    type: 'range', min: 0,     max: 1,    step: 0.01,  value: 0.0,
+    tip: 'Thins the ticks at the gradient origin, returning to full Tick Width as they travel around either way to the opposite side. 0 keeps that end at full width.' },
+  { key: 'u_width_gradient_strength',  label: 'Width Gradient Strength', type: 'range', min: 1,  max: 4,  step: 0.05,  value: 1.0,
+    tip: 'How much thicker than Tick Width the ticks get on the far side of the gradient. 1 caps them at Tick Width.' },
+  { key: 'u_width_gradient_rotation',  label: 'Width Gradient Rotation', type: 'range', min: 0,  max: 1,  step: 0.005, value: 0.0,
+    tip: 'Rotates the gradient, moving the thin end around the ring. 0 places it at the top.' },
+  { key: 'u_tick_phase',       label: 'Rotation',          type: 'range', min: 0,     max: 1,    step: 0.005, value: 0.0,
+    tip: 'Rotates the whole sunburst by up to one tick spacing.' },
+  { key: 'u_tick_major_every', label: 'Major Tick Every',  type: 'range', min: 1,     max: 12,   step: 1,     value: 5,
+    tip: 'Every Nth tick is drawn longer, like the hour marks on a dial.' },
+  { key: 'u_tick_major_scale', label: 'Major Tick Length', type: 'range', min: 1.0,   max: 4.0,  step: 0.05,  value: 1.8 },
+  { key: 'u_gap_size',         label: 'Gap Size',          type: 'range', min: 0,     max: 270,  step: 1,     value: 0, randomMax: 120,
+    tip: 'Clears a wedge of the ring, in degrees. 0 leaves the ring closed.' },
+  { key: 'u_gap_position',     label: 'Gap Position',      type: 'range', min: 0,     max: 1,    step: 0.005, value: 0.0, noRandomize: true,
+    tip: 'Rotates the gap around the ring. 0 places it at the top.' },
+  // ── Inner Circle ───────────────────────────────────────────────────────────
+  { type: 'header', label: 'Inner Circle' },
+  // Randomize ceilings on the two radii: the ring stays at its default 0.33 (it
+  // is noRandomize), so an unbounded inner disc or knockout would swallow it and
+  // leave a blank design.
+  { key: 'u_inner_radius', label: 'Radius',     type: 'range', min: 0.0,  max: 0.45, step: 0.005, value: 0.16, randomMax: 0.25 },
+  { key: 'u_inner_x',      label: 'Position X', type: 'range', min: -0.5, max: 0.5,  step: 0.005, value: 0.0, noRandomize: true },
+  { key: 'u_inner_y',      label: 'Position Y', type: 'range', min: -0.5, max: 0.5,  step: 0.005, value: 0.0, noRandomize: true },
+  // ── Knockout ───────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Knockout' },
+  { key: 'u_knockout_enabled', label: 'Enabled', type: 'toggle', value: 1, noRandomize: true,
+    tip: 'Punches a center hole straight through the ticks and the inner circle, revealing the garment.' },
+  { key: 'u_knockout_radius',  label: 'Radius',  type: 'range', min: 0.0, max: 0.45, step: 0.005, value: 0.06, randomMax: 0.15 },
+  // ── Color Palette ──────────────────────────────────────────────────────────
+  { type: 'header', label: 'Color Palette' },
+  { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
+    tip: 'Off = cosine palette. On = 4-stop linear gradient from center outward.' },
+  { key: '_rtr_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow', swatchPreview: 'cosine',
+    options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
+  },
+  { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
+    tip: 'Offset — base brightness per channel. Sets the center point colors oscillate around.' },
+  { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080',
+    tip: 'Amplitude — color swing range per channel. Higher = more vivid, saturated output.' },
+  { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff',
+    tip: 'Frequency — how many times the palette cycles per channel.' },
+  { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab',
+    tip: 'Phase — shifts the starting hue of the color cycle.' },
+  { key: '_rtr_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon', swatchPreview: 'fourstop',
+    options: Object.keys(FOUR_STOP_PRESETS).map(function (k) { return { label: k, value: k }; })
+  },
+  { key: 'u_color0', label: 'Color 1 (Center)', type: 'color', stopDependent: true, value: '#ff3366' },
+  { key: 'u_color1', label: 'Color 2',          type: 'color', stopDependent: true, value: '#ffcc00' },
+  { key: 'u_color2', label: 'Color 3',          type: 'color', stopDependent: true, value: '#00ccff' },
+  { key: 'u_color3', label: 'Color 4 (Edge)',   type: 'color', stopDependent: true, value: '#aa00ff' },
+  { key: 'u_use_ring_color',  label: 'Custom Ring Color',  type: 'toggle', value: 0, noRandomize: true,
+    tip: 'Paints the tick marks a single solid color instead of following the palette.' },
+  { key: 'u_ring_color',      label: 'Ring Color',         type: 'color',  value: '#ffffff' },
+  { key: 'u_use_inner_color', label: 'Custom Inner Color', type: 'toggle', value: 0, noRandomize: true,
+    tip: 'Paints the inner circle a single solid color instead of following the palette.' },
+  { key: 'u_inner_color',     label: 'Inner Color',        type: 'color',  value: '#ffffff' },
+].concat(FINISH_CONTROLS);
+
+var customAfterBuild = function () {
+  var cosineKeys = ['u_a', 'u_b', 'u_c', 'u_d'];
+
+  function applyCosinePreset(p) {
+    applyColors(cosineKeys.map(function (k, i) {
+      return [k, [p.a, p.b, p.c, p.d][i]];
+    }));
+  }
+
+  function apply4ColorPreset(p) {
+    applyColors([
+      ['u_color0', p.c0],
+      ['u_color1', p.c1],
+      ['u_color2', p.c2],
+      ['u_color3', p.c3],
+    ]);
+  }
+
+  // Apply default on load so shader matches pickers.
+  applyCosinePreset(COSINE_PRESETS['Rainbow']);
+
+  var cosinePresetSel = document.querySelector('[data-param-key="_rtr_palette_preset"]');
+  if (cosinePresetSel) {
+    cosinePresetSel.addEventListener('change', function () {
+      var p = COSINE_PRESETS[this.value];
+      if (p) applyCosinePreset(p);
+    });
+  }
+
+  var fourColorPresetSel = document.querySelector('[data-param-key="_rtr_4color_preset"]');
+  if (fourColorPresetSel) {
+    fourColorPresetSel.addEventListener('change', function () {
+      var p = FOUR_STOP_PRESETS[this.value];
+      if (p) apply4ColorPreset(p);
+    });
+  }
+
+  // Toggle-driven row visibility. The GUI builder's *Dependent flags are
+  // hard-coded per shader, so drive these two locally — keyed off param keys,
+  // same lookup test-shaders.html uses.
+  var body = document.getElementById('shader-gui-body');
+
+  function bindToggleVisibility(toggleKey, colorKey) {
+    var btn    = body.querySelector('[data-param-key="' + toggleKey + '"]');
+    var picker = body.querySelector('[data-param-key="' + colorKey + '"]');
+    if (!btn || !picker) return;
+    var row = picker.closest('.shader-control');
+    if (!row) return;
+
+    function apply() { row.style.display = btn.dataset.on === '1' ? '' : 'none'; }
+    btn.addEventListener('click', apply);
+    // Randomize and the restore paths set data-on directly instead of clicking,
+    // so watch the attribute too rather than relying on the click event alone.
+    new MutationObserver(apply).observe(btn, { attributes: true, attributeFilter: ['data-on'] });
+    apply();
+  }
+
+  bindToggleVisibility('u_use_ring_color', 'u_ring_color');
+  bindToggleVisibility('u_use_inner_color', 'u_inner_color');
+};
