@@ -1562,10 +1562,25 @@ export function classifyLineItem(li) {
   if (skuInfo) return { type: 'custom', skuInfo };
 
   const raw = li.variant?.metafield?.value;
-  if (raw == null || raw === '') return { type: 'unrecognized' };
+  if (raw == null) return { type: 'unrecognized' };
 
-  const printfulVariantId = parseInt(raw, 10);
-  if (!Number.isFinite(printfulVariantId) || printfulVariantId <= 0) {
+  // Whitespace-only is treated the same as empty (metafield never set) rather
+  // than as a broken value — an absent signal, not a merchant mistake.
+  const trimmed = String(raw).trim();
+  if (trimmed === '') return { type: 'unrecognized' };
+
+  // Strict digits-only, deliberately not parseInt(): parseInt stops at the
+  // first non-digit and returns what it got, so '4917503 (Black / M)' would
+  // pass as 4917503 and — worse — '1e5' would pass as *1*, silently fulfilling
+  // against Printful sync variant 1. The whole point of 'inhouse-invalid' is to
+  // refuse the order loudly rather than fulfill the wrong garment, so anything
+  // that isn't unambiguously an id is rejected. (Shopify's Integer metafield
+  // type makes this unlikely from the admin UI, but the type isn't enforced for
+  // values set via the API or a CSV import.)
+  if (!/^\d+$/.test(trimmed)) return { type: 'inhouse-invalid', raw };
+
+  const printfulVariantId = Number(trimmed);
+  if (!Number.isSafeInteger(printfulVariantId) || printfulVariantId <= 0) {
     return { type: 'inhouse-invalid', raw };
   }
   return { type: 'inhouse', printfulVariantId };
@@ -1613,6 +1628,34 @@ async function recordFulfillmentFailure(env, shopifyOrderId, detail) {
   }).catch((err) => {
     console.error('[order-paid] failed to persist failure record for Shopify order', shopifyOrderId, ':', err.message);
   });
+}
+
+// Builds the diagnostic message for a rejected Printful order-create. Two
+// things this does that `printfulJson.result || JSON.stringify(printfulJson)`
+// did not:
+//
+//  1. Handles a non-string `result`. Printful usually puts the error text
+//     there, but not always — and `new Error(someObject)` stringifies to
+//     "[object Object]", discarding the only diagnostic available on the one
+//     branch that actually needs one (the success path deliberately logs
+//     almost nothing).
+//  2. Strips `recipient` before falling back to serializing the whole body.
+//     This message is both console.error'd and returned in the 502 response,
+//     and Printful echoes the full recipient block — name, street address,
+//     phone, email — back on some responses. Dumping it here would put the
+//     same customer data into Cloudflare's logs that the success path was
+//     changed to stop writing.
+function formatPrintfulError(json) {
+  if (typeof json?.result === 'string' && json.result) return json.result;
+  if (typeof json?.error === 'string' && json.error) return json.error;
+  if (typeof json?.error?.message === 'string' && json.error.message) return json.error.message;
+
+  const redacted = { ...json };
+  if (redacted.recipient) redacted.recipient = '[redacted]';
+  if (redacted.result && typeof redacted.result === 'object' && redacted.result.recipient) {
+    redacted.result = { ...redacted.result, recipient: '[redacted]' };
+  }
+  return JSON.stringify(redacted);
 }
 
 async function handleOrderPaidWebhook(request, env, ctx) {
@@ -1669,22 +1712,57 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   // yet processed" before either has written anything, and both go on to
   // submit a Printful order for the same Shopify order.
   //
-  // Claim the key up front with an R2 conditional write — same compare-and-
-  // swap idiom as appendToCommunityList()'s community/list.json write (#551):
-  // `If-None-Match: *` so the put only succeeds if the key doesn't exist yet.
+  // Claim the key up front with an R2 conditional write: `If-None-Match: *`,
+  // so the put only succeeds if the key doesn't exist yet. This is the only
+  // compare-and-swap in this worker — the other multi-writer key,
+  // community/list.json, is still a plain read-modify-write (see
+  // handleCommunitySubmit) and has the race described above.
   // The value starts as a `pending` placeholder and gets overwritten with the
   // completed record (containing printfulOrderId) once the Printful order is
-  // actually created. Every exit path that isn't full success deletes the
+  // actually created. Every exit path that isn't full success releases the
   // claim (best-effort) so a future redelivery isn't permanently blocked by
   // an attempt that didn't finish.
   const idempotencyKey = `printful-orders/${shopifyOrderId}.json`;
-  const releaseClaim = () => env.MOCKUP_STAGING.delete(idempotencyKey).catch((err) => {
-    console.error('[order-paid] failed to release idempotency claim for Shopify order', shopifyOrderId, ':', err.message);
-  });
+
+  // Identifies *this* delivery's claim. Without it, releasing was a bare
+  // delete of whatever happened to be at the key — which is not necessarily
+  // ours. Consider: this delivery stalls past PRINTFUL_ORDER_CLAIM_STALE_MS, a
+  // second delivery correctly reclaims the stale claim and submits the order,
+  // and then our Printful call fails — which it reliably does, because the
+  // second delivery already consumed `external_id: shopify-{id}` and Printful
+  // rejects the duplicate. Our 502 path would then delete the *other*
+  // delivery's completed record, leaving a submitted order marked neither
+  // completed nor failed: every later redelivery resubmits, Printful rejects
+  // the duplicate again, and it never converges.
+  const claimId = crypto.randomUUID();
+  const claimValue = () => JSON.stringify({ status: 'pending', claimedAt: Date.now(), claimId });
+
+  // Only ever deletes a claim this delivery still owns. A record that has been
+  // completed, or re-claimed by someone else, is left alone.
+  //
+  // The read-then-delete isn't atomic (R2 delete takes no conditional), so a
+  // reclaim landing in that window can still be stomped — but reaching it
+  // requires our own claim to have already gone stale, which is the same
+  // narrow window the staleness timeout already tolerates.
+  const releaseClaim = async () => {
+    try {
+      const cur = await env.MOCKUP_STAGING.get(idempotencyKey);
+      if (!cur) return;
+      let rec = null;
+      try { rec = JSON.parse(await cur.text()); } catch { rec = null; }
+      if (rec?.status === 'pending' && rec.claimId === claimId) {
+        await env.MOCKUP_STAGING.delete(idempotencyKey);
+        return;
+      }
+      console.warn('[order-paid] not releasing idempotency claim for Shopify order', shopifyOrderId, '— it is no longer ours (status:', rec?.status + ')');
+    } catch (err) {
+      console.error('[order-paid] failed to release idempotency claim for Shopify order', shopifyOrderId, ':', err.message);
+    }
+  };
 
   const claimResult = await env.MOCKUP_STAGING.put(
     idempotencyKey,
-    JSON.stringify({ status: 'pending', claimedAt: Date.now() }),
+    claimValue(),
     { httpMetadata: { contentType: 'application/json' }, onlyIf: new Headers({ 'If-None-Match': '*' }) }
   );
 
@@ -1736,7 +1814,7 @@ async function handleOrderPaidWebhook(request, env, ctx) {
 
     const reclaimResult = await env.MOCKUP_STAGING.put(
       idempotencyKey,
-      JSON.stringify({ status: 'pending', claimedAt: Date.now() }),
+      claimValue(),
       { httpMetadata: { contentType: 'application/json' }, onlyIf: reclaimCondition }
     );
     if (!reclaimResult) {
@@ -1991,9 +2069,10 @@ async function handleOrderPaidWebhook(request, env, ctx) {
     });
     printfulJson = await printfulRes.json();
     if (printfulJson.code !== 200) {
-      // Only the failure branch logs the response body, and only via the thrown
-      // message — see below for why the success response must not be dumped.
-      throw new Error(printfulJson.result || printfulJson.error || JSON.stringify(printfulJson));
+      // Only the failure branch surfaces the response body, and only via the
+      // thrown message — see below for why the success response must not be
+      // dumped, and formatPrintfulError() for what gets stripped out of it.
+      throw new Error(formatPrintfulError(printfulJson));
     }
     // Log the id and status code, never the whole response: Printful echoes the
     // full `recipient` block back on success (name, street address, phone,
@@ -2034,10 +2113,16 @@ async function handleOrderPaidWebhook(request, env, ctx) {
       return acc;
     }, {}),
   };
-  // Overwrite the pending claim with the completed record — no `onlyIf`
-  // needed for this write since we already hold the claim (either the
-  // initial claim above, or a successful stale-claim reclaim). This is what
-  // a future redelivery's claim attempt (above) finds and short-circuits on.
+  // Overwrite the pending claim with the completed record. This is what a
+  // future redelivery's claim attempt (above) finds and short-circuits on.
+  //
+  // Deliberately unconditional, even though a stale-claim reclaim means we
+  // can't be certain we still hold the key. The two failure directions are not
+  // symmetric: writing over someone else's record costs at worst a confusing
+  // record for an order that did reach Printful, whereas *not* writing loses
+  // the only marker that this order was already submitted — and every later
+  // redelivery would then resubmit it. A duplicate Printful order is the more
+  // expensive mistake, so this write always lands.
   await writeJson(env, idempotencyKey, record).catch((err) => {
     console.error('[order-paid] failed to persist idempotency record for order', order.name, '— a redelivery could create a duplicate Printful order:', err.message);
   });

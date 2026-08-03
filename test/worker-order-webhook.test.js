@@ -28,11 +28,13 @@ afterEach(() => vi.unstubAllGlobals());
 const WEBHOOK_SECRET = 'test-webhook-secret';
 
 // ── R2 in-memory mock ─────────────────────────────────────────────────────────
-// Models etags + conditional put() (the `onlyIf` option), the same way
-// test/worker.test.js's mock does for the community/list.json compare-and-swap
-// (#551) — needed here to exercise handleOrderPaidWebhook's claim-then-complete
-// idempotency flow (#586 review: TOCTOU race in the original read-then-write
-// check) for real, rather than always succeeding regardless of what onlyIf says.
+// Models etags + conditional put() (the `onlyIf` option). test/worker.test.js's
+// R2 mock does not — nothing else in the worker uses conditional writes — so
+// this one is deliberately richer: without honouring onlyIf, every put would
+// succeed regardless of the condition and the claim/reclaim race tests below
+// would pass against a handler with no idempotency at all. Needed to exercise
+// handleOrderPaidWebhook's claim-then-complete flow (#586 review: TOCTOU race
+// in the original read-then-write check) for real.
 function makeR2() {
   const store = new Map();
   const etags = new Map(); // key -> etag string
@@ -286,6 +288,32 @@ describe('classifyLineItem', () => {
     expect(classifyLineItem(inhouseLineItem({ variant: { metafield: { value: 'not-a-number' } } })).type).toBe('inhouse-invalid');
     expect(classifyLineItem(inhouseLineItem({ variant: { metafield: { value: '0' } } })).type).toBe('inhouse-invalid');
     expect(classifyLineItem(inhouseLineItem({ variant: { metafield: { value: '-5' } } })).type).toBe('inhouse-invalid');
+  });
+
+  // parseInt() stops at the first non-digit and returns whatever it collected,
+  // so these all used to classify as a valid 'inhouse' id and get submitted to
+  // Printful. '1e5' is the dangerous one: it became sync variant *1* — a real
+  // id, silently fulfilling the wrong garment. Refusing loudly is the whole
+  // point of 'inhouse-invalid'.
+  it('rejects a value with trailing garbage rather than parsing a prefix out of it', () => {
+    const cases = ['1e5', '4917503 (Black / M)', '4917503abc', '49.99', '0x10', '12,345'];
+    for (const value of cases) {
+      const cls = classifyLineItem(inhouseLineItem({ variant: { metafield: { value } } }));
+      expect(cls, `expected ${JSON.stringify(value)} to be refused`).toEqual({ type: 'inhouse-invalid', raw: value });
+    }
+  });
+
+  it('rejects an id too large to round-trip exactly', () => {
+    expect(classifyLineItem(inhouseLineItem({ variant: { metafield: { value: '9'.repeat(30) } } })).type).toBe('inhouse-invalid');
+  });
+
+  it('treats a whitespace-only value as an unset metafield, not a broken one', () => {
+    expect(classifyLineItem(inhouseLineItem({ variant: { metafield: { value: '   ' } } })).type).toBe('unrecognized');
+  });
+
+  it('accepts a well-formed id with incidental surrounding whitespace', () => {
+    expect(classifyLineItem(inhouseLineItem({ variant: { metafield: { value: ' 4917503\n' } } })))
+      .toEqual({ type: 'inhouse', printfulVariantId: 4917503 });
   });
 });
 
@@ -1198,5 +1226,161 @@ describe('POST /webhook/order-paid — failure and skip paths', () => {
 
     const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
     expect(res.status).toBe(502);
+  });
+});
+
+// ── POST /webhook/order-paid — claim ownership on release ───────────────────
+// Releasing the idempotency claim used to be a bare delete of whatever was at
+// the key, which isn't necessarily this delivery's claim. The damaging case:
+// this delivery stalls past the staleness timeout, a second delivery reclaims
+// and submits the order, and then this one's Printful call fails — reliably,
+// since the second delivery already consumed `external_id: shopify-{id}` — and
+// its 502 path deletes the *other* delivery's completed record. The order is
+// then marked neither completed nor failed, and every later redelivery
+// resubmits into the same duplicate rejection forever.
+
+describe('POST /webhook/order-paid — claim ownership', () => {
+  const KEY = 'printful-orders/555000111.json';
+
+  // Runs the handler to a Printful failure, but has another delivery replace
+  // the record at the idempotency key while our call is in flight.
+  async function failAfterRecordReplacedWith(env, replacement) {
+    vi.stubGlobal('fetch', vi.fn(async (url, opts = {}) => {
+      const u = typeof url === 'string' ? url : url.toString();
+      if (u.includes('/admin/oauth/access_token')) return jsonRes({ access_token: 't', expires_in: 3600 });
+      if (u === 'https://api.printful.com/products/71') {
+        return jsonRes({ result: { variants: [{ id: 4017, size: 'M', color: 'Black' }] } });
+      }
+      if (u === 'https://api.printful.com/orders') {
+        // Simulates the concurrent delivery that reclaimed our stale claim and
+        // got there first — it owns the key now, whatever state it's in.
+        await env.MOCKUP_STAGING.put(KEY, JSON.stringify(replacement));
+        // ...and Printful rejects ours as a duplicate external_id.
+        return jsonRes({ code: 400, result: 'Order with this external_id already exists' });
+      }
+      if (u.includes('/admin/api/')) return jsonRes({ data: { order: defaultOrder() } });
+      throw new Error('Unmocked fetch in test: ' + u);
+    }));
+
+    return worker.fetch(await webhookRequest({ id: 555000111 }), env);
+  }
+
+  it('does not delete another delivery’s completed record when our own submission fails', async () => {
+    const env = makeEnv();
+    const res = await failAfterRecordReplacedWith(env, {
+      status: 'completed', shopifyOrderId: 555000111, printfulOrderId: 77777, createdAt: Date.now(),
+    });
+
+    expect(res.status).toBe(502);
+
+    // The other delivery's completed record must survive — it is the only
+    // marker that this order already reached Printful.
+    const stored = JSON.parse(env.MOCKUP_STAGING._store.get(KEY));
+    expect(stored.status).toBe('completed');
+    expect(stored.printfulOrderId).toBe(77777);
+  });
+
+  it('does not delete another delivery’s in-flight claim when our own submission fails', async () => {
+    const env = makeEnv();
+    const res = await failAfterRecordReplacedWith(env, {
+      status: 'pending', claimedAt: Date.now(), claimId: 'some-other-delivery',
+    });
+
+    expect(res.status).toBe(502);
+
+    // Deleting this would let a third delivery claim the key and submit a
+    // second order while the second delivery is still working.
+    const stored = JSON.parse(env.MOCKUP_STAGING._store.get(KEY));
+    expect(stored.status).toBe('pending');
+    expect(stored.claimId).toBe('some-other-delivery');
+  });
+
+  it('still releases the claim it does own, so a refused order stays recoverable', async () => {
+    // The guard must not over-correct into never releasing: this is the
+    // ordinary refusal path, where releasing is what makes a fix-and-replay
+    // work at all.
+    const env = makeEnv();
+    vi.stubGlobal('fetch', makeUpstreamFetch({
+      order: defaultOrder({ lineItems: { edges: [{ node: {
+        sku: 'CUSTOM-1700000000000-L', quantity: 1, title: 'Custom Dot Rise 2',
+        product: { id: 'gid://shopify/Product/9002', metafield: null },
+      } }] } }),
+    }));
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(422);
+    expect(env.MOCKUP_STAGING._store.has(KEY)).toBe(false);
+  });
+});
+
+// ── POST /webhook/order-paid — Printful error formatting ────────────────────
+
+describe('POST /webhook/order-paid — Printful error reporting', () => {
+  function printfulErrorResponse(errBody) {
+    return vi.fn(async (url, opts = {}) => {
+      const u = typeof url === 'string' ? url : url.toString();
+      if (u.includes('/admin/oauth/access_token')) return jsonRes({ access_token: 't', expires_in: 3600 });
+      if (u === 'https://api.printful.com/products/71') {
+        return jsonRes({ result: { variants: [{ id: 4017, size: 'M', color: 'Black' }] } });
+      }
+      if (u === 'https://api.printful.com/orders') return jsonRes(errBody);
+      if (u.includes('/admin/api/')) return jsonRes({ data: { order: defaultOrder() } });
+      throw new Error('Unmocked fetch in test: ' + u);
+    });
+  }
+
+  it('keeps the diagnostic when Printful returns a non-string result', async () => {
+    // `new Error(someObject)` stringifies to "[object Object]", which threw
+    // away the only diagnostic on the one branch that reports one.
+    const env = makeEnv();
+    vi.stubGlobal('fetch', printfulErrorResponse({
+      code: 400,
+      result: { reason: 'variant_id 4017 is unavailable', field: 'items[0]' },
+    }));
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(502);
+
+    const json = await res.json();
+    expect(json.error).not.toMatch(/\[object Object\]/);
+    expect(json.error).toMatch(/variant_id 4017 is unavailable/);
+  });
+
+  it('redacts the recipient Printful echoes back in an error body', async () => {
+    // Same customer data the success path was changed to stop logging — the
+    // failure path serializes the response, so it has to strip it too.
+    const env = makeEnv();
+    vi.stubGlobal('fetch', printfulErrorResponse({
+      code: 400,
+      result: {
+        reason: 'Invalid shipping destination',
+        recipient: { name: 'Jane Doe', address1: '123 Main St', phone: '5035551234', email: 'buyer@example.com' },
+      },
+    }));
+
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+      const json = await res.json();
+      const logged = errSpy.mock.calls.map(args => args.join(' ')).join('\n');
+
+      for (const sink of [json.error, logged]) {
+        expect(sink).not.toMatch(/123 Main St/);
+        expect(sink).not.toMatch(/5035551234/);
+        expect(sink).not.toMatch(/buyer@example\.com/);
+      }
+      // The actionable part still comes through.
+      expect(json.error).toMatch(/Invalid shipping destination/);
+    } finally {
+      errSpy.mockRestore();
+    }
+  });
+
+  it('still uses the plain string result when Printful sends one', async () => {
+    const env = makeEnv();
+    vi.stubGlobal('fetch', printfulErrorResponse({ code: 400, result: 'Invalid recipient' }));
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect((await res.json()).error).toMatch(/Invalid recipient/);
   });
 });
