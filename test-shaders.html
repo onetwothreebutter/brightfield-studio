@@ -202,6 +202,7 @@
     <option value="outline-pulse">Outline Pulse</option>
     <option value="contour-pareidolia">Contour Pareidolia</option>
     <option value="scribble-glyph">Scribble Glyph</option>
+    <option value="radial-tick-ring">Radial Tick Ring</option>
   </select>
   <button id="export-btn">Export PNG</button>
 </div>
@@ -1985,6 +1986,111 @@ SHADERS['scribble-glyph'] = {
     if (cSel) cSel.addEventListener('change', function(){ var p=cosinePresets[this.value]; if(p) applyCosinePreset(p); });
     var fSel = document.querySelector('[data-param-key="_sg_4color_preset"]');
     if (fSel) fSel.addEventListener('change', function(){ var p=fourStopPresets[this.value]; if(p) apply4StopPreset(p); });
+  },
+};
+
+// ── Radial Tick Ring ──────────────────────────────────────────────────────────
+SHADERS['radial-tick-ring'] = {
+  controls: [
+    { type: 'header', label: 'Ring' },
+    { key: 'u_ring_radius', label: 'Ring Radius', type: 'range', min: 0.05, max: 0.5, step: 0.01, value: 0.40, noRandomize: true },
+    { key: 'u_tick_count', label: 'Tick Count', type: 'range', min: 4, max: 180, step: 1, value: 48 },
+    { key: 'u_tick_length', label: 'Tick Length', type: 'range', min: 0.005, max: 0.25, step: 0.005, value: 0.05 },
+    { key: 'u_tick_width', label: 'Tick Width', type: 'range', min: 0.002, max: 0.08, step: 0.002, value: 0.010 },
+    { key: 'u_tick_phase', label: 'Rotation', type: 'range', min: 0, max: 1, step: 0.005, value: 0.0,
+      tip: 'Rotates the whole sunburst by up to one tick spacing.' },
+    { key: 'u_tick_major_every', label: 'Major Tick Every', type: 'range', min: 1, max: 12, step: 1, value: 5 },
+    { key: 'u_tick_major_scale', label: 'Major Tick Length', type: 'range', min: 1.0, max: 4.0, step: 0.05, value: 1.8 },
+    { type: 'header', label: 'Inner Circle' },
+    { key: 'u_inner_radius', label: 'Radius', type: 'range', min: 0.0, max: 0.45, step: 0.005, value: 0.16 },
+    { key: 'u_inner_x', label: 'Position X', type: 'range', min: -0.5, max: 0.5, step: 0.005, value: 0.0, noRandomize: true },
+    { key: 'u_inner_y', label: 'Position Y', type: 'range', min: -0.5, max: 0.5, step: 0.005, value: 0.0, noRandomize: true },
+    { type: 'header', label: 'Knockout' },
+    { key: 'u_knockout_enabled', label: 'Enabled', type: 'toggle', value: 1, noRandomize: true },
+    { key: 'u_knockout_radius', label: 'Radius', type: 'range', min: 0.0, max: 0.45, step: 0.005, value: 0.06 },
+    { type: 'header', label: 'Color Palette' },
+    { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
+      tip: 'Off = cosine palette. On = 4-stop linear gradient from center outward.' },
+    { key: '_rtr_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
+      options: [
+        { label: 'Rainbow',   value: 'Rainbow'   },
+        { label: 'Cool Blue', value: 'Cool Blue' },
+        { label: 'Neon Heat', value: 'Neon Heat' },
+        { label: 'Cyberpunk', value: 'Cyberpunk' },
+        { label: 'Golden',    value: 'Golden'    },
+      ]
+    },
+    { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080', tip: 'Offset.' },
+    { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080', tip: 'Amplitude.' },
+    { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff', tip: 'Frequency.' },
+    { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab', tip: 'Phase.' },
+    { key: '_rtr_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
+      options: [
+        { label: 'Neon',   value: 'Neon'   }, { label: 'Retro',  value: 'Retro'  },
+        { label: 'Sunset', value: 'Sunset' }, { label: 'Aurora', value: 'Aurora' },
+        { label: 'Dusk',   value: 'Dusk'   },
+      ]
+    },
+    { key: 'u_color0', label: 'Color 1 (Center)', type: 'color', stopDependent: true, value: '#ff3366' },
+    { key: 'u_color1', label: 'Color 2',          type: 'color', stopDependent: true, value: '#ffcc00' },
+    { key: 'u_color2', label: 'Color 3',          type: 'color', stopDependent: true, value: '#00ccff' },
+    { key: 'u_color3', label: 'Color 4 (Edge)',   type: 'color', stopDependent: true, value: '#aa00ff' },
+    { key: 'u_use_ring_color', label: 'Custom Ring Color', type: 'toggle', value: 0, noRandomize: true },
+    { key: 'u_ring_color', label: 'Ring Color', type: 'color', value: '#ffffff' },
+    { key: 'u_use_inner_color', label: 'Custom Inner Color', type: 'toggle', value: 0, noRandomize: true },
+    { key: 'u_inner_color', label: 'Inner Color', type: 'color', value: '#ffffff' },
+  ].concat(FINISH_CONTROLS),
+  fonts: [],
+  customAfterBuild: function (body) {
+    var cosinePresets = {
+      'Rainbow':   { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.0,  0.33, 0.67]  },
+      'Cool Blue': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.263,0.416,0.557] },
+      'Neon Heat': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,1.0], d:[0.3,  0.2,  0.2 ]  },
+      'Cyberpunk': { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[2.0,1.0,0.0], d:[0.5,  0.2,  0.25]  },
+      'Golden':    { a:[0.5,0.5,0.5], b:[0.5,0.5,0.5], c:[1.0,1.0,0.5], d:[0.8,  0.9,  0.3 ]  },
+    };
+    var fourStopPresets = {
+      'Neon':   { c0:[1.0, 0.2,  0.4  ], c1:[1.0,  0.8,   0.0  ], c2:[0.0,  0.8,   1.0  ], c3:[0.667,0.0,  1.0  ] },
+      'Retro':  { c0:[0.91,0.286,0.114], c1:[0.788,0.627, 0.188], c2:[0.176,0.541, 0.369], c3:[0.102,0.153,0.267] },
+      'Sunset': { c0:[1.0, 0.318,0.184], c1:[0.867,0.141, 0.463], c2:[0.541,0.169, 0.886], c3:[0.098,0.098,0.439] },
+      'Aurora': { c0:[0.0, 1.0,  0.533], c1:[0.0,  0.898,  1.0 ], c2:[0.486,0.302,  1.0 ], c3:[0.878,0.251,0.984] },
+      'Dusk':   { c0:[1.0, 0.6,  0.4  ], c1:[1.0,  0.369, 0.384], c2:[0.8,  0.169, 0.369], c3:[0.459,0.227,0.533] },
+    };
+    var cosineKeys = ['u_a', 'u_b', 'u_c', 'u_d'];
+    function applyColors(pairs) {
+      pairs.forEach(function(pair) {
+        var key = pair[0];
+        var stored = PALETTE_COEFF_KEYS[key] ? pair[1] : pair[1].map(srgbToLinear);
+        window._shaderState.values[key] = stored;
+        var inp = document.querySelector('[data-param-key="' + key + '"]');
+        if (inp) inp.value = toHex(stored, key);
+      });
+    }
+    function applyCosinePreset(p) {
+      applyColors(cosineKeys.map(function(k,i){ return [k,[p.a,p.b,p.c,p.d][i]]; }));
+    }
+    function apply4StopPreset(p) {
+      applyColors([['u_color0',p.c0],['u_color1',p.c1],['u_color2',p.c2],['u_color3',p.c3]]);
+    }
+    applyCosinePreset(cosinePresets['Rainbow']);
+    apply4StopPreset(fourStopPresets['Neon']);
+    var cSel = document.querySelector('[data-param-key="_rtr_palette_preset"]');
+    if (cSel) cSel.addEventListener('change', function(){ var p=cosinePresets[this.value]; if(p) applyCosinePreset(p); });
+    var fSel = document.querySelector('[data-param-key="_rtr_4color_preset"]');
+    if (fSel) fSel.addEventListener('change', function(){ var p=fourStopPresets[this.value]; if(p) apply4StopPreset(p); });
+
+    // Per-element color overrides: show the picker row only when its toggle is on.
+    function bindToggleVisibility(toggleKey, colorKey) {
+      var btn = body.querySelector('[data-param-key="' + toggleKey + '"]');
+      var picker = body.querySelector('[data-param-key="' + colorKey + '"]');
+      if (!btn || !picker) return;
+      var row = picker.closest('.shader-control');
+      function apply() { row.style.display = btn.dataset.on === '1' ? '' : 'none'; }
+      btn.addEventListener('click', apply);
+      apply();
+    }
+    bindToggleVisibility('u_use_ring_color', 'u_ring_color');
+    bindToggleVisibility('u_use_inner_color', 'u_inner_color');
   },
 };
 
