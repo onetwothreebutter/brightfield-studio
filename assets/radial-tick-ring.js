@@ -116,7 +116,14 @@
     '  float slot       = a / 6.28318530 * u_tick_count + u_tick_phase;',
     '  float angFrac    = abs(fract(slot) - 0.5);',
     '  float tangential = angFrac * (6.28318530 / max(u_tick_count, 1.0)) * r;',
-    '  float isMajor    = step(mod(floor(slot), max(u_tick_major_every, 1.0)), 0.5);',
+    '  // Wrap the slot index into [0, count) before the major test. With an odd',
+    '  // tick count a tick center lands exactly on the atan seam at +/-PI, and',
+    '  // its two halves see floor(slot) values differing by exactly count — raw',
+    '  // floor values only agree under mod(., majorEvery) when majorEvery',
+    '  // divides count, so without the wrap that one tick draws half at major',
+    '  // length and half at minor length.',
+    '  float slotIdx    = mod(floor(slot), max(u_tick_count, 1.0));',
+    '  float isMajor    = step(mod(slotIdx, max(u_tick_major_every, 1.0)), 0.5);',
     '  float len        = mix(u_tick_length, u_tick_length * u_tick_major_scale, isMajor);',
     '',
     '  // Where this tick sits around the dial, as a fraction of a turn. Taken',
@@ -304,7 +311,7 @@
     render: function (gl, u, v, w, h) {
       gl.uniform2f(u.res, w, h);
       gl.uniform1f(u.aspect, w / h);
-      gl.uniform1f(u.ringRadius,     v.u_ring_radius      != null ? v.u_ring_radius      : 0.40);
+      gl.uniform1f(u.ringRadius,     v.u_ring_radius      != null ? v.u_ring_radius      : 0.33);
       gl.uniform1f(u.tickCount,      v.u_tick_count       != null ? v.u_tick_count       : 48.0);
       gl.uniform1f(u.tickLength,     v.u_tick_length      != null ? v.u_tick_length      : 0.05);
       gl.uniform1f(u.tickWidth,      v.u_tick_width       != null ? v.u_tick_width       : 0.010);

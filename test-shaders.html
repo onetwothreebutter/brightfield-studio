@@ -1993,7 +1993,8 @@ SHADERS['scribble-glyph'] = {
 SHADERS['radial-tick-ring'] = {
   controls: [
     { type: 'header', label: 'Ring' },
-    { key: 'u_ring_radius', label: 'Ring Radius', type: 'range', min: 0.05, max: 0.5, step: 0.01, value: 0.40, noRandomize: true },
+    { key: 'u_ring_radius', label: 'Ring Radius', type: 'range', min: 0.05, max: 0.5, step: 0.01, value: 0.33, noRandomize: true,
+      tip: 'Above about 0.33 the ring runs off the left and right edges — the canvas is taller than it is wide.' },
     { key: 'u_tick_count', label: 'Tick Count', type: 'range', min: 4, max: 180, step: 1, value: 48 },
     { key: 'u_tick_length', label: 'Tick Length', type: 'range', min: 0.005, max: 0.25, step: 0.005, value: 0.05 },
     { key: 'u_tick_width', label: 'Tick Width', type: 'range', min: 0.002, max: 0.08, step: 0.002, value: 0.010 },
@@ -2007,17 +2008,17 @@ SHADERS['radial-tick-ring'] = {
       tip: 'Rotates the whole sunburst by up to one tick spacing.' },
     { key: 'u_tick_major_every', label: 'Major Tick Every', type: 'range', min: 1, max: 12, step: 1, value: 5 },
     { key: 'u_tick_major_scale', label: 'Major Tick Length', type: 'range', min: 1.0, max: 4.0, step: 0.05, value: 1.8 },
-    { key: 'u_gap_size', label: 'Gap Size', type: 'range', min: 0, max: 270, step: 1, value: 0,
+    { key: 'u_gap_size', label: 'Gap Size', type: 'range', min: 0, max: 270, step: 1, value: 0, randomMax: 120,
       tip: 'Clears a wedge of the ring, in degrees. 0 leaves the ring closed.' },
     { key: 'u_gap_position', label: 'Gap Position', type: 'range', min: 0, max: 1, step: 0.005, value: 0.0, noRandomize: true,
       tip: 'Rotates the gap around the ring. 0 places it at the top.' },
     { type: 'header', label: 'Inner Circle' },
-    { key: 'u_inner_radius', label: 'Radius', type: 'range', min: 0.0, max: 0.45, step: 0.005, value: 0.16 },
+    { key: 'u_inner_radius', label: 'Radius', type: 'range', min: 0.0, max: 0.45, step: 0.005, value: 0.16, randomMax: 0.25 },
     { key: 'u_inner_x', label: 'Position X', type: 'range', min: -0.5, max: 0.5, step: 0.005, value: 0.0, noRandomize: true },
     { key: 'u_inner_y', label: 'Position Y', type: 'range', min: -0.5, max: 0.5, step: 0.005, value: 0.0, noRandomize: true },
     { type: 'header', label: 'Knockout' },
     { key: 'u_knockout_enabled', label: 'Enabled', type: 'toggle', value: 1, noRandomize: true },
-    { key: 'u_knockout_radius', label: 'Radius', type: 'range', min: 0.0, max: 0.45, step: 0.005, value: 0.06 },
+    { key: 'u_knockout_radius', label: 'Radius', type: 'range', min: 0.0, max: 0.45, step: 0.005, value: 0.06, randomMax: 0.15 },
     { type: 'header', label: 'Color Palette' },
     { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
       tip: 'Off = cosine palette. On = 4-stop linear gradient from center outward.' },
@@ -2097,6 +2098,9 @@ SHADERS['radial-tick-ring'] = {
       var row = picker.closest('.shader-control');
       function apply() { row.style.display = btn.dataset.on === '1' ? '' : 'none'; }
       btn.addEventListener('click', apply);
+      // Randomize sets data-on directly instead of clicking, so watch the
+      // attribute too rather than relying on the click event alone.
+      new MutationObserver(apply).observe(btn, { attributes: true, attributeFilter: ['data-on'] });
       apply();
     }
     bindToggleVisibility('u_use_ring_color', 'u_ring_color');
