@@ -17,6 +17,11 @@
     --color-secondary: #ff00ff;
     --color-primary-dim: rgba(0, 255, 255, 0.1);
     --color-secondary-dim: rgba(255, 0, 255, 0.1);
+    /* #e05 only clears ~4.3:1 on --color-surface, which fails AA for the small
+       type errors are usually set in. --color-error is the readable stand-in. */
+    --color-error: #ff6b7a;
+    --color-error-dim: rgba(255, 107, 122, 0.12);
+    --color-error-border: rgba(255, 107, 122, 0.35);
 
     --font-heading: "Space Grotesk", system-ui, sans-serif;
     --font-body: "IBM Plex Mono", "Courier New", monospace;
@@ -2064,8 +2069,36 @@ dialog.mobile-nav[open]::backdrop {
 .mockup-modal__order-status:empty {
     display: none;
 }
+/* Errors drop the muted-status treatment entirely: the progress copy is meant to
+   recede, but a blocked add-to-cart has to be readable at a glance. Bigger type,
+   tighter tracking and a tinted chip keep it legible against the dark modal. */
 .mockup-modal__order-status--error {
-    color: #e05;
+    color: var(--color-error);
+    font-size: 0.8125rem;
+    letter-spacing: 0.02em;
+    background: var(--color-error-dim);
+    border: 1px solid var(--color-error-border);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.75rem;
+    /* Flex rather than inline flow: vertical-align can't reliably centre a 2em
+       glyph against 0.8125rem copy, and it keeps wrapped lines clear of the
+       icon instead of running underneath it. The :empty rule above still wins
+       on specificity, so an unset status stays hidden. */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4em;
+}
+
+.mockup-modal__order-status--error::before {
+    content: "⚠";
+    font-size: 2em;
+    line-height: 1;
+    flex-shrink: 0;
+    /* The glyph sits low in its em box; nudge it up off the flex centre line.
+       position:relative so the offset is visual only and doesn't shift the row. */
+    position: relative;
+    top: -3px;
 }
 
 .shader-gui__body.is-hidden {
