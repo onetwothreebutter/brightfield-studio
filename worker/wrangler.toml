@@ -91,6 +91,14 @@ namespace_id = "1004"
 #   SHOPIFY_STORE_DOMAIN       - e.g. brightfield-2.myshopify.com
 #   SHOPIFY_CUSTOM_DESIGN_CLIENT_ID     - custom-design app client ID (for Admin API product creation)
 #   SHOPIFY_CUSTOM_DESIGN_CLIENT_SECRET - custom-design app client secret (for Admin API product creation)
+#   SHOPIFY_WEBHOOK_SECRET     - webhook signing secret for POST /webhook/order-paid
+#                                (orders/paid). Must match the secret configured when the
+#                                webhook subscription is registered in Shopify admin — see
+#                                handleOrderPaidWebhook()/verifyShopifyWebhookHmac() in
+#                                src/index.js. NOT the same secret as SHOPIFY_APP_CLIENT_SECRET:
+#                                webhook signing (base64 HMAC-SHA256 of the raw body, header
+#                                X-Shopify-Hmac-Sha256) is a different scheme from the App
+#                                Bridge session-token JWT that secret verifies.
 #   DEVICE_ID_SECRET           - HMAC key used to sign client deviceIds (see
 #                                 signDeviceId/verifyDeviceToken in index.js, #544).
 #                                 Any long random string; not shared with any other
@@ -118,3 +126,9 @@ namespace_id = "1004"
 # inside that ~60-day window) and conservatively keeps anything older until
 # the scope is granted — it does NOT assume the permissive case. With the
 # scope granted, this restriction doesn't apply and GC behaves as before.
+#
+# Optional vars/secrets:
+#   PRINTFUL_GARMENT_COLOR     - garment color used when mapping a custom-design order's SKU
+#                                size to a Printful catalog variant (see getPrintfulVariantMap()
+#                                in src/index.js). Defaults to 'Black' if unset. Only matters
+#                                once the storefront offers more than one garment color.

@@ -9,11 +9,19 @@ const PRODUCT_ID   = 71;
 const PRINT_WIDTH  = 1800;
 const PRINT_HEIGHT = 2400;
 
+// Garment color used for order fulfillment. The storefront doesn't offer a
+// color choice, so every custom-design order is fulfilled in one fixed color —
+// matches the Black/M variant (4017) already used as the canonical example
+// elsewhere in this repo (worker/test-upload.mjs, worker/fetch-printfiles.mjs).
+// Override with the PRINTFUL_GARMENT_COLOR var/secret if that ever changes.
+const DEFAULT_PRINTFUL_GARMENT_COLOR = 'Black';
+
 let _shopifyToken = null;
 let _shopifyTokenExpiry = 0;
 let _onlineStorePublicationId = null;
 let _printfulLocationId = null;
 let _printfulSizes = null;
+let _printfulVariantMap = null;
 
 async function getShopifyToken(env) {
   if (_shopifyToken && Date.now() < _shopifyTokenExpiry) return _shopifyToken;
@@ -123,6 +131,60 @@ async function getPrintfulSizes(env) {
     return _printfulSizes;
   } catch (err) {
     console.warn('[getPrintfulSizes] error (non-fatal):', err.message);
+    return null;
+  }
+}
+
+// Maps each garment size (e.g. 'M', 'XL') to its Printful catalog variant ID for
+// PRODUCT_ID, filtered to a single garment color (see
+// DEFAULT_PRINTFUL_GARMENT_COLOR) since the storefront doesn't offer a color
+// choice. Used by the orders/paid webhook to translate a custom-design line
+// item's SKU size suffix (see parseCustomSku()) into the variant_id Printful's
+// POST /orders endpoint requires.
+//
+// Extends the same Printful catalog fetch getPrintfulSizes() above already
+// makes (GET /products/{id}): that function only keeps the deduped size
+// *labels* it needs for the Shopify "Size" option, discarding color and id;
+// this one keeps the size -> variant *id* mapping needed to actually place an
+// order. Kept as a separate cached call (rather than sharing one raw-variants
+// cache) so each stays simple and independently testable.
+async function getPrintfulVariantMap(env) {
+  if (_printfulVariantMap) return _printfulVariantMap;
+  try {
+    const res = await fetch(`${PRINTFUL_API}/products/${PRODUCT_ID}`, {
+      headers: env.PRINTFUL_API_KEY ? { 'Authorization': `Bearer ${env.PRINTFUL_API_KEY}` } : {},
+    });
+    if (!res.ok) {
+      console.warn('[getPrintfulVariantMap] non-OK response:', res.status);
+      return null;
+    }
+    const data = await res.json();
+    const variants = data?.result?.variants || [];
+    const targetColor = (env.PRINTFUL_GARMENT_COLOR || DEFAULT_PRINTFUL_GARMENT_COLOR).toLowerCase();
+
+    // Target color only. A size the target color doesn't offer is deliberately
+    // left unmapped rather than filled in from whatever color happens to have
+    // it: an unmapped size refuses the whole order (see the skippedItems check
+    // in handleOrderPaidWebhook), which is recoverable and leaves a durable
+    // printful-orders-failed/ record, whereas substituting a color would ship
+    // the customer a garment they didn't buy — with a console.warn as the only
+    // trace, exactly the silent-shortfall failure this handler refuses
+    // everywhere else. Filtering by color also keeps two variants sharing a
+    // size from colliding.
+    const map = {};
+    for (const v of variants) {
+      if (v.size && v.id != null && (v.color || '').toLowerCase() === targetColor) {
+        map[v.size] = v.id;
+      }
+    }
+
+    if (Object.keys(map).length) {
+      _printfulVariantMap = map;
+      console.log('[getPrintfulVariantMap] size -> variant id map:', map);
+    }
+    return _printfulVariantMap;
+  } catch (err) {
+    console.warn('[getPrintfulVariantMap] error (non-fatal):', err.message);
     return null;
   }
 }
@@ -403,6 +465,11 @@ export default {
 
     if (method === 'POST' && pathname === '/save-preview')    return handleSavePreview(request, env, origin);
     if (method === 'POST' && pathname === '/create-product')  return handleCreateProduct(request, env, origin);
+
+    // Shopify webhook — server-to-server, HMAC-authenticated (not browser CORS,
+    // see handleOrderPaidWebhook). Registered on the orders/paid topic; see
+    // wrangler.toml + PR description for the (manual, one-time) registration step.
+    if (method === 'POST' && pathname === '/webhook/order-paid') return handleOrderPaidWebhook(request, env, ctx);
 
     return new Response('Not found', { status: 404 });
   },
@@ -1291,6 +1358,45 @@ async function verifyShopifySessionToken(token, clientSecret, clientId, storeDom
   }
 }
 
+// ── Webhook HMAC verification (orders/paid) ─────────────────────────────────
+// A different scheme from verifyShopifySessionToken() above: that verifies an
+// App Bridge session token — a JWS/JWT (HS256-signed header.payload.signature,
+// base64url segments, exp/nbf/aud/dest/iss claims to check). Shopify webhook
+// signing has none of that: it's a raw HMAC-SHA256 over the exact request body
+// bytes, base64-encoded (standard base64, not base64url), sent whole in the
+// X-Shopify-Hmac-Sha256 header, with no claims — just compare digests.
+// https://shopify.dev/docs/apps/build/webhooks/subscribe/verify-a-webhook
+async function verifyShopifyWebhookHmac(rawBody, headerValue, secret) {
+  if (!rawBody || !headerValue || !secret) return false;
+  try {
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const sigBuf = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody));
+    let binary = '';
+    new Uint8Array(sigBuf).forEach(b => { binary += String.fromCharCode(b); });
+    const computed = btoa(binary);
+    return timingSafeEqualStrings(computed, headerValue);
+  } catch {
+    return false;
+  }
+}
+
+// Constant-time comparison so a mismatching signature can't be distinguished by
+// response-time timing. Both inputs are fixed-length base64 (44 chars for a
+// SHA-256 digest) on the success path; short-circuiting on a length mismatch is
+// safe since length alone doesn't reveal anything about the digest.
+function timingSafeEqualStrings(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 async function requireAdmin(request, env) {
   const auth = request.headers.get('Authorization') || '';
   if (auth === `Bearer ${env.ADMIN_TOKEN}`) return true;
@@ -1415,6 +1521,775 @@ async function authorizeDeviceWrite(env, deviceId, deviceToken) {
     return { ok: false, newToken: null };
   }
   return { ok: true, newToken: null };
+}
+
+// ── Order fulfillment (orders/paid webhook) ─────────────────────────────────
+// Automates what the merchant currently does by hand: copy the `_design_url`
+// cart line-item property out of a paid order and upload it to Printful.
+//
+// Custom-design SKUs are distinguished from normal catalog SKUs by prefix (see
+// createShopifyProduct()'s skuPrefix + inventoryItemUpdate call above):
+// `CUSTOM-{timestamp}-{size}` for direct custom-design purchases,
+// `COMMUNITY-{timestamp}-{size}` for community-gallery-approved designs turned
+// into products. Both are handled identically here — the design_url metafield
+// lives on the generated product either way.
+const CUSTOM_SKU_RE = /^(CUSTOM|COMMUNITY)-(\d+)-(.+)$/;
+
+// Parses a size-suffixed custom/community SKU. Returns null for a normal
+// catalog SKU (or anything else that doesn't match), so callers can filter an
+// order's line items down to just the custom-design ones.
+export function parseCustomSku(sku) {
+  if (typeof sku !== 'string') return null;
+  const m = CUSTOM_SKU_RE.exec(sku);
+  if (!m) return null;
+  return { prefix: m[1], timestamp: m[2], size: m[3] };
+}
+
+// Classifies an order line item as 'custom' (SKU-prefixed, print file comes
+// from the product's custom.design_url metafield), 'inhouse' (a regular,
+// merchant-configured product identified by a printful.variant_id *variant*
+// metafield — see docs/in-house-products.md for how the merchant sets this),
+// 'inhouse-invalid' (that metafield is present but not a usable id, which
+// should fail loudly rather than silently fall through to 'unrecognized'),
+// or 'unrecognized' (an ordinary catalog item with neither signal — ignored,
+// same as today). SKU match is checked first so a line item can never
+// satisfy both.
+export function classifyLineItem(li) {
+  const skuInfo = parseCustomSku(li.sku);
+  if (skuInfo) return { type: 'custom', skuInfo };
+
+  const raw = li.variant?.metafield?.value;
+  if (raw == null) return { type: 'unrecognized' };
+
+  // Whitespace-only is treated the same as empty (metafield never set) rather
+  // than as a broken value — an absent signal, not a merchant mistake.
+  const trimmed = String(raw).trim();
+  if (trimmed === '') return { type: 'unrecognized' };
+
+  // Strict digits-only, deliberately not parseInt(): parseInt stops at the
+  // first non-digit and returns what it got, so '4917503 (Black / M)' would
+  // pass as 4917503 and — worse — '1e5' would pass as *1*, silently fulfilling
+  // against Printful sync variant 1. The whole point of 'inhouse-invalid' is to
+  // refuse the order loudly rather than fulfill the wrong garment, so anything
+  // that isn't unambiguously an id is rejected. (Shopify's Integer metafield
+  // type makes this unlikely from the admin UI, but the type isn't enforced for
+  // values set via the API or a CSV import.)
+  if (!/^\d+$/.test(trimmed)) return { type: 'inhouse-invalid', raw };
+
+  const printfulVariantId = Number(trimmed);
+  if (!Number.isSafeInteger(printfulVariantId) || printfulVariantId <= 0) {
+    return { type: 'inhouse-invalid', raw };
+  }
+  return { type: 'inhouse', printfulVariantId };
+}
+
+// ── Financial status (Shopify OrderDisplayFinancialStatus) ──────────────────
+// Three groups, because they need three different answers — and the difference
+// that matters is not "is it PAID" but "will this order leave this state on
+// its own?".
+//
+// PARTIALLY_REFUNDED is fulfillable, not a refusal: the order *was* paid, part
+// of it was given back, and whatever wasn't refunded still has to be produced.
+// Lumping it in with the not-yet-paid states dropped it silently and forever —
+// it never transitions back to PAID, so no redelivery ever rescues it, and the
+// not-yet-paid path deliberately writes no failure record. Which units are
+// still owed is fulfillableQuantity()'s job, not this check's.
+const FULFILLABLE_FINANCIAL_STATUSES = new Set(['PAID', 'PARTIALLY_REFUNDED']);
+
+// May still become PAID and get redelivered, so refuse quietly and leave the
+// order free to proceed later — a failure record here would be noise for
+// something no human needs to touch.
+const PENDING_FINANCIAL_STATUSES = new Set(['PENDING', 'AUTHORIZED', 'PARTIALLY_PAID']);
+
+// Terminal, and not fulfilling is the correct final answer — the customer has
+// their money back or the payment never landed. Also quiet: nothing is stuck.
+const SETTLED_UNPAID_FINANCIAL_STATUSES = new Set(['REFUNDED', 'VOIDED', 'EXPIRED']);
+
+// Anything in none of those three sets is a status this code has never seen
+// (Shopify added an enum value, or the field came back null). That is exactly
+// when a human should look, so it refuses *and* records — guessing which of
+// the three groups it belongs to is how orders go missing quietly.
+
+// How many units of a line item to actually produce.
+//
+// `quantity` is what the customer originally ordered and never changes;
+// `currentQuantity` subtracts units refunded or removed afterwards. Printful
+// should be told the latter — on a redelivery after a partial refund,
+// `quantity` prints garments the customer no longer paid for.
+//
+// Returns null when neither field is a usable count, rather than guessing.
+// The previous `li.quantity || 1` guessed twice over: it mapped a legitimate 0
+// (every unit refunded) to one garment, and a missing field to one garment.
+// A quantity we can't determine is a data problem, and this handler's standing
+// rule for those is to refuse the whole order, not to invent a value.
+export function fulfillableQuantity(li) {
+  if (Number.isInteger(li?.currentQuantity) && li.currentQuantity >= 0) return li.currentQuantity;
+  if (Number.isInteger(li?.quantity) && li.quantity >= 0) return li.quantity;
+  return null;
+}
+
+// A pending claim older than this is assumed to belong to a delivery whose
+// isolate crashed or was evicted before it could write a completed record or
+// clean up after itself — sized generously vs. this handler's real runtime
+// (an Admin GraphQL round trip plus a Printful order-create call), so a
+// still-active delivery should never actually cross it.
+const PRINTFUL_ORDER_CLAIM_STALE_MS = 2 * 60 * 1000;
+
+// How many line items the order lookup fetches. This handler does not
+// paginate; an order exceeding this is refused outright rather than
+// partially fulfilled (see the hasNextPage check in handleOrderPaidWebhook).
+const ORDER_LINE_ITEM_PAGE_SIZE = 100;
+
+// Cap on the webhook body. This endpoint is public and unauthenticated until
+// the HMAC check passes, and that check has to run over the whole body — so
+// without a cap anyone can make the worker buffer and HMAC an arbitrarily
+// large payload for free. An orders/paid payload is a few tens of KB even
+// with a full page of line items; 256 KB is generous headroom.
+const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
+
+// Where a refusal that needs a human is recorded. The 422 paths below release
+// the idempotency claim so a redelivery can succeed once the underlying data
+// is fixed — but if nobody fixes it, Shopify eventually stops redelivering and
+// the order is simply never fulfilled, with nothing but a log line to show for
+// it. That's a regression against the manual workflow this replaces, where a
+// human was in the loop and would notice. These records are the durable trace:
+// one object per stuck order, listable from R2 (or the admin UI) to answer
+// "did anything paid fail to reach Printful?".
+//
+// Written only for refusals whose cause is the order's own data and that will
+// not clear on their own — which includes a Printful order-create rejection
+// (Printful answered and evaluated this order; see that catch block), even
+// though that path returns 502. Deliberately NOT written for: non-PAID orders
+// (a PENDING/AUTHORIZED order may legitimately become PAID and get
+// redelivered), or calls that never completed at all against Shopify or
+// Printful (transient, no verdict reached, retries into success). The key is
+// overwritten on each attempt, so a fixed-then-refused-again order doesn't
+// accumulate objects.
+//
+// Always call this BEFORE releaseClaim(), never after. Releasing first opens a
+// window where a concurrent redelivery claims the order, fulfills it, and
+// clears the failure record that hasn't been written yet — after which this
+// write recreates it, leaving a stuck-order record for an order that actually
+// reached Printful. Writing while the claim is still held closes that window.
+async function recordFulfillmentFailure(env, shopifyOrderId, detail) {
+  await writeJson(env, `printful-orders-failed/${shopifyOrderId}.json`, {
+    shopifyOrderId,
+    failedAt: Date.now(),
+    ...detail,
+  }).catch((err) => {
+    console.error('[order-paid] failed to persist failure record for Shopify order', shopifyOrderId, ':', err.message);
+  });
+}
+
+// Clears the failure record for an order that no longer needs a human. No-op
+// when there isn't one.
+//
+// Called from both terminal non-failure outcomes, not just the fulfilled one:
+// an order can also stop needing attention by ceasing to be this handler's
+// business at all. A merchant can resolve a refusal by *removing* the offending
+// printful.variant_id rather than fixing it, and a customer can refund the
+// offending items to zero — both leave the redelivery on the ignore path, which
+// would otherwise strand the old record forever. Since docs/in-house-products.md
+// tells the merchant that prefix should normally be empty, a record that can
+// never clear itself is worse than no record: it trains them to ignore the list.
+//
+// Like recordFulfillmentFailure, call this while the claim is still held — the
+// same ordering argument applies in reverse.
+async function clearFulfillmentFailure(env, shopifyOrderId, context) {
+  await env.MOCKUP_STAGING.delete(`printful-orders-failed/${shopifyOrderId}.json`).catch((err) => {
+    console.error('[order-paid] failed to clear failure record for', context, ':', err.message);
+  });
+}
+
+// Builds the diagnostic message for a rejected Printful order-create. Two
+// things this does that `printfulJson.result || JSON.stringify(printfulJson)`
+// did not:
+//
+//  1. Handles a non-string `result`. Printful usually puts the error text
+//     there, but not always — and `new Error(someObject)` stringifies to
+//     "[object Object]", discarding the only diagnostic available on the one
+//     branch that actually needs one (the success path deliberately logs
+//     almost nothing).
+//  2. Strips `recipient` before falling back to serializing the whole body.
+//     This message is both console.error'd and returned in the 502 response,
+//     and Printful echoes the full recipient block — name, street address,
+//     phone, email — back on some responses. Dumping it here would put the
+//     same customer data into Cloudflare's logs that the success path was
+//     changed to stop writing.
+function formatPrintfulError(json) {
+  if (typeof json?.result === 'string' && json.result) return json.result;
+  if (typeof json?.error === 'string' && json.error) return json.error;
+  if (typeof json?.error?.message === 'string' && json.error.message) return json.error.message;
+
+  const redacted = { ...json };
+  if (redacted.recipient) redacted.recipient = '[redacted]';
+  if (redacted.result && typeof redacted.result === 'object' && redacted.result.recipient) {
+    redacted.result = { ...redacted.result, recipient: '[redacted]' };
+  }
+  return JSON.stringify(redacted);
+}
+
+async function handleOrderPaidWebhook(request, env, ctx) {
+  const headers = { 'Content-Type': 'application/json' };
+  // No CORS headers: Shopify calls this server-to-server, not from a browser —
+  // this endpoint is authenticated via HMAC (below), not Origin.
+
+  // Reject an oversized body before reading it where the sender declared its
+  // length. Content-Length is advisory (it can be absent on a chunked request,
+  // or simply lie), so the actual byte count is re-checked after the read —
+  // this just avoids buffering the obvious cases at all.
+  const declaredLength = parseInt(request.headers.get('Content-Length'), 10);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_WEBHOOK_BODY_BYTES) {
+    console.warn('[order-paid] rejected: body larger than', MAX_WEBHOOK_BODY_BYTES, 'bytes (Content-Length:', declaredLength + ')');
+    return new Response(JSON.stringify({ error: 'Payload too large' }), { status: 413, headers });
+  }
+
+  // HMAC verification must run over the exact raw body bytes, so read text()
+  // (not json()) first — a Request body stream can only be consumed once, and
+  // parsing to JSON and re-stringifying it would not reliably reproduce the
+  // same bytes Shopify signed (key order, whitespace, unicode escaping).
+  const rawBody = await request.text();
+  // Byte length, not string length: a body of multi-byte characters is bigger
+  // on the wire than its character count suggests.
+  const actualLength = new TextEncoder().encode(rawBody).length;
+  if (actualLength > MAX_WEBHOOK_BODY_BYTES) {
+    console.warn('[order-paid] rejected: body larger than', MAX_WEBHOOK_BODY_BYTES, 'bytes (actual:', actualLength + ')');
+    return new Response(JSON.stringify({ error: 'Payload too large' }), { status: 413, headers });
+  }
+  const hmacHeader = request.headers.get('X-Shopify-Hmac-Sha256');
+  const validHmac = await verifyShopifyWebhookHmac(rawBody, hmacHeader, env.SHOPIFY_WEBHOOK_SECRET);
+  if (!validHmac) {
+    console.warn('[order-paid] rejected: missing/invalid HMAC signature');
+    return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 401, headers });
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
+  }
+
+  const shopifyOrderId = payload?.id;
+  if (!shopifyOrderId) {
+    return new Response(JSON.stringify({ error: 'Missing order id' }), { status: 400, headers });
+  }
+
+  // Idempotency: Shopify redelivers webhooks on timeouts/non-2xx responses, and
+  // orders/paid can in principle fire more than once for the same order —
+  // including two deliveries landing genuinely concurrently. A naive
+  // read-then-write check (read "no existing record", do all the work, write
+  // the record at the end) has a TOCTOU race: both deliveries can read "not
+  // yet processed" before either has written anything, and both go on to
+  // submit a Printful order for the same Shopify order.
+  //
+  // Claim the key up front with an R2 conditional write: `If-None-Match: *`,
+  // so the put only succeeds if the key doesn't exist yet. This is the only
+  // compare-and-swap in this worker — the other multi-writer key,
+  // community/list.json, is still a plain read-modify-write (see
+  // handleCommunitySubmit) and has the race described above.
+  // The value starts as a `pending` placeholder and gets overwritten with the
+  // completed record (containing printfulOrderId) once the Printful order is
+  // actually created. Every exit path that isn't full success releases the
+  // claim (best-effort) so a future redelivery isn't permanently blocked by
+  // an attempt that didn't finish.
+  const idempotencyKey = `printful-orders/${shopifyOrderId}.json`;
+
+  // Identifies *this* delivery's claim. Without it, releasing was a bare
+  // delete of whatever happened to be at the key — which is not necessarily
+  // ours. Consider: this delivery stalls past PRINTFUL_ORDER_CLAIM_STALE_MS, a
+  // second delivery correctly reclaims the stale claim and submits the order,
+  // and then our Printful call fails — which it reliably does, because the
+  // second delivery already consumed `external_id: shopify-{id}` and Printful
+  // rejects the duplicate. Our 502 path would then delete the *other*
+  // delivery's completed record, leaving a submitted order marked neither
+  // completed nor failed: every later redelivery resubmits, Printful rejects
+  // the duplicate again, and it never converges.
+  const claimId = crypto.randomUUID();
+  const claimValue = () => JSON.stringify({ status: 'pending', claimedAt: Date.now(), claimId });
+
+  // Only ever deletes a claim this delivery still owns. A record that has been
+  // completed, or re-claimed by someone else, is left alone.
+  //
+  // The read-then-delete isn't atomic (R2 delete takes no conditional), so a
+  // reclaim landing in that window can still be stomped — but reaching it
+  // requires our own claim to have already gone stale, which is the same
+  // narrow window the staleness timeout already tolerates.
+  const releaseClaim = async () => {
+    try {
+      const cur = await env.MOCKUP_STAGING.get(idempotencyKey);
+      if (!cur) return;
+      let rec = null;
+      try { rec = JSON.parse(await cur.text()); } catch { rec = null; }
+      if (rec?.status === 'pending' && rec.claimId === claimId) {
+        await env.MOCKUP_STAGING.delete(idempotencyKey);
+        return;
+      }
+      console.warn('[order-paid] not releasing idempotency claim for Shopify order', shopifyOrderId, '— it is no longer ours (status:', rec?.status + ')');
+    } catch (err) {
+      console.error('[order-paid] failed to release idempotency claim for Shopify order', shopifyOrderId, ':', err.message);
+    }
+  };
+
+  // The Headers form, not the tidier-looking `onlyIf: { etagDoesNotMatch: '*' }`
+  // — that one is actively broken. workerd parses a wildcard passed through the
+  // R2Conditional object as a *strong* etag (cloudflare/workerd#2572), so the
+  // condition evaluates backwards, every put succeeds, and this claim silently
+  // stops guarding anything: two concurrent deliveries both "win" and submit
+  // the same order to Printful twice. The header path parses wildcards
+  // correctly (R2 bindings gained strong/weak/wildcard etag parsing for
+  // conditional headers in the 2023-06-16 runtime release). A failed condition
+  // returns null rather than throwing, which is what !claimResult below tests.
+  //
+  // Nothing in the test suite can catch a regression here — the R2 mock
+  // implements the semantics this code assumes — so verify against real R2
+  // (`wrangler dev --remote`) if this line ever changes.
+  const claimResult = await env.MOCKUP_STAGING.put(
+    idempotencyKey,
+    claimValue(),
+    { httpMetadata: { contentType: 'application/json' }, onlyIf: new Headers({ 'If-None-Match': '*' }) }
+  );
+
+  if (!claimResult) {
+    // Another delivery already claimed (or completed) this order — read
+    // whatever's there now to decide how to respond.
+    const existingObj = await env.MOCKUP_STAGING.get(idempotencyKey);
+    let existing = null;
+    if (existingObj) {
+      try { existing = JSON.parse(await existingObj.text()); } catch { existing = null; }
+    }
+
+    // Completion is marked by an explicit `status`, not by the presence of
+    // printfulOrderId — see the record written at the end of this handler for
+    // why. `printfulOrderId` is still accepted as a completion signal so that
+    // any record written before that marker existed is still honoured.
+    if (existing?.status === 'completed' || existing?.printfulOrderId) {
+      console.log('[order-paid] idempotency hit for Shopify order', shopifyOrderId, '— Printful order already created:', existing.printfulOrderId);
+      return new Response(JSON.stringify({ ok: true, alreadyProcessed: true, printfulOrderId: existing.printfulOrderId }), { status: 200, headers });
+    }
+
+    // The key can also be *gone* by the time we read it: the delivery that
+    // beat us to the claim released it (every exit path that isn't full
+    // success does) in the window between our put failing and this get. That
+    // isn't a stale claim — there's no record and no etag to condition a
+    // reclaim on — so retry the same If-None-Match claim instead. Whoever
+    // wins that retry owns the key; the loser returns 409 and lets Shopify
+    // redeliver.
+    //
+    // Note the two forms are not interchangeable here. `etagMatches` holds a
+    // concrete etag, which the R2Conditional object handles correctly; the
+    // wildcard has to go through Headers for the reason given at the initial
+    // claim above (cloudflare/workerd#2572).
+    const reclaimCondition = existingObj
+      ? { etagMatches: existingObj.etag }
+      : new Headers({ 'If-None-Match': '*' });
+
+    if (existingObj) {
+      const claimedAt = existing?.claimedAt;
+      const stale = typeof claimedAt !== 'number' || (Date.now() - claimedAt) > PRINTFUL_ORDER_CLAIM_STALE_MS;
+
+      if (!stale) {
+        // A delivery is genuinely in-flight right now — don't race it. Shopify
+        // redelivers non-2xx responses on its own schedule; by the time it
+        // does, the in-flight delivery will have finished and the branch above
+        // will short-circuit normally.
+        console.log('[order-paid] claim already in flight for Shopify order', shopifyOrderId, '— returning 409 for redelivery');
+        return new Response(JSON.stringify({ ok: false, retrying: true }), { status: 409, headers });
+      }
+      // Stale placeholder — the delivery that claimed it never finished.
+      // Reclaim via a conditional put tied to its etag so we don't stomp a
+      // fresh claim that appears between our get() and this put().
+    }
+
+    const reclaimResult = await env.MOCKUP_STAGING.put(
+      idempotencyKey,
+      claimValue(),
+      { httpMetadata: { contentType: 'application/json' }, onlyIf: reclaimCondition }
+    );
+    if (!reclaimResult) {
+      console.log('[order-paid] lost the race reclaiming the idempotency key for Shopify order', shopifyOrderId, '— returning 409 for redelivery');
+      return new Response(JSON.stringify({ ok: false, retrying: true }), { status: 409, headers });
+    }
+    // Fall through — we now own the claim.
+  }
+
+  // Re-fetch the order via the Admin API rather than trusting the webhook
+  // payload's own shape: design_url lives on the *product* (a metafield), not
+  // the order, so it isn't in the payload at all regardless of shape; GraphQL
+  // gets order + line items + the metafield in one consistent round trip.
+  let orderData;
+  try {
+    orderData = await shopifyAdmin(env,
+      `query GetOrderForFulfillment($id: ID!) {
+        order(id: $id) {
+          id
+          name
+          email
+          displayFinancialStatus
+          shippingAddress {
+            firstName
+            lastName
+            address1
+            address2
+            city
+            province
+            provinceCode
+            zip
+            country
+            countryCode
+            phone
+          }
+          customer { firstName lastName email }
+          lineItems(first: ${ORDER_LINE_ITEM_PAGE_SIZE}) {
+            pageInfo { hasNextPage }
+            edges {
+              node {
+                sku
+                quantity
+                # Units still owed after any refunds/removals — see
+                # fulfillableQuantity(). The plain quantity field above is kept
+                # only as a fallback for a response somehow lacking this one.
+                currentQuantity
+                title
+                product {
+                  id
+                  metafield(namespace: "custom", key: "design_url") { value }
+                }
+                variant {
+                  id
+                  metafield(namespace: "printful", key: "variant_id") { value }
+                }
+              }
+            }
+          }
+        }
+      }`,
+      { id: `gid://shopify/Order/${shopifyOrderId}` }
+    );
+  } catch (err) {
+    console.error('[order-paid] order lookup request failed:', err.message);
+    await releaseClaim();
+    return new Response(JSON.stringify({ error: 'Could not look up order' }), { status: 502, headers });
+  }
+
+  const order = orderData?.data?.order;
+  if (!order) {
+    console.error('[order-paid] order lookup failed:', JSON.stringify(orderData));
+    await releaseClaim();
+    return new Response(JSON.stringify({ error: 'Could not look up order' }), { status: 502, headers });
+  }
+
+  // The handler is registered on the orders/paid topic, but don't just trust
+  // that — verify the order's actual payment state before submitting anything
+  // to Printful. Never persist a *completed* record on any of these paths: an
+  // order that isn't fulfillable now may become fulfillable later and get
+  // redelivered, and it should be free to proceed then.
+  const financialStatus = order.displayFinancialStatus;
+  if (!FULFILLABLE_FINANCIAL_STATUSES.has(financialStatus)) {
+    const expectedNonPayment = PENDING_FINANCIAL_STATUSES.has(financialStatus)
+      || SETTLED_UNPAID_FINANCIAL_STATUSES.has(financialStatus);
+
+    console.warn('[order-paid] order', order.name, 'is not fulfillable (financialStatus=' + financialStatus + ') — skipping Printful submission');
+
+    // An unrecognized status is the one case here that needs a human: this
+    // code can't tell whether the order will resolve itself or is being
+    // dropped for good, and dropping a paid order for good is the failure
+    // these records exist to catch.
+    if (!expectedNonPayment) {
+      await recordFulfillmentFailure(env, shopifyOrderId, {
+        shopifyOrderName: order.name,
+        reason: 'unrecognized financial status',
+        detail: `order.displayFinancialStatus was ${JSON.stringify(financialStatus)}, which this handler does not classify — check the order and fulfill it manually if it was paid`,
+        financialStatus,
+      });
+    }
+
+    await releaseClaim();
+    return new Response(JSON.stringify({ error: 'Order is not paid', financialStatus }), { status: 422, headers });
+  }
+
+  // The line-item query fetches a single page. If the order has more, the
+  // items beyond it were never seen here — classifying only what came back
+  // would submit a subset and then write the completed idempotency record,
+  // permanently under-fulfilling a paid order: exactly the failure the
+  // all-or-nothing check below exists to prevent, just triggered by item
+  // count instead of bad item data. Refuse the whole order instead so it
+  // stays recoverable (claim released, redelivery re-runs it) once someone
+  // pages through it manually or this handler learns to paginate.
+  if (order.lineItems?.pageInfo?.hasNextPage) {
+    console.error('[order-paid] order', order.name, 'has more than', ORDER_LINE_ITEM_PAGE_SIZE, 'line items — refusing rather than fulfilling only the first page');
+    await recordFulfillmentFailure(env, shopifyOrderId, {
+      shopifyOrderName: order.name,
+      reason: 'too many line items',
+      detail: `order has more than ${ORDER_LINE_ITEM_PAGE_SIZE} line items — needs manual fulfillment in Printful`,
+    });
+    await releaseClaim();
+    return new Response(JSON.stringify({
+      error: `Order has more than ${ORDER_LINE_ITEM_PAGE_SIZE} line items — needs manual fulfillment`,
+      lineItemLimit: ORDER_LINE_ITEM_PAGE_SIZE,
+    }), { status: 422, headers });
+  }
+
+  const lineItems = (order.lineItems?.edges || []).map(e => e.node);
+  const classified = lineItems.map(li => ({ ...li, cls: classifyLineItem(li), fulfillQty: fulfillableQuantity(li) }));
+
+  // Drop line items with nothing left to produce (every unit refunded or
+  // removed) *before* the relevance check, so a partially-refunded order whose
+  // only Printful-relevant items were the refunded ones is ignored rather than
+  // refused as "no valid line items" — nothing is stuck, there's just nothing
+  // to make. A null quantity is deliberately kept: that's a data problem and
+  // has to reach the all-or-nothing refusal below rather than vanish here.
+  const relevant = classified.filter(li => li.cls.type !== 'unrecognized' && li.fulfillQty !== 0);
+
+  // Acceptance criteria: orders with nothing Printful-relevant (no custom/
+  // community SKU and no printful.variant_id metafield on any line item) are
+  // ignored entirely.
+  if (!relevant.length) {
+    console.log('[order-paid] no custom-design or in-house line items on order', order.name, '— ignoring');
+    // This order has nothing for Printful, so any failure record from an
+    // earlier attempt describes a problem that no longer exists.
+    await clearFulfillmentFailure(env, shopifyOrderId, `order ${order.name}`);
+    await releaseClaim();
+    return new Response(JSON.stringify({ ok: true, ignored: true }), { status: 200, headers });
+  }
+
+  // The size -> catalog-variant lookup only matters for custom/community
+  // items — in-house items carry their own resolved Printful sync-variant id
+  // directly via the printful.variant_id metafield, so skip the extra round
+  // trip for orders that don't need it.
+  const needsVariantMap = relevant.some(li => li.cls.type === 'custom');
+  const variantMap = needsVariantMap ? await getPrintfulVariantMap(env) : null;
+  if (needsVariantMap && !variantMap) {
+    console.error('[order-paid] could not load Printful size -> variant map for order', order.name);
+    await releaseClaim();
+    return new Response(JSON.stringify({ error: 'Printful catalog lookup failed' }), { status: 502, headers });
+  }
+
+  const printfulItems = [];
+  const skippedItems = [];
+  for (const li of relevant) {
+    // Checked once here for every classification: an item we can't count is
+    // as unusable as one we can't map, and refusing beats printing a guess.
+    if (li.fulfillQty == null) {
+      console.error('[order-paid] line item has no usable quantity, skipping:', li.sku);
+      skippedItems.push({ sku: li.sku, reason: 'no usable quantity on line item' });
+      continue;
+    }
+    if (li.cls.type === 'custom') {
+      const designUrl = li.product?.metafield?.value;
+      const printfulVariantId = variantMap[li.cls.skuInfo.size];
+      if (!designUrl) {
+        console.error('[order-paid] line item missing design_url metafield, skipping:', li.sku, li.product?.id);
+        skippedItems.push({ sku: li.sku, reason: 'missing design_url metafield' });
+        continue;
+      }
+      if (!printfulVariantId) {
+        console.error('[order-paid] no Printful variant for size, skipping:', li.cls.skuInfo.size, li.sku);
+        skippedItems.push({ sku: li.sku, reason: `no Printful variant for size ${li.cls.skuInfo.size}` });
+        continue;
+      }
+      printfulItems.push({
+        variant_id: printfulVariantId,
+        quantity: li.fulfillQty,
+        // Same files/position shape as the mockup-task call in
+        // handleGenerateMockup above — Printful's order file-attachment shape
+        // mirrors the mockup-generator one.
+        files: [{
+          placement: 'front',
+          image_url: designUrl,
+          position: {
+            area_width:  PRINT_WIDTH,
+            area_height: PRINT_HEIGHT,
+            width:       PRINT_WIDTH,
+            height:      PRINT_HEIGHT,
+            top:  0,
+            left: 0,
+          },
+        }],
+      });
+    } else if (li.cls.type === 'inhouse') {
+      // No files[]: printful.variant_id points at a Printful *sync* variant
+      // (set up via the native catalog-sync app), which already has its
+      // print file attached server-side — unlike custom/community items,
+      // there's no per-order design upload to attach here.
+      printfulItems.push({
+        sync_variant_id: li.cls.printfulVariantId,
+        quantity: li.fulfillQty,
+      });
+    } else if (li.cls.type === 'inhouse-invalid') {
+      console.error('[order-paid] invalid printful.variant_id metafield value, skipping:', li.cls.raw, li.sku);
+      skippedItems.push({ sku: li.sku, reason: `invalid printful.variant_id metafield value: ${li.cls.raw}` });
+    }
+  }
+
+  // All-or-nothing: if *any* Printful-relevant line item had a data problem
+  // (missing/invalid metafield, unmapped size), submit nothing.
+  //
+  // Submitting just the valid subset would silently under-fulfill a paid
+  // order — the customer paid for two shirts and receives one — and because
+  // the success path writes the completed idempotency record, that shortfall
+  // would be permanent: every redelivery afterwards short-circuits on
+  // `alreadyProcessed` and the missing item is never revisited. The only
+  // trace would be a `skipped` field in an R2 object nobody reads.
+  //
+  // Refusing the whole order instead keeps it recoverable: the claim is
+  // released, so once the merchant fixes the offending product's metafield,
+  // Shopify's own redelivery (or a manual replay) fulfills the order
+  // completely. 422 rather than 502 because the upstreams are healthy — it's
+  // the order's own data that needs a human.
+  if (skippedItems.length || !printfulItems.length) {
+    console.error('[order-paid] refusing to partially fulfill order', order.name, '— unusable line items:', JSON.stringify(skippedItems));
+    await recordFulfillmentFailure(env, shopifyOrderId, {
+      shopifyOrderName: order.name,
+      reason: 'unusable line items',
+      detail: 'refused rather than partially fulfilling — fix the offending product/variant metafield, then replay the webhook',
+      skipped: skippedItems,
+    });
+    await releaseClaim();
+    return new Response(JSON.stringify({ error: 'No valid line items', skipped: skippedItems }), { status: 422, headers });
+  }
+
+  const shipping = order.shippingAddress;
+  if (!shipping) {
+    console.error('[order-paid] order has Printful-relevant line items but no shipping address:', order.name);
+    await recordFulfillmentFailure(env, shopifyOrderId, {
+      shopifyOrderName: order.name,
+      reason: 'missing shipping address',
+      detail: 'order has Printful-relevant line items but no shipping address to send them to',
+    });
+    await releaseClaim();
+    return new Response(JSON.stringify({ error: 'Missing shipping address' }), { status: 422, headers });
+  }
+
+  const recipientName = [shipping.firstName, shipping.lastName].filter(Boolean).join(' ')
+    || [order.customer?.firstName, order.customer?.lastName].filter(Boolean).join(' ')
+    || 'Customer';
+
+  const printfulOrderBody = {
+    external_id: `shopify-${shopifyOrderId}`,
+    recipient: {
+      name:         recipientName,
+      address1:     shipping.address1 || '',
+      address2:     shipping.address2 || '',
+      city:         shipping.city || '',
+      state_code:   shipping.provinceCode || shipping.province || '',
+      country_code: shipping.countryCode || '',
+      zip:          shipping.zip || '',
+      phone:        shipping.phone || '',
+      email:        order.email || order.customer?.email || '',
+    },
+    items: printfulItems,
+    // Draft, not auto-confirmed — the merchant reviews it in the Printful
+    // dashboard before it enters production. Per the ticket: don't auto-confirm
+    // orders yet.
+    confirm: false,
+  };
+
+  let printfulJson;
+  // Set when Printful *answered* and its answer was a rejection, as opposed to
+  // the call never completing (DNS/TLS/timeout, or a body that isn't JSON).
+  // The two need different handling — see the catch block.
+  let printfulRejectedWithCode = null;
+  try {
+    const printfulRes = await fetch(`${PRINTFUL_API}/orders`, {
+      method:  'POST',
+      headers: {
+        'Authorization': `Bearer ${env.PRINTFUL_API_KEY}`,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify(printfulOrderBody),
+    });
+    printfulJson = await printfulRes.json();
+    if (printfulJson.code !== 200) {
+      printfulRejectedWithCode = printfulJson.code ?? printfulRes.status;
+      // Only the failure branch surfaces the response body, and only via the
+      // thrown message — see below for why the success response must not be
+      // dumped, and formatPrintfulError() for what gets stripped out of it.
+      throw new Error(formatPrintfulError(printfulJson));
+    }
+    // Log the id and status code, never the whole response: Printful echoes the
+    // full `recipient` block back on success (name, street address, phone,
+    // email), so dumping it here would write a customer's home address into
+    // Cloudflare's logs on every single order.
+    console.log('[order-paid] Printful order-create ok (code', printfulJson.code + ', id', printfulJson.result?.id + ', status', printfulJson.result?.status + ')');
+  } catch (err) {
+    console.error('[order-paid] Printful order creation failed for order', order.name, ':', err.message);
+    // A rejection is not an outage. If Printful answered at all, it evaluated
+    // this specific order and said no — and the reasons it says no are mostly
+    // permanent properties of the order that no number of redeliveries will
+    // change: a state_code Printful won't accept (the recipient mapping above
+    // falls back to the full province name when Shopify has no provinceCode,
+    // which Printful rejects for US/CA), a printful.variant_id holding a
+    // catalog variant id instead of a sync variant id (digits-only, so
+    // classifyLineItem can't catch it), or an external_id a previous delivery
+    // already consumed. Those need the same durable trace as the 422 refusals:
+    // otherwise Shopify exhausts its retries and the paid order is gone with
+    // nothing but a log line, which is the failure mode recordFulfillmentFailure
+    // exists to prevent.
+    //
+    // A call that never completed is different — no verdict was reached, the
+    // next redelivery may well succeed — so it stays unrecorded, as before.
+    if (printfulRejectedWithCode !== null) {
+      await recordFulfillmentFailure(env, shopifyOrderId, {
+        shopifyOrderName: order.name,
+        reason: 'Printful rejected the order',
+        detail: err.message,
+        printfulCode: printfulRejectedWithCode,
+      });
+    }
+    await releaseClaim();
+    return new Response(JSON.stringify({ error: 'Printful order creation failed: ' + err.message }), { status: 502, headers });
+  }
+
+  const printfulOrderId = printfulJson.result?.id;
+  if (printfulOrderId == null) {
+    // Printful accepted the order (code 200) but didn't hand back an id.
+    // Nothing to do about it here — the order *was* created, so we must still
+    // record completion or a redelivery would submit it twice — but flag it,
+    // since the merchant has no id to look the draft up by.
+    console.error('[order-paid] Printful accepted order', order.name, 'but returned no result.id — recording completion anyway to prevent a duplicate submission');
+  }
+  const record = {
+    // Explicit completion marker. Do NOT infer this from printfulOrderId
+    // being present: when Printful returns no result.id (above), that key is
+    // dropped by JSON.stringify, and a record indistinguishable from a claim
+    // with no `claimedAt` is treated as stale by the reclaim path — which
+    // would resubmit the order to Printful a second time.
+    status: 'completed',
+    shopifyOrderId,
+    shopifyOrderName: order.name,
+    printfulOrderId,
+    createdAt: Date.now(),
+    skus: relevant.map(li => li.sku),
+    // Breakdown by classification, so a merchant inspecting this record (or
+    // R2 directly) can tell what kind of order this was without having to
+    // cross-reference SKUs against Printful.
+    lineItemTypes: relevant.reduce((acc, li) => {
+      acc[li.cls.type] = (acc[li.cls.type] || 0) + 1;
+      return acc;
+    }, {}),
+  };
+  // Overwrite the pending claim with the completed record. This is what a
+  // future redelivery's claim attempt (above) finds and short-circuits on.
+  //
+  // Deliberately unconditional, even though a stale-claim reclaim means we
+  // can't be certain we still hold the key. The two failure directions are not
+  // symmetric: writing over someone else's record costs at worst a confusing
+  // record for an order that did reach Printful, whereas *not* writing loses
+  // the only marker that this order was already submitted — and every later
+  // redelivery would then resubmit it. A duplicate Printful order is the more
+  // expensive mistake, so this write always lands.
+  await writeJson(env, idempotencyKey, record).catch((err) => {
+    console.error('[order-paid] failed to persist idempotency record for order', order.name, '— a redelivery could create a duplicate Printful order:', err.message);
+  });
+
+  // Clear any failure record from an earlier refused attempt: this order just
+  // fulfilled completely, so the problem it described is resolved.
+  await clearFulfillmentFailure(env, shopifyOrderId, `order ${order.name}`);
+
+  console.log('[order-paid] created Printful draft order', printfulOrderId, 'for Shopify order', order.name);
+  // No `skipped` on this path: reaching here means nothing was skipped.
+  return new Response(JSON.stringify({ ok: true, printfulOrderId }), { status: 200, headers });
 }
 
 // ── Community handlers ───────────────────────────────────────────────────────
@@ -2422,7 +3297,15 @@ const GC_REFERENCE_CHECKED_PREFIXES = ['designs/', 'mockups/'];
 //     survive a client-side retry window (minutes), not days.
 const GC_AGE_ONLY_PREFIXES = ['product-images/', 'checkouts/', 'create-product-keys/'];
 
-// Deliberately NOT swept, despite being one of the six R2 prefixes this
+// Also deliberately NOT swept: printful-orders/ (order fulfillment idempotency
+// records) and printful-orders-failed/ (orders refused as needing a human —
+// see recordFulfillmentFailure). Both are small JSON objects written at most
+// once per order, and both are load-bearing indefinitely: deleting an
+// idempotency record would let a late Shopify redelivery submit a duplicate
+// Printful order, and deleting a failure record would erase the only durable
+// trace that a paid order never got fulfilled.
+//
+// Deliberately NOT swept, despite being one of the R2 prefixes this
 // product family writes to: shader-states/ backs the standalone "Copy Link"
 // share feature (save-shader-state / get-shader-state, used from
 // homepage-shader-demo.liquid and main-product.liquid) — durable share links
