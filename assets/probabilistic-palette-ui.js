@@ -1,0 +1,728 @@
+// Probabilistic palette editor — mountable UI component.
+//
+//   ProbabilisticPaletteUI.mount(el, { palette: ..., onChange: fn });
+//
+// Self-contained: injects its own stylesheet, owns its DOM, and hands back the
+// edited palette object through onChange. Kept separate from the engine so the
+// engine stays usable headlessly (tests, exports, worker-side rendering) and so
+// this editor can later be dropped into a Shopify section as-is.
+(function () {
+  'use strict';
+
+  var PP = window.ProbabilisticPalette;
+  var STORAGE_KEY = 'brightfield.probabilisticPalettes';
+
+  // ── Styles ────────────────────────────────────────────────────────────────
+  // The tier colors are the load-bearing part: hierarchy has to be readable at
+  // a glance, before anyone reads a single number.
+
+  var CSS = [
+    '.pp{--pp-bg:#141416;--pp-panel:#1c1c20;--pp-line:#2c2c32;--pp-text:#e8e8e6;--pp-dim:#8a8a92;',
+    '--pp-dominant:#f2c14e;--pp-supporting:#6fb3f2;--pp-accent:#b98cf2;--pp-spark:#6fe0b8;',
+    'color:var(--pp-text);font-family:"IBM Plex Mono",Menlo,monospace;font-size:12px;}',
+    '.pp *{box-sizing:border-box;}',
+    '.pp-section{border:1px solid var(--pp-line);border-radius:6px;background:var(--pp-panel);padding:14px;margin-bottom:14px;}',
+    '.pp-section-title{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--pp-dim);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;}',
+    '.pp-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}',
+    '.pp-row:last-child{margin-bottom:0;}',
+    '.pp-label{color:var(--pp-dim);min-width:130px;}',
+    '.pp-val{min-width:74px;text-align:right;font-variant-numeric:tabular-nums;}',
+    '.pp input[type=range]{flex:1;accent-color:#6fb3f2;min-width:80px;}',
+    '.pp input[type=text],.pp input[type=number],.pp select{background:#0f0f11;border:1px solid var(--pp-line);',
+    'color:var(--pp-text);border-radius:4px;padding:5px 7px;font-family:inherit;font-size:12px;min-width:0;}',
+    '.pp input[type=color]{-webkit-appearance:none;appearance:none;width:34px;height:26px;padding:0;border:1px solid var(--pp-line);border-radius:4px;background:none;cursor:pointer;flex:none;}',
+    '.pp input[type=color]::-webkit-color-swatch-wrapper{padding:2px;}',
+    '.pp input[type=color]::-webkit-color-swatch{border:none;border-radius:2px;}',
+    '.pp-btn{background:#26262c;border:1px solid var(--pp-line);color:var(--pp-text);border-radius:4px;',
+    'padding:5px 10px;cursor:pointer;font-family:inherit;font-size:11px;}',
+    '.pp-btn:hover{border-color:#6fb3f2;color:#fff;}',
+    '.pp-btn.pp-danger:hover{border-color:#f2685a;color:#f2685a;}',
+    '.pp-btn-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;}',
+    '.pp-color{border:1px solid var(--pp-line);border-radius:5px;padding:8px;margin-bottom:6px;background:#17171a;',
+    'border-left-width:3px;}',
+    '.pp-color.pp-drag{opacity:.35;}',
+    '.pp-color.pp-over{border-top:2px solid #6fb3f2;}',
+    '.pp-color[data-tier=dominant]{border-left-color:var(--pp-dominant);}',
+    '.pp-color[data-tier=supporting]{border-left-color:var(--pp-supporting);}',
+    '.pp-color[data-tier=accent]{border-left-color:var(--pp-accent);}',
+    '.pp-color[data-tier=spark]{border-left-color:var(--pp-spark);}',
+    '.pp-color-head{display:flex;align-items:center;gap:7px;}',
+    '.pp-grip{cursor:grab;color:#55555e;user-select:none;padding:0 2px;flex:none;}',
+    '.pp-name{flex:1;min-width:60px;}',
+    '.pp-weight{width:58px;text-align:right;flex:none;}',
+    '.pp-pct{min-width:52px;text-align:right;color:var(--pp-dim);font-variant-numeric:tabular-nums;flex:none;}',
+    '.pp-tier{font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;border-radius:3px;flex:none;',
+    'min-width:78px;text-align:center;}',
+    '.pp-tier[data-tier=dominant]{background:rgba(242,193,78,.16);color:var(--pp-dominant);}',
+    '.pp-tier[data-tier=supporting]{background:rgba(111,179,242,.16);color:var(--pp-supporting);}',
+    '.pp-tier[data-tier=accent]{background:rgba(185,140,242,.16);color:var(--pp-accent);}',
+    '.pp-tier[data-tier=spark]{background:rgba(111,224,184,.16);color:var(--pp-spark);}',
+    '.pp-color-bar{margin-top:7px;display:flex;align-items:center;gap:8px;}',
+    '.pp-adv{margin-top:9px;padding-top:9px;border-top:1px dashed var(--pp-line);display:none;}',
+    '.pp-adv.pp-open{display:block;}',
+    '.pp-adv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:7px 12px;}',
+    '.pp-mini{display:flex;align-items:center;gap:6px;}',
+    '.pp-mini label{color:var(--pp-dim);font-size:11px;white-space:nowrap;}',
+    '.pp-mini input,.pp-mini select{flex:1;}',
+    '.pp-strip{display:flex;height:34px;border-radius:4px;overflow:hidden;border:1px solid var(--pp-line);}',
+    '.pp-strip-seg{position:relative;min-width:2px;}',
+    '.pp-strip-labels{display:flex;margin-top:5px;font-size:10px;color:var(--pp-dim);}',
+    '.pp-strip-label{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:4px;}',
+    '.pp-hint{color:var(--pp-dim);font-size:11px;line-height:1.5;}',
+    '.pp-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--pp-dim);font-size:11px;}',
+    '.pp-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--pp-dim);margin-top:10px;}',
+    '.pp-legend span{display:flex;align-items:center;gap:5px;}',
+    '.pp-legend i{width:9px;height:9px;border-radius:2px;display:inline-block;}'
+  ].join('');
+
+  function injectStyles() {
+    if (document.getElementById('pp-styles')) return;
+    var s = document.createElement('style');
+    s.id = 'pp-styles';
+    s.textContent = CSS;
+    document.head.appendChild(s);
+  }
+
+  // ── Small DOM helpers ─────────────────────────────────────────────────────
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function input(type, value, attrs) {
+    var n = document.createElement('input');
+    n.type = type;
+    if (value != null) n.value = value;
+    Object.keys(attrs || {}).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    return n;
+  }
+
+  function select(options, value) {
+    var n = document.createElement('select');
+    options.forEach(function (o) {
+      var opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = o.label;
+      n.appendChild(opt);
+    });
+    n.value = value;
+    return n;
+  }
+
+  function labeled(labelText, control) {
+    var wrap = el('div', 'pp-mini');
+    wrap.appendChild(el('label', null, labelText));
+    wrap.appendChild(control);
+    return wrap;
+  }
+
+  function num(v, fallback) {
+    var n = parseFloat(v);
+    return isFinite(n) ? n : fallback;
+  }
+
+  // ── Copy for the sliders ──────────────────────────────────────────────────
+  // The numbers alone don't tell an author what a setting *does* to the output,
+  // so each slider names the regime it's currently in.
+
+  function inheritanceLabel(v) {
+    if (v < 0.2) return 'confetti — every shape decides alone';
+    if (v < 0.45) return 'loose — small color echoes';
+    if (v < 0.75) return 'balanced color clusters';
+    if (v < 0.92) return 'strong regions';
+    return 'large graphic color fields';
+  }
+
+  function variationLabel(v) {
+    if (v <= 0.001) return 'fixed palette';
+    if (v <= 0.12) return 'subtle variation';
+    if (v <= 0.3) return 'noticeable variation';
+    return 'highly generative';
+  }
+
+  // ── Storage ───────────────────────────────────────────────────────────────
+
+  function loadSaved() {
+    try {
+      var raw = window.localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+
+  function persist(map) {
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(map)); } catch (e) { /* private mode */ }
+  }
+
+  // ── Component ─────────────────────────────────────────────────────────────
+
+  function mount(container, opts) {
+    injectStyles();
+    opts = opts || {};
+    var palette = opts.palette
+      ? JSON.parse(JSON.stringify(opts.palette))
+      : PP.clonePalette(PP.PRESETS['Brightfield / Black 01']);
+    var onChange = opts.onChange || function () {};
+    // Authoring randomness is seeded too, so "Randomize weights" is replayable
+    // and no Math.random call exists anywhere in the feature.
+    var randomizeNonce = 0;
+    var saved = loadSaved();
+
+    container.classList.add('pp');
+    var refreshers = [];   // derived readouts, re-run on every value change
+
+    function emit() { onChange(palette); }
+
+    function changed() { refreshers.forEach(function (f) { f(); }); emit(); }
+
+    function rebuild() {
+      refreshers = [];
+      container.textContent = '';
+      container.appendChild(buildIdentity());
+      container.appendChild(buildPreview());
+      container.appendChild(buildColors());
+      container.appendChild(buildPrint());
+      container.appendChild(buildGeography());
+      changed();
+    }
+
+    // ── Identity / presets ──────────────────────────────────────────────────
+
+    function buildIdentity() {
+      var sec = el('div', 'pp-section');
+      var title = el('div', 'pp-section-title');
+      title.appendChild(el('span', null, 'Palette'));
+      sec.appendChild(title);
+
+      var nameRow = el('div', 'pp-row');
+      nameRow.appendChild(el('span', 'pp-label', 'Name'));
+      var name = input('text', palette.name);
+      name.style.flex = '1';
+      name.addEventListener('input', function () { palette.name = this.value; emit(); });
+      nameRow.appendChild(name);
+      sec.appendChild(nameRow);
+
+      var loadRow = el('div', 'pp-row');
+      loadRow.appendChild(el('span', 'pp-label', 'Load'));
+      var options = [{ label: '— select —', value: '' }]
+        .concat(Object.keys(PP.PRESETS).map(function (k) { return { label: k, value: 'preset:' + k }; }))
+        .concat(Object.keys(saved).map(function (k) { return { label: '★ ' + k, value: 'saved:' + k }; }));
+      var loader = select(options, '');
+      loader.style.flex = '1';
+      loader.addEventListener('change', function () {
+        var v = this.value;
+        if (!v) return;
+        var src = v.indexOf('preset:') === 0
+          ? PP.PRESETS[v.slice(7)]
+          : saved[v.slice(6)];
+        if (!src) return;
+        palette = JSON.parse(JSON.stringify(src));
+        rebuild();
+      });
+      loadRow.appendChild(loader);
+      sec.appendChild(loadRow);
+
+      var btns = el('div', 'pp-btn-row');
+
+      var dup = el('button', 'pp-btn', 'Duplicate palette');
+      dup.addEventListener('click', function () {
+        palette = PP.clonePalette(palette);
+        rebuild();
+      });
+      btns.appendChild(dup);
+
+      var save = el('button', 'pp-btn', 'Save');
+      save.addEventListener('click', function () {
+        var n = window.prompt('Save palette as:', palette.name);
+        if (!n) return;
+        palette.name = n;
+        saved[n] = JSON.parse(JSON.stringify(palette));
+        persist(saved);
+        rebuild();
+      });
+      btns.appendChild(save);
+
+      var del = el('button', 'pp-btn pp-danger', 'Delete saved');
+      del.addEventListener('click', function () {
+        if (!saved[palette.name]) { window.alert('“' + palette.name + '” is not a saved palette.'); return; }
+        if (!window.confirm('Delete saved palette “' + palette.name + '”?')) return;
+        delete saved[palette.name];
+        persist(saved);
+        rebuild();
+      });
+      btns.appendChild(del);
+
+      var copy = el('button', 'pp-btn', 'Copy JSON');
+      copy.addEventListener('click', function () {
+        var json = JSON.stringify(palette, null, 2);
+        if (navigator.clipboard) navigator.clipboard.writeText(json);
+        copy.textContent = 'Copied';
+        window.setTimeout(function () { copy.textContent = 'Copy JSON'; }, 900);
+      });
+      btns.appendChild(copy);
+
+      sec.appendChild(btns);
+      return sec;
+    }
+
+    // ── Proportional preview strip ──────────────────────────────────────────
+
+    function buildPreview() {
+      var sec = el('div', 'pp-section');
+      var title = el('div', 'pp-section-title');
+      title.appendChild(el('span', null, 'Hierarchy'));
+      var seedNote = el('span', null, '');
+      title.appendChild(seedNote);
+      sec.appendChild(title);
+
+      var strip = el('div', 'pp-strip');
+      var labels = el('div', 'pp-strip-labels');
+      sec.appendChild(strip);
+      sec.appendChild(labels);
+
+      var legend = el('div', 'pp-legend');
+      ['dominant', 'supporting', 'accent', 'spark'].forEach(function (t) {
+        var s = el('span');
+        var sw = el('i');
+        sw.style.background = 'var(--pp-' + t + ')';
+        s.appendChild(sw);
+        s.appendChild(el('span', null, PP.TIERS[t].label));
+        legend.appendChild(s);
+      });
+      sec.appendChild(legend);
+
+      refreshers.push(function () {
+        var rows = PP.describe(palette);
+        strip.textContent = '';
+        labels.textContent = '';
+        rows.forEach(function (r) {
+          var seg = el('div', 'pp-strip-seg');
+          seg.style.background = r.color;
+          seg.style.flexGrow = String(Math.max(r.share, 0.002));
+          seg.title = r.name + ' · ' + r.percent + '% · ' + PP.TIERS[r.tier].label;
+          strip.appendChild(seg);
+
+          var lab = el('div', 'pp-strip-label', r.name + ' ' + r.percent + '%');
+          lab.style.flexGrow = String(Math.max(r.share, 0.002));
+          lab.style.flexBasis = '0';
+          lab.style.color = r.color;
+          labels.appendChild(lab);
+        });
+        var exposed = Math.round((1 - (palette.printDensity != null ? palette.printDensity : 1)) * 100);
+        seedNote.textContent = exposed + '% shirt exposed';
+      });
+
+      return sec;
+    }
+
+    // ── Colors ──────────────────────────────────────────────────────────────
+
+    function buildColors() {
+      var sec = el('div', 'pp-section');
+      var title = el('div', 'pp-section-title');
+      title.appendChild(el('span', null, 'Colors'));
+      title.appendChild(el('span', null, palette.colors.length + ' entries'));
+      sec.appendChild(title);
+
+      var list = el('div');
+      sec.appendChild(list);
+      palette.colors.forEach(function (c, i) { list.appendChild(buildColorRow(c, i, list)); });
+
+      var btns = el('div', 'pp-btn-row');
+
+      var add = el('button', 'pp-btn', '+ Add color');
+      add.addEventListener('click', function () {
+        palette.colors.push({
+          id: 'color-' + palette.colors.length,
+          name: 'New Color',
+          color: '#CCCCCC',
+          weight: 10
+        });
+        rebuild();
+      });
+      btns.appendChild(add);
+
+      var rand = el('button', 'pp-btn', 'Randomize weights');
+      rand.addEventListener('click', function () {
+        // Log-uniform draws produce a real hierarchy (one clear lead, a long
+        // tail) instead of the flat mush uniform draws give.
+        var rng = PP.makeRng(PP.deriveSeed(palette.name, 'randomize-weights', randomizeNonce++));
+        palette.colors.forEach(function (c) {
+          c.weight = Math.round(Math.exp(rng() * 3.2) * 10) / 10;
+        });
+        normalizeToHundred();
+        rebuild();
+      });
+      btns.appendChild(rand);
+
+      var norm = el('button', 'pp-btn', 'Normalize');
+      norm.addEventListener('click', function () { normalizeToHundred(); rebuild(); });
+      btns.appendChild(norm);
+
+      sec.appendChild(btns);
+      sec.appendChild(el('div', 'pp-hint',
+        'Weights normalize automatically — they never have to add up to 100. Normalize just rewrites them as percentages.'));
+      return sec;
+    }
+
+    function normalizeToHundred() {
+      var shares = PP.paletteShares(palette.colors);
+      palette.colors.forEach(function (c, i) { c.weight = Math.round(shares[i] * 1000) / 10; });
+    }
+
+    function buildColorRow(c, index, list) {
+      var row = el('div', 'pp-color');
+      row.draggable = true;
+      row.dataset.index = String(index);
+
+      var head = el('div', 'pp-color-head');
+
+      var grip = el('span', 'pp-grip', '⠿');
+      grip.title = 'Drag to reorder';
+      head.appendChild(grip);
+
+      var swatch = input('color', c.color);
+      swatch.addEventListener('input', function () { c.color = this.value.toUpperCase(); changed(); });
+      head.appendChild(swatch);
+
+      var name = input('text', c.name || '');
+      name.className = 'pp-name';
+      name.placeholder = 'Color name';
+      name.addEventListener('input', function () { c.name = this.value; changed(); });
+      head.appendChild(name);
+
+      var tier = el('span', 'pp-tier');
+      head.appendChild(tier);
+
+      var pct = el('span', 'pp-pct');
+      head.appendChild(pct);
+
+      var advBtn = el('button', 'pp-btn', 'Rules');
+      head.appendChild(advBtn);
+
+      var dupBtn = el('button', 'pp-btn', 'Copy');
+      dupBtn.title = 'Duplicate this color';
+      dupBtn.addEventListener('click', function () {
+        var copy = JSON.parse(JSON.stringify(c));
+        copy.id = (copy.id || 'color') + '-copy';
+        copy.name = (copy.name || 'Color') + ' copy';
+        palette.colors.splice(index + 1, 0, copy);
+        rebuild();
+      });
+      head.appendChild(dupBtn);
+
+      var delBtn = el('button', 'pp-btn pp-danger', '×');
+      delBtn.title = 'Remove this color';
+      delBtn.addEventListener('click', function () {
+        palette.colors.splice(index, 1);
+        rebuild();
+      });
+      head.appendChild(delBtn);
+
+      row.appendChild(head);
+
+      // weight slider + numeric field
+      var bar = el('div', 'pp-color-bar');
+      var slider = input('range', c.weight, { min: '0', max: '100', step: '0.5' });
+      var weightNum = input('number', c.weight, { min: '0', step: '0.5' });
+      weightNum.className = 'pp-weight';
+      slider.addEventListener('input', function () {
+        c.weight = num(this.value, 0);
+        weightNum.value = c.weight;
+        changed();
+      });
+      weightNum.addEventListener('input', function () {
+        c.weight = Math.max(0, num(this.value, 0));
+        slider.value = Math.min(100, c.weight);
+        changed();
+      });
+      bar.appendChild(slider);
+      bar.appendChild(weightNum);
+      row.appendChild(bar);
+
+      // ── Advanced rules: geometry, spatial ends, spark conditions ──────────
+      var adv = el('div', 'pp-adv');
+      advBtn.addEventListener('click', function () { adv.classList.toggle('pp-open'); });
+      var grid = el('div', 'pp-adv-grid');
+
+      var curveKey = 'none';
+      Object.keys(PP.SIZE_CURVE_PRESETS).forEach(function (k) {
+        if (JSON.stringify(PP.SIZE_CURVE_PRESETS[k]) === JSON.stringify(c.sizeCurve || null)) curveKey = k;
+      });
+      var sizeSel = select([
+        { label: 'Any size', value: 'none' },
+        { label: 'Favor large', value: 'large' },
+        { label: 'Favor medium', value: 'medium' },
+        { label: 'Favor small', value: 'small' },
+        { label: 'Favor tiny', value: 'tiny' },
+        { label: 'Custom curve', value: 'custom' }
+      ], c.sizeCurve && curveKey === 'none' ? 'custom' : curveKey);
+      sizeSel.addEventListener('change', function () {
+        if (this.value === 'custom') return;   // leave a hand-written curve alone
+        var preset = PP.SIZE_CURVE_PRESETS[this.value];
+        if (preset) c.sizeCurve = JSON.parse(JSON.stringify(preset));
+        else delete c.sizeCurve;
+        changed();
+      });
+      grid.appendChild(labeled('Size bias', sizeSel));
+
+      var spatialNear = input('number', c.spatial ? c.spatial[0] : c.weight, { min: '0', step: '1' });
+      var spatialFar = input('number', c.spatial ? c.spatial[1] : c.weight, { min: '0', step: '1' });
+      function writeSpatial() {
+        c.spatial = [Math.max(0, num(spatialNear.value, 0)), Math.max(0, num(spatialFar.value, 0))];
+        changed();
+      }
+      spatialNear.addEventListener('input', writeSpatial);
+      spatialFar.addEventListener('input', writeSpatial);
+      grid.appendChild(labeled('Weight at start', spatialNear));
+      grid.appendChild(labeled('Weight at end', spatialFar));
+
+      var sparkChk = input('checkbox');
+      sparkChk.checked = !!c.spark;
+      sparkChk.addEventListener('change', function () {
+        c.spark = this.checked;
+        // A spark that drifts with the seed stops feeling rare — lock its share
+        // by default when the flag goes on.
+        if (this.checked && c.variationScale == null) c.variationScale = 0;
+        changed();
+      });
+      grid.appendChild(labeled('Spark color', sparkChk));
+
+      var lockChk = input('checkbox');
+      lockChk.checked = c.variationScale === 0;
+      lockChk.addEventListener('change', function () {
+        if (this.checked) c.variationScale = 0; else delete c.variationScale;
+        changed();
+      });
+      grid.appendChild(labeled('Lock weight', lockChk));
+
+      var cond = c.conditions || {};
+      function writeCond(key, value) {
+        c.conditions = c.conditions || {};
+        if (value == null || value === '' || !isFinite(value)) delete c.conditions[key];
+        else c.conditions[key] = value;
+        if (!Object.keys(c.conditions).length) delete c.conditions;
+        changed();
+      }
+
+      var maxSize = input('number', cond.maxSize != null ? cond.maxSize : '', { min: '0', max: '1', step: '0.05', placeholder: 'any' });
+      maxSize.addEventListener('input', function () { writeCond('maxSize', this.value === '' ? null : num(this.value, null)); });
+      grid.appendChild(labeled('Only size ≤', maxSize));
+
+      var minSize = input('number', cond.minSize != null ? cond.minSize : '', { min: '0', max: '1', step: '0.05', placeholder: 'any' });
+      minSize.addEventListener('input', function () { writeCond('minSize', this.value === '' ? null : num(this.value, null)); });
+      grid.appendChild(labeled('Only size ≥', minSize));
+
+      var maxShare = input('number', cond.maxShare != null ? cond.maxShare : '', { min: '0', max: '1', step: '0.01', placeholder: 'none' });
+      maxShare.addEventListener('input', function () { writeCond('maxShare', this.value === '' ? null : num(this.value, null)); });
+      grid.appendChild(labeled('Max share of shapes', maxShare));
+
+      var afterSel = select([{ label: 'any', value: '' }].concat(palette.colors.map(function (o) {
+        return { label: o.name || o.color, value: o.color };
+      })), cond.afterColor || '');
+      afterSel.addEventListener('change', function () {
+        c.conditions = c.conditions || {};
+        if (this.value) c.conditions.afterColor = this.value; else delete c.conditions.afterColor;
+        if (!Object.keys(c.conditions).length) delete c.conditions;
+        changed();
+      });
+      grid.appendChild(labeled('Only after', afterSel));
+
+      var region = cond.region || {};
+      var regionSel = select([
+        { label: 'anywhere', value: '' },
+        { label: 'top half', value: 'top' },
+        { label: 'bottom half', value: 'bottom' },
+        { label: 'left half', value: 'left' },
+        { label: 'right half', value: 'right' },
+        { label: 'center', value: 'center' },
+        { label: 'outer ring', value: 'outer' }
+      ], regionKeyOf(region));
+      regionSel.addEventListener('change', function () {
+        c.conditions = c.conditions || {};
+        var r = REGION_PRESETS[this.value];
+        if (r) c.conditions.region = JSON.parse(JSON.stringify(r)); else delete c.conditions.region;
+        if (!Object.keys(c.conditions).length) delete c.conditions;
+        changed();
+      });
+      grid.appendChild(labeled('Only in region', regionSel));
+
+      adv.appendChild(grid);
+      adv.appendChild(el('div', 'pp-hint',
+        'Start/end weights apply when spatial probability is on — they are the weights at each end of the field. Conditions gate the color out entirely when unmet.'));
+      row.appendChild(adv);
+
+      // drag reorder
+      row.addEventListener('dragstart', function (e) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(index));
+        row.classList.add('pp-drag');
+      });
+      row.addEventListener('dragend', function () { row.classList.remove('pp-drag'); });
+      row.addEventListener('dragover', function (e) { e.preventDefault(); row.classList.add('pp-over'); });
+      row.addEventListener('dragleave', function () { row.classList.remove('pp-over'); });
+      row.addEventListener('drop', function (e) {
+        e.preventDefault();
+        row.classList.remove('pp-over');
+        var from = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        var to = index;
+        if (isNaN(from) || from === to) return;
+        var moved = palette.colors.splice(from, 1)[0];
+        palette.colors.splice(to, 0, moved);
+        rebuild();
+      });
+
+      refreshers.push(function () {
+        var shares = PP.paletteShares(palette.colors);
+        var t = PP.classifyTier(shares[index], c);
+        row.dataset.tier = t;
+        tier.dataset.tier = t;
+        tier.textContent = PP.TIERS[t].label;
+        pct.textContent = (Math.round(shares[index] * 1000) / 10) + '%';
+        swatch.value = c.color;
+      });
+
+      return row;
+    }
+
+    var REGION_PRESETS = {
+      top:    { yMax: 0.5 },
+      bottom: { yMin: 0.5 },
+      left:   { xMax: 0.5 },
+      right:  { xMin: 0.5 },
+      center: { rMax: 0.45 },
+      outer:  { rMin: 0.6 }
+    };
+
+    function regionKeyOf(region) {
+      var keys = Object.keys(REGION_PRESETS);
+      for (var i = 0; i < keys.length; i++) {
+        if (JSON.stringify(REGION_PRESETS[keys[i]]) === JSON.stringify(region)) return keys[i];
+      }
+      return '';
+    }
+
+    // ── Print density & inheritance ─────────────────────────────────────────
+
+    function buildPrint() {
+      var sec = el('div', 'pp-section');
+      var title = el('div', 'pp-section-title');
+      title.appendChild(el('span', null, 'Ink & clustering'));
+      sec.appendChild(title);
+
+      sec.appendChild(slider('Print density', 'printDensity', 0, 1, 0.01, function (v) {
+        return Math.round(v * 100) + '%';
+      }, function (v) {
+        return 'Black shirt exposed: ' + Math.round((1 - v) * 100) + '% — unprinted areas are left transparent, never inked black.';
+      }));
+
+      sec.appendChild(slider('Color inheritance', 'inheritance', 0, 1, 0.01, function (v) {
+        return Math.round(v * 100) + '%';
+      }, function (v) { return inheritanceLabel(v); }));
+
+      return sec;
+    }
+
+    // ── Geography: spatial + generative weights ─────────────────────────────
+
+    function buildGeography() {
+      var sec = el('div', 'pp-section');
+      var title = el('div', 'pp-section-title');
+      title.appendChild(el('span', null, 'Geography & variation'));
+      sec.appendChild(title);
+
+      var spatialRow = el('div', 'pp-row');
+      var spatialChk = input('checkbox');
+      spatialChk.checked = !!(palette.spatial && palette.spatial.enabled);
+      var spatialLabel = el('label', 'pp-toggle');
+      spatialLabel.appendChild(spatialChk);
+      spatialLabel.appendChild(el('span', null, 'Spatial probability'));
+      spatialRow.appendChild(spatialLabel);
+
+      var modeSel = select(Object.keys(PP.SPATIAL_MODES).map(function (k) {
+        return { label: PP.SPATIAL_MODES[k].label, value: k };
+      }), (palette.spatial && palette.spatial.mode) || 'top-bottom');
+      modeSel.addEventListener('change', function () {
+        palette.spatial = palette.spatial || {};
+        palette.spatial.mode = this.value;
+        changed();
+      });
+      spatialChk.addEventListener('change', function () {
+        palette.spatial = palette.spatial || { mode: 'top-bottom' };
+        palette.spatial.enabled = this.checked;
+        changed();
+      });
+      spatialRow.appendChild(modeSel);
+      sec.appendChild(spatialRow);
+      sec.appendChild(el('div', 'pp-hint',
+        'Probabilities are interpolated across the canvas — not the colors themselves. Each shape stays a discrete palette color while the composition drifts between color families. Set each color’s start/end weights under Rules.'));
+
+      var geoRow = el('div', 'pp-row');
+      geoRow.style.marginTop = '10px';
+      var geoChk = input('checkbox');
+      geoChk.checked = palette.geometryEnabled !== false;
+      var geoLabel = el('label', 'pp-toggle');
+      geoLabel.appendChild(geoChk);
+      geoLabel.appendChild(el('span', null, 'Geometry-aware color (shape size)'));
+      geoChk.addEventListener('change', function () { palette.geometryEnabled = this.checked; changed(); });
+      geoRow.appendChild(geoLabel);
+      sec.appendChild(geoRow);
+
+      var genRow = el('div', 'pp-row');
+      genRow.style.marginTop = '10px';
+      var genChk = input('checkbox');
+      genChk.checked = !!palette.generativeWeights;
+      var genLabel = el('label', 'pp-toggle');
+      genLabel.appendChild(genChk);
+      genLabel.appendChild(el('span', null, 'Generative weights'));
+      genChk.addEventListener('change', function () { palette.generativeWeights = this.checked; changed(); });
+      genRow.appendChild(genLabel);
+      sec.appendChild(genRow);
+
+      sec.appendChild(slider('Weight variation', 'weightVariation', 0, 0.5, 0.01, function (v) {
+        return Math.round(v * 100) + '%';
+      }, function (v) { return variationLabel(v); }));
+
+      return sec;
+    }
+
+    // Generic labeled slider bound to a top-level palette key.
+    function slider(labelText, key, min, max, step, fmt, hint) {
+      var wrap = el('div');
+      var row = el('div', 'pp-row');
+      row.appendChild(el('span', 'pp-label', labelText));
+      var value = palette[key] != null ? palette[key] : min;
+      var ctrl = input('range', value, { min: String(min), max: String(max), step: String(step) });
+      var out = el('span', 'pp-val', fmt(value));
+      var note = el('div', 'pp-hint', hint ? hint(value) : '');
+      ctrl.addEventListener('input', function () {
+        palette[key] = num(this.value, min);
+        out.textContent = fmt(palette[key]);
+        if (hint) note.textContent = hint(palette[key]);
+        changed();
+      });
+      row.appendChild(ctrl);
+      row.appendChild(out);
+      wrap.appendChild(row);
+      if (hint) wrap.appendChild(note);
+      return wrap;
+    }
+
+    rebuild();
+
+    return {
+      getPalette: function () { return palette; },
+      setPalette: function (p) { palette = JSON.parse(JSON.stringify(p)); rebuild(); },
+      refresh: rebuild
+    };
+  }
+
+  window.ProbabilisticPaletteUI = {
+    mount: mount,
+    STORAGE_KEY: STORAGE_KEY,
+    inheritanceLabel: inheritanceLabel,
+    variationLabel: variationLabel
+  };
+})();

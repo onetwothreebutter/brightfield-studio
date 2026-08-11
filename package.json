@@ -8,6 +8,7 @@
     "test:watch": "vitest",
     "test-shaders": "{ sleep 1 && open http://localhost:3001/test-shaders.html; } & npx serve . --listen 3001",
     "palette-viewer": "{ sleep 1 && open http://localhost:3002/palette-viewer.html; } & npx serve . --listen 3002",
+    "palette-lab": "{ sleep 1 && open http://localhost:3003/palette-lab.html; } & npx serve . --listen 3003",
     "test:e2e": "playwright test",
     "remove-bg": "node --env-file=worker/.env worker/process-product-images.mjs"
   },

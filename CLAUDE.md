@@ -9,6 +9,7 @@
 ## Dev commands
 - Dev preview: `npm run dev` → `shopify theme dev --store brightfield-2.myshopify.com`
 - Manual push: `npm run push` → `shopify theme push --store brightfield-2.myshopify.com`
+- Palette lab: `npm run palette-lab` → probabilistic palette editor + sample grid at `palette-lab.html`
 
 ## Architecture
 - Shopify theme (custom, no base theme)
@@ -151,3 +152,55 @@ Always use bold: `ctx.font = 'bold ' + fontSize + 'px ' + fontFamily`
 5. Add the shader to `test-shaders.html`
 
 **Checklist before submitting:** confirm `u_vignette_top`, `u_vignette_bottom`, `u_vignette_left`, `u_vignette_right`, `u_pos_x`, `u_pos_y`, `u_scale` are in the Finish section controls AND declared as GLSL uniforms + `setup()` locations + `render()` calls. See "Finish section — standard controls" above.
+
+## Probabilistic color palettes
+
+A palette is a *color system*, not a list to pick from uniformly: a vocabulary
+(which colors), a hierarchy (how likely each one is), a geography (how those
+odds shift across the canvas and with shape size), and controlled seed-driven
+variation. Separate from the shader system — these run on the CPU and can drive
+any generative algorithm.
+
+### Key files
+- `assets/probabilistic-palette.js` — engine (`window.ProbabilisticPalette`). DOM-free and renderer-free.
+- `assets/probabilistic-palette-ui.js` — mountable editor (`ProbabilisticPaletteUI.mount(el, { palette, onChange })`); injects its own styles.
+- `assets/probabilistic-palette-demo.js` — two reference generators (subdivision, scatter) that consume the engine.
+- `palette-lab.html` — editor + preview + 25–50 thumbnail sample grid (`npm run palette-lab`).
+- `test/probabilistic-palette.test.js` — determinism, distribution, spatial, geometry, spark and preset coverage.
+
+### Rules
+- **Never `Math.random()`** — every probabilistic decision goes through `makeRng(seed)` / `deriveSeed(seed, ...tags)`. Same seed + geometry + palette + settings ⇒ identical output. A test asserts no call sites exist.
+- **Weights auto-normalize** — `39/25/17` and `0.39/0.25/0.17` are the same palette. Never require them to sum to 1.
+- **Never ink black to make black areas.** Unprinted shapes return `{ printed: false, color: null }` and are simply not drawn, so the shirt shows through. Print density is its own control, not a palette color.
+- **Interpolate probabilities, not RGB.** Spatial weights are per-color `spatial: [wStart, wEnd]` pairs interpolated across the field; every shape keeps a discrete palette color.
+
+### Driving an algorithm
+```javascript
+var assigner = ProbabilisticPalette.createAssigner(palette, { seed: seed, totalShapes: shapes.length });
+shapes.forEach(function (s, i) {
+  var a = assigner.assign({ index: i, x: s.x, y: s.y, size: s.size, parentIndex: s.parentIndex });
+  if (!a.printed) return;          // leave transparent — shirt shows through
+  ctx.fillStyle = a.color;
+});
+```
+`x`, `y` and `size` are normalized 0–1 (`size` is the shape's rank within its own
+composition). `parentIndex` is what makes inheritance read as regions rather
+than noise — pass it whenever the algorithm has a real parent/neighbor.
+
+### Adding a preset
+Data only, no engine change:
+```javascript
+ProbabilisticPalette.registerPreset(ProbabilisticPalette.createPalette({
+  id: 'brightfield-black-04', name: 'Brightfield / Black 04',
+  printDensity: 0.68, inheritance: 0.65, weightVariation: 0.10, generativeWeights: true,
+  colors: [
+    { id: 'bone', name: 'Bone', color: '#EFE6D2', weight: 40, spatial: [55, 20],
+      sizeCurve: ProbabilisticPalette.SIZE_CURVE_PRESETS.large },
+    { id: 'spark', name: 'Spark', color: '#69CDB5', weight: 2, spark: true, variationScale: 0,
+      conditions: { maxSize: 0.35, maxShare: 0.05 } }
+  ]
+}));
+```
+Sparks should set `variationScale: 0` (locks the share so the seed can't inflate
+it) plus at least one condition — `maxSize`, `minSize`, `region`, `afterColor`,
+or `maxShare` — so they read as a find rather than a texture.

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Probabilistic Palette Lab</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #111;
+    color: #eee;
+    font-family: 'IBM Plex Mono', 'Menlo', monospace;
+    font-size: 12px;
+    padding: 24px 28px 64px;
+  }
+
+  h1 {
+    font-size: 16px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .subtitle { color: #666; margin-bottom: 24px; line-height: 1.6; max-width: 900px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(420px, 560px) 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  @media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel {
+    border: 1px solid #2c2c32;
+    border-radius: 6px;
+    background: #1c1c20;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+
+  .panel h2 {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #8a8a92;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .ctl { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .ctl label { color: #8a8a92; min-width: 108px; }
+  .ctl input[type=text], .ctl input[type=number], .ctl select {
+    background: #0f0f11; border: 1px solid #2c2c32; color: #eee;
+    border-radius: 4px; padding: 5px 7px; font-family: inherit; font-size: 12px;
+  }
+  .ctl input[type=range] { flex: 1; accent-color: #6fb3f2; }
+  .ctl output { min-width: 52px; text-align: right; color: #8a8a92; font-variant-numeric: tabular-nums; }
+
+  button {
+    background: #26262c; border: 1px solid #2c2c32; color: #eee;
+    border-radius: 4px; padding: 6px 11px; cursor: pointer;
+    font-family: inherit; font-size: 11px;
+  }
+  button:hover { border-color: #6fb3f2; color: #fff; }
+  .btn-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+
+  #preview {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    display: block;
+    border-radius: 4px;
+    background: #0d0d0f;
+  }
+
+  .samples {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 8px;
+  }
+  .samples canvas {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    display: block;
+    border-radius: 3px;
+    border: 1px solid #2c2c32;
+    cursor: pointer;
+    background: #0d0d0f;
+  }
+  .samples canvas:hover { border-color: #6fb3f2; }
+  .samples canvas.active { border-color: #f2c14e; }
+
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 3px 4px; }
+  th { color: #55555e; font-weight: normal; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+  td:first-child, th:first-child { text-align: left; }
+  .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  .hint { color: #666; font-size: 11px; line-height: 1.5; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<h1>Probabilistic Palette Lab</h1>
+<p class="subtitle">
+  Colors are chosen by weight, not uniformly. Unprinted areas are left transparent so the black shirt shows
+  through — black is never inked. Every decision runs on the seeded RNG, so the same seed, geometry and palette
+  always reproduce the same artwork. Judge a palette by the sample grid, not by one image.
+</p>
+
+<div class="layout">
+
+  <div>
+    <div id="editor"></div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h2><span>Preview</span><span id="preview-meta"></span></h2>
+      <div class="ctl">
+        <label for="seed">Seed</label>
+        <input type="text" id="seed" value="brightfield-001" style="flex:1">
+        <button id="reseed">New seed</button>
+      </div>
+      <div class="ctl">
+        <label for="algo">Algorithm</label>
+        <select id="algo" style="flex:1">
+          <option value="subdivision">Subdivision</option>
+          <option value="scatter">Scatter</option>
+        </select>
+      </div>
+      <div class="ctl">
+        <label for="detail">Detail</label>
+        <input type="range" id="detail" min="2" max="8" step="1" value="6">
+        <output id="detail-out">6</output>
+      </div>
+      <canvas id="preview" width="800" height="1000"></canvas>
+    </div>
+
+    <div class="panel">
+      <h2><span>Observed distribution</span><span id="dist-meta"></span></h2>
+      <table id="dist"></table>
+      <p class="hint">
+        Target is the seed-varied weight the palette asked for; observed is what this composition actually
+        produced after inheritance, size rules and spark caps. The two drift apart as inheritance rises —
+        clustering amplifies whichever color lands first in a region — so read a palette from the sample
+        grid, not from one composition's numbers.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h2><span>Generate samples</span><span id="samples-meta"></span></h2>
+      <div class="ctl">
+        <label for="count">Thumbnails</label>
+        <input type="range" id="count" min="25" max="50" step="1" value="36">
+        <output id="count-out">36</output>
+        <button id="regen">Generate</button>
+      </div>
+      <div class="samples" id="samples"></div>
+      <p class="hint">Click any thumbnail to load its seed into the preview above.</p>
+    </div>
+  </div>
+
+</div>
+
+<script src="assets/probabilistic-palette.js"></script>
+<script src="assets/probabilistic-palette-demo.js"></script>
+<script src="assets/probabilistic-palette-ui.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var PP = window.ProbabilisticPalette;
+  var Demo = window.ProbabilisticPaletteDemo;
+
+  var palette = PP.clonePalette(PP.PRESETS['Brightfield / Black 01'], 'Brightfield / Black 01');
+  var seed = document.getElementById('seed').value;
+  var algorithm = 'subdivision';
+  var detail = 6;
+  var sampleSeeds = [];
+
+  var previewCanvas = document.getElementById('preview');
+  var previewCtx = previewCanvas.getContext('2d');
+
+  // Geometry opts are derived from the detail slider per algorithm — the same
+  // control reads as "how busy is this" in both.
+  function geometryOpts(s) {
+    return algorithm === 'scatter'
+      ? { seed: s, count: 20 + detail * 22 }
+      : { seed: s, depth: detail };
+  }
+
+  function drawPreview() {
+    var shapes = Demo.generate(algorithm, geometryOpts(seed));
+    var assigner = Demo.render(previewCtx, shapes, palette, {
+      seed: seed,
+      width: previewCanvas.width,
+      height: previewCanvas.height
+    });
+    document.getElementById('preview-meta').textContent =
+      shapes.length + ' shapes · ' + assigner.stats.printedCount + ' printed';
+    drawDistribution(assigner);
+  }
+
+  function drawDistribution(assigner) {
+    var target = assigner.shares();
+    var observed = assigner.tally();
+    var table = document.getElementById('dist');
+    table.textContent = '';
+
+    var head = document.createElement('tr');
+    ['Color', 'Base', 'Target', 'Observed'].forEach(function (h) {
+      var th = document.createElement('th');
+      th.textContent = h;
+      head.appendChild(th);
+    });
+    table.appendChild(head);
+
+    var base = PP.paletteShares(palette.colors);
+    palette.colors.forEach(function (c, i) {
+      var tr = document.createElement('tr');
+      var name = document.createElement('td');
+      var sw = document.createElement('span');
+      sw.className = 'sw';
+      sw.style.background = c.color;
+      name.appendChild(sw);
+      name.appendChild(document.createTextNode(c.name || c.color));
+      tr.appendChild(name);
+      [base[i], target[i], observed[i]].forEach(function (v) {
+        var td = document.createElement('td');
+        td.textContent = (Math.round(v * 1000) / 10).toFixed(1) + '%';
+        tr.appendChild(td);
+      });
+      table.appendChild(tr);
+    });
+
+    document.getElementById('dist-meta').textContent =
+      palette.generativeWeights ? 'generative weights on' : 'fixed weights';
+  }
+
+  function drawSamples() {
+    var host = document.getElementById('samples');
+    var count = parseInt(document.getElementById('count').value, 10);
+    host.textContent = '';
+    sampleSeeds = [];
+
+    // Sample seeds are themselves derived from the base seed, so the whole
+    // grid is reproducible — reopening the lab with the same seed shows the
+    // same family of outputs.
+    var rng = PP.makeRng(PP.deriveSeed(seed, 'sample-grid'));
+    for (var i = 0; i < count; i++) {
+      var s = 'sample-' + Math.floor(rng() * 1e9).toString(36);
+      sampleSeeds.push(s);
+      host.appendChild(makeThumb(s));
+    }
+    document.getElementById('samples-meta').textContent = count + ' seeds';
+  }
+
+  function makeThumb(s) {
+    var c = document.createElement('canvas');
+    c.width = 200;
+    c.height = 250;
+    c.title = s;
+    var shapes = Demo.generate(algorithm, geometryOpts(s));
+    Demo.render(c.getContext('2d'), shapes, palette, { seed: s, width: c.width, height: c.height });
+    c.addEventListener('click', function () {
+      seed = s;
+      document.getElementById('seed').value = s;
+      Array.prototype.forEach.call(document.querySelectorAll('.samples canvas'), function (n) {
+        n.classList.remove('active');
+      });
+      c.classList.add('active');
+      drawPreview();
+    });
+    return c;
+  }
+
+  function redrawAll() {
+    drawPreview();
+    drawSamples();
+  }
+
+  // ── Editor ────────────────────────────────────────────────────────────────
+
+  window.ProbabilisticPaletteUI.mount(document.getElementById('editor'), {
+    palette: palette,
+    onChange: function (p) {
+      palette = p;
+      redrawAll();
+    }
+  });
+
+  // ── Controls ──────────────────────────────────────────────────────────────
+
+  document.getElementById('seed').addEventListener('input', function () {
+    seed = this.value;
+    redrawAll();
+  });
+
+  document.getElementById('reseed').addEventListener('click', function () {
+    // Walks a deterministic chain off the current seed rather than reaching for
+    // Math.random — the sequence of "new seed" clicks is itself reproducible.
+    var rng = PP.makeRng(PP.deriveSeed(seed, 'reseed'));
+    seed = 'bf-' + Math.floor(rng() * 1e9).toString(36);
+    document.getElementById('seed').value = seed;
+    redrawAll();
+  });
+
+  document.getElementById('algo').addEventListener('change', function () {
+    algorithm = this.value;
+    redrawAll();
+  });
+
+  document.getElementById('detail').addEventListener('input', function () {
+    detail = parseInt(this.value, 10);
+    document.getElementById('detail-out').textContent = detail;
+    redrawAll();
+  });
+
+  document.getElementById('count').addEventListener('input', function () {
+    document.getElementById('count-out').textContent = this.value;
+  });
+
+  document.getElementById('regen').addEventListener('click', drawSamples);
+
+  redrawAll();
+})();
+</script>
+
+</body>
+</html>
