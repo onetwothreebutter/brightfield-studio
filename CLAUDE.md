@@ -6,6 +6,17 @@
 - Merge via PR: `gh pr create` after pushing the branch
 - Never run `shopify theme push` automatically — wait for the user to verify locally first, then ask
 
+### PR descriptions
+Follow `docs/pr-descriptions.md`. Sections, in order, dropping any that don't apply:
+**Problem** (or Context) → **Change** → **Notes** → **Not done here** → **Testing**.
+
+Non-negotiable:
+- Explain why the *obvious* fix doesn't work whenever one exists — that paragraph is the point of the description.
+- For shader/visual changes, state explicitly whether existing designs render identically at default values.
+- **Not done here** is required if anything is deferred (manual admin steps, secrets, follow-ups).
+- Testing shows the real command and counts (`npm test` — 569 passed, 19 files). If local visual verification hasn't happened, say so — never imply it did.
+- Don't restate the diff file by file.
+
 ## Dev commands
 - Dev preview: `npm run dev` → `shopify theme dev --store brightfield-2.myshopify.com`
 - Manual push: `npm run push` → `shopify theme push --store brightfield-2.myshopify.com`
