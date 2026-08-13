@@ -204,3 +204,37 @@ ProbabilisticPalette.registerPreset(ProbabilisticPalette.createPalette({
 Sparks should set `variationScale: 0` (locks the share so the seed can't inflate
 it) plus at least one condition — `maxSize`, `minSize`, `region`, `afterColor`,
 or `maxShare` — so they read as a find rather than a texture.
+
+### Importing a palette
+Hex lists only — no image extraction, no network fetch. In the palette lab hit
+**Import**, paste, and check the swatch readout before committing:
+
+- Any separator works (comma, newline, space, hyphen), so a Coolors URL pastes
+  as-is: `https://coolors.co/palette/606c38-283618-fefae0-dda15e-bc6c25`.
+- Bare `606c38` parses; `#abc` shorthand expands, but bare `abc` is rejected on
+  purpose so words in pasted prose don't become colors.
+- **Replace palette** rebuilds from the paste; **Add to palette** appends the
+  new hexes below the current hierarchy at low weight, skipping duplicates.
+
+Headless equivalent:
+```javascript
+var hexes = ProbabilisticPalette.parseHexList(pasted);          // → ['#606C38', …]
+var palette = ProbabilisticPalette.paletteFromHexList(hexes, { name: 'Olive 01' });
+```
+`paletteFromHexList` assigns weights by a geometric ramp in **paste order** (each
+color ~⅔ of the one before), so order the paste dominant → rarest. With 4+
+colors the last entry becomes the spark at a fixed 3%. Both functions are pure
+and deterministic — same input, same palette.
+
+### Promoting an import to a committed preset
+1. Import, then tune in the lab against the sample grid.
+2. **Copy JSON** in the editor.
+3. Paste it as a `registerPreset(createPalette({ ... }))` block in
+   `assets/probabilistic-palette.js`, after the existing presets and before the
+   export map.
+4. Replace the generated `id` with a stable kebab one (`brightfield-black-04`)
+   and use a `Brightfield / …` name — `PRESETS` is keyed by **name**, and
+   `registerPreset` silently overwrites a duplicate.
+5. Add a `description`.
+6. `npm test` — the preset loop in `test/probabilistic-palette.test.js` validates
+   any newly registered preset automatically.

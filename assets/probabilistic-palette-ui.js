@@ -37,7 +37,14 @@
     'padding:5px 10px;cursor:pointer;font-family:inherit;font-size:11px;}',
     '.pp-btn:hover{border-color:#6fb3f2;color:#fff;}',
     '.pp-btn.pp-danger:hover{border-color:#f2685a;color:#f2685a;}',
+    '.pp-btn[disabled]{opacity:.38;cursor:not-allowed;border-color:var(--pp-line);color:var(--pp-dim);}',
     '.pp-btn-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;}',
+    '.pp-import{display:none;margin-top:12px;padding-top:11px;border-top:1px dashed var(--pp-line);}',
+    '.pp-import.pp-open{display:block;}',
+    '.pp-import textarea{width:100%;height:70px;resize:vertical;background:#0f0f11;border:1px solid var(--pp-line);',
+    'color:var(--pp-text);border-radius:4px;padding:6px 7px;font-family:inherit;font-size:12px;}',
+    '.pp-swatches{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0 4px;min-height:18px;}',
+    '.pp-swatches i{width:18px;height:18px;border-radius:3px;display:inline-block;border:1px solid var(--pp-line);}',
     '.pp-color{border:1px solid var(--pp-line);border-radius:5px;padding:8px;margin-bottom:6px;background:#17171a;',
     'border-left-width:3px;}',
     '.pp-color.pp-drag{opacity:.35;}',
@@ -191,6 +198,9 @@
     // ── Identity / presets ──────────────────────────────────────────────────
 
     function buildIdentity() {
+      // Re-read on every rebuild: a Save elsewhere in this session (or in
+      // another tab) has to show up in the Load list without a page reload.
+      saved = loadSaved();
       var sec = el('div', 'pp-section');
       var title = el('div', 'pp-section-title');
       title.appendChild(el('span', null, 'Palette'));
@@ -263,8 +273,124 @@
       });
       btns.appendChild(copy);
 
+      var importBtn = el('button', 'pp-btn', 'Import');
+      importBtn.title = 'Paste a list of hex codes';
+      btns.appendChild(importBtn);
+
       sec.appendChild(btns);
+      sec.appendChild(buildImport(importBtn));
       return sec;
+    }
+
+    // ── Import: paste a hex list ────────────────────────────────────────────
+    // Inline rather than a window.prompt — the paste is multi-line, and the
+    // parse readout is the thing that makes it trustworthy: you see the colors
+    // that were found before committing to them.
+
+    function buildImport(toggleBtn) {
+      var panel = el('div', 'pp-import');
+
+      var ta = document.createElement('textarea');
+      ta.placeholder = '#606c38, #283618, #fefae0 …';
+      ta.spellcheck = false;
+      panel.appendChild(ta);
+
+      var swatches = el('div', 'pp-swatches');
+      panel.appendChild(swatches);
+
+      var note = el('div', 'pp-hint', '');
+      panel.appendChild(note);
+
+      var actions = el('div', 'pp-btn-row');
+      var replaceBtn = el('button', 'pp-btn', 'Replace palette');
+      var addBtn = el('button', 'pp-btn', 'Add to palette');
+      var cancelBtn = el('button', 'pp-btn', 'Cancel');
+      actions.appendChild(replaceBtn);
+      actions.appendChild(addBtn);
+      actions.appendChild(cancelBtn);
+      panel.appendChild(actions);
+
+      var hexes = [];
+
+      function parse() {
+        hexes = PP.parseHexList(ta.value);
+        swatches.textContent = '';
+        hexes.forEach(function (h) {
+          var sw = el('i');
+          sw.style.background = h;
+          sw.title = h;
+          swatches.appendChild(sw);
+        });
+        if (!hexes.length) {
+          note.textContent = ta.value.trim() ? 'No hex codes found' : 'Paste hex codes — commas, spaces, newlines or a Coolors URL all work.';
+        } else if (hexes.length === 1) {
+          note.textContent = 'Only 1 color found';
+        } else if (hexes.length > 12) {
+          note.textContent = hexes.length + ' colors found — above about 12 the tail ends up too rare to read.';
+        } else {
+          note.textContent = hexes.length + ' colors found';
+        }
+        replaceBtn.disabled = !hexes.length;
+        addBtn.disabled = !hexes.length;
+      }
+
+      function close() {
+        panel.classList.remove('pp-open');
+        ta.value = '';
+        parse();
+      }
+
+      ta.addEventListener('input', parse);
+      parse();
+
+      toggleBtn.addEventListener('click', function () {
+        panel.classList.toggle('pp-open');
+        if (panel.classList.contains('pp-open')) ta.focus();
+      });
+
+      replaceBtn.addEventListener('click', function () {
+        if (!hexes.length) return;
+        palette = PP.paletteFromHexList(hexes, { name: palette.name });
+        rebuild();   // panel is rebuilt closed, with the palette in place
+      });
+
+      addBtn.addEventListener('click', function () {
+        if (!hexes.length) return;
+        var present = {};
+        palette.colors.forEach(function (c) { present[String(c.color).toUpperCase()] = true; });
+        var fresh = hexes.filter(function (h) { return !present[h]; });
+        if (!fresh.length) { close(); return; }
+
+        // Appended colors join at the bottom of the hierarchy — below whatever
+        // is currently rarest — so an addition never reshuffles the palette.
+        var existing = palette.colors
+          .map(function (c) { return typeof c.weight === 'number' ? c.weight : 0; })
+          .filter(function (w) { return w > 0; });
+        var floor = existing.length ? Math.min.apply(null, existing) : 10;
+        var w = Math.max(0.5, Math.round(floor * 0.75 * 10) / 10);
+
+        var taken = {};
+        palette.colors.forEach(function (c) { if (c.id) taken[c.id] = true; });
+
+        PP.paletteFromHexList(fresh).colors.forEach(function (c) {
+          delete c.spark;
+          delete c.variationScale;
+          delete c.conditions;
+          c.weight = w;
+          c.spatial = [w, w];
+          c.sizeCurve = JSON.parse(JSON.stringify(PP.SIZE_CURVE_PRESETS.small));
+          var id = c.id, k = 2;
+          while (taken[id]) { id = c.id + '-' + k; k++; }
+          taken[id] = true;
+          c.id = id;
+          palette.colors.push(c);
+        });
+        rebuild();
+      });
+
+      cancelBtn.addEventListener('click', close);
+
+      return panel;
     }
 
     // ── Proportional preview strip ──────────────────────────────────────────

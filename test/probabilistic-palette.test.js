@@ -546,6 +546,160 @@ describe('geometry generators', () => {
   });
 });
 
+describe('import', () => {
+  const COOLORS = ['#606C38', '#283618', '#FEFAE0', '#DDA15E', '#BC6C25'];
+
+  describe('parseHexList', () => {
+    it('parses every separator a palette site produces', () => {
+      expect(PP.parseHexList('#606c38, #283618, #fefae0, #dda15e, #bc6c25')).toEqual(COOLORS);
+      expect(PP.parseHexList('#606c38\n#283618\n#fefae0\n#dda15e\n#bc6c25')).toEqual(COOLORS);
+      expect(PP.parseHexList('#606c38 #283618 #fefae0 #dda15e #bc6c25')).toEqual(COOLORS);
+      expect(PP.parseHexList('606c38-283618-fefae0-dda15e-bc6c25')).toEqual(COOLORS);
+    });
+
+    it('parses bare hex and normalizes case', () => {
+      expect(PP.parseHexList('606c38 283618')).toEqual(['#606C38', '#283618']);
+      expect(PP.parseHexList('#EfE6d2')).toEqual(['#EFE6D2']);
+    });
+
+    it('expands #abc shorthand but rejects bare abc', () => {
+      expect(PP.parseHexList('#abc')).toEqual(['#AABBCC']);
+      expect(PP.parseHexList('#f00 #0f0')).toEqual(['#FF0000', '#00FF00']);
+      expect(PP.parseHexList('abc')).toEqual([]);
+      expect(PP.parseHexList('cafe fad bed')).toEqual([]);
+    });
+
+    it('reads a full Coolors URL as exactly its slug colors', () => {
+      expect(PP.parseHexList('https://coolors.co/palette/606c38-283618-fefae0-dda15e-bc6c25'))
+        .toEqual(COOLORS);
+    });
+
+    it('collapses duplicates, keeping first-occurrence order', () => {
+      expect(PP.parseHexList('#283618, #606c38, #283618, #606C38'))
+        .toEqual(['#283618', '#606C38']);
+    });
+
+    it('returns an empty list for prose and non-strings, never throwing', () => {
+      expect(PP.parseHexList('a warm olive palette I found on Pinterest')).toEqual([]);
+      expect(PP.parseHexList('')).toEqual([]);
+      expect(PP.parseHexList(null)).toEqual([]);
+      expect(PP.parseHexList(undefined)).toEqual([]);
+    });
+  });
+
+  describe('paletteFromHexList', () => {
+    it('builds a decaying hierarchy in paste order with the last color as the spark', () => {
+      const p = PP.paletteFromHexList(COOLORS);
+      expect(p.colors.map((c) => c.color)).toEqual(COOLORS);
+      for (let i = 1; i < p.colors.length; i++) {
+        expect(p.colors[i].weight).toBeLessThan(p.colors[i - 1].weight);
+      }
+      const spark = p.colors[p.colors.length - 1];
+      expect(spark.spark).toBe(true);
+      expect(spark.variationScale).toBe(0);
+      expect(spark.conditions).toBeTruthy();
+      expect(Object.keys(spark.conditions).length).toBeGreaterThan(0);
+      const shares = PP.paletteShares(p.colors);
+      expect(shares[shares.length - 1]).toBeCloseTo(0.03, 2);
+    });
+
+    it('lands a 5-color import on a full dominant → spark spread', () => {
+      expect(PP.classifyPalette(PP.paletteFromHexList(COOLORS).colors))
+        .toEqual(['dominant', 'supporting', 'supporting', 'accent', 'spark']);
+    });
+
+    it('makes no spark below 4 colors', () => {
+      const p = PP.paletteFromHexList(COOLORS.slice(0, 3));
+      expect(p.colors.length).toBe(3);
+      expect(p.colors.some((c) => c.spark)).toBe(false);
+    });
+
+    it('floors long lists at weight 0.5 so nothing becomes invisible', () => {
+      const many = PP.parseHexList(
+        '#606c38 #283618 #fefae0 #dda15e #bc6c25 #4472e8 #ef6045 #e5af3c #ef5a9d #69cdb5 #7b3b8c #8fd8f2');
+      expect(many.length).toBe(12);
+      const p = PP.paletteFromHexList(many);
+      expect(p.colors.length).toBe(12);
+      p.colors.forEach((c) => expect(c.weight).toBeGreaterThanOrEqual(0.5));
+    });
+
+    it('gives every entry a unique id, a name and a normalized hex', () => {
+      const p = PP.paletteFromHexList(['#606c38', '#616c38', '#fefae0', '#dda15e']);
+      const ids = p.colors.map((c) => c.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      p.colors.forEach((c) => {
+        expect(c.color).toMatch(/^#[0-9A-F]{6}$/);
+        expect(typeof c.name).toBe('string');
+        expect(c.name.length).toBeGreaterThan(0);
+        expect(c.spatial).toEqual([c.weight, c.weight]);
+      });
+    });
+
+    it('names near-neutrals as materials and chromatics by hue', () => {
+      expect(PP.hexColorName('#EFE6D2')).toBe('Bone');
+      expect(PP.hexColorName('#FEFAE0')).toBe('Chalk');
+      expect(PP.hexColorName('#4A4E58')).toBe('Slate');
+      expect(PP.hexColorName('#4472E8')).toBe('Bright Blue');
+      expect(PP.hexColorName('#283618')).toBe('Deep Green');
+    });
+
+    it('carries the black-tee defaults and an overridable name', () => {
+      const p = PP.paletteFromHexList(COOLORS);
+      expect(p.name).toBe('Imported Palette');
+      expect(p.printDensity).toBe(0.68);
+      expect(p.inheritance).toBe(0.65);
+      expect(p.weightVariation).toBe(0.10);
+      expect(p.generativeWeights).toBe(true);
+      expect(p.spatial).toEqual({ enabled: false, mode: 'top-bottom' });
+      expect(PP.paletteFromHexList(COOLORS, { name: 'Pinterest 1' }).name).toBe('Pinterest 1');
+    });
+
+    it('accepts a raw pasted string as well as a parsed list', () => {
+      expect(PP.paletteFromHexList('#606c38, #283618, #fefae0'))
+        .toEqual(PP.paletteFromHexList(['#606C38', '#283618', '#FEFAE0']));
+    });
+
+    it('is deterministic — same input, deep-equal palette', () => {
+      expect(PP.paletteFromHexList(COOLORS)).toEqual(PP.paletteFromHexList(COOLORS));
+    });
+
+    it('returns an empty palette for an empty list', () => {
+      const p = PP.paletteFromHexList([]);
+      expect(p.colors).toEqual([]);
+    });
+
+    it('drives an assigner over a real composition', () => {
+      const p = PP.paletteFromHexList(COOLORS);
+      const shapes = Demo.generate('scatter', { seed: 'import', count: 2000 });
+      const a = PP.createAssigner(p, { seed: 'import', totalShapes: shapes.length });
+      const known = new Set(COOLORS);
+      let printed = 0;
+      shapes.forEach((s, i) => {
+        const r = a.assign({ index: i, x: s.x, y: s.y, size: s.size, parentIndex: s.parentIndex });
+        if (r.printed) { printed++; expect(known.has(r.color)).toBe(true); }
+        else expect(r.color).toBeNull();
+      });
+      expect(printed / shapes.length).toBeCloseTo(0.68, 1);
+      expect(a.tally().reduce((s, v) => s + v, 0)).toBeCloseTo(1, 6);
+      // The imported spark is capped, so it stays a find even at 2000 shapes.
+      expect(a.tally()[4]).toBeLessThan(0.06);
+    });
+
+    it('tracks its declared shares once the size curves are out of the way', () => {
+      const p = PP.paletteFromHexList(COOLORS, { geometryEnabled: false });
+      const shapes = Demo.generate('scatter', { seed: 'import', count: 2000 });
+      const a = PP.createAssigner(p, { seed: 'import', totalShapes: shapes.length });
+      shapes.forEach((s, i) =>
+        a.assign({ index: i, x: s.x, y: s.y, size: s.size, parentIndex: s.parentIndex }));
+      const tally = a.tally();
+      const shares = a.shares();
+      // Inheritance clusters the draws, so the observed mix is noisy around the
+      // hierarchy rather than equal to it.
+      shares.forEach((s, i) => expect(Math.abs(tally[i] - s)).toBeLessThan(0.1));
+    });
+  });
+});
+
 describe('presets', () => {
   it('ships Brightfield / Black 01 with the specified settings', () => {
     const p = PP.PRESETS['Brightfield / Black 01'];
