@@ -219,11 +219,16 @@
           <p class="product-creator">Designed by {{ creator_name | escape }}</p>
         {%- endif -%}
 
+        {%- comment -%}
+          The current price sits in its own span so the design switcher can
+          rewrite it per variant without clobbering the compare-at sibling —
+          a textContent write on the <p> would take the <s> with it.
+        {%- endcomment -%}
         <p class="product-price">
           {%- if product.compare_at_price > product.price -%}
             <s class="product-price__compare">{{ product.compare_at_price | money }}</s>
           {%- endif -%}
-          {{ product.price | money }}
+          <span class="product-price__current">{{ product.price | money }}</span>
         </p>
 
         <div id="product-order-form">
@@ -1376,7 +1381,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
     if (!radios.length) return;
 
     var mainImg    = document.querySelector('.product-media__image');
-    var priceEl    = document.querySelector('.product-price');
+    var priceEl    = document.querySelector('.product-price__current');
     var variantSel = form.querySelector('select.variant-select');
 
     // Reflect the design that's already on the canvas. Done here rather than in
@@ -1460,14 +1465,18 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           shader: '{{ shader_file }}',
           design: next.option
         });
-        // The variant-sync script's own change listener runs independently;
-        // read the result rather than duplicating its matching logic.
-        setTimeout(syncVariantMedia, 0);
       });
     });
 
-    // Keep media in step when the *size* changes too — with Design x Size a
-    // size change moves to a different variant, hence a different image/price.
+    // Media follows the variant, so it has to re-sync on *any* radio change —
+    // with Design x Size, either axis moves to a different variant and so a
+    // different image/price. One listener over all radios rather than one per
+    // fieldset: the Design radios above would otherwise be covered twice and
+    // sync the same state twice.
+    //
+    // Deferred because the variant-sync script's own change listener runs
+    // independently; this reads the variantSel value it settles on rather than
+    // duplicating its matching logic.
     form.querySelectorAll('input[type="radio"]').forEach(function (radio) {
       radio.addEventListener('change', function () { setTimeout(syncVariantMedia, 0); });
     });

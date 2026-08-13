@@ -136,3 +136,29 @@ describe('findDesignOption', () => {
     expect(findDesignOption([null, { name: 'X' }, designOption], DESIGNS)).toBe(designOption);
   });
 });
+
+// ── Price markup contract ────────────────────────────────────────────────────
+// The design switcher rewrites the price on every variant change. It must not
+// write to the element that also holds the compare-at price: `textContent =`
+// replaces every child node, so a sale product's <s> strikethrough would
+// silently vanish the first time a shopper picked a design or size — and
+// `data-price` only carries the current price, so nothing could restore it.
+// These assert the two halves of that contract in main-product.liquid.
+
+describe('product price markup', () => {
+  const section = readFileSync(join(__dirname, '../sections/main-product.liquid'), 'utf8');
+
+  it('renders the current price in its own element, separate from the compare-at price', () => {
+    const priceBlock = section.match(/<p class="product-price">[\s\S]*?<\/p>/);
+    expect(priceBlock).not.toBeNull();
+    expect(priceBlock[0]).toContain('product-price__compare');
+    expect(priceBlock[0]).toMatch(/<span class="product-price__current">/);
+  });
+
+  it('points the switcher\'s price write at the current-price element only', () => {
+    expect(section).toMatch(/priceEl\s*=\s*document\.querySelector\('\.product-price__current'\)/);
+    // The bare .product-price element is the flex wrapper — writing textContent
+    // to it is what destroys the <s> sibling.
+    expect(section).not.toMatch(/priceEl\s*=\s*document\.querySelector\('\.product-price'\)/);
+  });
+});
