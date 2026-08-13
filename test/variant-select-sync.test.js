@@ -121,14 +121,77 @@ describe('single option (size only)', () => {
     }
   });
 
-  it('leaves select unchanged when no matching variant exists', () => {
+  it('clears select when no matching variant exists', () => {
     const { form, select } = buildForm(variants);
     runScript();
     // Manually fire change on a radio that has no matching option in select
     const radio = form.querySelector('input[type="radio"]');
     radio.value = 'XXXL';
     radio.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(select.value).toBe('100'); // unchanged
+    // Must NOT stay on the previously synced variant: a stale id here is what
+    // would let the submit guard pass and add the wrong item to the cart.
+    expect(select.value).toBe('');
+  });
+});
+
+// ── Design x Size: combinations that don't exist ──────────────────────────────
+// A product carrying several in-house designs has two options, so a shopper can
+// land on a combination Shopify has no variant for. The selection must never
+// silently fall back to the previously matched variant — that would charge them
+// for a different design than the one on screen.
+
+describe('two options with a missing combination', () => {
+  const variants = [
+    { id: 300, options: { Design: 'Chladni Bloom', Size: 'S' }, available: true },
+    { id: 301, options: { Design: 'Chladni Bloom', Size: 'M' }, available: true },
+    { id: 302, options: { Design: 'Line Circle',   Size: 'S' }, available: true },
+    // No "Line Circle / M" variant exists.
+  ];
+
+  function submit(form) {
+    const evt = new Event('submit', { bubbles: true, cancelable: true });
+    return !form.dispatchEvent(evt); // true if preventDefault() was called
+  }
+
+  it('clears the selection when the chosen combination has no variant', () => {
+    const { form, select } = buildForm(variants, { preselectFirst: false });
+    runScript();
+    pickRadio(form, 'Design', 'Chladni Bloom');
+    pickRadio(form, 'Size', 'M');
+    expect(select.value).toBe('301');
+
+    pickRadio(form, 'Design', 'Line Circle'); // Line Circle / M does not exist
+    expect(select.value).toBe('');
+  });
+
+  it('blocks submit after switching to a combination that has no variant', () => {
+    const { form } = buildForm(variants, { preselectFirst: false });
+    runScript();
+    pickRadio(form, 'Design', 'Chladni Bloom');
+    pickRadio(form, 'Size', 'M');
+    pickRadio(form, 'Design', 'Line Circle');
+    expect(submit(form)).toBe(true);
+  });
+
+  it('reports the missing combination rather than an unchosen option', () => {
+    const { form, errorEl } = buildForm(variants, { preselectFirst: false });
+    runScript();
+    pickRadio(form, 'Design', 'Chladni Bloom');
+    pickRadio(form, 'Size', 'M');
+    pickRadio(form, 'Design', 'Line Circle');
+    expect(errorEl.style.display).not.toBe('none');
+    expect(errorEl.textContent).toMatch(/combination/i);
+  });
+
+  it('recovers when the shopper picks a combination that does exist', () => {
+    const { form, select, errorEl } = buildForm(variants, { preselectFirst: false });
+    runScript();
+    pickRadio(form, 'Design', 'Chladni Bloom');
+    pickRadio(form, 'Size', 'M');
+    pickRadio(form, 'Design', 'Line Circle');
+    pickRadio(form, 'Size', 'S');
+    expect(select.value).toBe('302');
+    expect(errorEl.style.display).toBe('none');
   });
 });
 

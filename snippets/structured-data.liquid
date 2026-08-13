@@ -135,9 +135,15 @@
   {%- assign ld_price = product.price | money_without_currency | remove: ',' | strip -%}
   {%- assign ld_description = product.description | strip_html | strip_newlines | truncate: 5000 -%}
 
+  {%- comment -%}
+    Prefer the ?variant= deep-linked variant's image, matching og:image in
+    theme.liquid: on a product carrying several in-house designs the featured
+    image only depicts one of them.
+  {%- endcomment -%}
   {%- assign ld_images_json = '[]' -%}
-  {%- if product.featured_image -%}
-    {%- assign ld_image_url = product.featured_image | image_url: width: 1200 | prepend: 'https:' -%}
+  {%- assign ld_image_source = product.selected_variant.image | default: product.featured_image -%}
+  {%- if ld_image_source -%}
+    {%- assign ld_image_url = ld_image_source | image_url: width: 1200 | prepend: 'https:' -%}
     {%- capture ld_images_json -%}[{{ ld_image_url | json }}]{%- endcapture -%}
   {%- endif -%}
 

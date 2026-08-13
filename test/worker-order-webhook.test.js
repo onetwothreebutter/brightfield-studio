@@ -568,7 +568,7 @@ describe('POST /webhook/order-paid — in-house line items', () => {
     expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
   });
 
-  it('returns 422 with a clear reason when the printful.variant_id metafield is invalid, not a silent ignore', async () => {
+  it('reports a clear reason when the printful.variant_id metafield is invalid, not a silent ignore', async () => {
     const env = makeEnv();
     const fetchMock = makeUpstreamFetch({
       order: defaultOrder({
@@ -580,8 +580,60 @@ describe('POST /webhook/order-paid — in-house line items', () => {
     const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
     expect(res.status).toBe(422);
     const json = await res.json();
+    expect(json.error).toBe('No valid line items');
     expect(json.skipped[0].reason).toMatch(/invalid printful\.variant_id metafield/);
     expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
+  });
+
+  it('reports an in-house line item that has no printful.variant_id metafield at all', async () => {
+    // The storefront marks in-house add-to-carts with properties[_source].
+    // Without that signal this is indistinguishable from an ordinary catalog
+    // item, and a forgotten metafield would silently never reach Printful —
+    // the likeliest mistake once one product carries several Design x Size
+    // variants.
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({
+        lineItems: { edges: [{ node: inhouseLineItem({
+          variant: { id: 'gid://shopify/ProductVariant/9001', metafield: null },
+          customAttributes: [{ key: '_source', value: 'inhouse' }],
+        }) }] },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error).toBe('No valid line items');
+    expect(json.ignored).toBeUndefined(); // reported, not silently ignored
+    expect(json.skipped[0].reason).toMatch(/no printful\.variant_id metafield/);
+    expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
+  });
+
+  it('still ignores an ordinary catalog item that carries no _source property', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: defaultOrder({
+        lineItems: { edges: [{ node: inhouseLineItem({ variant: null }) }] },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.ignored).toBe(true);
+  });
+
+  it('classifies a community SKU as custom even when _source says inhouse', async () => {
+    // Community/custom products go through the same storefront form and so
+    // also carry properties[_source] = inhouse; the SKU branch must win.
+    const cls = classifyLineItem({
+      sku: 'COMMUNITY-1699999999999-M',
+      customAttributes: [{ key: '_source', value: 'inhouse' }],
+    });
+    expect(cls.type).toBe('custom');
   });
 
   it('submits a single Printful order covering both a custom and an in-house line item', async () => {
@@ -1138,6 +1190,7 @@ describe('POST /webhook/order-paid — partial fulfillment', () => {
     const json = await res.json();
 
     expect(res.status).toBe(422);
+    expect(json.error).toBe('No valid line items');
     expect(json.skipped[0].sku).toBe('CUSTOM-1700000000000-L');
     // The valid sibling item must not have been submitted on its own.
     expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
@@ -1220,6 +1273,7 @@ describe('POST /webhook/order-paid — partial fulfillment', () => {
 
     const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
     expect(res.status).toBe(422);
+    expect((await res.json()).error).toBe('No valid line items');
     expect(fetchMock.calls.some(c => c.url === 'https://api.printful.com/orders')).toBe(false);
   });
 });
@@ -1531,7 +1585,7 @@ describe('POST /webhook/order-paid — body size cap', () => {
 // ── POST /webhook/order-paid — failure / skip paths ─────────────────────────
 
 describe('POST /webhook/order-paid — failure and skip paths', () => {
-  it('returns 422 when the line item product has no design_url metafield', async () => {
+  it('reports, without fulfilling, when the line item product has no design_url metafield', async () => {
     const env = makeEnv();
     const fetchMock = makeUpstreamFetch({
       order: defaultOrder({
@@ -1548,10 +1602,11 @@ describe('POST /webhook/order-paid — failure and skip paths', () => {
     const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
     expect(res.status).toBe(422);
     const json = await res.json();
+    expect(json.error).toBe('No valid line items');
     expect(json.skipped[0].reason).toMatch(/design_url/);
   });
 
-  it('returns 422 when the SKU size has no Printful catalog match', async () => {
+  it('reports, without fulfilling, when the SKU size has no Printful catalog match', async () => {
     const env = makeEnv();
     const fetchMock = makeUpstreamFetch({
       order: defaultOrder({
@@ -1568,6 +1623,7 @@ describe('POST /webhook/order-paid — failure and skip paths', () => {
     const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
     expect(res.status).toBe(422);
     const json = await res.json();
+    expect(json.error).toBe('No valid line items');
     expect(json.skipped[0].reason).toMatch(/no Printful variant/);
   });
 

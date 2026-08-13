@@ -11,7 +11,15 @@
     {%- assign og_title       = page_title | default: shop.name -%}
     {%- assign og_description = page_description | default: shop.description -%}
     {%- assign og_url         = canonical_url | default: request.origin -%}
-    {%- if page_image -%}
+    {%- comment -%}
+      page_image is the product's featured image and doesn't follow ?variant=.
+      A product carrying several in-house designs has one variant image per
+      design, so prefer the deep-linked variant's own image — otherwise every
+      shared "?variant=<design B>" link previews design A.
+    {%- endcomment -%}
+    {%- if product.selected_variant.image -%}
+      {%- assign og_image = product.selected_variant.image | image_url: width: 1200 -%}
+    {%- elsif page_image -%}
       {%- assign og_image = page_image | image_url: width: 1200 -%}
     {%- elsif settings.og_image != blank -%}
       {%- assign og_image = settings.og_image | image_url: width: 1200 -%}
