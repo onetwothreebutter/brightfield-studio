@@ -36,14 +36,10 @@
         "show_view_all": true
       }
     },
-    "community-designs": {
-      "type": "community-designs",
-      "settings": {}
-    },
     "newsletter": {
       "type": "newsletter",
       "settings": {}
     }
   },
-  "order": ["hero", "featured-collection", "shader-demo", "designs-row", "community-designs", "newsletter"]
+  "order": ["hero", "featured-collection", "shader-demo", "designs-row", "newsletter"]
 }
