@@ -1,6 +1,4 @@
-{%- assign empty_icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 15l5-5 4 4 3-3 6 6"/><circle cx="8.5" cy="8.5" r="1.5"/></svg>' -%}
-
-<section class="designs-row-section section-padding">
+<section class="designs-row-section section-padding" id="designs-row-section">
   <div class="container">
     <div class="designs-row__col" id="designs-row__recent">
       <h2 class="recent-designs__heading">Your Recent Designs</h2>
@@ -19,14 +17,11 @@
 <script src="{{ 'recent-designs.js' | asset_url }}" defer></script>
 <script>
 (function () {
-  var EMPTY_ICON = {{ empty_icon | json }};
   var SEE_ALL_MAX = 15;
 
-  function emptyState(message) {
-    return '<div class="designs-row__empty">'
-      + EMPTY_ICON
-      + '<p>' + message + '</p>'
-      + '</div>';
+  function hideSection() {
+    var section = document.getElementById('designs-row-section');
+    if (section) section.hidden = true;
   }
 
   function addSeeAllBtn(col, href) {
@@ -43,13 +38,15 @@
     if (recentContainer && window.RecentDesigns) {
       RecentDesigns.fetchDesigns().then(function (designs) {
         if (!designs || !designs.length) {
-          recentContainer.innerHTML = emptyState('No saved designs yet');
+          hideSection();
           return;
         }
         var hasMore = designs.length > SEE_ALL_MAX;
         RecentDesigns.renderFilmstrip(recentContainer, hasMore ? designs.slice(0, SEE_ALL_MAX) : designs);
         if (hasMore) addSeeAllBtn(recentCol, '/pages/recent-designs');
       });
+    } else {
+      hideSection();
     }
   });
 }());
