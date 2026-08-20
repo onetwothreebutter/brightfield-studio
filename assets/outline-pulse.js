@@ -223,7 +223,11 @@
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
       // Load the real SDF from the URL stashed on the preview button
-      var sdfUrl = (document.getElementById('shader-preview-btn') || {}).dataset.shirtSdf;
+      // Absent outside the product page (test-shaders.html, palette-lab.html),
+      // where the placeholder texture above is the whole story. `|| {}` alone
+      // doesn't cover it — the fallback has no dataset to read either.
+      var sdfBtn = document.getElementById('shader-preview-btn');
+      var sdfUrl = sdfBtn && sdfBtn.dataset ? sdfBtn.dataset.shirtSdf : null;
       if (sdfUrl) {
         var img = new Image();
         img.crossOrigin = 'anonymous';

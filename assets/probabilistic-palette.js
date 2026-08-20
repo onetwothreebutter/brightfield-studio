@@ -52,6 +52,56 @@
   // Symmetric [-1, 1] draw — the shape generative weight variation wants.
   function rngSigned(rng) { return rng() * 2 - 1; }
 
+  // ── Per-element rolls, for decisions a GPU has to make ────────────────────
+  // A fragment shader can't call deriveSeed: it has no strings, and it reaches
+  // its element by computing an index, not by walking a list. So an element's
+  // stream is mixed from an integer instead — the golden-ratio constant is the
+  // standard 32-bit spread, and it is the only thing that differs from the tag
+  // path above.
+  //
+  // Both functions exist so the GLSL in shader-base.js has something to be a
+  // transcription *of*: makeRng is pure uint32 arithmetic (Math.imul is the low
+  // 32 bits of the product, `>>>` wraps), and WebGL2 uint math wraps mod 2^32
+  // the same way, so the shader reaches the same decision as this does — on
+  // every GPU, without a readback. `test/probabilistic-palette.test.js` pins
+  // the values the GLSL is expected to reproduce.
+  function elementSeed(base, id) {
+    return ((base >>> 0) ^ Math.imul(id >>> 0, 0x9E3779B1)) >>> 0;
+  }
+
+  // The odds an element prints, given how much of the design's ink it carries.
+  //
+  // A flat roll makes `printDensity` mean "this fraction of *elements*", which
+  // is the honest reading when elements are interchangeable — a halftone dot
+  // grid — and a misleading one when they are not. circle-on-line's power warp
+  // makes its first line about 6x the average cell and its last about 0.4x, so
+  // a flat roll lets one coin flip delete a third of the artwork.
+  //
+  // `weight` is the element's extent relative to the average (1 = average), and
+  // the exponent form is what makes this usable in a fragment shader: it needs
+  // nothing but the element's own weight — no total, no second pass, no sorting
+  // — and it preserves both endpoints exactly, since density 0 and 1 are fixed
+  // points of pow(). Bigger than average ⇒ exponent below 1 ⇒ likelier to print.
+  // isFinite before clamp, not clamp alone: NaN fails both of clamp's
+  // comparisons and falls straight through it, which would turn one bad weight
+  // into a NaN chance and an element that neither prints nor doesn't.
+  function elementPrintChance(density, weight) {
+    var d = typeof density === 'number' && isFinite(density) ? clamp(density, 0, 1) : 1;
+    var w = typeof weight === 'number' && isFinite(weight) ? clamp(weight, 0.05, 20) : 1;
+    return Math.pow(d, 1 / w);
+  }
+
+  // The single draw a print/skip decision is: printed when roll < the chance above.
+  //
+  // Quantized to 24 bits rather than the full 32 makeRng returns, because a
+  // fragment shader's float carries a 24-bit mantissa at best and cannot hold
+  // the wider value. Throwing the same 8 bits away on this side is what makes
+  // the GPU's roll the same decision as this one instead of nearly it — the
+  // multiply is exact, since makeRng's output is k/2^32 for integer k.
+  function elementRoll(base, id) {
+    return ((makeRng(elementSeed(base, id))() * 4294967296) >>> 8) / 16777216;
+  }
+
   // ── Weights ───────────────────────────────────────────────────────────────
 
   function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -164,7 +214,10 @@
       // One stream per color index, so adding a color to the end of the palette
       // doesn't re-roll the ones before it.
       var rng = makeRng(deriveSeed(seed, 'weight-variation', i, c.id || c.color));
-      var swing = rngSigned(rng) * amount * MAX_LOG_SWING;
+      // `scale` is graduated, not just a 0/1 lock: the field is named and
+      // clamped as an amplitude, so it has to behave like one. Every shipped
+      // caller passes 0 or nothing, so this changes no current output.
+      var swing = rngSigned(rng) * amount * scale * MAX_LOG_SWING;
       varied[i] = base[i] * Math.exp(swing);
       variedTotal += varied[i];
     });
@@ -235,6 +288,115 @@
     tiny:   [[0, 2.2], [0.25, 1.0], [0.6, 0.1], [1, 0.05]]
   };
 
+  // ── Size groups ───────────────────────────────────────────────────────────
+  // A third way to build structure, alongside spatial fields (where a shape is)
+  // and inheritance (what a shape is next to): group by *scale*. Every shape of
+  // roughly the same size takes one color, so a composition reads as a few
+  // deliberate tiers rather than as per-shape variety — the big forms one
+  // colour, the mid forms another, wherever they happen to sit.
+  //
+  // Boundaries are found from the composition's own size distribution rather
+  // than imposed: sort the sizes, and split where the gaps are widest. A
+  // subdivision that genuinely has three scales gets three groups; a smooth
+  // scatter with no natural break gets one, which is the honest answer.
+
+  // 0.02 rather than something coarser: measured across both reference
+  // generators, that is the setting where real tiers appear (4–5 well-populated
+  // groups per composition). Much above it and most compositions collapse to a
+  // single group, because generative size distributions are usually smooth.
+  var DEFAULT_SIZE_GROUPS = { enabled: false, mode: 'clusters', minGap: 0.02, maxGroups: 5, minShare: 0.06 };
+
+  function sizeGroupSettings(palette) {
+    var s = (palette && palette.sizeGroups) || {};
+    return {
+      enabled: !!s.enabled,
+      // Grouping recolours; by default it does not also delete. Print density is
+      // a separate decision from "which cohort is this", and letting the two run
+      // together means turning grouping on silently removes elements the design
+      // had a moment earlier — which reads as grouping being broken rather than
+      // as density doing its job. Opt in per palette to get both.
+      dropElements: !!s.dropElements,
+      mode: s.mode === 'bands' ? 'bands' : 'clusters',
+      // Floor at 0.001 rather than 0.005 so a caller can go below the spacing of
+      // a densely sampled field and force splits out of it. Worth knowing what
+      // that buys: on a field with no real gaps every candidate gap is the same
+      // width, so the widest-first sort is a tie and the cuts land wherever
+      // `minShare` first allows — bunched together, not spread. Legitimate for
+      // prising tiers out of a smooth distribution, but the tiers are imposed at
+      // that point, which is what `bands` does deliberately and legibly.
+      minGap: typeof s.minGap === 'number' ? clamp(s.minGap, 0.001, 1) : DEFAULT_SIZE_GROUPS.minGap,
+      maxGroups: Math.max(1, Math.round(typeof s.maxGroups === 'number' ? s.maxGroups : DEFAULT_SIZE_GROUPS.maxGroups)),
+      minShare: typeof s.minShare === 'number' ? clamp(s.minShare, 0, 0.5) : DEFAULT_SIZE_GROUPS.minShare
+    };
+  }
+
+  // Returns the split points between groups: sizes are grouped as
+  // [0, b0), [b0, b1), … [bn, 1]. Pure and deterministic — the same sizes always
+  // produce the same boundaries, with no RNG involved at all.
+  //
+  // Two modes, and the choice is a real one:
+  //
+  //   clusters — splits follow the composition's own distribution, so the tiers
+  //              are the ones actually in the geometry. A design with no break
+  //              in scale honestly comes back as one group.
+  //   bands    — the size range is cut into `maxGroups` equal slices, so you
+  //              always get that many tiers regardless of the geometry. Reliable
+  //              count, at the cost of splitting where nothing changes — and on
+  //              a skewed distribution (a power-law scatter) most shapes can
+  //              land in one band.
+  function sizeGroupBounds(sizes, opts) {
+    opts = opts || {};
+    var minGap = typeof opts.minGap === 'number' ? opts.minGap : DEFAULT_SIZE_GROUPS.minGap;
+    var maxGroups = Math.max(1, Math.round(opts.maxGroups || DEFAULT_SIZE_GROUPS.maxGroups));
+    if (!sizes || sizes.length < 2 || maxGroups < 2) return [];
+
+    if (opts.mode === 'bands') {
+      var bands = [];
+      for (var b = 1; b < maxGroups; b++) bands.push(b / maxGroups);
+      return bands;
+    }
+
+    var sorted = sizes.slice().sort(function (a, b) { return a - b; });
+    var gaps = [];
+    for (var i = 1; i < sorted.length; i++) {
+      var gap = sorted[i] - sorted[i - 1];
+      // The boundary sits in the middle of the empty band, so a shape landing
+      // just inside either edge still falls on the side it belongs to.
+      if (gap >= minGap) gaps.push({ at: (sorted[i] + sorted[i - 1]) / 2, gap: gap, below: i });
+    }
+    if (!gaps.length) return [];
+
+    // Widest gaps win — the most pronounced breaks in the distribution are the
+    // real tiers.
+    gaps.sort(function (a, b) { return b.gap - a.gap; });
+
+    // …but a split is only kept if both sides of it hold a real population.
+    // Without this, a single outlier shape is the widest gap in almost every
+    // composition, and grouping degenerates into "everything, plus three
+    // singletons" — technically the biggest gaps, useless as a color structure.
+    var minMembers = Math.max(1, Math.round((opts.minShare != null ? opts.minShare : DEFAULT_SIZE_GROUPS.minShare) * sorted.length));
+    var accepted = [];   // cut positions as indices into `sorted`, kept ascending
+    for (var g = 0; g < gaps.length && accepted.length < maxGroups - 1; g++) {
+      var cut = gaps[g].below;
+      var lo = 0, hi = sorted.length;
+      for (var k = 0; k < accepted.length; k++) {
+        if (accepted[k].below < cut) lo = Math.max(lo, accepted[k].below);
+        else hi = Math.min(hi, accepted[k].below);
+      }
+      if (cut - lo < minMembers || hi - cut < minMembers) continue;
+      accepted.push(gaps[g]);
+      accepted.sort(function (a, b) { return a.below - b.below; });
+    }
+
+    return accepted.map(function (a) { return a.at; })
+      .sort(function (a, b) { return a - b; });
+  }
+
+  function groupIndexOf(bounds, size) {
+    for (var i = 0; i < bounds.length; i++) if (size < bounds[i]) return i;
+    return bounds.length;
+  }
+
   // ── Spark eligibility ─────────────────────────────────────────────────────
   // Conditions that gate a color entirely (weight → 0) rather than just
   // reweighting it. Any condition may be combined; all must pass.
@@ -283,9 +445,16 @@
 
   // ctx: { x, y, size } — all normalized 0–1. Returns normalized shares, plus
   // the raw pre-normalization weights for debugging/preview.
-  function effectiveWeights(palette, ctx, stats) {
+  //
+  // `basisOverride` replaces the seed-varied share each color starts from, for
+  // callers that need a different vocabulary than the palette's own — the size
+  // group draw uses it to take sparks out. A zero entry there means "not in
+  // this draw at all", which has to be a hard gate: spatial weights otherwise
+  // *replace* the base weight, so a muted color with a `spatial` pair would
+  // walk straight back into contention.
+  function effectiveWeights(palette, ctx, stats, basisOverride) {
     var colors = palette.colors || [];
-    var basis = (stats && stats.variedShares) || paletteShares(colors);
+    var basis = basisOverride || (stats && stats.variedShares) || paletteShares(colors);
     ctx = ctx || {};
     var x = ctx.x != null ? ctx.x : 0.5;
     var y = ctx.y != null ? ctx.y : 0.5;
@@ -300,6 +469,7 @@
 
     var raw = colors.map(function (c, i) {
       var w;
+      if (basisOverride && !(basisOverride[i] > 0)) return 0;
       if (spatialOn && c.spatial && c.spatial.length === 2) {
         var variationFactor = baseShares[i] > 0 ? basis[i] / baseShares[i] : 1;
         w = lerp(c.spatial[0], c.spatial[1], t) * variationFactor;
@@ -355,6 +525,79 @@
 
     var byIndex = {};   // shape index → assigned color, for parent inheritance
 
+    // ── Size groups ─────────────────────────────────────────────────────────
+    // Needs the whole composition up front — a cohort can't be found one shape
+    // at a time — so grouping only engages when the caller passes `shapes`.
+    // Without it the assigner behaves exactly as it always has.
+    var groupCfg = sizeGroupSettings(palette);
+    var shapes = opts.shapes || null;
+    var bounds = [];
+    var groupColors = [];
+    var grouping = groupCfg.enabled && !!(shapes && shapes.length);
+
+    if (grouping) {
+      bounds = sizeGroupBounds(shapes.map(function (s) {
+        return s && typeof s.size === 'number' ? s.size : 0.5;
+      }), groupCfg);
+
+      // One representative context per group: the cohort's mean size and its
+      // centroid. A size group is spread across the canvas by definition, so
+      // its centroid is the only position that means anything for spatial
+      // weights — the group is one decision, not one per member.
+      var acc = [];
+      shapes.forEach(function (s) {
+        var g = groupIndexOf(bounds, s && typeof s.size === 'number' ? s.size : 0.5);
+        if (!acc[g]) acc[g] = { n: 0, x: 0, y: 0, size: 0 };
+        acc[g].n++;
+        acc[g].x += s && s.x != null ? s.x : 0.5;
+        acc[g].y += s && s.y != null ? s.y : 0.5;
+        acc[g].size += s && s.size != null ? s.size : 0.5;
+      });
+
+      // Sparks are drawn out of the group vocabulary: a spark that wins a group
+      // stops being a find and becomes a whole tier of the artwork. They stay
+      // available per-shape below, which is where rarity actually lives.
+      //
+      // This has to be a basis override, not a zeroed `weight` on a clone:
+      // effectiveWeights reads its shares from stats.variedShares (frozen from
+      // the real palette) and its spatial pairs from the color entries, so a
+      // muted `weight` would never be looked at.
+      var groupBasis = stats.variedShares.map(function (share, i) {
+        return colors[i] && colors[i].spark ? 0 : share;
+      });
+
+      for (var g = 0; g < bounds.length + 1; g++) {
+        var a = acc[g];
+        if (!a || !a.n) { groupColors.push(null); continue; }
+        var ctx = { x: a.x / a.n, y: a.y / a.n, size: a.size / a.n };
+        var grng = makeRng(deriveSeed(seed, 'size-group', g));
+        var geff = effectiveWeights(palette, ctx, stats, groupBasis);
+        var gpick = weightedRandomIndex(geff.weights, grng);
+        groupColors.push(gpick >= 0 && colors[gpick]
+          ? { color: colors[gpick].color, colorIndex: gpick, group: g }
+          : null);
+      }
+    }
+
+    // Spark colors stay reachable inside a group: their weight decides how often
+    // one lands, their conditions decide where, exactly as ungrouped.
+    function sparkOverride(ctx, rng) {
+      var sparkWeights = colors.map(function (c, i) {
+        if (!c || !c.spark) return 0;
+        var w = stats.variedShares[i];
+        if (w <= 0) return 0;
+        return isEligible(c, ctx, stats, i) ? w : 0;
+      });
+      var total = sparkWeights.reduce(function (a, b) { return a + b; }, 0);
+      if (total <= 0) return null;
+      // One roll against the sparks' combined share, then which spark.
+      if (rng() >= total) return null;
+      var pick = weightedRandomIndex(sparkWeights, rng);
+      return pick >= 0 && colors[pick]
+        ? { color: colors[pick].color, colorIndex: pick }
+        : null;
+    }
+
     function assign(shape) {
       shape = shape || {};
       var index = shape.index != null ? shape.index : stats.totalCount;
@@ -365,11 +608,15 @@
 
       var rng = makeRng(deriveSeed(seed, 'shape', index));
 
-      // 1. Print or expose the shirt. Drawn first and always, so the print/skip
-      //    pattern is stable no matter what the color settings do.
+      // 1. Print or expose the shirt. The roll is drawn first and *always* —
+      //    including when it cannot remove anything — so the print/skip pattern
+      //    and every roll after it are identical whether or not grouping is
+      //    allowed to drop elements. Toggling that setting must re-colour the
+      //    composition, not reshuffle it.
       var printRoll = rng();
       var density = typeof palette.printDensity === 'number' ? clamp(palette.printDensity, 0, 1) : 1;
-      if (printRoll >= density) {
+      var mayDrop = !grouping || groupCfg.dropElements;
+      if (mayDrop && printRoll >= density) {
         return {
           index: index, printed: false, color: null, colorIndex: -1,
           inherited: false, tier: null, field: 0
@@ -377,7 +624,39 @@
       }
       stats.printedCount++;
 
-      // 2. Inheritance. A shape can take the color of its parent (or, failing
+      // 2. Size group, when one is active. The cohort's color was drawn once,
+      //    up front, so every shape at this scale gets it wherever it sits —
+      //    which is the whole point, and why inheritance is skipped here: a
+      //    group is already the grouping.
+      if (grouping) {
+        var gIdx = groupIndexOf(bounds, size);
+        var g = groupColors[gIdx];
+        var spark = sparkOverride({ x: x, y: y, size: size }, rng);
+        var chosen = spark || g;
+        if (chosen) {
+          stats.used[chosen.colorIndex] = (stats.used[chosen.colorIndex] || 0) + 1;
+          stats.eligible[chosen.colorIndex] = (stats.eligible[chosen.colorIndex] || 0) + 1;
+          stats.previousColor = chosen.color;
+          stats.previousIndex = chosen.colorIndex;
+          var gOut = {
+            index: index,
+            printed: true,
+            color: chosen.color,
+            colorIndex: chosen.colorIndex,
+            inherited: !spark,          // the group is where the color came from
+            group: gIdx,
+            spark: !!spark,
+            field: 0,
+            tier: classifyTier(stats.variedShares[chosen.colorIndex], colors[chosen.colorIndex])
+          };
+          byIndex[index] = gOut;
+          return gOut;
+        }
+        // No group color (an empty cohort, or every color gated out) — fall
+        // through to the ordinary per-shape path rather than dropping the shape.
+      }
+
+      // 3. Inheritance. A shape can take the color of its parent (or, failing
       //    that, the previous printed shape) instead of drawing a new one —
       //    this is what turns confetti into color regions.
       var inheritRoll = rng();
@@ -398,7 +677,7 @@
       if (source && inheritRoll < inheritance) {
         result = { color: source, colorIndex: sourceIndex, inherited: true, field: 0 };
       } else {
-        // 3. Fresh weighted draw against this shape's effective hierarchy.
+        // 4. Fresh weighted draw against this shape's effective hierarchy.
         var eff = effectiveWeights(palette, { x: x, y: y, size: size }, stats);
         // Count eligibility before the draw so a maxShare cap measures against
         // the shapes that could have taken the color, not the ones that did.
@@ -436,6 +715,18 @@
     return {
       assign: assign,
       stats: stats,
+      // The size cohorts this composition was split into, or null when grouping
+      // is off (or when the caller didn't pass `shapes`). Boundaries are the
+      // split points; colors[i] is the one color group i paints with.
+      groups: function () {
+        if (!grouping) return null;
+        return {
+          bounds: bounds.slice(),
+          colors: groupColors.map(function (g) {
+            return g ? { color: g.color, colorIndex: g.colorIndex } : null;
+          })
+        };
+      },
       shares: function () { return stats.variedShares.slice(); },
       // Observed distribution, for the preview's "what actually came out" read.
       tally: function () {
@@ -457,6 +748,10 @@
       generativeWeights: false,
       geometryEnabled: true,
       spatial: { enabled: false, mode: 'top-bottom' },
+      sizeGroups: {
+        enabled: false, mode: DEFAULT_SIZE_GROUPS.mode,
+        minGap: DEFAULT_SIZE_GROUPS.minGap, maxGroups: DEFAULT_SIZE_GROUPS.maxGroups
+      },
       colors: []
     };
     Object.keys(overrides || {}).forEach(function (k) { p[k] = overrides[k]; });
@@ -776,6 +1071,13 @@
     // geography
     SPATIAL_MODES: SPATIAL_MODES,
     spatialField: spatialField,
+    // size cohorts
+    DEFAULT_SIZE_GROUPS: DEFAULT_SIZE_GROUPS,
+    sizeGroupBounds: sizeGroupBounds,
+    groupIndexOf: groupIndexOf,
+    elementSeed: elementSeed,
+    elementRoll: elementRoll,
+    elementPrintChance: elementPrintChance,
     SIZE_CURVE_PRESETS: SIZE_CURVE_PRESETS,
     evalCurve: evalCurve,
     isEligible: isEligible,

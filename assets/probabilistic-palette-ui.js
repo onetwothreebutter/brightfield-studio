@@ -79,7 +79,10 @@
     '.pp-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--pp-dim);font-size:11px;}',
     '.pp-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--pp-dim);margin-top:10px;}',
     '.pp-legend span{display:flex;align-items:center;gap:5px;}',
-    '.pp-legend i{width:9px;height:9px;border-radius:2px;display:inline-block;}'
+    '.pp-legend i{width:9px;height:9px;border-radius:2px;display:inline-block;}',
+    '.pp-inert{opacity:.5;}',
+    '.pp-inert-tag{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--pp-dim);',
+    'border:1px solid var(--pp-line);border-radius:3px;padding:1px 4px;margin-left:6px;white-space:nowrap;}'
   ].join('');
 
   function injectStyles() {
@@ -102,8 +105,14 @@
   function input(type, value, attrs) {
     var n = document.createElement('input');
     n.type = type;
-    if (value != null) n.value = value;
+    // Attributes before value, not after: a range input validates and step-snaps
+    // on assignment, so with min/max/step still at their defaults (0–100, step 1)
+    // any fractional value snaps to 0 and then clamps to the real min once it
+    // arrives. The thumb ends up parked on the floor while the readout — which
+    // reads the variable, not the element — still shows the value that was
+    // meant. Same trap for number inputs.
     Object.keys(attrs || {}).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    if (value != null) n.value = value;
     return n;
   }
 
@@ -129,6 +138,17 @@
   function num(v, fallback) {
     var n = parseFloat(v);
     return isFinite(n) ? n : fallback;
+  }
+
+  // Dims a control and badges it, for settings the engine honors but the host's
+  // preview cannot express. The editor is not allowed to imply it is driving
+  // something it isn't — an author tuning a dead slider learns the wrong lesson
+  // about the palette.
+  function markInert(node, why) {
+    node.classList.add('pp-inert');
+    node.title = why;
+    node.appendChild(el('span', 'pp-inert-tag', 'engine-only'));
+    return node;
   }
 
   // ── Copy for the sliders ──────────────────────────────────────────────────
@@ -172,6 +192,14 @@
       ? JSON.parse(JSON.stringify(opts.palette))
       : PP.clonePalette(PP.PRESETS['Brightfield / Black 01']);
     var onChange = opts.onChange || function () {};
+    // Set by hosts whose preview has no per-shape geometry — a fragment shader
+    // colors uniforms, not shapes, so shape size has nothing to read. Pass a
+    // string to replace the tooltip with something that tells the author where
+    // the setting *does* work; a bare `true` gets the generic wording.
+    var inertGeometry = !!opts.inertGeometry;
+    var INERT_WHY = typeof opts.inertGeometry === 'string' ? opts.inertGeometry
+      : 'Shape size has no meaning in this preview — a shader has no per-shape hook. '
+        + 'The engine still applies this wherever geometry exists.';
     // Authoring randomness is seeded too, so "Randomize weights" is replayable
     // and no Math.random call exists anywhere in the feature.
     var randomizeNonce = 0;
@@ -592,7 +620,9 @@
         else delete c.sizeCurve;
         changed();
       });
-      grid.appendChild(labeled('Size bias', sizeSel));
+      var sizeRow = labeled('Size bias', sizeSel);
+      if (inertGeometry) markInert(sizeRow, INERT_WHY);
+      grid.appendChild(sizeRow);
 
       var spatialNear = input('number', c.spatial ? c.spatial[0] : c.weight, { min: '0', step: '1' });
       var spatialFar = input('number', c.spatial ? c.spatial[1] : c.weight, { min: '0', step: '1' });
@@ -635,11 +665,15 @@
 
       var maxSize = input('number', cond.maxSize != null ? cond.maxSize : '', { min: '0', max: '1', step: '0.05', placeholder: 'any' });
       maxSize.addEventListener('input', function () { writeCond('maxSize', this.value === '' ? null : num(this.value, null)); });
-      grid.appendChild(labeled('Only size ≤', maxSize));
+      var maxSizeRow = labeled('Only size ≤', maxSize);
+      if (inertGeometry) markInert(maxSizeRow, INERT_WHY);
+      grid.appendChild(maxSizeRow);
 
       var minSize = input('number', cond.minSize != null ? cond.minSize : '', { min: '0', max: '1', step: '0.05', placeholder: 'any' });
       minSize.addEventListener('input', function () { writeCond('minSize', this.value === '' ? null : num(this.value, null)); });
-      grid.appendChild(labeled('Only size ≥', minSize));
+      var minSizeRow = labeled('Only size ≥', minSize);
+      if (inertGeometry) markInert(minSizeRow, INERT_WHY);
+      grid.appendChild(minSizeRow);
 
       var maxShare = input('number', cond.maxShare != null ? cond.maxShare : '', { min: '0', max: '1', step: '0.01', placeholder: 'none' });
       maxShare.addEventListener('input', function () { writeCond('maxShare', this.value === '' ? null : num(this.value, null)); });
@@ -677,7 +711,8 @@
 
       adv.appendChild(grid);
       adv.appendChild(el('div', 'pp-hint',
-        'Start/end weights apply when spatial probability is on — they are the weights at each end of the field. Conditions gate the color out entirely when unmet.'));
+        'Start/end weights apply when spatial probability is on — they are the weights at each end of the field. Conditions gate the color out entirely when unmet.'
+        + (inertGeometry ? ' Size rules are marked engine-only: they still work anywhere shapes exist, but this preview has none.' : '')));
       row.appendChild(adv);
 
       // drag reorder
@@ -767,10 +802,10 @@
       spatialLabel.appendChild(el('span', null, 'Spatial probability'));
       spatialRow.appendChild(spatialLabel);
 
-      var modeSel = select(Object.keys(PP.SPATIAL_MODES).map(function (k) {
+      var spatialModeSel = select(Object.keys(PP.SPATIAL_MODES).map(function (k) {
         return { label: PP.SPATIAL_MODES[k].label, value: k };
       }), (palette.spatial && palette.spatial.mode) || 'top-bottom');
-      modeSel.addEventListener('change', function () {
+      spatialModeSel.addEventListener('change', function () {
         palette.spatial = palette.spatial || {};
         palette.spatial.mode = this.value;
         changed();
@@ -780,10 +815,108 @@
         palette.spatial.enabled = this.checked;
         changed();
       });
-      spatialRow.appendChild(modeSel);
+      spatialRow.appendChild(spatialModeSel);
       sec.appendChild(spatialRow);
       sec.appendChild(el('div', 'pp-hint',
         'Probabilities are interpolated across the canvas — not the colors themselves. Each shape stays a discrete palette color while the composition drifts between color families. Set each color’s start/end weights under Rules.'));
+
+      // ── Size groups ───────────────────────────────────────────────────────
+      var groupRow = el('div', 'pp-row');
+      groupRow.style.marginTop = '10px';
+      var groupChk = input('checkbox');
+      groupChk.checked = !!(palette.sizeGroups && palette.sizeGroups.enabled);
+      var groupLabel = el('label', 'pp-toggle');
+      groupLabel.appendChild(groupChk);
+      groupLabel.appendChild(el('span', null, 'Group by size'));
+      groupChk.addEventListener('change', function () {
+        palette.sizeGroups = palette.sizeGroups || {};
+        palette.sizeGroups.enabled = this.checked;
+        changed();
+      });
+      groupRow.appendChild(groupLabel);
+      if (inertGeometry) markInert(groupRow, INERT_WHY);
+      sec.appendChild(groupRow);
+
+      sec.appendChild(el('div', 'pp-hint',
+        'Every shape of roughly the same size takes one color, wherever it sits — a third kind of structure, '
+        + 'next to geography (where a shape is) and inheritance (what it is next to).'));
+
+      var bands = (palette.sizeGroups || {}).mode === 'bands';
+
+      var modeRow = el('div', 'pp-row');
+      modeRow.appendChild(el('span', 'pp-label', 'Grouping'));
+      var groupModeSel = select([
+        { label: 'Natural clusters', value: 'clusters' },
+        { label: 'Fixed bands', value: 'bands' }
+      ], bands ? 'bands' : 'clusters');
+      groupModeSel.addEventListener('change', function () {
+        palette.sizeGroups = palette.sizeGroups || {};
+        palette.sizeGroups.mode = this.value;
+        // Rebuild rather than patch: the labels, the hints and which rows apply
+        // all differ between the two modes.
+        rebuild();
+      });
+      modeRow.appendChild(groupModeSel);
+      if (inertGeometry) markInert(modeRow, INERT_WHY);
+      sec.appendChild(modeRow);
+
+      sec.appendChild(el('div', 'pp-hint', bands
+        ? 'Fixed bands cuts the size range into equal slices, so you always get the number of tiers you asked '
+          + 'for. It will split where nothing actually changes, and on a lopsided composition most shapes can '
+          + 'land in one band — check the swatch strip under the preview for the per-band counts.'
+        : 'Natural clusters puts the splits at the widest gaps in the composition’s own size distribution, so a '
+          + 'design with three real scales gets three groups and one with no break in scale honestly gets a '
+          + 'single group. Switch to fixed bands if you would rather guarantee the count.'));
+
+      if (!bands) {
+        // Floors at the engine's 0.001, and steps in thousandths so that end of
+        // the range is actually reachable — below a sampled field's own spacing
+        // is where a smooth distribution can be forced to split at all.
+        var gapWrap = slider('Min size gap', 'sizeGroups.minGap', 0.001, 0.3, 0.001, function (v) {
+          return v.toFixed(3);
+        }, function (v) {
+          if (v <= 0.004) {
+            return 'below the spacing of most size fields — a smooth distribution will split, but every '
+              + 'candidate gap ties, so the cuts bunch rather than spread. Fixed bands imposes tiers more evenly.';
+          }
+          return v <= 0.012 ? 'splits on the faintest break — expect the maximum number of groups'
+            : (v >= 0.06 ? 'only a dramatic jump in scale counts — most compositions collapse to one group'
+              : 'splits on a clear step in scale');
+        }, PP.DEFAULT_SIZE_GROUPS.minGap);
+        if (inertGeometry) markInert(gapWrap, INERT_WHY);
+        sec.appendChild(gapWrap);
+      }
+
+      var dropRow = el('div', 'pp-row');
+      dropRow.style.marginTop = '10px';
+      var dropChk = input('checkbox');
+      dropChk.checked = !!(palette.sizeGroups && palette.sizeGroups.dropElements);
+      var dropLabel = el('label', 'pp-toggle');
+      dropLabel.appendChild(dropChk);
+      dropLabel.appendChild(el('span', null, 'Print density may drop elements'));
+      dropChk.addEventListener('change', function () {
+        palette.sizeGroups = palette.sizeGroups || {};
+        palette.sizeGroups.dropElements = this.checked;
+        changed();
+      });
+      dropRow.appendChild(dropLabel);
+      sec.appendChild(dropRow);
+      sec.appendChild(el('div', 'pp-hint',
+        'Off, grouping only re-colours: every element the design had without grouping is still there, '
+        + 'just painted by its size cohort. On, print density also removes elements, so the shirt breaks '
+        + 'through inside a cohort. The print/skip roll is drawn either way, so flipping this re-colours '
+        + 'the composition rather than reshuffling it.'));
+
+      var maxWrap = slider(bands ? 'Bands' : 'Max groups', 'sizeGroups.maxGroups', 1, 8, 1, function (v) {
+        return String(Math.round(v));
+      }, function (v) {
+        var n = Math.round(v);
+        if (n === 1) return 'one group — the whole print is a single color';
+        return bands ? 'exactly ' + n + ' tiers, split at every ' + (1 / n).toFixed(2) + ' of the size range'
+          : 'keeps the widest ' + (n - 1) + ' gaps at most';
+      });
+      if (inertGeometry) markInert(maxWrap, INERT_WHY);
+      sec.appendChild(maxWrap);
 
       var geoRow = el('div', 'pp-row');
       geoRow.style.marginTop = '10px';
@@ -794,6 +927,7 @@
       geoLabel.appendChild(el('span', null, 'Geometry-aware color (shape size)'));
       geoChk.addEventListener('change', function () { palette.geometryEnabled = this.checked; changed(); });
       geoRow.appendChild(geoLabel);
+      if (inertGeometry) markInert(geoRow, INERT_WHY);
       sec.appendChild(geoRow);
 
       var genRow = el('div', 'pp-row');
@@ -814,19 +948,39 @@
       return sec;
     }
 
-    // Generic labeled slider bound to a top-level palette key.
-    function slider(labelText, key, min, max, step, fmt, hint) {
+    // Generic labeled slider bound to a palette key, or a dotted path into a
+    // nested settings object (`sizeGroups.minGap`).
+    function readPath(path) {
+      return path.split('.').reduce(function (o, k) { return o == null ? undefined : o[k]; }, palette);
+    }
+    function writePath(path, value) {
+      var parts = path.split('.');
+      var last = parts.pop();
+      var target = parts.reduce(function (o, k) {
+        if (o[k] == null) o[k] = {};
+        return o[k];
+      }, palette);
+      target[last] = value;
+    }
+
+    // `dflt` is what the row shows when the palette has not set this key yet.
+    // It defaults to `min` only because most sliders have no other sensible
+    // resting point; anything the engine defaults to something else must pass it,
+    // or the panel will claim a value the engine is not using.
+    function slider(labelText, key, min, max, step, fmt, hint, dflt) {
       var wrap = el('div');
       var row = el('div', 'pp-row');
       row.appendChild(el('span', 'pp-label', labelText));
-      var value = palette[key] != null ? palette[key] : min;
+      var stored = readPath(key);
+      var value = stored != null ? stored : (dflt != null ? dflt : min);
       var ctrl = input('range', value, { min: String(min), max: String(max), step: String(step) });
       var out = el('span', 'pp-val', fmt(value));
       var note = el('div', 'pp-hint', hint ? hint(value) : '');
       ctrl.addEventListener('input', function () {
-        palette[key] = num(this.value, min);
-        out.textContent = fmt(palette[key]);
-        if (hint) note.textContent = hint(palette[key]);
+        writePath(key, num(this.value, min));
+        var v = readPath(key);
+        out.textContent = fmt(v);
+        if (hint) note.textContent = hint(v);
         changed();
       });
       row.appendChild(ctrl);

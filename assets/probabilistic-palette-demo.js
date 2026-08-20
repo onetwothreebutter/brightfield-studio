@@ -138,7 +138,11 @@
     opts = opts || {};
     var w = opts.width || ctx.canvas.width;
     var h = opts.height || ctx.canvas.height;
-    var assigner = PP.createAssigner(palette, { seed: opts.seed, totalShapes: shapes.length });
+    // `shapes` is what lets size grouping engage — a cohort can't be found one
+    // shape at a time, so the assigner needs the whole composition up front.
+    var assigner = PP.createAssigner(palette, {
+      seed: opts.seed, totalShapes: shapes.length, shapes: shapes
+    });
 
     ctx.clearRect(0, 0, w, h);
     if (opts.shirt !== false) {

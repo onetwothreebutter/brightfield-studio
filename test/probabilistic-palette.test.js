@@ -65,6 +65,94 @@ describe('seeded RNG', () => {
   });
 });
 
+// The GPU path for per-element print density is a transcription of these two
+// functions (see paletteRoll32 in shader-base.js). It can't be run under jsdom,
+// so what is pinned here is the contract it has to reproduce: uint32 in, the
+// same stream out, no float arithmetic anywhere in the derivation.
+describe('per-element rolls', () => {
+  // Lazily, not at describe scope: PP is only published once beforeAll has run.
+  const base = () => PP.deriveSeed('s', 'element-print');
+  const seed = base;
+
+  it('is deterministic per (base, id)', () => {
+    const base = seed();
+    expect(PP.elementRoll(base, 7)).toBe(PP.elementRoll(base, 7));
+    expect(PP.elementRoll(base, 7)).not.toBe(PP.elementRoll(base, 8));
+    expect(PP.elementRoll(base, 7)).not.toBe(PP.elementRoll(base + 1, 7));
+  });
+
+  it('stays a uint32 the GLSL can hold, for ids far past any real element count', () => {
+    const base = seed();
+    [0, 1, 4095, 65535, 1e6].forEach((id) => {
+      const s = PP.elementSeed(base, id);
+      expect(Number.isInteger(s)).toBe(true);
+      expect(s).toBeGreaterThanOrEqual(0);
+      expect(s).toBeLessThanOrEqual(0xFFFFFFFF);
+    });
+  });
+
+  it('is the first draw of makeRng on the mixed seed — one generator, not two', () => {
+    const base = seed();
+    const full = PP.makeRng(PP.elementSeed(base, 12))();
+    // Quantized to the 24 bits a fragment shader's float can actually hold, so
+    // the GPU makes this decision rather than one 8 bits away from it.
+    expect(PP.elementRoll(base, 12)).toBe(Math.floor(full * 16777216) / 16777216);
+    expect(Math.abs(PP.elementRoll(base, 12) - full)).toBeLessThan(1 / 16777216);
+  });
+
+  it('quantizes to a value a 24-bit mantissa holds exactly', () => {
+    for (let id = 0; id < 200; id++) {
+      const r = PP.elementRoll(base(), id) * 16777216;
+      expect(Number.isInteger(r)).toBe(true);
+    }
+  });
+
+  it('holds print density across a run of neighbouring ids', () => {
+    const base = seed();
+    // Adjacent element ids are the common case (a grid, a row of lines), so a
+    // hash that correlated on low bits would band the print pattern instead of
+    // scattering it. 20% tolerance on 4000 rolls.
+    [0.25, 0.6, 0.9].forEach((density) => {
+      let printed = 0;
+      for (let id = 0; id < 4000; id++) if (PP.elementRoll(base, id) < density) printed++;
+      expect(Math.abs(printed / 4000 - density)).toBeLessThan(density * 0.2);
+    });
+  });
+
+  it('weights the print chance by how much ink an element carries', () => {
+    // Weight 1 must be exactly the density, or wiring a weight into one shader
+    // would quietly shift every shader that never asked for one.
+    expect(PP.elementPrintChance(0.68, 1)).toBeCloseTo(0.68, 12);
+    expect(PP.elementPrintChance(0.68, undefined)).toBeCloseTo(0.68, 12);
+    // Bigger than average ⇒ likelier to print; smaller ⇒ likelier to drop.
+    expect(PP.elementPrintChance(0.68, 6)).toBeGreaterThan(0.9);
+    expect(PP.elementPrintChance(0.68, 0.4)).toBeLessThan(0.4);
+    // Both endpoints are fixed points, whatever the weight — otherwise density 0
+    // would leak ink and density 1 would punch holes in a design asking for none.
+    [0.05, 1, 6, 20].forEach((w) => {
+      expect(PP.elementPrintChance(0, w)).toBe(0);
+      expect(PP.elementPrintChance(1, w)).toBe(1);
+    });
+  });
+
+  it('keeps the weighted chance a probability for absurd weights', () => {
+    [-5, 0, 1e9, NaN, Infinity].forEach((w) => {
+      const c = PP.elementPrintChance(0.5, w);
+      expect(Number.isFinite(c), `weight ${w}`).toBe(true);
+      expect(c).toBeGreaterThanOrEqual(0);
+      expect(c).toBeLessThanOrEqual(1);
+    });
+  });
+
+  it('never prints at density 0 and always prints at density 1', () => {
+    const base = seed();
+    for (let id = 0; id < 500; id++) {
+      expect(PP.elementRoll(base, id) < 0).toBe(false);
+      expect(PP.elementRoll(base, id) < 1).toBe(true);
+    }
+  });
+});
+
 describe('normalizeWeights', () => {
   it('normalizes weights that already sum to 1', () => {
     expect(PP.normalizeWeights([0.5, 0.5])).toEqual([0.5, 0.5]);
@@ -517,7 +605,8 @@ describe('seed determinism end to end', () => {
     const files = [
       '../assets/probabilistic-palette.js',
       '../assets/probabilistic-palette-demo.js',
-      '../assets/probabilistic-palette-ui.js'
+      '../assets/probabilistic-palette-ui.js',
+      '../assets/probabilistic-palette-shader.js'
     ];
     files.forEach((f) => {
       const src = readFileSync(join(__dirname, f), 'utf8');
@@ -739,5 +828,289 @@ describe('presets', () => {
     expect(copy.name).toBe('My Palette');
     expect(original.colors[0].weight).toBe(39);
     expect(copy.id).not.toBe(original.id);
+  });
+});
+
+// ── Size groups ──────────────────────────────────────────────────────────────
+// A third kind of structure, next to geography (where a shape is) and
+// inheritance (what it is next to): shapes of the same scale take one color,
+// wherever they sit.
+
+describe('size group boundaries', () => {
+  it('splits at the widest gaps in the distribution', () => {
+    // Three obvious tiers with empty bands between them.
+    const sizes = [0, 0.02, 0.04, 0.5, 0.52, 0.54, 0.98, 1];
+    const bounds = PP.sizeGroupBounds(sizes, { minGap: 0.06, maxGroups: 5 });
+    expect(bounds).toHaveLength(2);
+    expect(bounds[0]).toBeGreaterThan(0.04);
+    expect(bounds[0]).toBeLessThan(0.5);
+    expect(bounds[1]).toBeGreaterThan(0.54);
+    expect(bounds[1]).toBeLessThan(0.98);
+  });
+
+  it('returns no split for a smooth distribution — one group is the honest answer', () => {
+    const sizes = Array.from({ length: 50 }, (_, i) => i / 49);
+    expect(PP.sizeGroupBounds(sizes, { minGap: 0.06, maxGroups: 5 })).toEqual([]);
+  });
+
+  it('keeps only the widest gaps when there are more candidates than groups', () => {
+    // Gaps of 0.15, 0.30, 0.35, 0.20 — all above minGap, all distinct.
+    const sizes = [0, 0.15, 0.45, 0.8, 1];
+    const bounds = PP.sizeGroupBounds(sizes, { minGap: 0.05, maxGroups: 3 });
+    expect(bounds).toHaveLength(2);
+    // The two widest are 0.45→0.8 and 0.15→0.45; boundaries sit mid-gap.
+    expect(bounds[0]).toBeCloseTo(0.3, 6);
+    expect(bounds[1]).toBeCloseTo(0.625, 6);
+  });
+
+  it('is pure — same sizes in, same bounds out, in any input order', () => {
+    const sizes = [0.9, 0.1, 0.5, 0.12, 0.88, 0.52];
+    const a = PP.sizeGroupBounds(sizes, { minGap: 0.1, maxGroups: 4 });
+    const b = PP.sizeGroupBounds(sizes.slice().reverse(), { minGap: 0.1, maxGroups: 4 });
+    expect(a).toEqual(b);
+    expect(a.length).toBeGreaterThan(0);
+  });
+
+  it('assigns sizes to groups in ascending order', () => {
+    const bounds = [0.3, 0.7];
+    expect(PP.groupIndexOf(bounds, 0.0)).toBe(0);
+    expect(PP.groupIndexOf(bounds, 0.29)).toBe(0);
+    expect(PP.groupIndexOf(bounds, 0.31)).toBe(1);
+    expect(PP.groupIndexOf(bounds, 1.0)).toBe(2);
+  });
+});
+
+describe('size-grouped assignment', () => {
+  const grouped = (overrides = {}) => {
+    const p = JSON.parse(JSON.stringify(PP.PRESETS['Brightfield / Black 01']));
+    p.printDensity = 1;             // isolate grouping from the print roll
+    p.sizeGroups = { enabled: true, minGap: 0.06, maxGroups: 5 };
+    return Object.assign(p, overrides);
+  };
+
+  // Three clean tiers, so grouping has something unambiguous to find.
+  const tiered = () => {
+    const shapes = [];
+    for (let i = 0; i < 30; i++) {
+      const tier = i % 3;
+      shapes.push({ x: (i % 6) / 5, y: Math.floor(i / 6) / 4, size: tier * 0.5 + (i % 5) * 0.004 });
+    }
+    return shapes;
+  };
+
+  function run(palette, shapes, seed = 'g1') {
+    const a = PP.createAssigner(palette, { seed, totalShapes: shapes.length, shapes });
+    return { a, out: shapes.map((s, i) => a.assign({ index: i, x: s.x, y: s.y, size: s.size })) };
+  }
+
+  it('gives every shape in a cohort the same color', () => {
+    const shapes = tiered();
+    const { a, out } = run(grouped(), shapes);
+    const bounds = a.groups().bounds;
+    const byGroup = {};
+    out.forEach((r, i) => {
+      if (!r.printed || r.spark) return;   // sparks are deliberate exceptions
+      const g = PP.groupIndexOf(bounds, shapes[i].size);
+      byGroup[g] = byGroup[g] || new Set();
+      byGroup[g].add(r.color);
+    });
+    Object.keys(byGroup).forEach((g) => {
+      expect(byGroup[g].size, `group ${g} used ${[...byGroup[g]].join(', ')}`).toBe(1);
+    });
+    expect(Object.keys(byGroup).length).toBeGreaterThan(1);
+  });
+
+  it('reports the cohorts it found', () => {
+    const { a } = run(grouped(), tiered());
+    const g = a.groups();
+    expect(g.bounds).toHaveLength(2);
+    expect(g.colors).toHaveLength(3);
+    g.colors.forEach((c) => expect(c.color).toMatch(/^#[0-9A-F]{6}$/i));
+  });
+
+  it('never exceeds maxGroups', () => {
+    const shapes = Array.from({ length: 40 }, (_, i) => ({ x: 0.5, y: 0.5, size: i / 39 }));
+    const p = grouped({ sizeGroups: { enabled: true, minGap: 0.005, maxGroups: 3 } });
+    const { a } = run(p, shapes);
+    expect(a.groups().bounds.length).toBeLessThanOrEqual(2);
+  });
+
+  it('stays inert when the caller does not pass shapes', () => {
+    const shapes = tiered();
+    const p = grouped();
+    const withShapes = PP.createAssigner(p, { seed: 'x', totalShapes: shapes.length, shapes });
+    const without = PP.createAssigner(p, { seed: 'x', totalShapes: shapes.length });
+    expect(withShapes.groups()).not.toBeNull();
+    expect(without.groups()).toBeNull();
+  });
+
+  it('reproduces an identical artwork for identical inputs', () => {
+    const shapes = tiered();
+    expect(run(grouped(), shapes, 'same').out).toEqual(run(grouped(), shapes, 'same').out);
+    expect(run(grouped(), shapes, 'a').out).not.toEqual(run(grouped(), shapes, 'b').out);
+  });
+
+  it('keeps every element by default — grouping re-colours, it does not delete', () => {
+    // Turning grouping on must not silently remove elements the design had a
+    // moment earlier: that reads as grouping being broken rather than as density
+    // doing its job.
+    const shapes = tiered();
+    const { out } = run(grouped({ printDensity: 0.5 }), shapes);
+    expect(out.filter((r) => r.printed)).toHaveLength(shapes.length);
+    out.forEach((r) => expect(r.color).not.toBeNull());
+  });
+
+  it('lets print density expose the shirt when the palette opts in', () => {
+    const shapes = tiered();
+    const p = grouped({ printDensity: 0.5 });
+    p.sizeGroups.dropElements = true;
+    const { out } = run(p, shapes);
+    const printed = out.filter((r) => r.printed).length;
+    expect(printed).toBeGreaterThan(0);
+    expect(printed).toBeLessThan(shapes.length);
+    out.filter((r) => !r.printed).forEach((r) => expect(r.color).toBeNull());
+  });
+
+  it('re-colours rather than reshuffles when that setting is flipped', () => {
+    // The print roll is drawn either way, so every downstream stream stays put:
+    // the elements that survive at dropElements:true must be coloured exactly as
+    // they are when nothing is dropped.
+    const shapes = tiered();
+    const keep = grouped({ printDensity: 0.5 });
+    const drop = grouped({ printDensity: 0.5 });
+    drop.sizeGroups.dropElements = true;
+    const a = run(keep, shapes).out;
+    const b = run(drop, shapes).out;
+    b.forEach((r, i) => { if (r.printed) expect(r.color, `shape ${i}`).toBe(a[i].color); });
+  });
+
+  // Swept across many seeds, not one: the single-seed version of this test
+  // passed for months while sparks were in fact winning ~5% of cohorts, because
+  // the hardcoded seed happened to miss. Every stock preset is covered, since
+  // the two failure paths differed (spatial off read the frozen shares, spatial
+  // on read the color's own `spatial` pair).
+  it('never lets a spark win a size cohort, across every preset and 200 seeds', () => {
+    Object.keys(PP.PRESETS).forEach((name) => {
+      const shapes = tiered();
+      const base = JSON.parse(JSON.stringify(PP.PRESETS[name]));
+      const sparkIndex = base.colors.findIndex((c) => c.spark);
+      expect(sparkIndex, `${name} has no spark`).toBeGreaterThanOrEqual(0);
+      for (let i = 0; i < 200; i++) {
+        const p = JSON.parse(JSON.stringify(base));
+        p.printDensity = 1;
+        p.sizeGroups = { enabled: true, minGap: 0.06, maxGroups: 5 };
+        const a = PP.createAssigner(p, { seed: `${name}-${i}`, totalShapes: shapes.length, shapes });
+        a.groups().colors.forEach((c, g) => {
+          expect(c && c.colorIndex, `${name} seed ${i}: spark took cohort ${g}`).not.toBe(sparkIndex);
+        });
+      }
+    });
+  });
+
+  it('still lets a spark land on individual shapes inside a group', () => {
+    const shapes = tiered();
+    const p = grouped();
+    const sparkIndex = p.colors.findIndex((c) => c.spark);
+    p.colors[sparkIndex].conditions = { maxShare: 0.2 };   // drop the size gate
+
+    let sparkHits = 0, total = 0;
+    for (let i = 0; i < 40; i++) {
+      const { out } = run(p, shapes, 'spark-' + i);
+      out.forEach((r) => { if (r.printed) { total++; if (r.colorIndex === sparkIndex) sparkHits++; } });
+    }
+    expect(sparkHits).toBeGreaterThan(0);
+    expect(sparkHits / total).toBeLessThan(0.15);
+  });
+});
+
+describe('size groups reject singleton tiers', () => {
+  it('will not split off a lone outlier, however wide its gap', () => {
+    // 40 shapes packed at the bottom, one stray at the top. The stray's gap is
+    // by far the widest, but a group of one is not a color structure.
+    const sizes = Array.from({ length: 40 }, (_, i) => i * 0.002).concat([1]);
+    expect(PP.sizeGroupBounds(sizes, { minGap: 0.05, maxGroups: 4 })).toEqual([]);
+  });
+
+  it('still splits when both sides carry a real population', () => {
+    const sizes = Array.from({ length: 20 }, (_, i) => i * 0.002)
+      .concat(Array.from({ length: 20 }, (_, i) => 0.9 + i * 0.002));
+    const bounds = PP.sizeGroupBounds(sizes, { minGap: 0.05, maxGroups: 4 });
+    expect(bounds).toHaveLength(1);
+    expect(bounds[0]).toBeGreaterThan(0.04);
+    expect(bounds[0]).toBeLessThan(0.9);
+  });
+
+  it('honors minShare — lowering it lets smaller tiers through', () => {
+    const sizes = Array.from({ length: 38 }, (_, i) => i * 0.002).concat([0.9, 0.92]);
+    expect(PP.sizeGroupBounds(sizes, { minGap: 0.05, maxGroups: 4, minShare: 0.2 })).toEqual([]);
+    expect(PP.sizeGroupBounds(sizes, { minGap: 0.05, maxGroups: 4, minShare: 0.05 })).toHaveLength(1);
+  });
+
+  it('produces groups that all carry members on a real composition', () => {
+    const shapes = Demo.generate('scatter', { seed: 'pop', count: 160 });
+    const bounds = PP.sizeGroupBounds(shapes.map((s) => s.size), { minGap: 0.06, maxGroups: 5 });
+    const counts = new Array(bounds.length + 1).fill(0);
+    shapes.forEach((s) => { counts[PP.groupIndexOf(bounds, s.size)]++; });
+    counts.forEach((n, i) => {
+      expect(n, `group ${i} of ${counts.length} is empty or a singleton`).toBeGreaterThan(1);
+    });
+  });
+});
+
+describe('fixed size bands', () => {
+  it('cuts the range into equal slices, regardless of the distribution', () => {
+    const smooth = Array.from({ length: 50 }, (_, i) => i / 49);
+    const bounds = PP.sizeGroupBounds(smooth, { mode: 'bands', maxGroups: 4 });
+    expect(bounds).toEqual([0.25, 0.5, 0.75]);
+  });
+
+  it('gives the asked-for count where clusters would find none', () => {
+    // The smooth case clusters honestly reports as one group.
+    const smooth = Array.from({ length: 50 }, (_, i) => i / 49);
+    expect(PP.sizeGroupBounds(smooth, { mode: 'clusters', minGap: 0.06, maxGroups: 4 })).toEqual([]);
+    expect(PP.sizeGroupBounds(smooth, { mode: 'bands', maxGroups: 4 })).toHaveLength(3);
+  });
+
+  it('ignores minGap and minShare — the count is the whole point', () => {
+    const clumped = Array.from({ length: 40 }, (_, i) => i * 0.001).concat([1]);
+    const bounds = PP.sizeGroupBounds(clumped, { mode: 'bands', maxGroups: 3, minGap: 0.5, minShare: 0.4 });
+    expect(bounds).toEqual([1 / 3, 2 / 3]);
+  });
+
+  it('collapses to a single group at one band', () => {
+    const sizes = [0, 0.5, 1];
+    expect(PP.sizeGroupBounds(sizes, { mode: 'bands', maxGroups: 1 })).toEqual([]);
+  });
+
+  it('is pure and order-independent, like clusters', () => {
+    const sizes = [0.9, 0.1, 0.5];
+    expect(PP.sizeGroupBounds(sizes, { mode: 'bands', maxGroups: 5 }))
+      .toEqual(PP.sizeGroupBounds(sizes.slice().reverse(), { mode: 'bands', maxGroups: 5 }));
+  });
+
+  it('drives the assigner: one color per band, on a composition clusters would not split', () => {
+    const p = JSON.parse(JSON.stringify(PP.PRESETS['Brightfield / Black 01']));
+    p.printDensity = 1;
+    p.sizeGroups = { enabled: true, mode: 'bands', maxGroups: 4 };
+    const shapes = Array.from({ length: 60 }, (_, i) => ({ x: 0.5, y: 0.5, size: i / 59 }));
+    const a = PP.createAssigner(p, { seed: 'bands', totalShapes: shapes.length, shapes });
+    const out = shapes.map((s, i) => a.assign({ index: i, x: s.x, y: s.y, size: s.size }));
+
+    expect(a.groups().bounds).toEqual([0.25, 0.5, 0.75]);
+    const byBand = {};
+    out.forEach((r, i) => {
+      if (!r.printed || r.spark) return;
+      const g = PP.groupIndexOf(a.groups().bounds, shapes[i].size);
+      byBand[g] = byBand[g] || new Set();
+      byBand[g].add(r.color);
+    });
+    expect(Object.keys(byBand)).toHaveLength(4);
+    Object.keys(byBand).forEach((g) => expect(byBand[g].size).toBe(1));
+  });
+
+  it('defaults to clusters when no mode is given', () => {
+    const sizes = Array.from({ length: 50 }, (_, i) => i / 49);
+    expect(PP.sizeGroupBounds(sizes, { minGap: 0.06, maxGroups: 4 })).toEqual([]);
+    expect(PP.DEFAULT_SIZE_GROUPS.mode).toBe('clusters');
   });
 });
