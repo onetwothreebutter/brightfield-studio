@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Probabilistic Palette Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Azeret+Mono:wght@900&family=Barlow+Condensed:wght@700&family=Bebas+Neue&family=Fjalla+One&family=Big+Shoulders+Display:wght@700&family=Bricolage+Grotesque:wght@800&family=Courier+Prime:wght@700&family=Cutive+Mono&family=DM+Mono:wght@500&family=DM+Sans:wght@900&family=Epilogue:wght@900&family=Fira+Code:wght@700&family=Fragment+Mono&family=Geist+Mono:wght@900&family=IBM+Plex+Mono:wght@700&family=Inconsolata:wght@900&family=JetBrains+Mono:wght@800&family=Montserrat:wght@900&family=Orbitron:wght@700&family=Oswald:wght@700&family=Playfair+Display:wght@700&family=Righteous&family=Roboto+Mono:wght@700&family=Russo+One&family=Share+Tech+Mono&family=Source+Code+Pro:wght@900&family=Space+Mono:wght@700&family=Spline+Sans+Mono:wght@700&family=Syne:wght@800&family=Teko:wght@500&family=Unbounded:wght@900" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #111;
+    color: #eee;
+    font-family: 'IBM Plex Mono', 'Menlo', monospace;
+    font-size: 12px;
+    padding: 24px 28px 64px;
+  }
+
+  h1 {
+    font-size: 16px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .subtitle { color: #666; margin-bottom: 24px; line-height: 1.6; max-width: 900px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(420px, 560px) 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  @media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel {
+    border: 1px solid #2c2c32;
+    border-radius: 6px;
+    background: #1c1c20;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+
+  .panel h2 {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #8a8a92;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .ctl { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .ctl label { color: #8a8a92; min-width: 108px; }
+  .ctl input[type=text], .ctl input[type=number], .ctl select {
+    background: #0f0f11; border: 1px solid #2c2c32; color: #eee;
+    border-radius: 4px; padding: 5px 7px; font-family: inherit; font-size: 12px;
+  }
+  .ctl input[type=range] { flex: 1; accent-color: #6fb3f2; }
+  .ctl output { min-width: 52px; text-align: right; color: #8a8a92; font-variant-numeric: tabular-nums; }
+
+  button {
+    background: #26262c; border: 1px solid #2c2c32; color: #eee;
+    border-radius: 4px; padding: 6px 11px; cursor: pointer;
+    font-family: inherit; font-size: 11px;
+  }
+  button:hover { border-color: #6fb3f2; color: #fff; }
+  .btn-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+
+  /* The one WebGL canvas every sample is rendered through. Kept out of layout
+     so nothing about the page can resize it mid-grid. */
+  #shader-canvas { display: none; }
+
+  #preview {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    display: block;
+    border-radius: 4px;
+    background: #000;
+  }
+
+  .samples {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 8px;
+  }
+  .samples canvas {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    display: block;
+    border-radius: 3px;
+    border: 1px solid #2c2c32;
+    cursor: pointer;
+    background: #000;
+  }
+  .samples canvas:hover { border-color: #6fb3f2; }
+  .samples canvas.active { border-color: #f2c14e; }
+
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 3px 4px; }
+  th { color: #55555e; font-weight: normal; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+  td:first-child, th:first-child { text-align: left; }
+  .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  .hint { color: #666; font-size: 11px; line-height: 1.5; margin-top: 10px; }
+  .slots { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 10px; }
+  .slots i {
+    display: inline-block; width: 16px; height: 16px; border-radius: 3px;
+    border: 1px solid #2c2c32;
+  }
+  .warn { color: #f2a04e; }
+
+  /* The shader's own controls. Long lists (70 rows on four-circles) get their
+     own scroll rather than pushing the sample grid off the page. */
+  #shader-gui-body {
+    max-height: 460px;
+    overflow-y: auto;
+    padding-right: 6px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Probabilistic Palette Lab</h1>
+<p class="subtitle">
+  Every sample below is colored by the palette on the left — either a real Brightfield product shader, or one of
+  the shape generators, which is where per-shape rules (size groups, size curves, inheritance) actually bite.
+  One design, one set of settings, many seeds, so the only thing changing between thumbnails is what the palette
+  decided. Colors are chosen by weight, not uniformly; unprinted areas are left black so the shirt shows through —
+  black is never inked. Every decision runs on the seeded RNG at a frozen clock, so the same seed always
+  reproduces the same image. Judge a palette by the sample grid, not by one design.
+</p>
+
+<canvas id="shader-canvas" width="600" height="750"></canvas>
+
+<div class="layout">
+
+  <div>
+    <div id="editor"></div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h2><span>Preview</span><span id="preview-meta"></span></h2>
+      <div class="ctl">
+        <label for="seed">Seed</label>
+        <input type="text" id="seed" value="brightfield-001" style="flex:1">
+        <button id="reseed">New seed</button>
+      </div>
+      <div class="ctl">
+        <label for="source">Source</label>
+        <select id="source" style="flex:1"></select>
+      </div>
+      <div class="ctl" id="variation-row">
+        <label for="variation">Shader drift</label>
+        <input type="range" id="variation" min="0" max="1" step="0.05" value="0">
+        <output id="variation-out">0%</output>
+      </div>
+      <div class="ctl" id="detail-row">
+        <label for="detail">Detail</label>
+        <input type="range" id="detail" min="2" max="8" step="1" value="6">
+        <output id="detail-out">6</output>
+      </div>
+      <div class="ctl" id="group-label-row">
+        <label for="group-labels">Cohort labels</label>
+        <input type="checkbox" id="group-labels">
+        <span class="hint" style="margin:0">number each size band on the artwork</span>
+      </div>
+      <p class="hint" id="variation-hint"></p>
+      <canvas id="preview" width="600" height="750"></canvas>
+      <div class="slots" id="slots"></div>
+      <p class="hint" id="slots-hint"></p>
+    </div>
+
+    <div class="panel" id="shader-panel">
+      <h2>
+        <span>Shader controls</span>
+        <button id="reset-shader" type="button">Reset to defaults</button>
+      </h2>
+      <div id="shader-gui-body"></div>
+      <p class="hint">
+        These settings are shared by the preview and every thumbnail — that is what makes the grid a comparison of
+        color alone. Color mode and the palette-driven color pickers are not listed: the palette owns them, and
+        anything you set there would be overwritten on the next render.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h2><span>Observed ink by area</span><span id="dist-meta"></span></h2>
+      <table id="dist"></table>
+      <p class="hint">
+        Base is the weight you typed; seeded is what generative variation made of it for this seed. The third
+        column counts the units the palette actually assigned — a shader's color uniforms, or the composition's
+        shapes. Area is the honest one: every pixel of the rendered frame bucketed to its nearest palette color,
+        with black counted as exposed shirt rather than ink. The two diverge because neither a gradient stop nor a
+        shape owns an equal share of the canvas.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h2><span>Generate samples</span><span id="samples-meta"></span></h2>
+      <div class="ctl">
+        <label for="count">Thumbnails</label>
+        <input type="range" id="count" min="25" max="50" step="1" value="36">
+        <output id="count-out">36</output>
+        <button id="regen">Generate</button>
+      </div>
+      <div class="samples" id="samples"></div>
+      <p class="hint">Click any thumbnail to load its seed into the preview above.</p>
+    </div>
+  </div>
+
+</div>
+
+<script src="assets/probabilistic-palette.js"></script>
+<script src="assets/probabilistic-palette-demo.js"></script>
+<script src="assets/shader-base.js"></script>
+<script src="assets/shader-defs.js"></script>
+<script src="assets/shader-gui.js"></script>
+<script src="assets/probabilistic-palette-shader.js"></script>
+<script src="assets/probabilistic-palette-ui.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var PP = window.ProbabilisticPalette;
+  var PPS = window.ProbabilisticPaletteShader;
+  var Demo = window.ProbabilisticPaletteDemo;
+  var SHADERS = window.ShaderDefs.SHADERS;
+
+  // Every shader draws into this one context, one after another. Chrome drops
+  // WebGL contexts past roughly sixteen, so 50 thumbnails cannot each own one;
+  // instead each thumbnail is a 2D canvas that receives a drawImage of the
+  // shared frame. The canvas is sized in markup and never resized — shader-base
+  // sets the viewport from the drawing buffer at context creation.
+  window.ShaderBase.manual = true;
+
+  var GL_CANVAS = document.getElementById('shader-canvas');
+  var W = GL_CANVAS.width;
+  var H = GL_CANVAS.height;
+
+  var palette = PP.clonePalette(PP.PRESETS['Brightfield / Black 01'], 'Brightfield / Black 01');
+  var seed = document.getElementById('seed').value;
+
+  // Two families of source. The shaders are what ships; the shape generators are
+  // where per-shape palette rules — size groups, size curves, inheritance —
+  // actually have shapes to bite on, so a palette tuned for them can be seen
+  // working before it is judged on a shader.
+  var SHAPE_SOURCES = { subdivision: 'Subdivision', scatter: 'Scatter' };
+  var sourceName = 'subdivision';
+  function isShapes() { return !!SHAPE_SOURCES[sourceName]; }
+
+  var detail = 6;
+  // Zero by default, and that is the point of the grid: every sample is the
+  // same composition at the same settings, so the only thing changing cell to
+  // cell is the palette's decision. Turn it up to see how the palette holds
+  // across different compositions — but then you are reading two variables.
+  var variation = 0;
+  // Diagnostic overlay: numbers each size cohort on the artwork. Off by default
+  // and never persisted — it is a tuning aid, not part of any design.
+  var showGroupLabels = false;
+  var previewSlots = [];
+
+  // Per-shader settings, owned by the control panel below and shared by the
+  // preview and every thumbnail. Kept per shader name so switching away and
+  // back doesn't throw away what you tuned.
+  var settings = {};
+
+  function settingsFor(name) {
+    if (!settings[name]) {
+      var def = SHADERS[name];
+      var v = PPS.defaultValues(def);
+      // Seed the mode the palette is going to force anyway, so the panel's
+      // dependency rules show the rows that are actually live.
+      var mode = PPS.chooseColorMode(def);
+      if (mode != null) v.u_color_mode = mode;
+      settings[name] = v;
+    }
+    return settings[name];
+  }
+
+  var previewCanvas = document.getElementById('preview');
+  // The ink measurement reads this canvas back on every redraw, which is
+  // exactly the access pattern willReadFrequently exists for.
+  var previewCtx = previewCanvas.getContext('2d', { willReadFrequently: true });
+
+  // ── Shader loading ────────────────────────────────────────────────────────
+  // A shader script calls ShaderBase.create() on load and throws the handle
+  // away, so it is picked up from ShaderBase.last. Handles are cached: the
+  // program only has to be compiled once per shader per page load.
+
+  var handles = {};
+  var pending = {};
+
+  function failShader(name, why) {
+    var meta = document.getElementById('preview-meta');
+    meta.textContent = name + ' failed to load';
+    var hint = document.getElementById('slots-hint');
+    hint.className = 'hint warn';
+    hint.textContent = why;
+  }
+
+  function withShader(name, done) {
+    if (handles[name]) return done(handles[name]);
+    if (pending[name]) { pending[name].push(done); return; }
+    pending[name] = [done];
+
+    var def = SHADERS[name];
+    // create() reads _shaderState during setup, so the defaults have to be in
+    // place before the script executes.
+    window._shaderState = { values: PPS.defaultValues(def), textDirty: true };
+
+    var s = document.createElement('script');
+    s.src = 'assets/' + name + '.js';
+    // A 404 or a blocked request fires onerror, not onload. Without this the
+    // pending queue for this shader never drains, so every later preview and
+    // every grid cell pushes another callback into a queue nothing will ever
+    // resolve — and the canvas silently keeps showing the previous shader.
+    s.onerror = function () {
+      delete pending[name];
+      failShader(name, 'assets/' + name + '.js failed to load — check the path and the network tab.');
+    };
+    s.onload = function () {
+      var waiting = pending[name];
+      delete pending[name];
+      // create() nulls the handle before it runs, so a shader that threw or
+      // failed to compile shows up here rather than silently rendering
+      // whichever program happened to be bound last.
+      if (!window.ShaderBase.last) {
+        failShader(name, 'assets/' + name + '.js did not finish ShaderBase.create — see the console.');
+        return;
+      }
+      handles[name] = window.ShaderBase.last;
+      waiting.forEach(function (fn) { fn(handles[name]); });
+    };
+    document.head.appendChild(s);
+  }
+
+  // Renders one sample into the shared WebGL canvas and returns its slot
+  // assignment. Nothing is scheduled — the frame is drawn by the time it
+  // returns, so the caller can drawImage immediately.
+  function renderSample(handle, s) {
+    var mapped = PPS.mapPalette(SHADERS[sourceName], {
+      palette: palette, seed: s, variation: variation, values: settingsFor(sourceName)
+    });
+    // Diagnostic only, and set here rather than in mapPalette so it stays out of
+    // the mapping's output entirely — nothing about the palette decision changes.
+    mapped.values.u_group_debug = showGroupLabels ? 1 : 0;
+    window._shaderState.values = mapped.values;
+    // textDirty is deliberately left alone: every shader authors a `textKey`
+    // naming exactly the values its text texture depends on, so the texture is
+    // redrawn when it has to be and reused across the other 49 thumbnails.
+    handle.renderFrame(PPS.FIXED_TIME);
+    return mapped;
+  }
+
+  function blit(ctx, w, h) {
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#000';         // the shirt, under everything
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(GL_CANVAS, 0, 0, w, h);
+  }
+
+  // ── Shapes ────────────────────────────────────────────────────────────────
+  // The CPU path. Geometry is generated from the seed, then the engine colors
+  // every shape — which is the only place size groups, size curves and
+  // inheritance have anything to work with.
+
+  function shapeOpts(s) {
+    return sourceName === 'scatter'
+      ? { seed: s, count: 20 + detail * 22 }
+      : { seed: s, depth: detail };
+  }
+
+  function renderShapes(ctx, s, w, h) {
+    var shapes = Demo.generate(sourceName, shapeOpts(s));
+    var assigner = Demo.render(ctx, shapes, palette, {
+      seed: s, width: w, height: h, shirt: '#000'
+    });
+    return { shapes: shapes, assigner: assigner };
+  }
+
+  // ── Preview ───────────────────────────────────────────────────────────────
+
+  var previewTally = null;   // per-unit shares: slots for a shader, shapes for geometry
+  var previewShapeStats = { printed: 0, total: 0 };
+
+  function drawPreview() {
+    if (isShapes()) {
+      var out = renderShapes(previewCtx, seed, previewCanvas.width, previewCanvas.height);
+      previewSlots = [];
+      previewTally = out.assigner.tally();
+      previewShapeStats = { printed: out.assigner.stats.printedCount, total: out.shapes.length };
+      document.getElementById('preview-meta').textContent =
+        out.shapes.length + ' shapes · ' + out.assigner.stats.printedCount + ' printed';
+      drawGroups(out);
+      drawDistribution();
+      return;
+    }
+    withShader(sourceName, function (handle) {
+      var mapped = renderSample(handle, seed);
+      blit(previewCtx, previewCanvas.width, previewCanvas.height);
+      // With grouping driving a supported shader the gradient stops are
+      // overridden, so the distribution has to count cohorts instead — the
+      // stops are no longer what put color on the shirt.
+      var grouped = mapped.groups && handles[sourceName] && handles[sourceName].supportsGroups;
+      previewSlots = grouped ? mapped.groups.cohorts : mapped.slots;
+      previewTally = null;
+      syncGroupSupport();
+
+      // Grouped, "inked" is not a count the CPU can report: the print roll
+      // happens per element inside the GLSL, so the honest reading is the odds
+      // it rolled against rather than a tally of cohorts.
+      var printed = previewSlots.filter(function (s) { return s.printed; }).length;
+      // Not "% inked": a shader may weight the roll by how much ink an element
+      // carries, so this is the odds an *average* element takes ink, not the
+      // share of the canvas that ends up printed. The Area column measures that.
+      document.getElementById('preview-meta').textContent = grouped
+        ? previewSlots.length + ' size groups · '
+          + Math.round(mapped.groups.u_group_density * 100) + '% print density'
+        : previewSlots.length + ' color slots · ' + printed + ' inked';
+      drawSlots(mapped);
+      drawDistribution();
+    });
+  }
+
+  // The swatch strip under a shape preview shows the size cohorts: one swatch
+  // per group, smallest shapes first, so you can read the tiering directly
+  // instead of inferring it from the artwork.
+  function drawGroups(out) {
+    var host = document.getElementById('slots');
+    var hint = document.getElementById('slots-hint');
+    host.textContent = '';
+    hint.className = 'hint';
+
+    var cfg = palette.sizeGroups || {};
+    if (!cfg.enabled) {
+      hint.textContent = 'Size grouping is off — every shape decides its own color, subject to inheritance and '
+        + 'size curves. Turn on “Group by size” under Geography & variation to color by scale instead.';
+      return;
+    }
+
+    // The assigner already decided; this is its own record, not a re-derivation.
+    var groups = out.assigner.groups();
+    if (!groups) {
+      hint.textContent = 'Size grouping is on but this composition produced no shapes to group.';
+      hint.className = 'hint warn';
+      return;
+    }
+    var bounds = groups.bounds;
+    var members = [];
+    out.shapes.forEach(function (sh) {
+      var g = PP.groupIndexOf(bounds, sh.size);
+      members[g] = (members[g] || 0) + 1;
+    });
+
+    for (var g = 0; g < bounds.length + 1; g++) {
+      var n = members[g] || 0;
+      // Empty bands are shown, not skipped: with fixed bands the count is the
+      // promise, and a band nothing landed in is the thing you need to see.
+      if (!n && cfg.mode !== 'bands') continue;
+      var sw = document.createElement('i');
+      var c = n ? groups.colors[g] : null;
+      sw.style.background = c ? c.color : 'transparent';
+      if (!n) sw.style.borderStyle = 'dashed';
+      var lo = g === 0 ? 0 : bounds[g - 1];
+      var hi = g === bounds.length ? 1 : bounds[g];
+      sw.title = (cfg.mode === 'bands' ? 'Band ' : 'Group ') + (g + 1)
+        + ' · size ' + lo.toFixed(2) + '–' + hi.toFixed(2)
+        + ' · ' + (n ? n + ' shapes' + (c ? ' · ' + c.color : '') : 'empty — no shape this size');
+      host.appendChild(sw);
+    }
+    if (cfg.mode === 'bands') {
+      hint.textContent = (bounds.length + 1) + ' fixed bands, smallest first — the size range cut into equal '
+        + 'slices, so the count is guaranteed. Hover a swatch for how many shapes actually landed in it: an '
+        + 'empty or near-empty band means the split fell where the geometry has nothing.';
+      return;
+    }
+    hint.textContent = bounds.length
+      ? (bounds.length + 1) + ' size groups found in this composition, smallest first — the splits are the '
+        + 'widest gaps in its own size distribution, so they follow the geometry rather than being imposed on it.'
+      : 'One group: this composition has no gap in its size distribution wide enough to split on, so the whole '
+        + 'print is a single color. Lower “Min size gap”, or switch to fixed bands to guarantee a count.';
+  }
+
+  function drawSlots(mapped) {
+    var host = document.getElementById('slots');
+    var hint = document.getElementById('slots-hint');
+    host.textContent = '';
+
+    // Grouping overrides the gradient per element, so showing the four stops
+    // would describe a color path that is no longer on screen.
+    var supported = handles[sourceName] && handles[sourceName].supportsGroups;
+    if (mapped.groups && supported) {
+      var b = mapped.groups.u_group_bounds;
+      mapped.groups.u_group_colors.forEach(function (rgb, g) {
+        var sw = document.createElement('i');
+        var hex = window.ShaderDefs.toHex(rgb, 'u_group_colors');
+        sw.style.background = hex;
+        var lo = g === 0 ? 0 : b[g - 1];
+        var hi = g === b.length ? 1 : b[g];
+        sw.title = 'Group ' + (g + 1) + ' · element size ' + lo.toFixed(2) + '–' + hi.toFixed(2)
+          + ' · ' + (hex === '#000000' ? 'empty cohort — shirt' : hex);
+        host.appendChild(sw);
+      });
+      hint.className = 'hint';
+      hint.textContent = mapped.groups.u_group_count + ' size groups, smallest element first — this shader '
+        + 'computes its own element size, so the palette colors each cohort directly instead of running a '
+        + 'gradient. Print density rolls per element inside the cohort, so a swatch is the tier\'s color and '
+        + 'the shirt breaks through it at ' + Math.round((1 - mapped.groups.u_group_density) * 100) + '%.';
+      return;
+    }
+    mapped.slots.forEach(function (s) {
+      var sw = document.createElement('i');
+      sw.style.background = s.hex;
+      sw.title = s.key + ' → ' + (s.printed ? s.hex + (s.inherited ? ' (inherited)' : '') : 'unprinted — shirt');
+      host.appendChild(sw);
+    });
+    if (!mapped.slots.length) {
+      hint.textContent = 'This shader exposes no literal color uniforms in the mode it was put into.';
+      hint.className = 'hint warn';
+    } else {
+      hint.className = 'hint';
+      hint.textContent = 'One swatch per color uniform, in gradient order'
+        + (mapped.colorMode != null ? ' · u_color_mode = ' + mapped.colorMode : ' · no color mode')
+        + '. Repeats are the point: a color that wins two neighbouring stops paints a flat band, which is how'
+        + ' hierarchy shows up in a gradient.'
+        + (mapped.groups ? ' Size grouping is on but this shader exposes no per-element size, so it is'
+          + ' still painting the gradient.' : '');
+    }
+  }
+
+  // ── Observed ink, measured off the rendered frame ─────────────────────────
+  // A shader has no shapes to tally, so the only honest reading of "how much of
+  // this palette actually landed" is the pixels. Each one is bucketed to its
+  // nearest palette color; anything nearer to black than to any of them is
+  // exposed shirt, not ink.
+
+  function measureArea() {
+    var img = previewCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height).data;
+    var counts = palette.colors.map(function () { return 0; });
+    var exposed = 0, total = 0;
+
+    var targets = palette.colors.map(function (c) {
+      return [
+        parseInt(c.color.substr(1, 2), 16),
+        parseInt(c.color.substr(3, 2), 16),
+        parseInt(c.color.substr(5, 2), 16)
+      ];
+    });
+
+    // Every fourth pixel on each axis: the answer moves by well under a tenth of
+    // a percent and the whole grid stays interactive.
+    var stride = 4;
+    for (var y = 0; y < previewCanvas.height; y += stride) {
+      for (var x = 0; x < previewCanvas.width; x += stride) {
+        var i = (y * previewCanvas.width + x) * 4;
+        var r = img[i], g = img[i + 1], b = img[i + 2];
+        total++;
+        var best = -1, bestD = r * r + g * g + b * b;   // distance to black
+        for (var k = 0; k < targets.length; k++) {
+          var dr = r - targets[k][0], dg = g - targets[k][1], db = b - targets[k][2];
+          var d = dr * dr + dg * dg + db * db;
+          if (d < bestD) { bestD = d; best = k; }
+        }
+        if (best < 0) exposed++; else counts[best]++;
+      }
+    }
+    return { counts: counts, exposed: exposed, total: total || 1 };
+  }
+
+  function drawDistribution() {
+    var area = measureArea();
+    var base = PP.paletteShares(palette.colors);
+    var seeded = PP.describe(palette, seed);
+
+    // Third column: whatever unit the palette actually assigned. A shader has
+    // colour uniforms; a composition has shapes, and the assigner already
+    // counted those, so its own tally is used rather than a second count.
+    var unitLabel, unitShares, unshown;
+    if (previewTally) {
+      unitLabel = 'Shapes';
+      // tally() is a share of *printed* shapes; rescale to all shapes so the
+      // column and the shirt row still sum to 100% like the shader case does.
+      var printedShare = previewShapeStats.total
+        ? previewShapeStats.printed / previewShapeStats.total : 0;
+      unitShares = previewTally.map(function (v) { return v * printedShare; });
+      unshown = 1 - printedShare;
+    } else {
+      unitLabel = 'Slots';
+      var slotTotal = previewSlots.length || 1;
+      var slotCounts = palette.colors.map(function () { return 0; });
+      previewSlots.forEach(function (s) {
+        if (s.colorIndex >= 0) slotCounts[s.colorIndex]++;
+      });
+      unitShares = slotCounts.map(function (n) { return n / slotTotal; });
+      unshown = previewSlots.filter(function (s) { return !s.printed; }).length / slotTotal;
+    }
+
+    var table = document.getElementById('dist');
+    table.textContent = '';
+
+    var head = document.createElement('tr');
+    ['Color', 'Base', 'Seeded', unitLabel, 'Area'].forEach(function (h) {
+      var th = document.createElement('th');
+      th.textContent = h;
+      head.appendChild(th);
+    });
+    table.appendChild(head);
+
+    function pct(v) { return (Math.round(v * 1000) / 10).toFixed(1) + '%'; }
+
+    palette.colors.forEach(function (c, i) {
+      var tr = document.createElement('tr');
+      var name = document.createElement('td');
+      var sw = document.createElement('span');
+      sw.className = 'sw';
+      sw.style.background = c.color;
+      name.appendChild(sw);
+      name.appendChild(document.createTextNode(c.name || c.color));
+      tr.appendChild(name);
+      [base[i], seeded[i].share, unitShares[i], area.counts[i] / area.total].forEach(function (v) {
+        var td = document.createElement('td');
+        td.textContent = pct(v);
+        tr.appendChild(td);
+      });
+      table.appendChild(tr);
+    });
+
+    var shirt = document.createElement('tr');
+    var label = document.createElement('td');
+    var sw2 = document.createElement('span');
+    sw2.className = 'sw';
+    sw2.style.background = '#000';
+    label.appendChild(sw2);
+    label.appendChild(document.createTextNode('Shirt (unprinted)'));
+    shirt.appendChild(label);
+    ['—', '—', pct(unshown), pct(area.exposed / area.total)].forEach(function (t) {
+      var td = document.createElement('td');
+      td.textContent = t;
+      shirt.appendChild(td);
+    });
+    table.appendChild(shirt);
+
+    document.getElementById('dist-meta').textContent =
+      palette.generativeWeights ? 'generative weights on' : 'fixed weights';
+  }
+
+  // ── Sample grid ───────────────────────────────────────────────────────────
+
+  var gridToken = 0;   // invalidates an in-flight grid when settings change
+
+  function drawSamples() {
+    var host = document.getElementById('samples');
+    var count = parseInt(document.getElementById('count').value, 10);
+    var meta = document.getElementById('samples-meta');
+    host.textContent = '';
+
+    // Sample seeds are themselves derived from the base seed, so the whole grid
+    // is reproducible — reopening the lab with the same seed shows the same
+    // family of outputs.
+    var rng = PP.makeRng(PP.deriveSeed(seed, 'sample-grid'));
+    var seeds = [];
+    var cells = [];
+    for (var i = 0; i < count; i++) {
+      var s = 'sample-' + Math.floor(rng() * 1e9).toString(36);
+      seeds.push(s);
+      var cell = makeThumb(s);
+      cells.push(cell);
+      host.appendChild(cell);
+    }
+
+    var token = ++gridToken;
+
+    // Yielding every few cells keeps the editor usable while a 50-cell grid
+    // fills in, without changing the order, and so without changing a pixel.
+    // Shaders have to be sequential anyway — one WebGL context, one frame at a
+    // time — and shapes get the same treatment for the same responsiveness.
+    function run(drawCell) {
+      var next = 0;
+      function step() {
+        if (token !== gridToken) return;
+        var end = Math.min(next + 6, cells.length);
+        for (; next < end; next++) drawCell(cells[next], seeds[next]);
+        meta.textContent = next + ' / ' + count + ' seeds';
+        if (next < cells.length) requestAnimationFrame(step);
+      }
+      step();
+    }
+
+    if (isShapes()) {
+      run(function (cell, s) {
+        renderShapes(cell.getContext('2d'), s, cell.width, cell.height);
+      });
+      return;
+    }
+    withShader(sourceName, function (handle) {
+      if (token !== gridToken) return;
+      run(function (cell, s) {
+        renderSample(handle, s);
+        blit(cell.getContext('2d'), cell.width, cell.height);
+      });
+    });
+  }
+
+  function makeThumb(s) {
+    var c = document.createElement('canvas');
+    c.width = 200;
+    c.height = 250;
+    c.title = s;
+    c.addEventListener('click', function () {
+      seed = s;
+      document.getElementById('seed').value = s;
+      Array.prototype.forEach.call(document.querySelectorAll('.samples canvas'), function (n) {
+        n.classList.remove('active');
+      });
+      c.classList.add('active');
+      drawPreview();
+    });
+    return c;
+  }
+
+  // The preview is one frame and redraws immediately; the grid is 25–50, so a
+  // slider drag coalesces into a single rebuild once the hand stops moving.
+  var samplesTimer = null;
+  function scheduleSamples() {
+    if (samplesTimer) clearTimeout(samplesTimer);
+    samplesTimer = setTimeout(function () { samplesTimer = null; drawSamples(); }, 140);
+  }
+
+  function redrawAll() {
+    drawPreview();
+    scheduleSamples();
+  }
+
+  // ── Shader control panel ──────────────────────────────────────────────────
+
+  function buildShaderPanel() {
+    var def = SHADERS[sourceName];
+    var body = document.getElementById('shader-gui-body');
+    body.textContent = '';
+    window.ShaderGUI.build(body, def, {
+      values: settingsFor(sourceName),
+      // The palette owns the color mode and every literal ink uniform; showing
+      // them would invite edits that the next render throws away. The `_`-keyed
+      // rows are the snippets' cosine/four-stop preset pickers, which exist only
+      // to write those same colors.
+      hiddenKeys: PPS.paletteOwnedKeys(def).concat(
+        def.controls.filter(function (c) { return c.key && c.key.charAt(0) === '_'; })
+          .map(function (c) { return c.key; })),
+      // Both reach for Math.random and both write colors — neither belongs in a
+      // lab whose whole claim is that a seed reproduces the image.
+      randomize: false,
+      customAfterBuild: false,
+      onChange: redrawAll
+    });
+  }
+
+  // ── Editor ────────────────────────────────────────────────────────────────
+
+  // Remounted when the source family changes: `inertGeometry` is decided at
+  // mount time, and it is only true for shaders — a shape composition has real
+  // sizes, so size groups and size curves are live there and the editor must
+  // stop badging them engine-only.
+  // What the currently mounted editor believes about size rules, so a shader
+  // finishing its (async) load can correct the badge without remounting on
+  // every redraw.
+  var editorInert = null;
+
+  function groupsLive() {
+    return isShapes() || !!(handles[sourceName] && handles[sourceName].supportsGroups);
+  }
+
+  // Offered on exactly the shaders whose GLSL answers to it: supportsGroupLabels
+  // is a null uniform location, so the toggle cannot drift from the shader
+  // source the way a hard-coded list of shader names would. Also needs grouping
+  // itself to be on — there are no cohorts to number otherwise.
+  function syncLabelRow() {
+    var h = handles[sourceName];
+    var live = !isShapes() && !!(h && h.supportsGroupLabels)
+      && !!(palette.sizeGroups && palette.sizeGroups.enabled);
+    document.getElementById('group-label-row').style.display = live ? '' : 'none';
+  }
+
+  function syncGroupSupport() {
+    syncLabelRow();
+    if (editorInert === !groupsLive()) return;
+    mountEditor(isShapes());
+  }
+
+  function mountEditor(forShapes) {
+    // Live for shapes, and for the shaders that compute a per-element size and
+    // call paletteGroupColor — shader-base reports that from whether the uniform
+    // survived compilation, so this can't drift from the GLSL.
+    var live = groupsLive();
+    editorInert = !live;
+    window.ProbabilisticPaletteUI.mount(document.getElementById('editor'), {
+      palette: palette,
+      inertGeometry: live ? false
+        : 'This shader has no per-element size to group on. Size grouping works on the shape sources, '
+          + 'and on the shaders that expose an element size (Rise Shirt, Circle On Line, Line Circle, '
+          + 'Three Square).',
+      onChange: function (p) {
+        palette = p;
+        redrawAll();
+      }
+    });
+  }
+
+  // ── Controls ──────────────────────────────────────────────────────────────
+
+  var sourceSel = document.getElementById('source');
+  function addGroup(label, entries) {
+    var g = document.createElement('optgroup');
+    g.label = label;
+    Object.keys(entries).forEach(function (name) {
+      var opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = entries[name];
+      g.appendChild(opt);
+    });
+    sourceSel.appendChild(g);
+  }
+  addGroup('Shapes', SHAPE_SOURCES);
+  var shaderLabels = {};
+  Object.keys(SHADERS).forEach(function (name) {
+    shaderLabels[name] = name.split('-').map(function (w) {
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    }).join(' ');
+  });
+  addGroup('Shaders', shaderLabels);
+  sourceSel.value = sourceName;
+
+  // Which controls make sense depends on the source: shader drift and the
+  // shader panel are meaningless for shapes, and Detail is meaningless for a
+  // shader. Size rules are only inert on the shader side, so the editor is
+  // remounted to match rather than lying in one mode or the other.
+  function applyMode() {
+    var shapes = isShapes();
+    document.getElementById('variation-row').style.display = shapes ? 'none' : '';
+    document.getElementById('detail-row').style.display = shapes ? '' : 'none';
+    syncLabelRow();
+    document.getElementById('shader-panel').style.display = shapes ? 'none' : '';
+    if (!shapes) buildShaderPanel();
+    mountEditor(shapes);
+  }
+
+  sourceSel.addEventListener('change', function () {
+    var wasShapes = isShapes();
+    sourceName = this.value;
+    if (isShapes() !== wasShapes) applyMode();
+    else if (!isShapes()) { buildShaderPanel(); mountEditor(false); }
+    redrawAll();
+  });
+
+  document.getElementById('reset-shader').addEventListener('click', function () {
+    delete settings[sourceName];
+    buildShaderPanel();
+    redrawAll();
+  });
+
+  document.getElementById('detail').addEventListener('input', function () {
+    detail = parseInt(this.value, 10);
+    document.getElementById('detail-out').textContent = detail;
+    redrawAll();
+  });
+
+  document.getElementById('group-labels').addEventListener('change', function () {
+    showGroupLabels = this.checked;
+    redrawAll();
+  });
+
+  document.getElementById('seed').addEventListener('input', function () {
+    seed = this.value;
+    redrawAll();
+  });
+
+  document.getElementById('reseed').addEventListener('click', function () {
+    // Walks a deterministic chain off the current seed rather than reaching for
+    // Math.random — the sequence of "new seed" clicks is itself reproducible.
+    var rng = PP.makeRng(PP.deriveSeed(seed, 'reseed'));
+    seed = 'bf-' + Math.floor(rng() * 1e9).toString(36);
+    document.getElementById('seed').value = seed;
+    redrawAll();
+  });
+
+  function variationHint() {
+    document.getElementById('variation-out').textContent = Math.round(variation * 100) + '%';
+    if (isShapes()) {
+      document.getElementById('variation-hint').textContent =
+        'Detail sets how busy the composition is — depth for subdivision, shape count for scatter. '
+        + 'Every sample uses the same value, so the grid stays a comparison of color alone.';
+      return;
+    }
+    document.getElementById('variation-hint').textContent = variation === 0
+      ? 'Every sample uses this shader’s own settings, unchanged — the grid is a controlled comparison of color alone.'
+      : 'Samples also drift ' + Math.round(variation * 100) + '% off the shader’s settings, so the grid now varies '
+        + 'composition as well as color. Colors and the Finish section are never touched.';
+  }
+
+  document.getElementById('variation').addEventListener('input', function () {
+    variation = parseFloat(this.value);
+    variationHint();
+    redrawAll();
+  });
+  variationHint();
+
+  document.getElementById('count').addEventListener('input', function () {
+    document.getElementById('count-out').textContent = this.value;
+  });
+
+  document.getElementById('regen').addEventListener('click', drawSamples);
+
+  // Text overlays are part of several of these designs, so wait for the web
+  // fonts before the first render — otherwise the first grid bakes in a
+  // fallback face and only a reload fixes it.
+  applyMode();
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(redrawAll);
+  } else {
+    redrawAll();
+  }
+})();
+</script>
+
+</body>
+</html>
