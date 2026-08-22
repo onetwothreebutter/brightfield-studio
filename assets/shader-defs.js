@@ -1449,7 +1449,7 @@
           { key: 'u_word',         label: 'Word',          type: 'text',   value: 'PIZZA', textDirty: true,
             randomOptions: ['PIZZA','NACHOS','WAFFLES','CORNDOGS','DOUGHNUTS','ONIONRINGS','CHEESESTEAK'],
             tip: 'Up to 11 characters. Word length determines the grid layout.' },
-          { key: 'u_font_family',  label: 'Font',          type: 'select', value: 'Barlow Condensed',
+          { key: 'u_font_family',  label: 'Font',          type: 'select', value: 'Barlow Condensed', textDirty: true,
             options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; }) },
           { key: 'u_font_size',    label: 'Font Size',     type: 'range',  min: 50, max: 500, step: 10, value: 300 },
           { key: 'perLetterSizeEnabled', label: 'Per-Letter Size', type: 'toggle', value: 0,
@@ -1919,7 +1919,7 @@
           { key: 'u_letter3', label: 'Letter 3', type: 'text', value: '8' },
           { key: 'u_letter4', label: 'Letter 4', type: 'text', value: '1',
             tip: 'Only visible when Square Count is 4.' },
-          { key: 'u_font_family', label: 'Font', type: 'select', value: 'Oswald',
+          { key: 'u_font_family', label: 'Font', type: 'select', value: 'Oswald', textDirty: true,
             options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
           },
           { key: 'u_font_size',      label: 'Font Size',             type: 'range',  min: 50, max: 500, step: 10, value: 300 },
