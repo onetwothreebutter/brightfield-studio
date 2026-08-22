@@ -222,7 +222,19 @@
     // engine rather than being re-derived here.
     var field = sizeField();
     var shapes = field.map(function (size) { return { x: 0.5, y: 0.5, size: size }; });
-    var groups = PP.createAssigner(palette, {
+    // GROUP_MAX is a hard GLSL array size, so the engine is asked for at most
+    // that many cohorts rather than being allowed to produce more and having the
+    // extras chopped off below. Truncating a 10-group solution is not the same
+    // as an 8-group one: the boundaries would be the widest gaps of a split the
+    // shader cannot represent, and cohorts 9 and 10 would vanish with their
+    // colors. The editor's slider already caps at 8; this catches a pasted or
+    // stored palette JSON carrying more, which sizeGroupSettings does not clamp.
+    var forGroups = palette;
+    if (cfg.maxGroups > GROUP_MAX) {
+      forGroups = JSON.parse(JSON.stringify(palette));
+      forGroups.sizeGroups.maxGroups = GROUP_MAX;
+    }
+    var groups = PP.createAssigner(forGroups, {
       seed: seed, totalShapes: shapes.length, shapes: shapes
     }).groups();
     if (!groups) return null;

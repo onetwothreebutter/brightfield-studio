@@ -49,6 +49,7 @@
     'border-left-width:3px;}',
     '.pp-color.pp-drag{opacity:.35;}',
     '.pp-color.pp-over{border-top:2px solid #6fb3f2;}',
+    '.pp-color.pp-over-below{border-bottom:2px solid #6fb3f2;}',
     '.pp-color[data-tier=dominant]{border-left-color:var(--pp-dominant);}',
     '.pp-color[data-tier=supporting]{border-left-color:var(--pp-supporting);}',
     '.pp-color[data-tier=accent]{border-left-color:var(--pp-accent);}',
@@ -197,6 +198,7 @@
     // string to replace the tooltip with something that tells the author where
     // the setting *does* work; a bare `true` gets the generic wording.
     var inertGeometry = !!opts.inertGeometry;
+    var dragFrom = -1;   // row being dragged, for the drop indicator
     var INERT_WHY = typeof opts.inertGeometry === 'string' ? opts.inertGeometry
       : 'Shape size has no meaning in this preview — a shader has no per-shape hook. '
         + 'The engine still applies this wherever geometry exists.';
@@ -715,18 +717,34 @@
         + (inertGeometry ? ' Size rules are marked engine-only: they still work anywhere shapes exist, but this preview has none.' : '')));
       row.appendChild(adv);
 
-      // drag reorder
+      // Drag reorder. splice(from,1) then splice(to,0) lands the row at index
+      // `to` in both directions, which is the predictable rule — but relative to
+      // the *row* under the cursor that means "above" when dragging up and
+      // "below" when dragging down. The indicator has to say which, or a
+      // downward drag looks like it missed by one. dataTransfer is unreadable
+      // during dragover (by spec), so the source index is tracked here instead.
       row.addEventListener('dragstart', function (e) {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', String(index));
+        dragFrom = index;
         row.classList.add('pp-drag');
       });
-      row.addEventListener('dragend', function () { row.classList.remove('pp-drag'); });
-      row.addEventListener('dragover', function (e) { e.preventDefault(); row.classList.add('pp-over'); });
-      row.addEventListener('dragleave', function () { row.classList.remove('pp-over'); });
+      row.addEventListener('dragend', function () {
+        row.classList.remove('pp-drag');
+        dragFrom = -1;
+      });
+      row.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        var below = dragFrom > -1 && dragFrom < index;
+        row.classList.toggle('pp-over', !below);
+        row.classList.toggle('pp-over-below', below);
+      });
+      row.addEventListener('dragleave', function () {
+        row.classList.remove('pp-over', 'pp-over-below');
+      });
       row.addEventListener('drop', function (e) {
         e.preventDefault();
-        row.classList.remove('pp-over');
+        row.classList.remove('pp-over', 'pp-over-below');
         var from = parseInt(e.dataTransfer.getData('text/plain'), 10);
         var to = index;
         if (isNaN(from) || from === to) return;

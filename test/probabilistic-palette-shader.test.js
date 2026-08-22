@@ -462,6 +462,26 @@ describe('size groups on a shader', () => {
     expect(on.values.u_group_seed).not.toBe(0);
   });
 
+  it('solves for 8 cohorts rather than truncating a larger split', () => {
+    // GROUP_MAX is a hard GLSL array size. A palette carrying maxGroups > 8
+    // (the editor caps at 8, but stored/pasted JSON need not) must come back as
+    // a genuine 8-band solution, not the first 7 boundaries of a 12-band one —
+    // otherwise the top cohort spans a range nothing was drawn for and the
+    // extra cohorts vanish along with their colors.
+    const p = grouped('bands', { maxGroups: 12 });
+    const { values } = map('rise-shirt', { palette: p });
+    expect(values.u_group_count).toBe(8);
+    expect(values.u_group_bounds).toHaveLength(7);
+    values.u_group_bounds.forEach((b, i) => expect(b).toBeCloseTo((i + 1) / 8, 12));
+    expect(values.u_group_colors).toHaveLength(8);
+  });
+
+  it('does not mutate the caller\'s palette when it clamps', () => {
+    const p = grouped('bands', { maxGroups: 12 });
+    map('rise-shirt', { palette: p });
+    expect(p.sizeGroups.maxGroups).toBe(12);
+  });
+
   it('stays deterministic', () => {
     const a = map('rise-shirt', { palette: grouped(), seed: 'g' });
     const b = map('rise-shirt', { palette: grouped(), seed: 'g' });

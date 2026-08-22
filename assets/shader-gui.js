@@ -71,6 +71,29 @@
     return v;
   }
 
+  // One popup element and one outside-click listener for the life of the page,
+  // however many times build() runs.
+  var _tip = null;
+  function sharedTip() {
+    if (_tip) return _tip;
+    var el = document.createElement('div');
+    el.className = 'shader-tip__popup';
+    el.style.display = 'none';
+    document.body.appendChild(el);
+    _tip = {
+      el: el,
+      active: null,
+      hide: function () {
+        el.style.display = 'none';
+        if (_tip.active) { _tip.active.classList.remove('is-open'); _tip.active = null; }
+      }
+    };
+    document.addEventListener('click', function (e) {
+      if (_tip.active && !_tip.active.contains(e.target)) _tip.hide();
+    });
+    return _tip;
+  }
+
   function build(body, shader, opts) {
     injectStyles();
     opts = opts || {};
@@ -95,26 +118,21 @@
       onChange(ctrl.key, ctrl);
     }
 
-    // Tooltip
-    var tipEl = document.createElement('div');
-    tipEl.className = 'shader-tip__popup';
-    tipEl.style.display = 'none';
-    document.body.appendChild(tipEl);
-    var activeTipBtn = null;
+    // Tooltip. The element and the outside-click listener are shared across
+    // every build(): a host that rebuilds the panel (the lab does, on each
+    // Source change and on Reset to defaults) would otherwise leak one popup div
+    // and one permanent document listener per call, each closing over the
+    // previous build's rows and holding them alive.
+    var tip = sharedTip();
+    var tipEl = tip.el;
     function showTip(btn, text) {
       var rect = btn.getBoundingClientRect();
       tipEl.textContent = text; tipEl.style.display = 'block';
       tipEl.style.top = (rect.bottom+6)+'px'; tipEl.style.left = rect.left+'px';
-      if (activeTipBtn) activeTipBtn.classList.remove('is-open');
-      activeTipBtn = btn; btn.classList.add('is-open');
+      if (tip.active) tip.active.classList.remove('is-open');
+      tip.active = btn; btn.classList.add('is-open');
     }
-    function hideTip() {
-      tipEl.style.display='none';
-      if(activeTipBtn){activeTipBtn.classList.remove('is-open');activeTipBtn=null;}
-    }
-    document.addEventListener('click', function(e){
-      if(activeTipBtn&&!activeTipBtn.contains(e.target)) hideTip();
-    });
+    function hideTip() { tip.hide(); }
 
     // Dependency tracking
     var paletteDependentRows   = [];
@@ -158,7 +176,7 @@
         var tipBtn = document.createElement('button');
         tipBtn.type = 'button'; tipBtn.className = 'shader-tip-btn'; tipBtn.textContent = '?';
         tipBtn.addEventListener('click', (function(t){ return function(e){
-          e.stopPropagation(); activeTipBtn===this ? hideTip() : showTip(this,t);
+          e.stopPropagation(); tip.active===this ? hideTip() : showTip(this,t);
         }; })(ctrl.tip));
         label.appendChild(tipBtn);
       }

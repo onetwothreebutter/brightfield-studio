@@ -327,6 +327,30 @@ excludes anything `textDirty` or keyed `text*`, so **a control that changes the
 rendered text must carry `textDirty: true`** — including ones not named `text`.
 `u_font_family` on three-square and scaling-letters is the case that got missed.
 
+### Editor + lab gotchas
+- **`markInert` says "engine-only", and that is accurate** — the engine honours
+  size rules and size groups on the shape sources; only the shader in front of
+  you cannot. The reason string is in the row's `title`. It reads as broken
+  mainly because the explanation is easy to miss, not because the tag is wrong.
+- **The drop indicator has to name the side the row will land on.** Reorder is
+  `splice(from,1)` then `splice(to,0)`, which lands the row at index `to` in
+  both directions — relative to the row under the cursor that is *above* when
+  dragging up and *below* when dragging down. `dataTransfer` is unreadable
+  during `dragover` by spec, so the source index is tracked in a mount-scoped
+  `dragFrom` instead.
+- **`ShaderGUI.build` shares one tooltip element and one document listener**
+  (`sharedTip()`), because the lab rebuilds the panel on every Source change and
+  on Reset. Per-build listeners would accumulate for the life of the page and
+  keep detached rows alive.
+- **A shader script that 404s fires `onerror`, not `onload`.** `withShader` has
+  to drain `pending[name]` there too, or every later preview and grid cell
+  queues a callback nothing will resolve while the canvas keeps showing the
+  previous shader.
+- **`GROUP_MAX` (8) is a hard GLSL array size.** The adapter asks the engine for
+  at most that many cohorts rather than truncating a larger split, since the
+  first 7 boundaries of a 12-band solution are not an 8-band one. The editor
+  slider caps at 8; stored or pasted palette JSON need not.
+
 ### Adding a preset
 Data only, no engine change:
 ```javascript

@@ -315,6 +315,14 @@
 
     var s = document.createElement('script');
     s.src = 'assets/' + name + '.js';
+    // A 404 or a blocked request fires onerror, not onload. Without this the
+    // pending queue for this shader never drains, so every later preview and
+    // every grid cell pushes another callback into a queue nothing will ever
+    // resolve — and the canvas silently keeps showing the previous shader.
+    s.onerror = function () {
+      delete pending[name];
+      failShader(name, 'assets/' + name + '.js failed to load — check the path and the network tab.');
+    };
     s.onload = function () {
       var waiting = pending[name];
       delete pending[name];
