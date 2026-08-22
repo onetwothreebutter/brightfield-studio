@@ -506,10 +506,28 @@ describe('size groups on a shader', () => {
 describe('shaders that opt into size groups', () => {
   const WIRED = ['rise-shirt', 'circle-on-line', 'line-circle', 'three-square'];
 
+  // Two valid opt-in shapes, and the tests below have to accept both:
+  //   applyPaletteGroups(col, size, id[, weight])   — the ordinary path
+  //   paletteGroupedColor(col, size) + paletteElementPrinted(id, …)
+  // The split form exists for a shader that post-processes the ink colour
+  // before deciding whether ink lands at all: rise-shirt inverts its dots, and
+  // inverting an already-masked colour turns "unprinted" into white ink.
+  // One level of nesting, because rise-shirt passes paletteAt(mixFactor).
+  const CALL = (fn) => new RegExp(fn + '\\(((?:[^()]|\\([^()]*\\))*)\\)');
+  const argsOf = (m) => m[1].replace(/\([^()]*\)/g, '').split(',').map((a) => a.trim());
+  const optIn = (src) => {
+    const joint = src.match(CALL('applyPaletteGroups'));
+    if (joint) return { form: 'joint', args: argsOf(joint) };
+    const col = src.match(CALL('paletteGroupedColor'));
+    const ink = src.match(CALL('paletteElementPrinted'));
+    if (col && ink) return { form: 'split', args: argsOf(col).concat(argsOf(ink)[0]) };
+    return null;
+  };
+
   it('call paletteGroupColor with a normalized element size', () => {
     WIRED.forEach((name) => {
       const src = readFileSync(join(__dirname, `../assets/${name}.js`), 'utf8');
-      expect(src, `${name} does not opt in`).toMatch(/applyPaletteGroups\(/);
+      expect(optIn(src), `${name} does not opt in`).toBeTruthy();
     });
   });
 
@@ -519,18 +537,13 @@ describe('shaders that opt into size groups', () => {
     // wiring exists to remove. Three arguments, with a non-constant third.
     WIRED.forEach((name) => {
       const src = readFileSync(join(__dirname, `../assets/${name}.js`), 'utf8');
-      // One level of nesting, because rise-shirt passes paletteAt(mixFactor).
-      const call = src.match(/applyPaletteGroups\(((?:[^()]|\([^()]*\))*)\)/);
-      expect(call, `${name} does not opt in`).toBeTruthy();
-      // Flatten nested calls before splitting so their commas can't count.
-      // Three args, or four when the shader also weights the roll by how much
-      // ink the element carries.
-      const args = call[1].replace(/\([^()]*\)/g, '').split(',');
-      expect(args.length, `${name} passes no element id`).toBeGreaterThanOrEqual(3);
-      expect(args.length, `${name} passes too many args`).toBeLessThanOrEqual(4);
-      expect(args[2].trim(), `${name} passes a constant element id`).toMatch(/Id$/);
-      if (args.length === 4) {
-        expect(args[3].trim(), `${name} passes a constant weight`).toMatch(/W(gt|eight)$/);
+      const got = optIn(src);
+      expect(got, `${name} does not opt in`).toBeTruthy();
+      expect(got.args.length, `${name} passes no element id`).toBeGreaterThanOrEqual(3);
+      expect(got.args.length, `${name} passes too many args`).toBeLessThanOrEqual(4);
+      expect(got.args[2], `${name} passes a constant element id`).toMatch(/Id$/);
+      if (got.args.length === 4) {
+        expect(got.args[3], `${name} passes a constant weight`).toMatch(/W(gt|eight)$/);
       }
     });
   });
@@ -543,6 +556,7 @@ describe('shaders that opt into size groups', () => {
     expect(src).toContain('vec3 paletteGroupColor(float size)');
     expect(src).toContain('vec3 applyPaletteGroups(vec3 col, float size)');
     expect(src).toContain('vec3 applyPaletteGroups(vec3 col, float size, highp float elementId)');
+    expect(src).toContain('vec3 paletteGroupedColor(vec3 col, float size)');
   });
 
   it('qualifies the 32-bit path highp, which a fragment shader will not do for it', () => {
@@ -559,11 +573,53 @@ describe('shaders that opt into size groups', () => {
     expect(src).not.toMatch(/'\s*uint t = a;/);
     WIRED.forEach((name) => {
       const s = readFileSync(join(__dirname, `../assets/${name}.js`), 'utf8');
-      const call = s.match(/applyPaletteGroups\(((?:[^()]|\([^()]*\))*)\)/);
-      const id = call[1].replace(/\([^()]*\)/g, '').split(',')[2].trim();
+      const id = optIn(s).args[2];
       expect(s, `${name} builds ${id} at default precision`)
         .toMatch(new RegExp(`highp float ${id}\\s*=`));
+      // And every operand of that id, not just the result: GLSL evaluates an
+      // expression at the precision of its operands, so `highp float id =
+      // <mediump maths>` converts a value that already lost precision.
+      const decl = s.match(new RegExp(`highp float ${id}\\s*=([^']*)`));
+      (decl[1].match(/[A-Za-z_][A-Za-z0-9_]*/g) || [])
+        .filter((tok) => /^(dot|col|line)[A-Za-z]*$/.test(tok) && tok !== id)
+        .forEach((tok) => {
+          expect(s, `${name}: ${id} mixes in ${tok}, which is not highp`)
+            .toMatch(new RegExp(`highp float ${tok}\\s*=`));
+        });
     });
+  });
+
+  it('masks rise-shirt after inverting, so a skipped dot is shirt and not white', () => {
+    // applyPaletteGroups returns vec3(0) for an unprinted element, and
+    // rise-shirt inverts its dots — so masking first printed pure white ink
+    // exactly where the shirt was meant to show through.
+    const src = readFileSync(join(__dirname, '../assets/rise-shirt.js'), 'utf8');
+    const grouped = src.indexOf('paletteGroupedColor(');
+    const invert = src.indexOf('1.0 - dotBase');
+    const mask = src.indexOf('paletteElementPrinted(');
+    expect(grouped).toBeGreaterThan(-1);
+    expect(invert).toBeGreaterThan(grouped);
+    expect(mask, 'the print mask must come after the invert').toBeGreaterThan(invert);
+    // And it must not use the masking form, which would reintroduce the bug.
+    expect(src).not.toMatch(/applyPaletteGroups\(/);
+  });
+
+  it('reads the word toggle a snippet actually defines', () => {
+    // `wordEnabled` is defined by no snippet; four-circles ships
+    // `u_text_enabled`. Keyed off the wrong name, the whole Word Overlay
+    // section was permanently hidden and u_text_color never got a palette color.
+    const gui = readFileSync(join(__dirname, '../assets/shader-gui.js'), 'utf8');
+    const adapter = readFileSync(join(__dirname, '../assets/probabilistic-palette-shader.js'), 'utf8');
+    expect(gui).not.toContain('wordEnabled');
+    expect(adapter).not.toContain('wordEnabled');
+    const def = SHADERS['four-circles'];
+    const keys = def.controls.map((c) => c.key);
+    expect(keys, 'four-circles lost its word toggle').toContain('u_text_enabled');
+    const off = PPS.defaultValues(def);
+    off.u_color_mode = PPS.chooseColorMode(def);
+    expect(PPS.colorSlots(def, off)).not.toContain('u_text_color');
+    const on = Object.assign({}, off, { u_text_enabled: 1 });
+    expect(PPS.colorSlots(def, on)).toContain('u_text_color');
   });
 
   it('draws cohort labels on circle-on-line only, gated behind the debug flag', () => {

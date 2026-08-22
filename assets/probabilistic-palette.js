@@ -470,9 +470,22 @@
     var raw = colors.map(function (c, i) {
       var w;
       if (basisOverride && !(basisOverride[i] > 0)) return 0;
-      if (spatialOn && c.spatial && c.spatial.length === 2) {
+      if (spatialOn) {
+        // Both branches have to be in the *same* unit or normalizeWeights below
+        // compares apples to oranges. A spatial pair is authored in the same
+        // scale as `weight` — the editor seeds those two inputs from it — so a
+        // color without a pair contributes its authored weight, not its
+        // normalized share. Mixing the two made every color lacking a pair
+        // roughly two orders of magnitude rarer than the panel claimed: a
+        // 60/30/10 palette with a pair on the first color alone rendered as
+        // 99.4/0.6/0.07.
+        var authored = (c.spatial && c.spatial.length === 2)
+          ? lerp(c.spatial[0], c.spatial[1], t)
+          : (typeof c.weight === 'number' && isFinite(c.weight) ? c.weight : 0);
+        // Generative variation is carried across as a ratio so both systems
+        // compose, rather than one silently overriding the other.
         var variationFactor = baseShares[i] > 0 ? basis[i] / baseShares[i] : 1;
-        w = lerp(c.spatial[0], c.spatial[1], t) * variationFactor;
+        w = authored * variationFactor;
       } else {
         w = basis[i];
       }

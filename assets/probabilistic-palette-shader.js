@@ -106,7 +106,7 @@
       if (c.stopDependent) return mode === '1';
       if (c.quadDependent) return mode === '2';
       if (c.textColorDependent) return !!values.u_use_text_color;
-      if (c.wordDependent) return !!values.wordEnabled;
+      if (c.wordDependent) return !!values.u_text_enabled;
       return true;
     }).map(function (c) { return c.key; });
   }

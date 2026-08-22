@@ -215,7 +215,7 @@
         if (ctrl.key==='u_color_mode')    colorModeBtn     = btn;
         if (ctrl.key==='u_use_text_color') useTextColorBtn = btn;
         if (ctrl.key==='outlineEnabled')  outlineToggleBtn = btn;
-        if (ctrl.key==='wordEnabled')           wordToggleBtn          = btn;
+        if (ctrl.key==='u_text_enabled')        wordToggleBtn          = btn;
         if (ctrl.key==='perLetterSizeEnabled')  perLetterSizeToggleBtn = btn;
         row.appendChild(btn); controlEls.push({ctrl:ctrl,el:btn});
 

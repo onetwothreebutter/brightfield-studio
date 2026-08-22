@@ -153,6 +153,72 @@ describe('per-element rolls', () => {
   });
 });
 
+describe('spatial weights keep one unit', () => {
+  // A spatial pair is authored in the same scale as `weight` — the editor seeds
+  // those inputs from it. Contributing a normalized share for colors without a
+  // pair and an absolute weight for colors with one put two units in the same
+  // vector: a 60/30/10 palette with a pair on the dominant color alone rendered
+  // as 99.4 / 0.6 / 0.07.
+  const mixed = () => PP.createPalette({
+    spatial: { enabled: true, mode: 'topBottom' },
+    colors: [
+      { id: 'a', name: 'Dominant', color: '#EFE6D2', weight: 60, spatial: [60, 60] },
+      { id: 'b', name: 'Support', color: '#4472E8', weight: 30 },
+      { id: 'c', name: 'Accent', color: '#EF6045', weight: 10 }
+    ]
+  });
+
+  const realized = (p, n = 6000) => {
+    const a = PP.createAssigner(p, { seed: 'units', totalShapes: n });
+    const counts = {};
+    for (let i = 0; i < n; i++) {
+      const r = a.assign({ index: i, x: 0.5, y: (i % 100) / 100, size: 0.5 });
+      if (r.color) counts[r.color] = (counts[r.color] || 0) + 1;
+    }
+    return p.colors.map((c) => (counts[c.color] || 0) / n);
+  };
+
+  it('honors authored weights when only some colors carry a spatial pair', () => {
+    const got = realized(mixed());
+    expect(got[0]).toBeGreaterThan(0.5);
+    expect(got[0]).toBeLessThan(0.7);
+    expect(got[1]).toBeGreaterThan(0.22);
+    expect(got[1]).toBeLessThan(0.38);
+    expect(got[2]).toBeGreaterThan(0.05);
+    expect(got[2]).toBeLessThan(0.16);
+  });
+
+  it('is unchanged when every color carries a pair', () => {
+    // The all-spatial case is what the shipped presets do, and it must not move.
+    const p = mixed();
+    p.colors[1].spatial = [30, 30];
+    p.colors[2].spatial = [10, 10];
+    const got = realized(p);
+    expect(got[0]).toBeCloseTo(0.6, 1);
+    expect(got[1]).toBeCloseTo(0.3, 1);
+    expect(got[2]).toBeCloseTo(0.1, 1);
+  });
+
+  it('still lets a spatial pair override the flat weight across the field', () => {
+    // The point of the feature: odds shift end to end, not a fixed share.
+    const p = PP.createPalette({
+      spatial: { enabled: true, mode: 'topBottom' },
+      colors: [
+        { id: 'a', name: 'Top', color: '#EFE6D2', weight: 50, spatial: [90, 10] },
+        { id: 'b', name: 'Bottom', color: '#4472E8', weight: 50, spatial: [10, 90] }
+      ]
+    });
+    const a = PP.createAssigner(p, { seed: 'field', totalShapes: 4000 });
+    let topNear = 0, topFar = 0;
+    for (let i = 0; i < 2000; i++) {
+      if (a.assign({ index: i, x: 0.5, y: 0.02, size: 0.5 }).color === '#EFE6D2') topNear++;
+      if (a.assign({ index: 2000 + i, x: 0.5, y: 0.98, size: 0.5 }).color === '#EFE6D2') topFar++;
+    }
+    expect(topNear / 2000).toBeGreaterThan(0.7);
+    expect(topFar / 2000).toBeLessThan(0.3);
+  });
+});
+
 describe('normalizeWeights', () => {
   it('normalizes weights that already sum to 1', () => {
     expect(PP.normalizeWeights([0.5, 0.5])).toEqual([0.5, 0.5]);
