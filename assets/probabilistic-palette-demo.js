@@ -104,9 +104,19 @@
     return normalizeSizes(shapes);
   }
 
-  // `size` is the normalized 0–1 rank of a shape's extent within its own
-  // composition — that is what geometry-aware palette rules are written
-  // against, so it must not depend on canvas pixel dimensions.
+  // `size` is a shape's extent rescaled to 0–1 against the smallest and largest
+  // in its own composition — not its *rank*, which earlier comments claimed.
+  // The difference is load-bearing, not pedantry: a rank is uniform by
+  // construction, so it has no gaps, and `clusters` mode finds its tiers by
+  // splitting at the widest gaps. Measured over ten seeds, switching to a true
+  // rank takes scatter from 5 cohorts to 1 — the same collapse a shader's
+  // continuous size field produces.
+  //
+  // The cost is that a skewed distribution stays skewed: `bands` cuts the range
+  // evenly, so a power-law scatter puts 50–64% of its shapes in band 0. That is
+  // the geometry being honest rather than a bug, and it is why `clusters` is the
+  // default. Rescaled rather than absolute so the rules never depend on canvas
+  // pixel dimensions.
   function normalizeSizes(shapes) {
     if (!shapes.length) return shapes;
     var min = Infinity, max = -Infinity;

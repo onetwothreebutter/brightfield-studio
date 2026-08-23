@@ -145,6 +145,21 @@
   // preview cannot express. The editor is not allowed to imply it is driving
   // something it isn't — an author tuning a dead slider learns the wrong lesson
   // about the palette.
+  // Print density only exposes shirt when something is allowed to go unprinted.
+  // Under grouping the roll cannot drop anything unless the palette opts in, so
+  // a readout derived from printDensity alone claimed exposed garment while the
+  // engine was printing every last shape.
+  function dropsElements(palette) {
+    var g = palette && palette.sizeGroups;
+    return !(g && g.enabled) || !!g.dropElements;
+  }
+
+  function exposureNote(palette) {
+    if (!dropsElements(palette)) return 'grouped — every element printed';
+    var d = palette.printDensity != null ? palette.printDensity : 1;
+    return Math.round((1 - d) * 100) + '% shirt exposed';
+  }
+
   function markInert(node, why) {
     node.classList.add('pp-inert');
     node.title = why;
@@ -466,8 +481,7 @@
           lab.style.color = r.color;
           labels.appendChild(lab);
         });
-        var exposed = Math.round((1 - (palette.printDensity != null ? palette.printDensity : 1)) * 100);
-        seedNote.textContent = exposed + '% shirt exposed';
+        seedNote.textContent = exposureNote(palette);
       });
 
       return sec;
@@ -506,6 +520,11 @@
         // tail) instead of the flat mush uniform draws give.
         var rng = PP.makeRng(PP.deriveSeed(palette.name, 'randomize-weights', randomizeNonce++));
         palette.colors.forEach(function (c) {
+          // Skip anything the editor already marked as held: `variationScale: 0`
+          // is what the Lock weight checkbox sets, and a spark locks itself when
+          // the flag goes on. Overwriting them here made the lock a lie — and a
+          // spark that gets re-rolled to 40% is no longer a find.
+          if (c.spark || c.variationScale === 0) return;
           c.weight = Math.round(Math.exp(rng() * 3.2) * 10) / 10;
         });
         normalizeToHundred();
@@ -642,9 +661,13 @@
       sparkChk.addEventListener('change', function () {
         c.spark = this.checked;
         // A spark that drifts with the seed stops feeling rare — lock its share
-        // by default when the flag goes on.
+        // by default when the flag goes on. That writes the very field the Lock
+        // weight checkbox renders from, so the panel has to be rebuilt, not just
+        // refreshed: `changed()` re-runs the readouts but leaves Lock showing
+        // its build-time state, so the box read unchecked while the weight was
+        // locked, and unticking Spark left the lock silently in place.
         if (this.checked && c.variationScale == null) c.variationScale = 0;
-        changed();
+        rebuild();
       });
       grid.appendChild(labeled('Spark color', sparkChk));
 
@@ -794,7 +817,10 @@
       sec.appendChild(slider('Print density', 'printDensity', 0, 1, 0.01, function (v) {
         return Math.round(v * 100) + '%';
       }, function (v) {
-        return 'Black shirt exposed: ' + Math.round((1 - v) * 100) + '% — unprinted areas are left transparent, never inked black.';
+        return dropsElements(palette)
+          ? 'Black shirt exposed: ' + Math.round((1 - v) * 100) + '% — unprinted areas are left transparent, never inked black.'
+          : 'No effect while “Group by size” is on: grouping re-colours and never removes an element. '
+            + 'Turn on “Print density may drop elements” below to let this expose the shirt again.';
       }));
 
       sec.appendChild(slider('Color inheritance', 'inheritance', 0, 1, 0.01, function (v) {

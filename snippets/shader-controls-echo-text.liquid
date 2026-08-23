@@ -25,7 +25,7 @@ var controls = [
   { key: 'textFontSize', label: 'Font Size', type: 'range', textDirty: true, noRandomize: true, min: 50,   max: 800, step: 10, value: 180 },
 { key: 'textX',        label: 'Text X',    type: 'range', textDirty: true, noRandomize: true, min: 0,    max: 1.0, step: 0.01, value: 0.5 },
   { key: 'textY',        label: 'Text Y',    type: 'range', textDirty: true, noRandomize: true, min: 0,    max: 1.0, step: 0.01, value: 0.32 },
-  { key: 'u_text_color', label: 'Text Color', type: 'color', value: '#ffffff' },
+  { key: 'u_text_color', label: 'Text Color', type: 'color', value: '#ffffff', paletteDependent: true },
   // ── Palette ───────────────────────────────────────────────────────────────
   { type: 'header', label: 'Palette' },
   { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '1',

@@ -238,8 +238,12 @@ shapes.forEach(function (s, i) {
   ctx.fillStyle = a.color;
 });
 ```
-`x`, `y` and `size` are normalized 0–1 (`size` is the shape's rank within its own
-composition). `parentIndex` is what makes inheritance read as regions rather
+`x`, `y` and `size` are normalized 0–1. **`size` is the shape's extent rescaled
+against the smallest and largest in its own composition — not its rank.** A rank
+would be uniform by construction and so has no gaps for `clusters` to split on:
+measured, it takes scatter from 5 cohorts to 1. The trade is that a skewed
+distribution stays skewed, which is why `bands` can put most of a power-law
+scatter in band 0. `parentIndex` is what makes inheritance read as regions rather
 than noise — pass it whenever the algorithm has a real parent/neighbor.
 
 ### Driving a product shader
@@ -369,6 +373,23 @@ Not `wordEnabled`, which no snippet defines. Keyed off the wrong name, four
 -circles' entire Word Overlay section stayed hidden in both dev pages and its
 `u_text_color` was excluded from the palette draw while still being hidden from
 the panel — an off-palette color with no control anywhere.
+
+### Editor readouts must ask what is actually happening
+Two settings only mean what they say under conditions the panel has to check:
+- **Print density exposes no shirt while grouping is on** unless
+  `sizeGroups.dropElements` is set, so a readout derived from `printDensity`
+  alone reported exposed garment while the engine printed every shape.
+- **Randomize weights honours `spark: true` and `variationScale: 0`** — the
+  lock its own Lock weight checkbox sets, three hundred lines away.
+- **Anything that writes a field another control renders from needs
+  `rebuild()`, not `changed()`.** Ticking Spark sets `variationScale = 0`, which
+  is exactly what Lock weight displays; `changed()` only re-runs the readouts,
+  so the box kept showing its build-time state.
+
+### `generativeWeights` defaults to on
+`createAssigner` skips variation only when the flag is exactly `false`.
+`describe()` — which the tier badges and preview strip read — must use the same
+test, or an unset flag makes the reported hierarchy differ from the rendered one.
 
 ### Adding a preset
 Data only, no engine change:

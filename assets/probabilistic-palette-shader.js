@@ -244,8 +244,13 @@
     // 1 unless the palette opts in: grouping recolours the design, it does not
     // thin it out. Sent as a uniform rather than dropped here so the GLSL keeps
     // one code path — density 1 makes every element's roll pass.
+    // Clamped, like every CPU path does via elementPrintChance. Unclamped, a
+    // stored palette carrying printDensity > 1 or < 0 reaches pow() in the GLSL
+    // with a negative base or an out-of-range exponent, which is undefined —
+    // and the CPU and GPU would then disagree about the same palette.
     var density = cfg.dropElements && typeof palette.printDensity === 'number'
-      ? palette.printDensity : 1;
+      && isFinite(palette.printDensity)
+      ? Math.max(0, Math.min(1, palette.printDensity)) : 1;
 
     var colors = [];
     var cohorts = [];

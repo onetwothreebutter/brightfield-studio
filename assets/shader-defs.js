@@ -349,6 +349,11 @@
             window._shaderState.values[key] = stateValue !== undefined ? stateValue : value;
           }
 
+          // Hosts that asked for no randomize affordances get none. This button uses
+          // Math.random and writes straight to _shaderState, bypassing the host's own
+          // values object — which is exactly what a seeded, reproducible host (the
+          // palette lab) cannot have. Undefined on the storefront, so the button stays.
+          var randAllowed = !(window.ShaderGUI && window.ShaderGUI.allowRandomize === false);
           var randRow = document.createElement('div');
           randRow.className = 'shader-control';
           var randBtn = document.createElement('button');
@@ -384,7 +389,7 @@
           });
 
           randRow.appendChild(randBtn);
-          body.appendChild(randRow);
+          if (randAllowed) body.appendChild(randRow);
         }());
 
       return {
@@ -646,7 +651,7 @@
           { key: 'textFontSize', label: 'Font Size', type: 'range', textDirty: true, noRandomize: true, min: 50,   max: 800, step: 10, value: 180 },
         { key: 'textX',        label: 'Text X',    type: 'range', textDirty: true, noRandomize: true, min: 0,    max: 1.0, step: 0.01, value: 0.5 },
           { key: 'textY',        label: 'Text Y',    type: 'range', textDirty: true, noRandomize: true, min: 0,    max: 1.0, step: 0.01, value: 0.32 },
-          { key: 'u_text_color', label: 'Text Color', type: 'color', value: '#ffffff' },
+          { key: 'u_text_color', label: 'Text Color', type: 'color', value: '#ffffff', paletteDependent: true },
           // ── Palette ───────────────────────────────────────────────────────────────
           { type: 'header', label: 'Palette' },
           { key: 'u_color_mode', label: 'Color Mode', type: 'select', value: '1',
@@ -1467,7 +1472,7 @@
           { key: 'u_font_size_11', label: 'Size 11', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
           { key: 'centerLetters', label: 'Center in Cell', type: 'toggle', value: 1, textDirty: true,
             tip: 'Centers each letter using its actual glyph bounding box instead of the typographic em-box.' },
-          { key: 'u_text_color',   label: 'Text Color',    type: 'color',  value: '#ffffff' },
+          { key: 'u_text_color',   label: 'Text Color',    type: 'color',  value: '#ffffff', paletteDependent: true },
           { key: 'u_invert',       label: 'Invert Colors', type: 'toggle', value: 1,
             tip: 'Colors the cell background instead of the letter (text becomes a cutout).' },
           { key: 'outlineEnabled', label: 'Outline',       type: 'toggle', value: 0, noRandomize: true },

@@ -262,6 +262,9 @@
   // Diagnostic overlay: numbers each size cohort on the artwork. Off by default
   // and never persisted — it is a tuning aid, not part of any design.
   var showGroupLabels = false;
+  // Invalidates an in-flight preview whose shader script is still loading, the
+  // same way gridToken does for the sample grid.
+  var previewToken = 0;
   var previewSlots = [];
 
   // Per-shader settings, owned by the control panel below and shared by the
@@ -342,9 +345,14 @@
   // Renders one sample into the shared WebGL canvas and returns its slot
   // assignment. Nothing is scheduled — the frame is drawn by the time it
   // returns, so the caller can drawImage immediately.
-  function renderSample(handle, s) {
-    var mapped = PPS.mapPalette(SHADERS[sourceName], {
-      palette: palette, seed: s, variation: variation, values: settingsFor(sourceName)
+  // `name` is passed in rather than read off the global: withShader queues its
+  // callback and a slow script load resolves it later, by which time the Source
+  // picker may have moved on — and rendering one shader's program with another
+  // shader's uniforms is silent, not an error.
+  function renderSample(handle, s, name) {
+    name = name || sourceName;
+    var mapped = PPS.mapPalette(SHADERS[name], {
+      palette: palette, seed: s, variation: variation, values: settingsFor(name)
     });
     // Diagnostic only, and set here rather than in mapPalette so it stays out of
     // the mapping's output entirely — nothing about the palette decision changes.
@@ -400,8 +408,13 @@
       drawDistribution();
       return;
     }
-    withShader(sourceName, function (handle) {
-      var mapped = renderSample(handle, seed);
+    var want = sourceName;
+    var token = ++previewToken;
+    withShader(want, function (handle) {
+      // Same guard drawSamples has had via gridToken: drop a frame whose shader
+      // or settings were superseded while its script was still loading.
+      if (token !== previewToken || want !== sourceName) return;
+      var mapped = renderSample(handle, seed, want);
       blit(previewCtx, previewCanvas.width, previewCanvas.height);
       // With grouping driving a supported shader the gradient stops are
       // overridden, so the distribution has to count cohorts instead — the
@@ -697,10 +710,11 @@
       });
       return;
     }
-    withShader(sourceName, function (handle) {
-      if (token !== gridToken) return;
+    var want = sourceName;
+    withShader(want, function (handle) {
+      if (token !== gridToken || want !== sourceName) return;
       run(function (cell, s) {
-        renderSample(handle, s);
+        renderSample(handle, s, want);
         blit(cell.getContext('2d'), cell.width, cell.height);
       });
     });
@@ -771,7 +785,14 @@
   var editorInert = null;
 
   function groupsLive() {
-    return isShapes() || !!(handles[sourceName] && handles[sourceName].supportsGroups);
+    if (isShapes()) return true;
+    // On a shader, size rules reach the *group* draw and nothing else —
+    // mapPalette strips sizeCurve and the size conditions from the slot draw
+    // unconditionally. So they are live only when grouping is on as well;
+    // reporting them live with grouping off showed controls that were about to
+    // be thrown away.
+    var on = !!(palette.sizeGroups && palette.sizeGroups.enabled);
+    return on && !!(handles[sourceName] && handles[sourceName].supportsGroups);
   }
 
   // Offered on exactly the shaders whose GLSL answers to it: supportsGroupLabels

@@ -107,6 +107,12 @@
     // container, which is how a snippet that appends its own DOM (chladni's
     // pattern randomizer) gets somewhere to put it. A plain `{ controls }`
     // object still works.
+    // A snippet may append its own UI before returning its controls (chladni's
+    // pattern randomizer). Tell it whether this host wants randomize
+    // affordances *before* it runs — those buttons use Math.random and write
+    // straight to _shaderState, bypassing opts.values, which a seeded host
+    // cannot allow.
+    window.ShaderGUI.allowRandomize = opts.randomize !== false;
     var built = typeof shader.build === 'function' ? shader.build(body) : shader;
     var controls = built.controls;
 

@@ -648,7 +648,18 @@
         var chosen = spark || g;
         if (chosen) {
           stats.used[chosen.colorIndex] = (stats.used[chosen.colorIndex] || 0) + 1;
-          stats.eligible[chosen.colorIndex] = (stats.eligible[chosen.colorIndex] || 0) + 1;
+          // Eligibility counts what *could* have been chosen, not what was.
+          // Crediting only the winner collapsed the maxShare fallback
+          // denominator to the color's own use count, so the first time a spark
+          // landed it read as 100% share and locked itself out of the rest of
+          // the composition. Only reachable when a caller omits `totalShapes`,
+          // which the documented headless API allows.
+          colors.forEach(function (c, ci) {
+            if (stats.variedShares[ci] > 0
+                && isEligible(c, { x: x, y: y, size: size }, stats, ci)) {
+              stats.eligible[ci] = (stats.eligible[ci] || 0) + 1;
+            }
+          });
           stats.previousColor = chosen.color;
           stats.previousIndex = chosen.colorIndex;
           var gOut = {
@@ -781,7 +792,11 @@
   // Percent-formatted view of the hierarchy, for previews and strip labels.
   function describe(palette, seed) {
     var colors = palette.colors || [];
-    var shares = (seed != null && palette.generativeWeights)
+    // `!== false`, matching createAssigner: an unset flag means on. Requiring it
+    // truthy here made describe() report a different hierarchy than the one
+    // being rendered, for any palette that simply never set the field — and
+    // describe() is what the editor's tier badges and preview strip read.
+    var shares = (seed != null && palette.generativeWeights !== false)
       ? applyGenerativeVariation(colors, seed, palette.weightVariation || 0)
       : paletteShares(colors);
     return colors.map(function (c, i) {

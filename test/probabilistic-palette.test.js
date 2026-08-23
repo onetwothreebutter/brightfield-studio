@@ -219,6 +219,31 @@ describe('spatial weights keep one unit', () => {
   });
 });
 
+describe('shape size is a rescale, not a rank', () => {
+  // Pinned because the distinction is easy to "fix" in the wrong direction: a
+  // rank reads more principled and is what earlier comments claimed, but it is
+  // uniform by construction, so clusters — which splits at the widest gaps —
+  // finds nothing at all.
+  it('preserves the distribution, so clusters still finds tiers on scatter', () => {
+    const opts = { mode: 'clusters', minGap: 0.02, maxGroups: 5, minShare: 0.06 };
+    const shapes = Demo.generate('scatter', { seed: 3 });
+    const asIs = PP.sizeGroupBounds(shapes.map((s) => s.size), opts).length + 1;
+    const sorted = shapes.map((s) => s.extent).slice().sort((a, b) => a - b);
+    const ranked = shapes.map((s) => sorted.indexOf(s.extent) / (sorted.length - 1));
+    const asRank = PP.sizeGroupBounds(ranked, opts).length + 1;
+    expect(asIs).toBeGreaterThan(1);
+    expect(asRank, 'a true rank has no gaps to split on').toBe(1);
+  });
+
+  it('spans exactly 0–1 without depending on canvas pixels', () => {
+    ['scatter', 'subdivision'].forEach((algo) => {
+      const sizes = Demo.generate(algo, { seed: 1 }).map((s) => s.size);
+      expect(Math.min(...sizes)).toBeCloseTo(0, 9);
+      expect(Math.max(...sizes)).toBeCloseTo(1, 9);
+    });
+  });
+});
+
 describe('normalizeWeights', () => {
   it('normalizes weights that already sum to 1', () => {
     expect(PP.normalizeWeights([0.5, 0.5])).toEqual([0.5, 0.5]);

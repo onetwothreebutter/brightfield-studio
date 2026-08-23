@@ -22,7 +22,7 @@ var controls = [
   { key: 'u_font_size_11', label: 'Size 11', type: 'range', min: 50, max: 500, step: 10, value: 300, perLetterSizeDependent: true },
   { key: 'centerLetters', label: 'Center in Cell', type: 'toggle', value: 1, textDirty: true,
     tip: 'Centers each letter using its actual glyph bounding box instead of the typographic em-box.' },
-  { key: 'u_text_color',   label: 'Text Color',    type: 'color',  value: '#ffffff' },
+  { key: 'u_text_color',   label: 'Text Color',    type: 'color',  value: '#ffffff', paletteDependent: true },
   { key: 'u_invert',       label: 'Invert Colors', type: 'toggle', value: 1,
     tip: 'Colors the cell background instead of the letter (text becomes a cutout).' },
   { key: 'outlineEnabled', label: 'Outline',       type: 'toggle', value: 0, noRandomize: true },
