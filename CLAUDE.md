@@ -295,6 +295,15 @@ handle.renderFrame(ProbabilisticPaletteShader.FIXED_TIME);
   lock it out of every design. The lab mounts the editor with
   `inertGeometry: true` so those controls are visibly badged **engine-only**
   rather than quietly doing nothing.
+- **A shader can declare the element sizes it actually has.** `groupUniforms` derives cohort boundaries from a *size field*, which defaults to a dense uniform sample of 64 values — fine for a continuous field (a dot grid's radius sweeping down the canvas), and the reason natural clusters collapses to one cohort on every shader wired so far: a uniform sample has no gaps to split on. A shader with genuinely discrete elements registers its own instead:
+  ```javascript
+  ProbabilisticPaletteShader.registerSizeField('scaling-letters', function (values) {
+    return [...];   // sizes normalized 0–1, or null to fall back
+  });
+  ```
+  - **This one is declared, not detected, and the asymmetry is deliberate.** Whether a shader *supports* grouping is read from a uniform location, so it cannot drift from the GLSL. A shader's element sizes are CPU-side data the GLSL has no way to report back without a readback, so there is no equivalent trick — a test asserts every registered name is a real shader.
+  - **A declared field is validated, not trusted.** Fewer than two samples, a non-finite entry, or a thrown error falls back to the dense sample rather than producing bounds nothing can be grouped into; values are clamped to 0–1.
+  - **It is read from live `values`, not from the definition**, because element sizes are usually control state rather than static.
 - **Size groups reach the shaders that expose an element size.** A fragment shader has no shape list, but it already computed how big the element under each fragment is, and it can name which element that is. So the CPU sends only what it alone can decide — the cohort boundaries, the color each one drew, the print odds and the seed — and the GLSL does the lookup and the roll. No readback, no ID buffer, no second pass. A shader opts in with one line:
   ```glsl
   // size: 0 = smallest element, 1 = largest.  id: this element's own index.
