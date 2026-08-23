@@ -45,7 +45,7 @@ var controls = [
   { key: 'u_letter3', label: 'Letter 3', type: 'text', value: '8' },
   { key: 'u_letter4', label: 'Letter 4', type: 'text', value: '1',
     tip: 'Only visible when Square Count is 4.' },
-  { key: 'u_font_family', label: 'Font', type: 'select', value: 'Oswald',
+  { key: 'u_font_family', label: 'Font', type: 'select', value: 'Oswald', textDirty: true,
     options: SHADER_FONTS.map(function (f) { return { label: f, value: f }; })
   },
   { key: 'u_font_size',      label: 'Font Size',             type: 'range',  min: 50, max: 500, step: 10, value: 300 },

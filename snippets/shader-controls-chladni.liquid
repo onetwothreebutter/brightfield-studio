@@ -75,6 +75,11 @@ var controls = [
     window._shaderState.values[key] = stateValue !== undefined ? stateValue : value;
   }
 
+  // Hosts that asked for no randomize affordances get none. This button uses
+  // Math.random and writes straight to _shaderState, bypassing the host's own
+  // values object — which is exactly what a seeded, reproducible host (the
+  // palette lab) cannot have. Undefined on the storefront, so the button stays.
+  var randAllowed = !(window.ShaderGUI && window.ShaderGUI.allowRandomize === false);
   var randRow = document.createElement('div');
   randRow.className = 'shader-control';
   var randBtn = document.createElement('button');
@@ -110,5 +115,5 @@ var controls = [
   });
 
   randRow.appendChild(randBtn);
-  body.appendChild(randRow);
+  if (randAllowed) body.appendChild(randRow);
 }());

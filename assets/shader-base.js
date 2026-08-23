@@ -2,6 +2,10 @@
   'use strict';
 
   function create(opts) {
+    // Cleared up front so a caller reading ShaderBase.last after loading a
+    // shader script sees null when create bailed out, rather than the handle
+    // from whichever shader loaded before it.
+    window.ShaderBase.last = null;
     var canvasId  = opts.canvasId  || 'shader-canvas';
     var stateKey  = opts.stateKey  || '_shaderState';
     var exportKey = opts.exportKey || '_shaderExport';
@@ -58,6 +62,74 @@
 
     var uniforms = opts.setup(gl, program);
 
+    // ── Palette size groups ───────────────────────────────────────────────────
+    // Owned here rather than by each shader's setup/render, so a shader opts in
+    // with one GLSL call and no JS wiring. A shader that never calls
+    // paletteGroupColor has these optimized out by the compiler, so a null
+    // location is a truthful answer to "does this shader support grouping?".
+    var groupU = {
+      mode:    gl.getUniformLocation(program, 'u_group_mode'),
+      count:   gl.getUniformLocation(program, 'u_group_count'),
+      bounds:  gl.getUniformLocation(program, 'u_group_bounds[0]'),
+      colors:  gl.getUniformLocation(program, 'u_group_colors[0]'),
+      // Null on a shader that only calls the two-argument applyPaletteGroups —
+      // the per-element branch is then dead code and the compiler drops it. The
+      // uploads below no-op on a null location, so that is a supported state,
+      // not a broken one.
+      seed:    gl.getUniformLocation(program, 'u_group_seed'),
+      density: gl.getUniformLocation(program, 'u_group_density'),
+      // Null unless the shader draws cohort labels. Diagnostic, off by default.
+      debug:   gl.getUniformLocation(program, 'u_group_debug')
+    };
+    var supportsGroups = !!groupU.mode;
+    // Size-group uniforms are structural, not continuous: bounds are a number
+    // list and colors a list of triples, so lerping them would produce NaN as
+    // well as meaningless in-between cohorts. The seed is worse — a halfway
+    // value between two seeds is a third unrelated stream, so the print pattern
+    // would boil while it animated. Hoisted out of render() — it is a constant
+    // table and render() runs at the display refresh rate.
+    var ALWAYS_INSTANT = {
+      u_group_mode: 1, u_group_count: 1, u_group_bounds: 1, u_group_colors: 1,
+      u_group_seed: 1, u_group_density: 1, u_group_debug: 1
+    };
+    var GROUP_MAX = 8;
+    var groupBoundsBuf = new Float32Array(GROUP_MAX - 1);
+    var groupColorsBuf = new Float32Array(GROUP_MAX * 3);
+
+    function uploadGroups(v) {
+      if (!supportsGroups) return;
+      var on = v.u_group_mode ? 1 : 0;
+      gl.uniform1f(groupU.mode, on);
+      // Uploaded before the early return: otherwise switching labels off while
+      // grouping is off would leave a stale 1 to surprise the next time it goes on.
+      if (groupU.debug) gl.uniform1f(groupU.debug, v.u_group_debug ? 1 : 0);
+      if (!on) return;
+      var bounds = v.u_group_bounds || [];
+      var colors = v.u_group_colors || [];
+      var count = Math.max(1, Math.min(GROUP_MAX, v.u_group_count || 1));
+      gl.uniform1f(groupU.count, count);
+      groupBoundsBuf.fill(1);          // unreached slots never win a comparison
+      for (var i = 0; i < groupBoundsBuf.length; i++) {
+        if (i < bounds.length) groupBoundsBuf[i] = bounds[i];
+      }
+      groupColorsBuf.fill(0);          // unfilled cohorts read as shirt, not garbage
+      for (var c = 0; c < GROUP_MAX; c++) {
+        var rgb = colors[c];
+        if (!rgb) continue;
+        groupColorsBuf[c * 3]     = rgb[0];
+        groupColorsBuf[c * 3 + 1] = rgb[1];
+        groupColorsBuf[c * 3 + 2] = rgb[2];
+      }
+      if (groupU.bounds) gl.uniform1fv(groupU.bounds, groupBoundsBuf);
+      if (groupU.colors) gl.uniform3fv(groupU.colors, groupColorsBuf);
+      // Density defaults to 1 — fully inked — so a host that sends bounds and
+      // colors but no density gets the old whole-cohort behavior rather than a
+      // blank shirt.
+      if (groupU.seed)    gl.uniform1ui(groupU.seed, (v.u_group_seed || 0) >>> 0);
+      if (groupU.density) gl.uniform1f(groupU.density,
+        typeof v.u_group_density === 'number' ? v.u_group_density : 1);
+    }
+
     // ── Text texture (only when drawText is provided) ─────────────────────────
     var textCanvas, textCtx, textTex, lastTextKey, lastTexW, lastTexH;
     if (opts.drawText) {
@@ -107,13 +179,22 @@
     var paused         = false; // true when canvas is off-screen (Intersection Observer)
     var idle           = false; // true when animVals have converged; triggers slow polling
     var pendingTimeout = null;
+    // Manual mode (window.ShaderBase.manual set before this script loads): the
+    // caller drives every frame itself, at a clock it supplies. Nothing here
+    // schedules work — no rAF chain, no idle poll, no visibility observer — so
+    // several shaders can share one WebGL context without fighting over it.
+    // Read once at create time so flipping the flag later can't strand a
+    // half-started loop. See handle.renderFrame at the bottom of create().
+    var manual = !!(window.ShaderBase && window.ShaderBase.manual);
 
     function scheduleNextFrame() {
-      if (exporting || paused) return;
+      if (exporting || paused || manual) return;
       if (idle) {
         pendingTimeout = setTimeout(function () { pendingTimeout = null; render(); }, 100);
       } else {
-        requestAnimationFrame(render);
+        // Wrapped: rAF passes a DOMHighResTimeStamp, which render() would read
+        // as a caller-supplied fixed t.
+        requestAnimationFrame(function () { render(); });
       }
     }
 
@@ -127,9 +208,11 @@
       return b; // instant for strings, booleans, etc.
     }
 
-    function render() {
+    // fixedT (seconds) overrides the wall clock — the same t always draws the
+    // same frame, which is what makes an offline thumbnail reproducible.
+    function render(fixedT) {
       if (paused) return;
-      var t = (performance.now() - start) / 1000.0;
+      var t = fixedT != null ? fixedT : (performance.now() - start) / 1000.0;
       var v = (window[stateKey] && window[stateKey].values) || {};
       var w = canvas.width;
       var h = canvas.height;
@@ -146,7 +229,7 @@
           if (snap) { window[stateKey].snapValues = false; }
           var maxDiff = 0;
           Object.keys(v).forEach(function (k) {
-            if (snap || instant.indexOf(k) !== -1) {
+            if (snap || ALWAYS_INSTANT[k] || instant.indexOf(k) !== -1) {
               animVals[k] = Array.isArray(v[k]) ? v[k].slice() : v[k];
             } else if (animVals[k] === undefined) {
               animVals[k] = Array.isArray(v[k]) ? v[k].slice() : v[k];
@@ -183,6 +266,7 @@
           }
         }
 
+        uploadGroups(renderV);
         opts.render(gl, uniforms, renderV, w, h, t, textTex || null);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         if (!revealed && !(window[stateKey] && window[stateKey].holdReveal)) {
@@ -197,7 +281,7 @@
       if (!exporting) scheduleNextFrame();
     }
 
-    if (window.IntersectionObserver) {
+    if (!manual && window.IntersectionObserver) {
       new IntersectionObserver(function (entries) {
         var visible = entries[0].isIntersecting;
         if (!visible) {
@@ -210,7 +294,10 @@
       }, { threshold: 0 }).observe(canvas);
     }
 
-    render();
+    // In manual mode the first frame is the caller's to ask for: values are
+    // usually written after the script loads, and drawing here would just burn
+    // a frame on the defaults.
+    if (!manual) render();
 
     // Export the shader at print resolution and return base64 PNG via callback.
     window[exportKey] = function (targetW, targetH, callback) {
@@ -304,10 +391,45 @@
 
       callback(dataUrl.split(',')[1]); // base64 only
     };
+
+    // ── Caller-driven frame ───────────────────────────────────────────────────
+    // Shader scripts drop create()'s return value, so the handle is also parked
+    // on ShaderBase.last — that is what a page loading `assets/<name>.js` by
+    // <script src> can actually reach.
+    var handle = {
+      canvas: canvas,
+      gl: gl,
+      program: program,
+      // True when this shader actually calls paletteGroupColor — see groupU.
+      supportsGroups: supportsGroups,
+      // Same detection, one step further in: true only when the shader also
+      // draws the cohort labels, so a host can offer the toggle on exactly the
+      // shaders that answer to it rather than keeping a list that drifts.
+      supportsGroupLabels: !!groupU.debug,
+      // Draws exactly one frame at t seconds. Animated values are snapped to
+      // their targets first, so the frame depends only on _shaderState.values
+      // and t — never on how long the page has been open.
+      renderFrame: function (t) {
+        // Several shaders may share this context; each owns its own program and
+        // quad, so rebind before drawing rather than trusting whoever drew last.
+        gl.useProgram(program);
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.enableVertexAttribArray(posLoc);
+        gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+        if (window[stateKey]) window[stateKey].snapValues = true;
+        render(t != null ? t : 0);
+      }
+    };
+    window.ShaderBase.last = handle;
+    return handle;
   }
 
   window.ShaderBase = {
     create: create,
+    // Set true before loading a shader script to suppress its animation loop.
+    manual: false,
+    // Handle from the most recent create() — see handle.renderFrame above.
+    last: null,
     commonGLSL: [
       'uniform float u_halftone_angle;',
       'uniform float u_halftone_luma;',
@@ -432,6 +554,177 @@
       '}',
       'vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {',
       '  return a + b * cos(6.28318 * (c * t + d));',
+      '}',
+      '// ── Palette size groups ─────────────────────────────────────────────────',
+      '// The probabilistic palette groups shapes by scale and paints each cohort',
+      '// one color. A fragment shader has no shape list — but it does already',
+      '// know how big the element under this fragment is, because it computed it.',
+      '// So the CPU sends only what it alone can decide (where the cohort',
+      '// boundaries fall, and which color each one drew) and the shader does the',
+      '// lookup. No readback, no ID buffer, no second pass.',
+      '//',
+      '// A shader opts in by calling paletteGroupColor() with its own normalized',
+      '// element size (0 = smallest element in the design, 1 = largest) and',
+      '// blending on u_group_mode. Shaders that never call it get these uniforms',
+      '// optimized out, which is exactly how the host detects support.',
+      'uniform float u_group_mode;    // 0 = off, the shader keeps its own palette',
+      'uniform float u_group_count;',
+      'uniform float u_group_bounds[7];',
+      'uniform vec3  u_group_colors[8];',
+      // highp is not decoration. A GLSL ES 3.00 fragment shader defaults int and
+      // uint to *mediump* — 16 bits guaranteed — and every shader here declares
+      // only `precision mediump float`. Left implicit, the 32-bit arithmetic
+      // below would be exact on desktop (where mediump is fp32 anyway) and
+      // quietly wrong on the phones most of these shirts get viewed on. Declared
+      // here rather than as a `precision highp int` statement each shader has to
+      // remember, so opting in stays one line of GLSL.
+      'uniform highp uint  u_group_seed;    // base stream for the per-element roll',
+      'uniform highp float u_group_density; // print density, rolled per element below',
+      'vec3 paletteGroupColor(float size) {',
+      '  int g = 0;',
+      '  for (int i = 0; i < 7; i++) {',
+      '    if (float(i) < u_group_count - 1.0 && size >= u_group_bounds[i]) g = i + 1;',
+      '  }',
+      '  return u_group_colors[g];',
+      '}',
+      '',
+      '// ── Per-element print density ───────────────────────────────────────────',
+      '// A transcription of makeRng/elementRoll in probabilistic-palette.js, not a',
+      '// second generator: mulberry32 is pure uint32 arithmetic, and WebGL2 uint',
+      '// math wraps mod 2^32 exactly as Math.imul and `>>>` do on the CPU. That is',
+      '// what lets the print/skip roll happen per element without a readback and',
+      '// still land in the same place on every GPU. Integer ops only — a float',
+      '// hash would drift between drivers and break same-seed-same-pixels.',
+      'highp uint paletteRoll32(highp uint a) {',
+      '  a += 0x6D2B79F5u;',
+      '  highp uint t = a;',
+      '  t = (t ^ (t >> 15u)) * (t | 1u);',
+      '  t ^= t + (t ^ (t >> 7u)) * (t | 61u);',
+      '  return t ^ (t >> 14u);',
+      '}',
+      '// 1 = this element takes ink, 0 = it is left as shirt. Matches the CPU rule',
+      '// exactly, including the boundary: printed when roll < the chance.',
+      '//',
+      '// `weight` is how much of the design this element carries, relative to an',
+      '// average one. At 1 the chance is just u_group_density, so density means',
+      '// "this fraction of elements" — right when elements are interchangeable',
+      '// (a halftone dot grid), wrong when they are not: circle-on-line\'s power',
+      '// warp makes its first line ~6x the average cell, and a flat roll lets one',
+      '// coin flip delete a third of the artwork. The exponent form is what makes',
+      '// the correction affordable here — it needs only this element\'s weight, no',
+      '// total and no second pass — and pow() fixes both endpoints, so density 0',
+      '// still prints nothing and 1 still prints everything. See elementPrintChance',
+      '// in probabilistic-palette.js, which this mirrors.',
+      'float paletteElementPrinted(highp float elementId, float weight) {',
+      '  highp uint id   = uint(max(elementId, 0.0));',
+      '  highp uint seed = u_group_seed ^ (id * 0x9E3779B1u);',
+      '  // The top 24 bits, not all 32: a float carries a 24-bit mantissa at',
+      '  // best, so a full-width roll cannot survive the conversion. elementRoll',
+      '  // on the CPU drops the same 8 bits — that is what makes the two sides',
+      '  // the same decision rather than nearly the same one.',
+      '  highp float roll = float(paletteRoll32(seed) >> 8u) / 16777216.0;',
+      '  float chance = pow(u_group_density, 1.0 / clamp(weight, 0.05, 20.0));',
+      '  return 1.0 - step(chance, roll);',
+      '}',
+      '// Unweighted: every element carries the same share.',
+      'float paletteElementPrinted(highp float elementId) {',
+      '  return paletteElementPrinted(elementId, 1.0);',
+      '}',
+      '',
+      '',
+      '// ── Cohort labels (diagnostic) ──────────────────────────────────────────',
+      '// Draws the cohort number over each size band so the tiering can be read',
+      '// off the artwork while tuning, instead of inferred from the colors — which',
+      '// is exactly the thing that is hard when two cohorts draw the same color.',
+      '// Purely additive: it never touches the color assignment, and u_group_debug',
+      '// is 0 everywhere except when a host explicitly turns it on, so a product',
+      '// render can never carry a label.',
+      '//',
+      '// A 3x5 bitmap font for 1-8 (GROUP_MAX cohorts), one uint of row bits each,',
+      '// MSB = top-left. Cheaper and sharper than a text texture, and it needs no',
+      '// JS wiring at all — which matters for something meant to be switched on',
+      '// mid-tune and off again.',
+      'uniform float u_group_debug;',
+      'highp uint paletteDigitBits(int d) {',
+      '  if (d == 1) return 0x2C97u;',
+      '  if (d == 2) return 0x73E7u;',
+      '  if (d == 3) return 0x73CFu;',
+      '  if (d == 4) return 0x5BC9u;',
+      '  if (d == 5) return 0x79CFu;',
+      '  if (d == 6) return 0x79EFu;',
+      '  if (d == 7) return 0x7249u;',
+      '  return 0x7BEFu;',
+      '}',
+      '// p is the digit-local coordinate, (0,0) bottom-left to (1,1) top-right.',
+      'float paletteDigitMask(int d, vec2 p) {',
+      '  if (p.x < 0.0 || p.x >= 1.0 || p.y < 0.0 || p.y >= 1.0) return 0.0;',
+      '  int col = int(p.x * 3.0);',
+      '  int row = int((1.0 - p.y) * 5.0);',
+      '  int bit = 14 - (row * 3 + col);',
+      '  return float((paletteDigitBits(d) >> uint(bit)) & 1u);',
+      '}',
+      '// One label per cohort, placed along whatever axis the shader maps size to:',
+      '// size 0 sits at uv.y = y0 and size 1 at y1, so an inverted field just swaps',
+      '// them. x is the left edge in uv, h the digit height in uv, and pxAspect',
+      '// (u_resolution.y / u_resolution.x) keeps the glyph square on a portrait',
+      '// canvas. Returns a 0/1 mask for the caller to composite however it likes.',
+      'float paletteGroupLabelMask(vec2 uv, float x, float y0, float y1, float h, float pxAspect) {',
+      '  if (u_group_debug < 0.5 || u_group_mode < 0.5) return 0.0;',
+      '  float w = h * 0.6 * pxAspect;',
+      '  float m = 0.0;',
+      '  float prevY = -999.0;',
+      '  float lane  = 0.0;',
+      '  for (int g = 0; g < 8; g++) {',
+      '    if (float(g) >= u_group_count) break;',
+      '    // The band this cohort owns, then its midpoint — the label belongs where',
+      '    // the cohort actually is, not at a fixed stride.',
+      '    float lo = g == 0 ? 0.0 : u_group_bounds[max(g - 1, 0)];',
+      '    // min(g, 6): u_group_bounds is float[7]. The ternary already avoids',
+      '    // reading index 7 on the last cohort, but relying on short-circuiting',
+      '    // to keep an out-of-bounds index unevaluated is not something the',
+      '    // spec guarantees a compiler will honour.',
+      '    float hi = float(g) >= u_group_count - 1.0 ? 1.0 : u_group_bounds[min(g, 6)];',
+      '    float yc = mix(y0, y1, (lo + hi) * 0.5);',
+      '    // Cohorts crammed into a narrow slice of the range would stack their',
+      '    // labels into an unreadable pile — and that is the case where the count',
+      '    // matters most, since bunched cuts are what a too-small minGap produces.',
+      '    // Step sideways instead: the staircase still shows the crowding.',
+      '    lane = abs(yc - prevY) < h * 1.05 ? lane + 1.0 : 0.0;',
+      '    prevY = yc;',
+      '    vec2 p = (uv - vec2(x + lane * w * 1.5, yc - h * 0.5)) / vec2(w, h);',
+      '    m = max(m, paletteDigitMask(g + 1, p));',
+      '  }',
+      '  return m;',
+      '}',
+      '',
+      '// Convenience: leaves `col` untouched when grouping is off.',
+      '//',
+      '// The three-argument form is the one to use wherever the shader can name',
+      '// the element under this fragment (a grid cell, a line, a column). Each',
+      '// element then rolls its own print/skip, so density reads as texture inside',
+      '// a cohort rather than deleting whole tiers. An unprinted element goes',
+      '// black, the same rule everywhere: black is the shirt, never an ink.',
+      '// The four-argument form adds the element\'s ink weight (1 = average), for',
+      '// shaders whose elements differ enough in area that "fraction of elements"',
+      '// and "fraction of ink" are not the same number.',
+      'vec3 applyPaletteGroups(vec3 col, float size, highp float elementId, float weight) {',
+      '  vec3 grouped = paletteGroupColor(size) * paletteElementPrinted(elementId, weight);',
+      '  return mix(col, grouped, step(0.5, u_group_mode));',
+      '}',
+      'vec3 applyPaletteGroups(vec3 col, float size, highp float elementId) {',
+      '  return applyPaletteGroups(col, size, elementId, 1.0);',
+      '}',
+      '// Cohort colour with NO print mask applied. For a shader that post-processes',
+      '// the ink colour before deciding whether any ink lands: rise-shirt inverts',
+      '// its dots, and inverting an already-masked colour turns vec3(0) — "this',
+      '// element is unprinted" — into pure white ink. Mask last, with',
+      '// paletteElementPrinted, so black stays the shirt either way.',
+      'vec3 paletteGroupedColor(vec3 col, float size) {',
+      '  return mix(col, paletteGroupColor(size), step(0.5, u_group_mode));',
+      '}',
+      '// Two-argument form: no element to name, so the whole cohort takes ink.',
+      'vec3 applyPaletteGroups(vec3 col, float size) {',
+      '  return mix(col, paletteGroupColor(size), step(0.5, u_group_mode));',
       '}',
     ].join('\n'),
   };
