@@ -79,7 +79,9 @@
       seed:    gl.getUniformLocation(program, 'u_group_seed'),
       density: gl.getUniformLocation(program, 'u_group_density'),
       // Null unless the shader draws cohort labels. Diagnostic, off by default.
-      debug:   gl.getUniformLocation(program, 'u_group_debug')
+      debug:   gl.getUniformLocation(program, 'u_group_debug'),
+      // Null unless the shader indexes the per-element table.
+      element: gl.getUniformLocation(program, 'u_element[0]')
     };
     var supportsGroups = !!groupU.mode;
     // Size-group uniforms are structural, not continuous: bounds are a number
@@ -90,9 +92,15 @@
     // table and render() runs at the display refresh rate.
     var ALWAYS_INSTANT = {
       u_group_mode: 1, u_group_count: 1, u_group_bounds: 1, u_group_colors: 1,
-      u_group_seed: 1, u_group_density: 1, u_group_debug: 1
+      u_group_seed: 1, u_group_density: 1, u_group_debug: 1, u_element: 1
     };
     var GROUP_MAX = 8;
+    var ELEMENT_MAX = 11;
+    // Seeded to a mid size and an average weight, not zeros: an unset weight
+    // would clamp to 0.05 in the GLSL and make pow(density, 20) — every element
+    // unprinted — for any shader that indexes the table without being sent one.
+    var elementBuf = new Float32Array(ELEMENT_MAX * 2);
+    for (var e = 0; e < ELEMENT_MAX; e++) { elementBuf[e * 2] = 0.5; elementBuf[e * 2 + 1] = 1; }
     var groupBoundsBuf = new Float32Array(GROUP_MAX - 1);
     var groupColorsBuf = new Float32Array(GROUP_MAX * 3);
 
@@ -125,6 +133,15 @@
       // Density defaults to 1 — fully inked — so a host that sends bounds and
       // colors but no density gets the old whole-cohort behavior rather than a
       // blank shirt.
+      if (groupU.element) {
+        var el = v.u_element || [];
+        for (var n = 0; n < ELEMENT_MAX; n++) {
+          var pair = el[n];
+          elementBuf[n * 2]     = pair && typeof pair[0] === 'number' ? pair[0] : 0.5;
+          elementBuf[n * 2 + 1] = pair && typeof pair[1] === 'number' ? pair[1] : 1;
+        }
+        gl.uniform2fv(groupU.element, elementBuf);
+      }
       if (groupU.seed)    gl.uniform1ui(groupU.seed, (v.u_group_seed || 0) >>> 0);
       if (groupU.density) gl.uniform1f(groupU.density,
         typeof v.u_group_density === 'number' ? v.u_group_density : 1);
@@ -580,6 +597,18 @@
       // remember, so opting in stays one line of GLSL.
       'uniform highp uint  u_group_seed;    // base stream for the per-element roll',
       'uniform highp float u_group_density; // print density, rolled per element below',
+      '// ── Per-element table ───────────────────────────────────────────────────',
+      '// A shader with discrete elements whose sizes only the CPU knows (a word',
+      '// drawn as letters at author-set point sizes) gets them here, indexed by',
+      '// the same id it passes to applyPaletteGroups. .x is the size, 0-1 within',
+      '// this design; .y is how much ink the element carries relative to an',
+      '// average one, which is what keeps print density from deleting the big',
+      '// ones on a single roll. Optimized out — and so never uploaded — for the',
+      '// shaders whose size field is continuous and has no element to index.',
+      'uniform vec2 u_element[11];',
+      'vec2 paletteElement(float id) {',
+      '  return u_element[int(clamp(id, 0.0, 10.0))];',
+      '}',
       'vec3 paletteGroupColor(float size) {',
       '  int g = 0;',
       '  for (int i = 0; i < 7; i++) {',
