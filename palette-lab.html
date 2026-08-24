@@ -243,6 +243,11 @@
   var H = GL_CANVAS.height;
 
   var palette = PP.clonePalette(PP.PRESETS['Brightfield / Black 01'], 'Brightfield / Black 01');
+  // The lab opens with grouping on and the gap floored, so the first thing on
+  // screen is the tiering behaviour being tuned rather than a flat palette.
+  // 0.001 sits below the shaders' 64-sample field spacing, which is the only
+  // setting that prises cohorts out of a continuous size field at all.
+  palette.sizeGroups = Object.assign({}, palette.sizeGroups, { enabled: true, minGap: 0.001 });
   var seed = document.getElementById('seed').value;
 
   // Two families of source. The shaders are what ships; the shape generators are
