@@ -377,6 +377,32 @@ rendered text must carry `textDirty: true`** — including ones not named `text`
   first 7 boundaries of a 12-band solution are not an 8-band one. The editor
   slider caps at 8; stored or pasted palette JSON need not.
 
+### Collection drawer
+The lab's right-edge **Collection** tab keeps the best designs from the sample
+grid and compares them side by side. `assets/palette-lab-collection.js` is the
+DOM-free store (`PaletteLabCollection.createStore({ storage })`); the drawer,
+grid badges and compare overlay are wired in `palette-lab.html`.
+- **An entry is a restorable snapshot, not a picture** — source, seed, a deep
+  copy of the palette and of the shader settings, detail and drift. That is
+  what lets **Load** put the whole lab back and lets the compare overlay
+  re-render an entry at full shared-canvas resolution after the palette in the
+  editor has moved on. The JPEG thumbnail is a display convenience and is the
+  first thing dropped on a `localStorage` quota error; a missing one is
+  re-rendered from the snapshot and cached back.
+- **Keeping a cell is hover-`+` or shift-click, never plain click.** Plain
+  click already loads the seed into the preview, and changing it would break
+  the gesture every other part of the page relies on.
+- **Identity is `keyOf(snapshot)`** — source, seed, palette, settings, detail
+  and drift — so re-keeping a design you already have is a no-op, and a grid
+  cell's ✓ badge is answered against the *live* state: change the palette and
+  the same seed is a different design, so the badge goes away.
+- Adding never redraws the grid or the preview; the thumbnail is read off the
+  cell's own canvas once it carries `data-drawn`.
+- Rendering an entry goes through `renderSnapshot`, which passes every input
+  `renderSample` reads off a global explicitly, and draws + blits in one call
+  on the one WebGL context so a grid filling in at the same time cannot
+  interleave with it.
+
 ### Spatial weights are authored in the same unit as `weight`
 A `spatial: [wStart, wEnd]` pair replaces the flat weight across the field, and
 both are on the same scale — the editor seeds those two inputs from `weight`.
