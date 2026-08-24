@@ -197,11 +197,12 @@
   // can decide where the cohort boundaries fall and what color each one drew.
   // So this sends exactly that — see `paletteGroupColor` in shader-base.js.
   //
-  // The size field of a procedural shader is continuous (a dot grid's radius
-  // sweeps smoothly down the canvas), so it is modelled as a dense uniform
-  // sample. That has a real consequence: natural clustering finds no gaps in a
-  // uniform sample and honestly returns one group, which is why fixed bands is
-  // the mode that does something here.
+  // Most procedural shaders have a *continuous* size field — a dot grid's radius
+  // sweeps smoothly down the canvas — with no discrete elements to enumerate. For
+  // those, the field is modelled as a dense uniform sample, and that has a real
+  // consequence: natural clustering finds no gaps in a uniform sample and
+  // honestly returns one group, which is why fixed bands is the mode that does
+  // something there.
   var SIZE_FIELD_SAMPLES = 64;
 
   function sizeField() {
@@ -210,17 +211,56 @@
     return out;
   }
 
+  // ── Declared size fields ──────────────────────────────────────────────────
+  // Some shaders do have discrete elements with known sizes (a word drawn as
+  // letters at eleven author-set point sizes, say). Feeding the synthetic sample
+  // for those throws that away and guarantees the collapse described above, so a
+  // shader can declare the sizes it actually has.
+  //
+  // This is a registry rather than something detected, and the asymmetry is the
+  // point: whether a shader *supports* grouping is read from a uniform location,
+  // so it cannot drift from the GLSL — but a shader's element sizes are CPU-side
+  // data the GLSL has no way to report back without a readback. A test asserts
+  // every entry names a real shader.
+  //
+  // fn(values) -> array of sizes normalized 0–1, or null to fall back.
+  var SIZE_FIELDS = {};
+
+  function registerSizeField(name, fn) { SIZE_FIELDS[name] = fn; }
+
+  // The field to derive cohort boundaries from. Anything unusable — too few
+  // samples, a non-finite entry, a shader that declared nothing — falls back to
+  // the dense sample rather than producing bounds nothing can be grouped into.
+  function sizeFieldFor(def, values) {
+    var fn = def && def.name ? SIZE_FIELDS[def.name] : null;
+    if (!fn) return sizeField();
+    var got = null;
+    try { got = fn(values || {}); } catch (e) { got = null; }
+    if (!got || got.length < 2) return sizeField();
+    var clean = [];
+    for (var i = 0; i < got.length; i++) {
+      var v = got[i];
+      if (typeof v !== 'number' || !isFinite(v)) return sizeField();
+      clean.push(v < 0 ? 0 : (v > 1 ? 1 : v));
+    }
+    return clean;
+  }
+
   var GROUP_MAX = 8;
 
   // Returns the u_group_* uniforms, or null when grouping is off.
-  function groupUniforms(palette, seed) {
+  //
+  // `field` is the set of element sizes to derive boundaries from; it defaults
+  // to the dense synthetic sample, which is what every shader that has not
+  // declared its own gets.
+  function groupUniforms(palette, seed, field) {
     var cfg = palette && palette.sizeGroups;
     if (!cfg || !cfg.enabled) return null;
 
     // Synthetic shapes spanning the size field, run through the ordinary
     // assigner: bounds, spark exclusion and the group draws all come from the
     // engine rather than being re-derived here.
-    var field = sizeField();
+    field = field && field.length >= 2 ? field : sizeField();
     var shapes = field.map(function (size) { return { x: 0.5, y: 0.5, size: size }; });
     // GROUP_MAX is a hard GLSL array size, so the engine is asked for at most
     // that many cohorts rather than being allowed to produce more and having the
@@ -316,7 +356,7 @@
     // gradient where grouping is off or unsupported, and overrides per element
     // where it is on. u_group_mode 0 by default, so nothing changes for shaders
     // that never opted in.
-    var groups = groupUniforms(palette, seed);
+    var groups = groupUniforms(palette, seed, sizeFieldFor(def, values));
     values.u_group_mode = groups ? 1 : 0;
     if (groups) {
       values.u_group_count   = groups.u_group_count;
@@ -371,6 +411,9 @@
     chooseColorMode: chooseColorMode,
     colorSlots: colorSlots,
     groupUniforms: groupUniforms,
+    registerSizeField: registerSizeField,
+    sizeFieldFor: sizeFieldFor,
+    SIZE_FIELDS: SIZE_FIELDS,
     SIZE_FIELD_SAMPLES: SIZE_FIELD_SAMPLES,
     paletteOwnedKeys: paletteOwnedKeys,
     defaultValues: defaultValues,

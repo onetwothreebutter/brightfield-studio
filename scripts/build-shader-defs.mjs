@@ -80,6 +80,7 @@ export function generate() {
         return cached;
       }
       SHADERS[name] = {
+        name: name,
         build: build,
         fonts: SHADER_FONTS,
         get controls() { return ensure().controls; },

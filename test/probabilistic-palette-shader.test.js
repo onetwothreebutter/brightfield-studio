@@ -503,6 +503,87 @@ describe('size groups on a shader', () => {
   });
 });
 
+describe('declared size fields', () => {
+  const grouped = (mode = 'clusters', over = {}) => {
+    const p = preset();
+    p.sizeGroups = Object.assign({ enabled: true, mode, maxGroups: 5, minGap: 0.02, minShare: 0.06 }, over);
+    return p;
+  };
+
+  it('ships with none declared, so every shader still gets the dense sample', () => {
+    // The property that makes adding this hook a no-op: nothing declares a
+    // field yet, so no shader's boundaries move.
+    expect(Object.keys(PPS.SIZE_FIELDS)).toHaveLength(0);
+    names().forEach((name) => {
+      expect(PPS.sizeFieldFor(SHADERS[name], {}), name)
+        .toHaveLength(PPS.SIZE_FIELD_SAMPLES);
+    });
+  });
+
+  it('a shader def knows its own name, which is what the field is keyed on', () => {
+    names().forEach((name) => expect(SHADERS[name].name).toBe(name));
+  });
+
+  it('lets a declared field replace the synthetic one', () => {
+    // Four discrete sizes with real gaps — the case the dense sample cannot
+    // represent, and the reason clusters collapses on a shader today.
+    try {
+      PPS.registerSizeField('rise-shirt', () => [0.05, 0.08, 0.5, 0.53, 0.95, 0.98]);
+      const { values } = map('rise-shirt', { palette: grouped('clusters') });
+      expect(values.u_group_count, 'clusters should find the gaps').toBeGreaterThan(1);
+    } finally {
+      delete PPS.SIZE_FIELDS['rise-shirt'];
+    }
+  });
+
+  it('still collapses on a continuous field, which is the honest answer', () => {
+    const { values } = map('rise-shirt', { palette: grouped('clusters') });
+    expect(values.u_group_count).toBe(1);
+  });
+
+  it('reads the field from live values, not from the definition', () => {
+    try {
+      PPS.registerSizeField('rise-shirt', (v) => (v.u_rows > 10 ? [0, 0.9, 1] : [0, 0.02, 1]));
+      expect(PPS.sizeFieldFor(SHADERS['rise-shirt'], { u_rows: 40 })).toEqual([0, 0.9, 1]);
+      expect(PPS.sizeFieldFor(SHADERS['rise-shirt'], { u_rows: 2 })).toEqual([0, 0.02, 1]);
+    } finally {
+      delete PPS.SIZE_FIELDS['rise-shirt'];
+    }
+  });
+
+  it('falls back rather than trusting a field it cannot use', () => {
+    // A declared field is shader-authored data, so it is checked: too few
+    // samples, a NaN, or a thrown error must not produce bounds nothing can be
+    // grouped into.
+    const bad = [() => [], () => [0.5], () => [0, NaN, 1], () => [0, undefined, 1],
+      () => { throw new Error('boom'); }, () => null];
+    bad.forEach((fn, i) => {
+      try {
+        PPS.registerSizeField('rise-shirt', fn);
+        expect(PPS.sizeFieldFor(SHADERS['rise-shirt'], {}), `case ${i}`)
+          .toHaveLength(PPS.SIZE_FIELD_SAMPLES);
+      } finally {
+        delete PPS.SIZE_FIELDS['rise-shirt'];
+      }
+    });
+  });
+
+  it('clamps a declared field into 0–1', () => {
+    try {
+      PPS.registerSizeField('rise-shirt', () => [-3, 0.5, 7]);
+      expect(PPS.sizeFieldFor(SHADERS['rise-shirt'], {})).toEqual([0, 0.5, 1]);
+    } finally {
+      delete PPS.SIZE_FIELDS['rise-shirt'];
+    }
+  });
+
+  it('every registered field names a real shader', () => {
+    // The registry is the one thing here that is declared rather than detected,
+    // so it is the one thing that can drift from the shader list.
+    Object.keys(PPS.SIZE_FIELDS).forEach((n) => expect(names()).toContain(n));
+  });
+});
+
 describe('shaders that opt into size groups', () => {
   const WIRED = ['rise-shirt', 'circle-on-line', 'line-circle', 'three-square'];
 
