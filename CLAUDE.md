@@ -396,6 +396,8 @@ grid badges and compare overlay are wired in `palette-lab.html`.
   and drift — so re-keeping a design you already have is a no-op, and a grid
   cell's ✓ badge is answered against the *live* state: change the palette and
   the same seed is a different design, so the badge goes away.
+- **Compare shows every kept entry**, not a ticked subset — the collection is
+  the shortlist. A tile's Remove only takes it out of that view.
 - Adding never redraws the grid or the preview; the thumbnail is read off the
   cell's own canvas once it carries `data-drawn`.
 - Rendering an entry goes through `renderSnapshot`, which passes every input

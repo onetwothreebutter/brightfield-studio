@@ -144,11 +144,10 @@
   #coll-list .empty { color: #666; line-height: 1.6; }
   .coll-item { border: 1px solid #2c2c32; border-radius: 4px; background: #141417; padding: 8px; margin-bottom: 10px; }
   .coll-item canvas { width: 100%; aspect-ratio: 4 / 5; display: block; border-radius: 3px; background: #000; }
-  .coll-item.selected { border-color: #6fb3f2; }
   .coll-item .meta { color: #8a8a92; font-size: 10px; margin: 6px 0 0; word-break: break-all; line-height: 1.5; }
   .coll-item .meta b { color: #eee; font-weight: normal; }
   .coll-item .row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
-  .coll-item .row label { flex: 1; display: flex; align-items: center; gap: 6px; color: #8a8a92; cursor: pointer; }
+  .coll-item .row { justify-content: flex-end; }
   @media (max-width: 1080px) {
     #coll-drawer { width: 100%; }
     #coll-tab.open { right: 0; z-index: 31; }
@@ -993,19 +992,19 @@
     var list = document.getElementById('coll-list');
     var entries = store.entries();
     document.getElementById('coll-count').textContent = store.size();
-    document.getElementById('coll-compare').disabled = store.selected().length < 2;
+    document.getElementById('coll-compare').disabled = store.size() < 2;
     list.textContent = '';
     if (!entries.length) {
       var empty = document.createElement('p');
       empty.className = 'empty';
       empty.textContent = 'Nothing kept yet. Hover a thumbnail in the sample grid and hit + (or shift-click) '
-        + 'to keep it here. Tick two or more to compare them side by side.';
+        + 'to keep it here. Keep two or more and Compare shows them side by side.';
       list.appendChild(empty);
       return;
     }
     entries.forEach(function (e) {
       var item = document.createElement('div');
-      item.className = 'coll-item' + (e.selected ? ' selected' : '');
+      item.className = 'coll-item';
       item.appendChild(entryThumb(e));
 
       var meta = document.createElement('p');
@@ -1017,15 +1016,6 @@
 
       var row = document.createElement('div');
       row.className = 'row';
-      var lab = document.createElement('label');
-      var chk = document.createElement('input');
-      chk.type = 'checkbox';
-      chk.checked = !!e.selected;
-      chk.addEventListener('change', function () { store.setSelected(e.id, this.checked); });
-      lab.appendChild(chk);
-      lab.appendChild(document.createTextNode('compare'));
-      row.appendChild(lab);
-
       var load = document.createElement('button');
       load.type = 'button';
       load.textContent = 'Load';
@@ -1043,12 +1033,13 @@
     });
   }
 
-  // Selected entries at full shared-canvas resolution, rendered one after
+  // Every kept entry at full shared-canvas resolution, rendered one after
   // another on the one WebGL context — the same rule the grid lives by.
+  // Remove on a tile only takes it out of this view; the entry stays kept.
   function openCompare() {
     var tiles = document.getElementById('compare-tiles');
     tiles.textContent = '';
-    var picked = store.selected();
+    var picked = store.entries();
     if (picked.length < 2) return;
     compare.classList.add('open');
     var i = 0;
@@ -1071,7 +1062,6 @@
       drop.textContent = 'Remove';
       drop.title = 'Take out of this comparison';
       drop.addEventListener('click', function () {
-        store.setSelected(e.id, false);
         tile.remove();
         if (tiles.children.length < 2) closeCompare();
       });
