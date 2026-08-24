@@ -236,7 +236,10 @@
     if (!fn) return sizeField();
     var got = null;
     try { got = fn(values || {}); } catch (e) { got = null; }
-    if (!got || got.length < 2) return sizeField();
+    // A field may come back as a bare array of sizes, or as { sizes, weights }
+    // when the shader also knows how much ink each element carries.
+    if (got && !Array.isArray(got) && got.sizes) got = got.sizes;
+    if (!got || !Array.isArray(got) || got.length < 2) return sizeField();
     var clean = [];
     for (var i = 0; i < got.length; i++) {
       var v = got[i];
@@ -244,6 +247,34 @@
       clean.push(v < 0 ? 0 : (v > 1 ? 1 : v));
     }
     return clean;
+  }
+
+  var ELEMENT_MAX = 11;
+
+  // The table `paletteElement(id)` reads in the GLSL: [size, weight] per element,
+  // from the same registered function that supplies the size field, so the CPU's
+  // cohort boundaries and the shader's per-element lookup can never disagree
+  // about how big anything is.
+  //
+  // Weight is how much ink an element carries relative to an average one, and
+  // only affects the print roll, never which cohort an element lands in. A
+  // declaration that omits it gets 1, which is exactly today's flat behaviour.
+  function elementTable(def, values) {
+    var fn = def && def.name ? SIZE_FIELDS[def.name] : null;
+    if (!fn) return null;
+    var got = null;
+    try { got = fn(values || {}); } catch (e) { return null; }
+    if (!got) return null;
+    var sizes = Array.isArray(got) ? got : got.sizes;
+    var weights = Array.isArray(got) ? null : got.weights;
+    if (!sizes || !sizes.length) return null;
+    var out = [];
+    for (var i = 0; i < Math.min(sizes.length, ELEMENT_MAX); i++) {
+      var sz = typeof sizes[i] === 'number' && isFinite(sizes[i]) ? sizes[i] : 0.5;
+      var w = weights && typeof weights[i] === 'number' && isFinite(weights[i]) ? weights[i] : 1;
+      out.push([Math.max(0, Math.min(1, sz)), Math.max(0.05, Math.min(20, w))]);
+    }
+    return out;
   }
 
   var GROUP_MAX = 8;
@@ -323,6 +354,56 @@
     };
   }
 
+  // ── scaling-letters ───────────────────────────────────────────────────────
+  // The first shader whose elements are genuinely discrete: a word drawn as up
+  // to eleven letters, each at its own point size. That matters beyond this one
+  // shader — natural clusters splits at the widest gaps, and eleven distinct
+  // sizes have gaps where a continuous field has none, so this is the first
+  // shader on which clusters can find anything at all.
+  //
+  // Mirrors the shader's own resolution in render(): the word is capped at
+  // eleven letters, and the per-letter sliders only apply when the toggle is on.
+  function letterPointSizes(values) {
+    var word = values.u_word != null ? values.u_word : 'ABCDE';
+    var count = Math.max(1, String(word).slice(0, ELEMENT_MAX).split('').filter(Boolean).length);
+    var base = typeof values.u_font_size === 'number' ? values.u_font_size : 300;
+    var per = !!values.perLetterSizeEnabled;
+    var out = [];
+    for (var i = 1; i <= count; i++) {
+      var k = values['u_font_size_' + i];
+      out.push(per && typeof k === 'number' ? k : base);
+    }
+    return out;
+  }
+
+  registerSizeField('scaling-letters', function (values) {
+    var pt = letterPointSizes(values);
+    var min = Math.min.apply(null, pt), max = Math.max.apply(null, pt);
+    var span = max - min;
+    // Rescaled, not ranked — the same contract the shape sources use, and for
+    // the same reason: a rank is uniform by construction and would hand clusters
+    // a field with no gaps, which is precisely what this shader exists to fix.
+    // With the per-letter toggle off every letter is the same size, so this is
+    // flat and one cohort is the honest answer.
+    var sizes = pt.map(function (v) { return span > 0 ? (v - min) / span : 0.5; });
+
+    // Ink area goes as the square of point size — measured, a letter at 300pt
+    // carries about 21x the ink of the same letter at 60pt, against the 25x
+    // size^2 predicts. Normalized to a mean of 1 so an average letter rolls at
+    // exactly the palette's density.
+    //
+    // What this deliberately does not model is glyph shape: at one size a W
+    // carries roughly 3x the ink of an I, and a full stop about a sixteenth of
+    // an M. Measuring that means reading back the letter atlas, which would cost
+    // this function its purity. The point-size term spans ~100x across the
+    // slider's range and dominates; the shape term is worth revisiting only if
+    // letters visibly pop.
+    var sq = pt.map(function (v) { return v * v; });
+    var mean = sq.reduce(function (a, b) { return a + b; }, 0) / sq.length;
+    var weights = sq.map(function (v) { return mean > 0 ? v / mean : 1; });
+    return { sizes: sizes, weights: weights };
+  });
+
   // Returns { values, slots, colorMode }.
   //
   //   values    — a complete _shaderState.values, ready to assign
@@ -356,6 +437,8 @@
     // gradient where grouping is off or unsupported, and overrides per element
     // where it is on. u_group_mode 0 by default, so nothing changes for shaders
     // that never opted in.
+    var elements = elementTable(def, values);
+    if (elements) values.u_element = elements;
     var groups = groupUniforms(palette, seed, sizeFieldFor(def, values));
     values.u_group_mode = groups ? 1 : 0;
     if (groups) {
@@ -413,6 +496,8 @@
     groupUniforms: groupUniforms,
     registerSizeField: registerSizeField,
     sizeFieldFor: sizeFieldFor,
+    elementTable: elementTable,
+    ELEMENT_MAX: ELEMENT_MAX,
     SIZE_FIELDS: SIZE_FIELDS,
     SIZE_FIELD_SAMPLES: SIZE_FIELD_SAMPLES,
     paletteOwnedKeys: paletteOwnedKeys,

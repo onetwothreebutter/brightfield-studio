@@ -489,16 +489,78 @@ describe('size groups on a shader', () => {
     expect(map('rise-shirt', { palette: grouped(), seed: 'h' })).not.toEqual(a);
   });
 
-  it('emits the same uniforms for every shader — support is the GLSL’s to declare', () => {
-    // The mapping is shader-agnostic on purpose; whether a shader *uses* the
-    // uniforms is reported at runtime by shader-base from the linked program,
-    // so this layer can never disagree with the GLSL.
+  it('emits the same uniforms for every shader that has not declared a field', () => {
+    // The mapping is shader-agnostic except where a shader declares its own
+    // element sizes — whether a shader *uses* the uniforms is still reported at
+    // runtime by shader-base from the linked program, so this layer can never
+    // disagree with the GLSL about support.
     const ref = map('rise-shirt', { palette: grouped(), seed: 'same' }).values;
-    names().forEach((name) => {
+    names().filter((n) => !PPS.SIZE_FIELDS[n]).forEach((name) => {
       const v = map(name, { palette: grouped(), seed: 'same' }).values;
       expect(v.u_group_count, name).toBe(ref.u_group_count);
       expect(v.u_group_bounds, name).toEqual(ref.u_group_bounds);
       expect(v.u_group_colors, name).toEqual(ref.u_group_colors);
+    });
+  });
+
+  it('gives a shader that declared a field its own boundaries', () => {
+    // The whole point: scaling-letters' cohorts come from its own letter sizes
+    // rather than a synthetic sample, so they must not match a shader that got
+    // the dense one. Needs the per-letter toggle on — with it off every letter
+    // is the same size, and one cohort is the honest answer.
+    const letters = PPS.defaultValues(SHADERS['scaling-letters']);
+    Object.assign(letters, {
+      perLetterSizeEnabled: 1,
+      u_font_size_1: 500, u_font_size_2: 80, u_font_size_3: 300,
+      u_font_size_4: 90, u_font_size_5: 460
+    });
+    // clusters, not bands: bands cuts the size *range* into equal slices and so
+    // returns the same boundaries whatever the field contains. Only clusters
+    // reads the distribution, which is the thing a declared field supplies.
+    const ref = map('rise-shirt', { palette: grouped('clusters'), seed: 'same' }).values;
+    const v = PPS.mapPalette(SHADERS['scaling-letters'], {
+      palette: grouped('clusters'), seed: 'same', variation: 0, values: letters
+    }).values;
+    expect(v.u_group_bounds).not.toEqual(ref.u_group_bounds);
+    // And it is the thing this shader was chosen for: eleven discrete sizes
+    // have gaps, so natural clusters finds tiers where a continuous field
+    // returns one cohort every time.
+    expect(v.u_group_count, 'clusters should find real tiers here')
+      .toBeGreaterThan(1);
+    expect(ref.u_group_count, 'a continuous field still collapses').toBe(1);
+  });
+
+  it('sends a per-element table the GLSL can index, weighted by ink', () => {
+    const letters = PPS.defaultValues(SHADERS['scaling-letters']);
+    Object.assign(letters, {
+      perLetterSizeEnabled: 1,
+      u_font_size_1: 500, u_font_size_2: 80, u_font_size_3: 300,
+      u_font_size_4: 90, u_font_size_5: 460
+    });
+    const { values } = PPS.mapPalette(SHADERS['scaling-letters'], {
+      palette: grouped(), seed: 's', variation: 0, values: letters
+    });
+    const table = values.u_element;
+    expect(table).toHaveLength(5);                 // one per letter of "PIZZA"
+    table.forEach(([size, w]) => {
+      expect(size).toBeGreaterThanOrEqual(0);
+      expect(size).toBeLessThanOrEqual(1);
+      expect(w).toBeGreaterThan(0);
+    });
+    // Ink goes as the square of point size, so the 500pt letter must outweigh
+    // the 80pt one by far more than the 6x their sizes differ by.
+    expect(table[0][1] / table[1][1]).toBeGreaterThan(20);
+    // Biggest letter is size 1, smallest is 0 — a rescale, not a rank.
+    expect(table[0][0]).toBe(1);
+    expect(table[1][0]).toBe(0);
+  });
+
+  it('is flat, and honestly one cohort, with per-letter sizing off', () => {
+    const { values } = map('scaling-letters', { palette: grouped('clusters') });
+    expect(values.u_group_count).toBe(1);
+    values.u_element.forEach(([size, w]) => {
+      expect(size).toBe(0.5);
+      expect(w).toBe(1);
     });
   });
 });
@@ -510,11 +572,8 @@ describe('declared size fields', () => {
     return p;
   };
 
-  it('ships with none declared, so every shader still gets the dense sample', () => {
-    // The property that makes adding this hook a no-op: nothing declares a
-    // field yet, so no shader's boundaries move.
-    expect(Object.keys(PPS.SIZE_FIELDS)).toHaveLength(0);
-    names().forEach((name) => {
+  it('leaves every shader that has not declared a field on the dense sample', () => {
+    names().filter((n) => !PPS.SIZE_FIELDS[n]).forEach((name) => {
       expect(PPS.sizeFieldFor(SHADERS[name], {}), name)
         .toHaveLength(PPS.SIZE_FIELD_SAMPLES);
     });
