@@ -186,3 +186,57 @@ describe('hygiene', () => {
     expect(html).not.toMatch(/Math\s*\.\s*random\s*\(/);
   });
 });
+
+describe('export metadata', () => {
+  const entry = () => Object.assign(Coll.makeSnapshot(snap({ seed: 'sample-q' })), { id: 'c1', addedAt: 1 });
+
+  it('carries the product page restore payload and a ?bfr= link where the handle is known', () => {
+    const values = PPS.mapPalette(SHADERS['rise-shirt'], {
+      palette: preset(), seed: 'sample-q', variation: 0, values: PPS.defaultValues(SHADERS['rise-shirt'])
+    }).values;
+    const meta = Coll.buildExportMeta(entry(), {
+      values, handles: { 'rise-shirt': 'dot-rise' }, image: { width: 1800, height: 2400 }, now: 'T'
+    });
+    expect(meta.format).toBe('brightfield-lab-design/1');
+    expect(meta.family).toBe('shader');
+    expect(meta.design).toEqual({ shader: 'rise-shirt', values });
+    // Exactly what main-product.liquid does with the param.
+    expect(JSON.parse(atob(meta.product.bfr))).toEqual({ shader: 'rise-shirt', values });
+    expect(meta.product.url).toBe(
+      Coll.STORE_ORIGIN + '/products/dot-rise?bfr=' + encodeURIComponent(meta.product.bfr));
+    expect(meta.image).toEqual({ file: 'brightfield-rise-shirt-sample-q.png', width: 1800, height: 2400, background: '#000000' });
+    expect(meta.labSnapshot.palette).toEqual(entry().palette);
+    expect(meta.product.sizeGroupsWarning).toBeUndefined();
+  });
+
+  it('still exports the payload with instructions when no handle is on file', () => {
+    const meta = Coll.buildExportMeta(entry(), { values: { u_cols: 1 }, handles: {} });
+    expect(meta.product.handle).toBeNull();
+    expect(meta.product.url).toBeNull();
+    expect(meta.product.bfr).toBeTruthy();
+    expect(meta.product.note).toMatch(/shader-rise-shirt/);
+  });
+
+  it('warns when the design depends on size groups the product page cannot restore', () => {
+    const p = preset(); p.sizeGroups = { enabled: true, mode: 'bands', maxGroups: 3 };
+    const values = PPS.mapPalette(SHADERS['rise-shirt'], {
+      palette: p, seed: 'sample-q', variation: 0, values: PPS.defaultValues(SHADERS['rise-shirt'])
+    }).values;
+    expect(values.u_group_mode).toBe(1);
+    const meta = Coll.buildExportMeta(entry(), { values, handles: {} });
+    expect(meta.product.sizeGroupsWarning).toMatch(/size groups/);
+  });
+
+  it('describes a shape entry as image-only', () => {
+    const e = Object.assign(Coll.makeSnapshot(snap({ source: 'scatter', shaderValues: null, detail: 5 })), { id: 'c2' });
+    const meta = Coll.buildExportMeta(e, {});
+    expect(meta.family).toBe('shapes');
+    expect(meta.product).toBeNull();
+    expect(meta.design).toBeUndefined();
+    expect(meta.labSnapshot.detail).toBe(5);
+  });
+
+  it('makes a filesystem-safe base name', () => {
+    expect(Coll.exportBaseName({ source: 'line-circle', seed: 'a/b c' })).toBe('brightfield-line-circle-a_b_c');
+  });
+});

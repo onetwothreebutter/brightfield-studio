@@ -292,6 +292,7 @@
   <header>
     <span>Collection</span>
     <button id="coll-compare" type="button" disabled>Compare</button>
+    <button id="coll-export" type="button" disabled title="Download every entry as a PNG plus metadata JSON">Export all</button>
     <button id="coll-clear" type="button">Clear</button>
     <button id="coll-close" type="button" aria-label="Close">×</button>
   </header>
@@ -993,6 +994,7 @@
     var entries = store.entries();
     document.getElementById('coll-count').textContent = store.size();
     document.getElementById('coll-compare').disabled = store.size() < 2;
+    document.getElementById('coll-export').disabled = store.size() < 1;
     list.textContent = '';
     if (!entries.length) {
       var empty = document.createElement('p');
@@ -1022,6 +1024,13 @@
       load.title = 'Restore the source, palette, settings and seed that made this';
       load.addEventListener('click', function () { restore(e); });
       row.appendChild(load);
+
+      var exp = document.createElement('button');
+      exp.type = 'button';
+      exp.textContent = 'Export';
+      exp.title = 'Download a ' + EXPORT_W + '×' + EXPORT_H + ' PNG plus the metadata to recreate it';
+      exp.addEventListener('click', function () { exportEntries([e]); });
+      row.appendChild(exp);
 
       var rm = document.createElement('button');
       rm.type = 'button';
@@ -1074,6 +1083,94 @@
   }
 
   function closeCompare() { compare.classList.remove('open'); }
+
+  // ── Export ────────────────────────────────────────────────────────────────
+  // A PNG at the same size the product page exports for print, plus a JSON
+  // sidecar: the product page's own restore payload (`{ shader, values }`,
+  // base64'd into a ?bfr= link) and the lab snapshot. Rendering borrows the
+  // shared WebGL canvas, resized for one frame and put back.
+
+  var EXPORT_W = 1800;
+  var EXPORT_H = 2400;
+  // Shader → product handle, for a pasteable product URL. Only what is known;
+  // an unlisted shader still exports the bfr payload with instructions.
+  var PRODUCT_HANDLES = { 'rise-shirt': 'dot-rise' };
+
+  function renderExportImage(entry, done) {
+    var out = document.createElement('canvas');
+    out.width = EXPORT_W;
+    out.height = EXPORT_H;
+    var ctx = out.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
+    if (SHAPE_SOURCES[entry.source]) {
+      renderSnapshot(entry, ctx, EXPORT_W, EXPORT_H, function () { done(out, null); });
+      return;
+    }
+    withShader(entry.source, function (handle) {
+      var gl = handle.gl;
+      var prevW = GL_CANVAS.width;
+      var prevH = GL_CANVAS.height;
+      var mapped = PPS.mapPalette(SHADERS[entry.source], {
+        palette: entry.palette, seed: entry.seed, variation: entry.variation || 0,
+        values: entry.shaderValues || PPS.defaultValues(SHADERS[entry.source])
+      });
+      mapped.values.u_group_debug = 0;
+      window._shaderState.values = mapped.values;
+      // Text textures are rasterized at canvas size, so force a redraw at the
+      // export size and again on the way back.
+      window._shaderState.textDirty = true;
+      GL_CANVAS.width = EXPORT_W;
+      GL_CANVAS.height = EXPORT_H;
+      gl.viewport(0, 0, EXPORT_W, EXPORT_H);
+      handle.renderFrame(PPS.FIXED_TIME);
+      ctx.drawImage(GL_CANVAS, 0, 0, EXPORT_W, EXPORT_H);
+      GL_CANVAS.width = prevW;
+      GL_CANVAS.height = prevH;
+      gl.viewport(0, 0, prevW, prevH);
+      window._shaderState.textDirty = true;
+      done(out, mapped.values);
+    });
+  }
+
+  function download(name, blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+  }
+
+  // Sequential: one shared canvas, and browsers throttle a burst of downloads.
+  function exportEntries(list) {
+    var btn = document.getElementById('coll-export');
+    var i = 0;
+    function next() {
+      if (i >= list.length) { btn.textContent = 'Export all'; renderDrawer(); return; }
+      var e = list[i++];
+      btn.textContent = 'Exporting ' + i + '/' + list.length;
+      renderExportImage(e, function (canvas, values) {
+        var base = Coll.exportBaseName(e);
+        var meta = Coll.buildExportMeta(e, {
+          values: values, handles: PRODUCT_HANDLES,
+          image: { width: EXPORT_W, height: EXPORT_H },
+          now: new Date().toISOString()
+        });
+        canvas.toBlob(function (blob) {
+          download(base + '.png', blob);
+          download(base + '.json', new Blob([JSON.stringify(meta, null, 2)], { type: 'application/json' }));
+          setTimeout(next, 400);
+        }, 'image/png');
+      });
+    }
+    next();
+  }
+
+  document.getElementById('coll-export').addEventListener('click', function () {
+    exportEntries(store.entries());
+  });
 
   tab.addEventListener('click', function () { setDrawer(!drawer.classList.contains('open')); });
   document.getElementById('coll-close').addEventListener('click', function () { setDrawer(false); });

@@ -196,7 +196,83 @@
     return api;
   }
 
+  // ── Export metadata ─────────────────────────────────────────────────────
+  // The product page restores a design from `?bfr=<base64 JSON>` holding
+  // exactly `{ shader, values }` (sections/main-product.liquid), so that is the
+  // payload — same key names, same value shapes — rather than a lab-specific
+  // format it would then have to translate. Everything else in the file is for
+  // a human running the A/B test: what it is, where it came from, how to get
+  // it back into the lab.
+  var STORE_ORIGIN = 'https://brightfield-2.myshopify.com';
+
+  function utf8Base64(str) {
+    try { return btoa(str); } catch (e) {
+      return btoa(unescape(encodeURIComponent(str)));
+    }
+  }
+
+  function exportBaseName(entry) {
+    return 'brightfield-' + entry.source + '-' + String(entry.seed).replace(/[^a-z0-9_-]/gi, '_');
+  }
+
+  // `opts.values` is the mapped shader values (mapPalette output) for a shader
+  // entry — the caller renders from them, so they are the truth. `opts.handles`
+  // maps shader name → product handle where known; `opts.image` describes the
+  // PNG written alongside.
+  function buildExportMeta(entry, opts) {
+    opts = opts || {};
+    var isShader = !!opts.values;
+    var base = exportBaseName(entry);
+    var out = {
+      format: 'brightfield-lab-design/1',
+      exportedAt: typeof opts.now === 'string' ? opts.now : null,
+      family: isShader ? 'shader' : 'shapes',
+      source: entry.source,
+      seed: entry.seed,
+      palette: { id: entry.palette && entry.palette.id, name: entry.palette && entry.palette.name },
+      image: {
+        file: base + '.png',
+        width: opts.image ? opts.image.width : null,
+        height: opts.image ? opts.image.height : null,
+        background: '#000000'
+      },
+      // Everything the lab needs to re-render or restore this exact entry.
+      labSnapshot: {
+        source: entry.source, seed: entry.seed, palette: entry.palette,
+        shaderValues: entry.shaderValues || null, detail: entry.detail, variation: entry.variation || 0
+      }
+    };
+    if (!isShader) {
+      out.product = null;
+      out.productNote = 'A shape source is a lab generator with no product page; the image is the deliverable.';
+      return out;
+    }
+    var design = { shader: entry.source, values: opts.values };
+    var bfr = utf8Base64(JSON.stringify(design));
+    var handle = opts.handles && opts.handles[entry.source];
+    var grouped = !!(opts.values.u_group_mode);
+    out.design = design;
+    out.product = {
+      shader: entry.source,
+      handle: handle || null,
+      bfr: bfr,
+      url: handle ? STORE_ORIGIN + '/products/' + handle + '?bfr=' + encodeURIComponent(bfr) : null,
+      note: handle
+        ? 'Open url: the product page reads ?bfr= and loads these values into the design.'
+        : 'No product handle is on file for this shader. Open the product tagged shader-' + entry.source
+          + ' and append ?bfr=<bfr> to its URL.'
+    };
+    if (grouped) {
+      out.product.sizeGroupsWarning = 'This design uses size groups (u_group_* uniforms). The product page '
+        + 'only restores values that are controls, so it will show the ungrouped colouring.';
+    }
+    return out;
+  }
+
   window.PaletteLabCollection = {
+    STORE_ORIGIN: STORE_ORIGIN,
+    exportBaseName: exportBaseName,
+    buildExportMeta: buildExportMeta,
     STORAGE_KEY: STORAGE_KEY,
     keyOf: keyOf,
     makeSnapshot: makeSnapshot,

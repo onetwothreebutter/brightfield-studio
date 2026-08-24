@@ -398,6 +398,18 @@ grid badges and compare overlay are wired in `palette-lab.html`.
   the same seed is a different design, so the badge goes away.
 - **Compare shows every kept entry**, not a ticked subset — the collection is
   the shortlist. A tile's Remove only takes it out of that view.
+- **Export** writes a 1800×2400 PNG (the print-export size, flattened on black
+  like the lab shows it) plus a JSON sidecar per entry. For a shader entry the
+  sidecar's `design` is exactly `{ shader, values }` — the product page's own
+  `?bfr=` restore payload (`sections/main-product.liquid`) — and `product.url`
+  is a pasteable link when the shader's product handle is in the lab's
+  `PRODUCT_HANDLES` map (only `rise-shirt → dot-rise` so far; unlisted shaders
+  get the raw `bfr` and instructions). The product page restores only keys
+  that are controls, so a design that depends on size groups (`u_group_*`)
+  reopens ungrouped — the sidecar says so in `sizeGroupsWarning`.
+  `buildExportMeta` is pure and tested; the render resizes the shared WebGL
+  canvas for one frame, with `textDirty` forced both ways so text is
+  rasterized at export size and back.
 - Adding never redraws the grid or the preview; the thumbnail is read off the
   cell's own canvas once it carries `data-drawn`.
 - Rendering an entry goes through `renderSnapshot`, which passes every input
