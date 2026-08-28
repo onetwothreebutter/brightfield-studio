@@ -383,7 +383,9 @@ in `#right-column`) drag by their `h2`; the order persists in `localStorage`
 and unknown ids fall back to source order. `draggable` is set on `mousedown`
 of the header and cleared on `dragend`, so the panel body's sliders, canvases
 and buttons keep their own mouse behaviour — a permanently draggable panel
-would swallow slider drags.
+would swallow slider drags. Each header also carries a ▾/▸ button that
+collapses the panel to its header (persisted separately); nothing stops
+rendering while collapsed, so the header readouts stay live.
 
 ### Collection drawer
 The lab's right-edge **Collection** tab keeps the best designs from the sample

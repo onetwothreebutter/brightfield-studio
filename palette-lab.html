@@ -48,6 +48,12 @@
   #right-column .panel.dragging { opacity: 0.4; }
   #right-column .panel.drop-before { box-shadow: 0 -3px 0 0 #6fb3f2; }
   #right-column .panel.drop-after { box-shadow: 0 3px 0 0 #6fb3f2; }
+  #right-column .panel > h2 .fold {
+    width: 20px; height: 20px; padding: 0; margin-left: 8px; line-height: 18px;
+    font-size: 10px; flex: 0 0 auto;
+  }
+  #right-column .panel.collapsed > h2 { margin-bottom: 0; }
+  #right-column .panel.collapsed > :not(h2) { display: none; }
 
   .panel h2 {
     font-size: 10px;
@@ -1217,6 +1223,7 @@
   // panel later never loses a saved arrangement.
 
   var ORDER_KEY = 'brightfield-palette-lab-panel-order';
+  var FOLD_KEY = 'brightfield-palette-lab-panel-collapsed';
   var column = document.getElementById('right-column');
 
   function panels() { return Array.prototype.slice.call(column.querySelectorAll(':scope > .panel[data-panel]')); }
@@ -1235,6 +1242,43 @@
     panels().forEach(function (p) { byId[p.dataset.panel] = p; });
     saved.forEach(function (id) { if (byId[id]) column.appendChild(byId[id]); });
   }
+
+  // Collapsed panels keep their header (and stay draggable) and hide the rest.
+  // Nothing stops rendering: a collapsed preview still draws into its canvas,
+  // so the ink table and the grid keep reporting the current state.
+  function saveFolds() {
+    try {
+      window.localStorage.setItem(FOLD_KEY, JSON.stringify(panels()
+        .filter(function (p) { return p.classList.contains('collapsed'); })
+        .map(function (p) { return p.dataset.panel; })));
+    } catch (e) { /* private mode */ }
+  }
+
+  function setFold(p, collapsed) {
+    p.classList.toggle('collapsed', collapsed);
+    var btn = p.querySelector(':scope > h2 .fold');
+    btn.textContent = collapsed ? '▸' : '▾';
+    btn.title = collapsed ? 'Expand' : 'Collapse';
+    btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+
+  (function wirePanelFold() {
+    var saved = [];
+    try { saved = JSON.parse(window.localStorage.getItem(FOLD_KEY) || '[]'); } catch (e) { /* ignore */ }
+    if (!Array.isArray(saved)) saved = [];
+    panels().forEach(function (p) {
+      var h2 = p.querySelector(':scope > h2');
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'fold';
+      btn.addEventListener('click', function () {
+        setFold(p, !p.classList.contains('collapsed'));
+        saveFolds();
+      });
+      h2.appendChild(btn);
+      setFold(p, saved.indexOf(p.dataset.panel) !== -1);
+    });
+  })();
 
   (function wirePanelDrag() {
     var dragging = null;
