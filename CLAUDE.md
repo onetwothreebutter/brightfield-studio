@@ -377,6 +377,14 @@ rendered text must carry `textDirty: true`** — including ones not named `text`
   first 7 boundaries of a 12-band solution are not an 8-band one. The editor
   slider caps at 8; stored or pasted palette JSON need not.
 
+### Right-column panels reorder by dragging their header
+Preview, Shader controls, Observed ink and Generate samples (`data-panel` ids
+in `#right-column`) drag by their `h2`; the order persists in `localStorage`
+and unknown ids fall back to source order. `draggable` is set on `mousedown`
+of the header and cleared on `dragend`, so the panel body's sliders, canvases
+and buttons keep their own mouse behaviour — a permanently draggable panel
+would swallow slider drags.
+
 ### Collection drawer
 The lab's right-edge **Collection** tab keeps the best designs from the sample
 grid and compares them side by side. `assets/palette-lab-collection.js` is the

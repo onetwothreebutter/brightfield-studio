@@ -43,6 +43,12 @@
     margin-bottom: 14px;
   }
 
+  /* Panels in the right column reorder by dragging their header. */
+  #right-column .panel > h2 { cursor: grab; user-select: none; }
+  #right-column .panel.dragging { opacity: 0.4; }
+  #right-column .panel.drop-before { box-shadow: 0 -3px 0 0 #6fb3f2; }
+  #right-column .panel.drop-after { box-shadow: 0 3px 0 0 #6fb3f2; }
+
   .panel h2 {
     font-size: 10px;
     letter-spacing: 0.12em;
@@ -209,8 +215,8 @@
     <div id="editor"></div>
   </div>
 
-  <div>
-    <div class="panel">
+  <div id="right-column">
+    <div class="panel" data-panel="preview">
       <h2><span>Preview</span><span id="preview-meta"></span></h2>
       <div class="ctl">
         <label for="seed">Seed</label>
@@ -242,7 +248,7 @@
       <p class="hint" id="slots-hint"></p>
     </div>
 
-    <div class="panel" id="shader-panel">
+    <div class="panel" id="shader-panel" data-panel="shader">
       <h2>
         <span>Shader controls</span>
         <button id="reset-shader" type="button">Reset to defaults</button>
@@ -255,7 +261,7 @@
       </p>
     </div>
 
-    <div class="panel">
+    <div class="panel" data-panel="ink">
       <h2><span>Observed ink by area</span><span id="dist-meta"></span></h2>
       <table id="dist"></table>
       <p class="hint">
@@ -267,7 +273,7 @@
       </p>
     </div>
 
-    <div class="panel">
+    <div class="panel" data-panel="samples">
       <h2><span>Generate samples</span><span id="samples-meta"></span></h2>
       <div class="ctl">
         <label for="count">Thumbnails</label>
@@ -1203,6 +1209,80 @@
       if (ui && ui.open) setDrawer(true);
     } catch (e) { /* private mode */ }
   }
+
+  // ── Panel order ───────────────────────────────────────────────────────────
+  // The right column's panels drag by their header, so the sample grid can sit
+  // above the preview and be watched while the palette is edited. Order is
+  // persisted; unknown or missing ids fall back to source order, so adding a
+  // panel later never loses a saved arrangement.
+
+  var ORDER_KEY = 'brightfield-palette-lab-panel-order';
+  var column = document.getElementById('right-column');
+
+  function panels() { return Array.prototype.slice.call(column.querySelectorAll(':scope > .panel[data-panel]')); }
+
+  function saveOrder() {
+    try {
+      window.localStorage.setItem(ORDER_KEY, JSON.stringify(panels().map(function (p) { return p.dataset.panel; })));
+    } catch (e) { /* private mode */ }
+  }
+
+  function restoreOrder() {
+    var saved = null;
+    try { saved = JSON.parse(window.localStorage.getItem(ORDER_KEY) || 'null'); } catch (e) { /* ignore */ }
+    if (!Array.isArray(saved)) return;
+    var byId = {};
+    panels().forEach(function (p) { byId[p.dataset.panel] = p; });
+    saved.forEach(function (id) { if (byId[id]) column.appendChild(byId[id]); });
+  }
+
+  (function wirePanelDrag() {
+    var dragging = null;
+    function clearMarks() {
+      panels().forEach(function (p) { p.classList.remove('drop-before', 'drop-after'); });
+    }
+    panels().forEach(function (p) {
+      var h2 = p.querySelector(':scope > h2');
+      // Only the header starts a drag — the panel body holds sliders, canvases
+      // and buttons that must keep their own mouse behaviour.
+      h2.addEventListener('mousedown', function (ev) {
+        if (ev.target.closest('button, input, select')) return;
+        p.draggable = true;
+      });
+      p.addEventListener('dragstart', function (ev) {
+        dragging = p;
+        p.classList.add('dragging');
+        ev.dataTransfer.effectAllowed = 'move';
+        try { ev.dataTransfer.setData('text/plain', p.dataset.panel); } catch (e) { /* IE */ }
+      });
+      p.addEventListener('dragend', function () {
+        p.classList.remove('dragging');
+        p.draggable = false;
+        dragging = null;
+        clearMarks();
+      });
+      p.addEventListener('dragover', function (ev) {
+        if (!dragging || dragging === p) return;
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+        var r = p.getBoundingClientRect();
+        var before = ev.clientY < r.top + r.height / 2;
+        clearMarks();
+        p.classList.add(before ? 'drop-before' : 'drop-after');
+      });
+      p.addEventListener('dragleave', function () { p.classList.remove('drop-before', 'drop-after'); });
+      p.addEventListener('drop', function (ev) {
+        if (!dragging || dragging === p) return;
+        ev.preventDefault();
+        var r = p.getBoundingClientRect();
+        var before = ev.clientY < r.top + r.height / 2;
+        column.insertBefore(dragging, before ? p : p.nextSibling);
+        clearMarks();
+        saveOrder();
+      });
+    });
+    restoreOrder();
+  })();
 
   // ── Shader control panel ──────────────────────────────────────────────────
 
