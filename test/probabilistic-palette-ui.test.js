@@ -53,6 +53,24 @@ describe('import panel', () => {
     expect(lab.ta().value).toBe('');
   });
 
+  it('keeps the size grouping settings across Replace', () => {
+    const lab = mountLab();
+    const current = lab.api.getPalette();
+    current.sizeGroups = { enabled: true, mode: 'clusters', minGap: 0.001, maxGroups: 4, dropElements: true };
+    lab.api.setPalette(current);
+    const ta = lab.ta();
+    ta.value = '606c38 283618 fefae0';
+    ta.dispatchEvent(new window.Event('input'));
+    lab.btn('Replace palette').dispatchEvent(new window.Event('click'));
+    const p = lab.api.getPalette();
+    expect(p.colors).toHaveLength(3);
+    expect(p.sizeGroups).toEqual({ enabled: true, mode: 'clusters', minGap: 0.001, maxGroups: 4, dropElements: true });
+    // And the rebuilt panel agrees with it.
+    const group = Array.from(lab.host.querySelectorAll('input[type=checkbox]'))
+      .find((c) => /Group by size/.test(c.parentNode.textContent));
+    expect(group.checked).toBe(true);
+  });
+
   it('reports prose and single colors, and cancel clears', () => {
     const lab = mountLab();
     const ta = lab.ta();

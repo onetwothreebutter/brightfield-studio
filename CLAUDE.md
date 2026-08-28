@@ -377,6 +377,56 @@ rendered text must carry `textDirty: true`** — including ones not named `text`
   first 7 boundaries of a 12-band solution are not an 8-band one. The editor
   slider caps at 8; stored or pasted palette JSON need not.
 
+### Right-column panels reorder by dragging their header
+Preview, Shader controls, Observed ink and Generate samples (`data-panel` ids
+in `#right-column`) drag by their `h2`; the order persists in `localStorage`
+and unknown ids fall back to source order. `draggable` is set on `mousedown`
+of the header and cleared on `dragend`, so the panel body's sliders, canvases
+and buttons keep their own mouse behaviour — a permanently draggable panel
+would swallow slider drags. Each header also carries a ▾/▸ button that
+collapses the panel to its header (persisted separately); nothing stops
+rendering while collapsed, so the header readouts stay live.
+
+### Collection drawer
+The lab's right-edge **Collection** tab keeps the best designs from the sample
+grid and compares them side by side. `assets/palette-lab-collection.js` is the
+DOM-free store (`PaletteLabCollection.createStore({ storage })`); the drawer,
+grid badges and compare overlay are wired in `palette-lab.html`.
+- **An entry is a restorable snapshot, not a picture** — source, seed, a deep
+  copy of the palette and of the shader settings, detail and drift. That is
+  what lets **Load** put the whole lab back and lets the compare overlay
+  re-render an entry at full shared-canvas resolution after the palette in the
+  editor has moved on. The JPEG thumbnail is a display convenience and is the
+  first thing dropped on a `localStorage` quota error; a missing one is
+  re-rendered from the snapshot and cached back.
+- **Keeping a cell is hover-`+` or shift-click, never plain click.** Plain
+  click already loads the seed into the preview, and changing it would break
+  the gesture every other part of the page relies on.
+- **Identity is `keyOf(snapshot)`** — source, seed, palette, settings, detail
+  and drift — so re-keeping a design you already have is a no-op, and a grid
+  cell's ✓ badge is answered against the *live* state: change the palette and
+  the same seed is a different design, so the badge goes away.
+- **Compare shows every kept entry**, not a ticked subset — the collection is
+  the shortlist. A tile's Remove only takes it out of that view.
+- **Export** writes a 1800×2400 PNG (the print-export size, flattened on black
+  like the lab shows it) plus a JSON sidecar per entry. For a shader entry the
+  sidecar's `design` is exactly `{ shader, values }` — the product page's own
+  `?bfr=` restore payload (`sections/main-product.liquid`) — and `product.url`
+  is a pasteable link when the shader's product handle is in the lab's
+  `PRODUCT_HANDLES` map (only `rise-shirt → dot-rise` so far; unlisted shaders
+  get the raw `bfr` and instructions). The product page restores only keys
+  that are controls, so a design that depends on size groups (`u_group_*`)
+  reopens ungrouped — the sidecar says so in `sizeGroupsWarning`.
+  `buildExportMeta` is pure and tested; the render resizes the shared WebGL
+  canvas for one frame, with `textDirty` forced both ways so text is
+  rasterized at export size and back.
+- Adding never redraws the grid or the preview; the thumbnail is read off the
+  cell's own canvas once it carries `data-drawn`.
+- Rendering an entry goes through `renderSnapshot`, which passes every input
+  `renderSample` reads off a global explicitly, and draws + blits in one call
+  on the one WebGL context so a grid filling in at the same time cannot
+  interleave with it.
+
 ### Spatial weights are authored in the same unit as `weight`
 A `spatial: [wStart, wEnd]` pair replaces the flat weight across the field, and
 both are on the same scale — the editor seeds those two inputs from `weight`.

@@ -395,7 +395,12 @@
 
       replaceBtn.addEventListener('click', function () {
         if (!hexes.length) return;
+        // Replace swaps the colors, not the structure: size grouping (on/off,
+        // mode, min gap, max groups) describes the composition being tuned,
+        // and losing it on every import meant re-ticking it each time.
+        var groups = palette.sizeGroups ? JSON.parse(JSON.stringify(palette.sizeGroups)) : null;
         palette = PP.paletteFromHexList(hexes, { name: palette.name });
+        if (groups) palette.sizeGroups = groups;
         rebuild();   // panel is rebuilt closed, with the palette in place
       });
 

@@ -43,6 +43,18 @@
     margin-bottom: 14px;
   }
 
+  /* Panels in the right column reorder by dragging their header. */
+  #right-column .panel > h2 { cursor: grab; user-select: none; }
+  #right-column .panel.dragging { opacity: 0.4; }
+  #right-column .panel.drop-before { box-shadow: 0 -3px 0 0 #6fb3f2; }
+  #right-column .panel.drop-after { box-shadow: 0 3px 0 0 #6fb3f2; }
+  #right-column .panel > h2 .fold {
+    width: 20px; height: 20px; padding: 0; margin-left: 8px; line-height: 18px;
+    font-size: 10px; flex: 0 0 auto;
+  }
+  #right-column .panel.collapsed > h2 { margin-bottom: 0; }
+  #right-column .panel.collapsed > :not(h2) { display: none; }
+
   .panel h2 {
     font-size: 10px;
     letter-spacing: 0.12em;
@@ -100,6 +112,73 @@
   .samples canvas:hover { border-color: #6fb3f2; }
   .samples canvas.active { border-color: #f2c14e; }
 
+  /* Each cell wraps its canvas so a keep button can sit on top of it. The
+     canvas keeps its own click (load the seed); the button and shift-click add
+     the cell to the collection. */
+  .samples .cell { position: relative; }
+  .samples .cell .keep {
+    position: absolute; top: 4px; right: 4px;
+    width: 22px; height: 22px; padding: 0; line-height: 20px; text-align: center;
+    border-radius: 4px; font-size: 14px;
+    background: rgba(17, 17, 17, 0.85); border: 1px solid #2c2c32; color: #eee;
+    opacity: 0; transition: opacity 0.12s;
+  }
+  .samples .cell:hover .keep, .samples .cell .keep:focus-visible { opacity: 1; }
+  .samples .cell.kept .keep { opacity: 1; background: #f2c14e; border-color: #f2c14e; color: #111; }
+  .samples .cell.kept canvas { border-color: #f2c14e; }
+
+  /* ── Collection drawer ─────────────────────────────────────────────────── */
+  #coll-tab {
+    position: fixed; right: 0; top: 50%; z-index: 30;
+    transform: translateY(-50%) rotate(180deg);
+    writing-mode: vertical-rl;
+    padding: 12px 7px; border-radius: 0 4px 4px 0;
+    background: #26262c; border: 1px solid #2c2c32; border-right: none;
+    letter-spacing: 0.12em; text-transform: uppercase; font-size: 10px;
+    transition: right 0.18s;
+  }
+  #coll-tab.open { right: 320px; }
+  #coll-tab .n { color: #f2c14e; }
+  #coll-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 320px; z-index: 29;
+    background: #1c1c20; border-left: 1px solid #2c2c32;
+    transform: translateX(100%); transition: transform 0.18s;
+    display: flex; flex-direction: column;
+  }
+  #coll-drawer.open { transform: none; }
+  #coll-drawer header {
+    display: flex; align-items: center; gap: 8px; padding: 12px 14px;
+    border-bottom: 1px solid #2c2c32;
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #8a8a92;
+  }
+  #coll-drawer header span { flex: 1; }
+  #coll-list { flex: 1; overflow-y: auto; padding: 12px 14px; }
+  #coll-list .empty { color: #666; line-height: 1.6; }
+  .coll-item { border: 1px solid #2c2c32; border-radius: 4px; background: #141417; padding: 8px; margin-bottom: 10px; }
+  .coll-item canvas { width: 100%; aspect-ratio: 4 / 5; display: block; border-radius: 3px; background: #000; }
+  .coll-item .meta { color: #8a8a92; font-size: 10px; margin: 6px 0 0; word-break: break-all; line-height: 1.5; }
+  .coll-item .meta b { color: #eee; font-weight: normal; }
+  .coll-item .row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+  .coll-item .row { justify-content: flex-end; }
+  @media (max-width: 1080px) {
+    #coll-drawer { width: 100%; }
+    #coll-tab.open { right: 0; z-index: 31; }
+  }
+
+  /* ── Compare overlay ───────────────────────────────────────────────────── */
+  #compare {
+    position: fixed; inset: 0; z-index: 40; background: rgba(8, 8, 10, 0.96);
+    display: none; flex-direction: column; padding: 18px 24px;
+  }
+  #compare.open { display: flex; }
+  #compare header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  #compare header h2 { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #8a8a92; flex: 1; }
+  #compare-tiles { flex: 1; display: flex; gap: 18px; overflow-x: auto; align-items: flex-start; }
+  .cmp-tile { flex: 1 1 0; min-width: 220px; max-width: 600px; display: flex; flex-direction: column; gap: 6px; }
+  .cmp-tile canvas { width: 100%; max-height: 78vh; aspect-ratio: 4 / 5; object-fit: contain; display: block; border-radius: 4px; background: #000; border: 1px solid #2c2c32; }
+  .cmp-tile .meta { display: flex; align-items: center; gap: 8px; color: #8a8a92; font-size: 10px; }
+  .cmp-tile .meta span { flex: 1; word-break: break-all; }
+
   table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   th, td { text-align: right; padding: 3px 4px; }
   th { color: #55555e; font-weight: normal; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
@@ -142,8 +221,8 @@
     <div id="editor"></div>
   </div>
 
-  <div>
-    <div class="panel">
+  <div id="right-column">
+    <div class="panel" data-panel="preview">
       <h2><span>Preview</span><span id="preview-meta"></span></h2>
       <div class="ctl">
         <label for="seed">Seed</label>
@@ -175,7 +254,7 @@
       <p class="hint" id="slots-hint"></p>
     </div>
 
-    <div class="panel" id="shader-panel">
+    <div class="panel" id="shader-panel" data-panel="shader">
       <h2>
         <span>Shader controls</span>
         <button id="reset-shader" type="button">Reset to defaults</button>
@@ -188,7 +267,7 @@
       </p>
     </div>
 
-    <div class="panel">
+    <div class="panel" data-panel="ink">
       <h2><span>Observed ink by area</span><span id="dist-meta"></span></h2>
       <table id="dist"></table>
       <p class="hint">
@@ -200,7 +279,7 @@
       </p>
     </div>
 
-    <div class="panel">
+    <div class="panel" data-panel="samples">
       <h2><span>Generate samples</span><span id="samples-meta"></span></h2>
       <div class="ctl">
         <label for="count">Thumbnails</label>
@@ -209,10 +288,34 @@
         <button id="regen">Generate</button>
       </div>
       <div class="samples" id="samples"></div>
-      <p class="hint">Click any thumbnail to load its seed into the preview above.</p>
+      <p class="hint">
+        Click any thumbnail to load its seed into the preview above. Hover and hit <b>+</b> (or shift-click)
+        to keep it in the collection on the right.
+      </p>
     </div>
   </div>
 
+</div>
+
+<button id="coll-tab" type="button" aria-controls="coll-drawer" aria-expanded="false">
+  Collection <span class="n" id="coll-count">0</span>
+</button>
+<aside id="coll-drawer" aria-label="Comparison collection">
+  <header>
+    <span>Collection</span>
+    <button id="coll-compare" type="button" disabled>Compare</button>
+    <button id="coll-export" type="button" disabled title="Download every entry as a PNG plus metadata JSON">Export all</button>
+    <button id="coll-clear" type="button">Clear</button>
+    <button id="coll-close" type="button" aria-label="Close">×</button>
+  </header>
+  <div id="coll-list"></div>
+</aside>
+<div id="compare" role="dialog" aria-label="Compare designs">
+  <header>
+    <h2>Compare</h2>
+    <button id="compare-close" type="button">Close</button>
+  </header>
+  <div id="compare-tiles"></div>
 </div>
 
 <script src="assets/probabilistic-palette.js"></script>
@@ -222,6 +325,7 @@
 <script src="assets/shader-gui.js"></script>
 <script src="assets/probabilistic-palette-shader.js"></script>
 <script src="assets/probabilistic-palette-ui.js"></script>
+<script src="assets/palette-lab-collection.js"></script>
 <script>
 (function () {
   'use strict';
@@ -688,7 +792,7 @@
       seeds.push(s);
       var cell = makeThumb(s);
       cells.push(cell);
-      host.appendChild(cell);
+      host.appendChild(cell.parentNode);
     }
 
     var token = ++gridToken;
@@ -702,7 +806,7 @@
       function step() {
         if (token !== gridToken) return;
         var end = Math.min(next + 6, cells.length);
-        for (; next < end; next++) drawCell(cells[next], seeds[next]);
+        for (; next < end; next++) { drawCell(cells[next], seeds[next]); cells[next].dataset.drawn = '1'; }
         meta.textContent = next + ' / ' + count + ' seeds';
         if (next < cells.length) requestAnimationFrame(step);
       }
@@ -725,12 +829,18 @@
     });
   }
 
+  // Returns the canvas; its wrapper (canvas.parentNode) is what goes in the
+  // grid. A plain click still loads the seed into the preview — that gesture
+  // was here first — so keeping a cell is the hover button or shift-click.
   function makeThumb(s) {
+    var wrap = document.createElement('div');
+    wrap.className = 'cell';
     var c = document.createElement('canvas');
     c.width = 200;
     c.height = 250;
     c.title = s;
-    c.addEventListener('click', function () {
+    c.addEventListener('click', function (ev) {
+      if (ev.shiftKey) { toggleKept(c, s); return; }
       seed = s;
       document.getElementById('seed').value = s;
       Array.prototype.forEach.call(document.querySelectorAll('.samples canvas'), function (n) {
@@ -739,6 +849,13 @@
       c.classList.add('active');
       drawPreview();
     });
+    var keep = document.createElement('button');
+    keep.type = 'button';
+    keep.className = 'keep';
+    keep.addEventListener('click', function (ev) { ev.stopPropagation(); toggleKept(c, s); });
+    wrap.appendChild(c);
+    wrap.appendChild(keep);
+    syncKept(c, s);
     return c;
   }
 
@@ -754,6 +871,462 @@
     drawPreview();
     scheduleSamples();
   }
+
+  // ── Collection ────────────────────────────────────────────────────────────
+  // Kept designs. Each is a full snapshot (source, seed, palette, shader
+  // settings, detail, drift) so it can be re-rendered and restored long after
+  // the palette in the editor has moved on. Adding never redraws the grid or
+  // the preview: the snapshot is read off the lab's state, and the thumbnail
+  // is read off the cell's own canvas.
+
+  var Coll = window.PaletteLabCollection;
+  var store = Coll.createStore({ storage: safeStorage() });
+  var UI_KEY = 'brightfield-palette-lab-collection-ui';
+  var thumbCache = {};   // entry id → rendered canvas, for entries stored without a picture
+
+  function safeStorage() {
+    try { return window.localStorage; } catch (e) { return null; }
+  }
+
+  function currentSnapshot(s, canvas) {
+    var shapes = isShapes();
+    return {
+      source: sourceName,
+      seed: s,
+      palette: palette,
+      shaderValues: shapes ? null : settingsFor(sourceName),
+      detail: shapes ? detail : null,
+      variation: shapes ? 0 : variation,
+      thumbnail: canvas && canvas.dataset.drawn ? canvas.toDataURL('image/jpeg', 0.85) : null
+    };
+  }
+
+  function syncKept(c, s) {
+    var kept = store.has(currentSnapshot(s, null));
+    c.parentNode.classList.toggle('kept', kept);
+    var btn = c.parentNode.querySelector('.keep');
+    btn.textContent = kept ? '✓' : '+';
+    btn.title = kept ? 'Remove from collection' : 'Keep in collection';
+    btn.setAttribute('aria-pressed', kept ? 'true' : 'false');
+  }
+
+  function toggleKept(c, s) {
+    store.toggle(currentSnapshot(s, c), Date.now());
+    syncKept(c, s);
+  }
+
+  // Re-renders one entry from its snapshot, without touching the lab's state:
+  // everything renderSample reads off globals is passed explicitly here. The
+  // shared WebGL canvas is drawn and blitted in the same call, so a grid
+  // filling in at the same time can't interleave with it.
+  function renderSnapshot(entry, ctx, w, h, done) {
+    if (SHAPE_SOURCES[entry.source]) {
+      var o = entry.source === 'scatter'
+        ? { seed: entry.seed, count: 20 + (entry.detail || 6) * 22 }
+        : { seed: entry.seed, depth: entry.detail || 6 };
+      var shapes = Demo.generate(entry.source, o);
+      Demo.render(ctx, shapes, entry.palette, { seed: entry.seed, width: w, height: h, shirt: '#000' });
+      if (done) done();
+      return;
+    }
+    if (!SHADERS[entry.source]) { if (done) done(); return; }
+    withShader(entry.source, function (handle) {
+      var mapped = PPS.mapPalette(SHADERS[entry.source], {
+        palette: entry.palette, seed: entry.seed, variation: entry.variation || 0,
+        values: entry.shaderValues || PPS.defaultValues(SHADERS[entry.source])
+      });
+      mapped.values.u_group_debug = 0;
+      window._shaderState.values = mapped.values;
+      handle.renderFrame(PPS.FIXED_TIME);
+      blit(ctx, w, h);
+      if (done) done();
+    });
+  }
+
+  function entryThumb(entry) {
+    var c = document.createElement('canvas');
+    c.width = 200;
+    c.height = 250;
+    var ctx = c.getContext('2d');
+    if (entry.thumbnail) {
+      var img = new Image();
+      img.onload = function () { ctx.drawImage(img, 0, 0, c.width, c.height); };
+      img.src = entry.thumbnail;
+      return c;
+    }
+    if (thumbCache[entry.id]) { ctx.drawImage(thumbCache[entry.id], 0, 0); return c; }
+    renderSnapshot(entry, ctx, c.width, c.height, function () {
+      thumbCache[entry.id] = c;
+      store.setThumbnail(entry.id, c.toDataURL('image/jpeg', 0.85));
+    });
+    return c;
+  }
+
+  function sourceLabel(name) { return SHAPE_SOURCES[name] || shaderLabels[name] || name; }
+
+  // Puts the whole lab back to the state that produced an entry.
+  function restore(entry) {
+    var wasShapes = isShapes();
+    if (!SHAPE_SOURCES[entry.source] && !SHADERS[entry.source]) return;
+    sourceName = entry.source;
+    sourceSel.value = sourceName;
+    palette = JSON.parse(JSON.stringify(entry.palette));
+    seed = entry.seed;
+    document.getElementById('seed').value = seed;
+    if (isShapes()) {
+      detail = entry.detail || 6;
+      document.getElementById('detail').value = detail;
+      document.getElementById('detail-out').textContent = detail;
+    } else {
+      settings[sourceName] = JSON.parse(JSON.stringify(entry.shaderValues || settingsFor(sourceName)));
+      variation = entry.variation || 0;
+      document.getElementById('variation').value = variation;
+    }
+    variationHint();
+    // applyMode rebuilds the shader panel and remounts the editor from the
+    // globals just set; the cheaper path only applies within one family.
+    if (isShapes() !== wasShapes) applyMode();
+    else { if (!isShapes()) buildShaderPanel(); mountEditor(isShapes()); }
+    redrawAll();
+  }
+
+  var drawer = document.getElementById('coll-drawer');
+  var tab = document.getElementById('coll-tab');
+  var compare = document.getElementById('compare');
+
+  function setDrawer(open) {
+    drawer.classList.toggle('open', open);
+    tab.classList.toggle('open', open);
+    tab.setAttribute('aria-expanded', open ? 'true' : 'false');
+    try { window.localStorage.setItem(UI_KEY, JSON.stringify({ open: open })); } catch (e) { /* private mode */ }
+  }
+
+  function renderDrawer() {
+    var list = document.getElementById('coll-list');
+    var entries = store.entries();
+    document.getElementById('coll-count').textContent = store.size();
+    document.getElementById('coll-compare').disabled = store.size() < 2;
+    document.getElementById('coll-export').disabled = store.size() < 1;
+    list.textContent = '';
+    if (!entries.length) {
+      var empty = document.createElement('p');
+      empty.className = 'empty';
+      empty.textContent = 'Nothing kept yet. Hover a thumbnail in the sample grid and hit + (or shift-click) '
+        + 'to keep it here. Keep two or more and Compare shows them side by side.';
+      list.appendChild(empty);
+      return;
+    }
+    entries.forEach(function (e) {
+      var item = document.createElement('div');
+      item.className = 'coll-item';
+      item.appendChild(entryThumb(e));
+
+      var meta = document.createElement('p');
+      meta.className = 'meta';
+      meta.innerHTML = '<b></b><br>';
+      meta.querySelector('b').textContent = sourceLabel(e.source) + ' · ' + (e.palette && e.palette.name || '');
+      meta.appendChild(document.createTextNode(e.seed));
+      item.appendChild(meta);
+
+      var row = document.createElement('div');
+      row.className = 'row';
+      var load = document.createElement('button');
+      load.type = 'button';
+      load.textContent = 'Load';
+      load.title = 'Restore the source, palette, settings and seed that made this';
+      load.addEventListener('click', function () { restore(e); });
+      row.appendChild(load);
+
+      var exp = document.createElement('button');
+      exp.type = 'button';
+      exp.textContent = 'Export';
+      exp.title = 'Download a ' + EXPORT_W + '×' + EXPORT_H + ' PNG plus the metadata to recreate it';
+      exp.addEventListener('click', function () { exportEntries([e]); });
+      row.appendChild(exp);
+
+      var rm = document.createElement('button');
+      rm.type = 'button';
+      rm.textContent = 'Remove';
+      rm.addEventListener('click', function () { store.remove(e.id); });
+      row.appendChild(rm);
+      item.appendChild(row);
+      list.appendChild(item);
+    });
+  }
+
+  // Every kept entry at full shared-canvas resolution, rendered one after
+  // another on the one WebGL context — the same rule the grid lives by.
+  // Remove on a tile only takes it out of this view; the entry stays kept.
+  function openCompare() {
+    var tiles = document.getElementById('compare-tiles');
+    tiles.textContent = '';
+    var picked = store.entries();
+    if (picked.length < 2) return;
+    compare.classList.add('open');
+    var i = 0;
+    function next() {
+      if (i >= picked.length || !compare.classList.contains('open')) return;
+      var e = picked[i++];
+      var tile = document.createElement('div');
+      tile.className = 'cmp-tile';
+      var c = document.createElement('canvas');
+      c.width = GL_CANVAS.width;
+      c.height = GL_CANVAS.height;
+      tile.appendChild(c);
+      var meta = document.createElement('div');
+      meta.className = 'meta';
+      var span = document.createElement('span');
+      span.textContent = sourceLabel(e.source) + ' · ' + e.seed;
+      meta.appendChild(span);
+      var drop = document.createElement('button');
+      drop.type = 'button';
+      drop.textContent = 'Remove';
+      drop.title = 'Take out of this comparison';
+      drop.addEventListener('click', function () {
+        tile.remove();
+        if (tiles.children.length < 2) closeCompare();
+      });
+      meta.appendChild(drop);
+      tile.appendChild(meta);
+      tiles.appendChild(tile);
+      renderSnapshot(e, c.getContext('2d'), c.width, c.height, next);
+    }
+    next();
+  }
+
+  function closeCompare() { compare.classList.remove('open'); }
+
+  // ── Export ────────────────────────────────────────────────────────────────
+  // A PNG at the same size the product page exports for print, plus a JSON
+  // sidecar: the product page's own restore payload (`{ shader, values }`,
+  // base64'd into a ?bfr= link) and the lab snapshot. Rendering borrows the
+  // shared WebGL canvas, resized for one frame and put back.
+
+  var EXPORT_W = 1800;
+  var EXPORT_H = 2400;
+  // Shader → product handle, for a pasteable product URL. Only what is known;
+  // an unlisted shader still exports the bfr payload with instructions.
+  var PRODUCT_HANDLES = { 'rise-shirt': 'dot-rise' };
+
+  function renderExportImage(entry, done) {
+    var out = document.createElement('canvas');
+    out.width = EXPORT_W;
+    out.height = EXPORT_H;
+    var ctx = out.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
+    if (SHAPE_SOURCES[entry.source]) {
+      renderSnapshot(entry, ctx, EXPORT_W, EXPORT_H, function () { done(out, null); });
+      return;
+    }
+    withShader(entry.source, function (handle) {
+      var gl = handle.gl;
+      var prevW = GL_CANVAS.width;
+      var prevH = GL_CANVAS.height;
+      var mapped = PPS.mapPalette(SHADERS[entry.source], {
+        palette: entry.palette, seed: entry.seed, variation: entry.variation || 0,
+        values: entry.shaderValues || PPS.defaultValues(SHADERS[entry.source])
+      });
+      mapped.values.u_group_debug = 0;
+      window._shaderState.values = mapped.values;
+      // Text textures are rasterized at canvas size, so force a redraw at the
+      // export size and again on the way back.
+      window._shaderState.textDirty = true;
+      GL_CANVAS.width = EXPORT_W;
+      GL_CANVAS.height = EXPORT_H;
+      gl.viewport(0, 0, EXPORT_W, EXPORT_H);
+      handle.renderFrame(PPS.FIXED_TIME);
+      ctx.drawImage(GL_CANVAS, 0, 0, EXPORT_W, EXPORT_H);
+      GL_CANVAS.width = prevW;
+      GL_CANVAS.height = prevH;
+      gl.viewport(0, 0, prevW, prevH);
+      window._shaderState.textDirty = true;
+      done(out, mapped.values);
+    });
+  }
+
+  function download(name, blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+  }
+
+  // Sequential: one shared canvas, and browsers throttle a burst of downloads.
+  function exportEntries(list) {
+    var btn = document.getElementById('coll-export');
+    var i = 0;
+    function next() {
+      if (i >= list.length) { btn.textContent = 'Export all'; renderDrawer(); return; }
+      var e = list[i++];
+      btn.textContent = 'Exporting ' + i + '/' + list.length;
+      renderExportImage(e, function (canvas, values) {
+        var base = Coll.exportBaseName(e);
+        var meta = Coll.buildExportMeta(e, {
+          values: values, handles: PRODUCT_HANDLES,
+          image: { width: EXPORT_W, height: EXPORT_H },
+          now: new Date().toISOString()
+        });
+        canvas.toBlob(function (blob) {
+          download(base + '.png', blob);
+          download(base + '.json', new Blob([JSON.stringify(meta, null, 2)], { type: 'application/json' }));
+          setTimeout(next, 400);
+        }, 'image/png');
+      });
+    }
+    next();
+  }
+
+  document.getElementById('coll-export').addEventListener('click', function () {
+    exportEntries(store.entries());
+  });
+
+  tab.addEventListener('click', function () { setDrawer(!drawer.classList.contains('open')); });
+  document.getElementById('coll-close').addEventListener('click', function () { setDrawer(false); });
+  document.getElementById('coll-compare').addEventListener('click', openCompare);
+  document.getElementById('compare-close').addEventListener('click', closeCompare);
+  document.getElementById('coll-clear').addEventListener('click', function () {
+    if (!store.size()) return;
+    store.clear();
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    if (compare.classList.contains('open')) closeCompare();
+    else if (drawer.classList.contains('open')) setDrawer(false);
+  });
+
+  store.onChange(function () {
+    renderDrawer();
+    // Grid badges answer "is this cell kept" against the live state, so a
+    // removal from the drawer has to reach the grid too.
+    Array.prototype.forEach.call(document.querySelectorAll('.samples canvas'), function (c) {
+      syncKept(c, c.title);
+    });
+  });
+  // Called once the source picker and its labels exist, at the bottom of the
+  // script — the drawer names shaders through them.
+  function initCollection() {
+    renderDrawer();
+    try {
+      var ui = JSON.parse(window.localStorage.getItem(UI_KEY) || 'null');
+      if (ui && ui.open) setDrawer(true);
+    } catch (e) { /* private mode */ }
+  }
+
+  // ── Panel order ───────────────────────────────────────────────────────────
+  // The right column's panels drag by their header, so the sample grid can sit
+  // above the preview and be watched while the palette is edited. Order is
+  // persisted; unknown or missing ids fall back to source order, so adding a
+  // panel later never loses a saved arrangement.
+
+  var ORDER_KEY = 'brightfield-palette-lab-panel-order';
+  var FOLD_KEY = 'brightfield-palette-lab-panel-collapsed';
+  var column = document.getElementById('right-column');
+
+  function panels() { return Array.prototype.slice.call(column.querySelectorAll(':scope > .panel[data-panel]')); }
+
+  function saveOrder() {
+    try {
+      window.localStorage.setItem(ORDER_KEY, JSON.stringify(panels().map(function (p) { return p.dataset.panel; })));
+    } catch (e) { /* private mode */ }
+  }
+
+  function restoreOrder() {
+    var saved = null;
+    try { saved = JSON.parse(window.localStorage.getItem(ORDER_KEY) || 'null'); } catch (e) { /* ignore */ }
+    if (!Array.isArray(saved)) return;
+    var byId = {};
+    panels().forEach(function (p) { byId[p.dataset.panel] = p; });
+    saved.forEach(function (id) { if (byId[id]) column.appendChild(byId[id]); });
+  }
+
+  // Collapsed panels keep their header (and stay draggable) and hide the rest.
+  // Nothing stops rendering: a collapsed preview still draws into its canvas,
+  // so the ink table and the grid keep reporting the current state.
+  function saveFolds() {
+    try {
+      window.localStorage.setItem(FOLD_KEY, JSON.stringify(panels()
+        .filter(function (p) { return p.classList.contains('collapsed'); })
+        .map(function (p) { return p.dataset.panel; })));
+    } catch (e) { /* private mode */ }
+  }
+
+  function setFold(p, collapsed) {
+    p.classList.toggle('collapsed', collapsed);
+    var btn = p.querySelector(':scope > h2 .fold');
+    btn.textContent = collapsed ? '▸' : '▾';
+    btn.title = collapsed ? 'Expand' : 'Collapse';
+    btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+
+  (function wirePanelFold() {
+    var saved = [];
+    try { saved = JSON.parse(window.localStorage.getItem(FOLD_KEY) || '[]'); } catch (e) { /* ignore */ }
+    if (!Array.isArray(saved)) saved = [];
+    panels().forEach(function (p) {
+      var h2 = p.querySelector(':scope > h2');
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'fold';
+      btn.addEventListener('click', function () {
+        setFold(p, !p.classList.contains('collapsed'));
+        saveFolds();
+      });
+      h2.appendChild(btn);
+      setFold(p, saved.indexOf(p.dataset.panel) !== -1);
+    });
+  })();
+
+  (function wirePanelDrag() {
+    var dragging = null;
+    function clearMarks() {
+      panels().forEach(function (p) { p.classList.remove('drop-before', 'drop-after'); });
+    }
+    panels().forEach(function (p) {
+      var h2 = p.querySelector(':scope > h2');
+      // Only the header starts a drag — the panel body holds sliders, canvases
+      // and buttons that must keep their own mouse behaviour.
+      h2.addEventListener('mousedown', function (ev) {
+        if (ev.target.closest('button, input, select')) return;
+        p.draggable = true;
+      });
+      p.addEventListener('dragstart', function (ev) {
+        dragging = p;
+        p.classList.add('dragging');
+        ev.dataTransfer.effectAllowed = 'move';
+        try { ev.dataTransfer.setData('text/plain', p.dataset.panel); } catch (e) { /* IE */ }
+      });
+      p.addEventListener('dragend', function () {
+        p.classList.remove('dragging');
+        p.draggable = false;
+        dragging = null;
+        clearMarks();
+      });
+      p.addEventListener('dragover', function (ev) {
+        if (!dragging || dragging === p) return;
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+        var r = p.getBoundingClientRect();
+        var before = ev.clientY < r.top + r.height / 2;
+        clearMarks();
+        p.classList.add(before ? 'drop-before' : 'drop-after');
+      });
+      p.addEventListener('dragleave', function () { p.classList.remove('drop-before', 'drop-after'); });
+      p.addEventListener('drop', function (ev) {
+        if (!dragging || dragging === p) return;
+        ev.preventDefault();
+        var r = p.getBoundingClientRect();
+        var before = ev.clientY < r.top + r.height / 2;
+        column.insertBefore(dragging, before ? p : p.nextSibling);
+        clearMarks();
+        saveOrder();
+      });
+    });
+    restoreOrder();
+  })();
 
   // ── Shader control panel ──────────────────────────────────────────────────
 
@@ -944,6 +1517,7 @@
   // fonts before the first render — otherwise the first grid bakes in a
   // fallback face and only a reload fixes it.
   applyMode();
+  initCollection();
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(redrawAll);
   } else {
