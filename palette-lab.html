@@ -628,11 +628,21 @@
           + ' · ' + (hex === '#000000' ? 'empty cohort — shirt' : hex);
         host.appendChild(sw);
       });
+      var spark = mapped.groups.spark;
+      if (spark) {
+        var ss = document.createElement('i');
+        ss.style.background = spark.hex;
+        ss.style.borderRadius = '50%';
+        ss.title = 'Spark · ' + spark.hex + ' · lands on ' + (spark.chance * 100).toFixed(1) + '% of elements';
+        host.appendChild(ss);
+      }
       hint.className = 'hint';
       hint.textContent = mapped.groups.u_group_count + ' size groups, smallest element first — this shader '
         + 'computes its own element size, so the palette colors each cohort directly instead of running a '
         + 'gradient. Print density rolls per element inside the cohort, so a swatch is the tier\'s color and '
-        + 'the shirt breaks through it at ' + Math.round((1 - mapped.groups.u_group_density) * 100) + '%.';
+        + 'the shirt breaks through it at ' + Math.round((1 - mapped.groups.u_group_density) * 100) + '%.'
+        + (spark ? ' The round swatch is the spark: kept out of the cohort draw so it never becomes a tier, '
+          + 'it lands on single elements at ' + (spark.chance * 100).toFixed(1) + '%.' : '');
       return;
     }
     mapped.slots.forEach(function (s) {

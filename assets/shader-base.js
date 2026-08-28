@@ -79,7 +79,13 @@
       seed:    gl.getUniformLocation(program, 'u_group_seed'),
       density: gl.getUniformLocation(program, 'u_group_density'),
       // Null unless the shader draws cohort labels. Diagnostic, off by default.
-      debug:   gl.getUniformLocation(program, 'u_group_debug')
+      debug:   gl.getUniformLocation(program, 'u_group_debug'),
+      // The per-element spark: a rare colour that lands on single elements
+      // inside a cohort. Same detection as everything else here — a shader that
+      // never names its elements has these optimized out.
+      sparkColor:  gl.getUniformLocation(program, 'u_spark_color'),
+      sparkChance: gl.getUniformLocation(program, 'u_spark_chance'),
+      sparkSeed:   gl.getUniformLocation(program, 'u_spark_seed')
     };
     var supportsGroups = !!groupU.mode;
     // Size-group uniforms are structural, not continuous: bounds are a number
@@ -90,7 +96,8 @@
     // table and render() runs at the display refresh rate.
     var ALWAYS_INSTANT = {
       u_group_mode: 1, u_group_count: 1, u_group_bounds: 1, u_group_colors: 1,
-      u_group_seed: 1, u_group_density: 1, u_group_debug: 1
+      u_group_seed: 1, u_group_density: 1, u_group_debug: 1,
+      u_spark_color: 1, u_spark_chance: 1, u_spark_seed: 1
     };
     var GROUP_MAX = 8;
     var groupBoundsBuf = new Float32Array(GROUP_MAX - 1);
@@ -128,6 +135,14 @@
       if (groupU.seed)    gl.uniform1ui(groupU.seed, (v.u_group_seed || 0) >>> 0);
       if (groupU.density) gl.uniform1f(groupU.density,
         typeof v.u_group_density === 'number' ? v.u_group_density : 1);
+      // Chance defaults to 0 — no spark — so a host that sends cohorts and
+      // nothing else gets exactly the pre-spark picture.
+      var spark = v.u_spark_color;
+      if (groupU.sparkColor) gl.uniform3f(groupU.sparkColor,
+        spark ? spark[0] : 0, spark ? spark[1] : 0, spark ? spark[2] : 0);
+      if (groupU.sparkChance) gl.uniform1f(groupU.sparkChance,
+        typeof v.u_spark_chance === 'number' ? v.u_spark_chance : 0);
+      if (groupU.sparkSeed) gl.uniform1ui(groupU.sparkSeed, (v.u_spark_seed || 0) >>> 0);
     }
 
     // ── Text texture (only when drawText is provided) ─────────────────────────
@@ -631,6 +646,24 @@
       '  return paletteElementPrinted(elementId, 1.0);',
       '}',
       '',
+      '// ── Per-element spark ───────────────────────────────────────────────────',
+      '// The engine keeps sparks out of the cohort draw on purpose: a spark that',
+      '// wins a whole tier stops being a find. On the CPU it stays reachable per',
+      '// shape via sparkOverride; this is the same roll for a shader, so a few',
+      '// dots or a single line take the spark colour while the tier keeps its own.',
+      '// Its own seed stream (u_spark_seed, tagged separately on the CPU) so',
+      '// turning a spark on cannot move a single print/skip decision, and the',
+      '// same 24-bit quantization as the print roll. Chance 0 = no spark.',
+      'uniform vec3        u_spark_color;',
+      'uniform highp float u_spark_chance;',
+      'uniform highp uint  u_spark_seed;',
+      'vec3 paletteSparkOr(vec3 col, highp float elementId) {',
+      '  highp uint id   = uint(max(elementId, 0.0));',
+      '  highp uint seed = u_spark_seed ^ (id * 0x9E3779B1u);',
+      '  highp float roll = float(paletteRoll32(seed) >> 8u) / 16777216.0;',
+      '  return mix(col, u_spark_color, 1.0 - step(u_spark_chance, roll));',
+      '}',
+      '',
       '',
       '// ── Cohort labels (diagnostic) ──────────────────────────────────────────',
       '// Draws the cohort number over each size band so the tiering can be read',
@@ -708,7 +741,8 @@
       '// shaders whose elements differ enough in area that "fraction of elements"',
       '// and "fraction of ink" are not the same number.',
       'vec3 applyPaletteGroups(vec3 col, float size, highp float elementId, float weight) {',
-      '  vec3 grouped = paletteGroupColor(size) * paletteElementPrinted(elementId, weight);',
+      '  vec3 grouped = paletteSparkOr(paletteGroupColor(size), elementId)',
+      '               * paletteElementPrinted(elementId, weight);',
       '  return mix(col, grouped, step(0.5, u_group_mode));',
       '}',
       'vec3 applyPaletteGroups(vec3 col, float size, highp float elementId) {',
@@ -721,6 +755,12 @@
       '// paletteElementPrinted, so black stays the shirt either way.',
       'vec3 paletteGroupedColor(vec3 col, float size) {',
       '  return mix(col, paletteGroupColor(size), step(0.5, u_group_mode));',
+      '}',
+      '// With the element named, the spark can land on it too. This is the form',
+      '// a post-processing shader should use, so the spark goes through the same',
+      '// post-processing as the cohort colour instead of skipping it.',
+      'vec3 paletteGroupedColor(vec3 col, float size, highp float elementId) {',
+      '  return mix(col, paletteSparkOr(paletteGroupColor(size), elementId), step(0.5, u_group_mode));',
       '}',
       '// Two-argument form: no element to name, so the whole cohort takes ink.',
       'vec3 applyPaletteGroups(vec3 col, float size) {',
