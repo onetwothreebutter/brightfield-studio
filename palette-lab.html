@@ -152,6 +152,14 @@
     font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #8a8a92;
   }
   #coll-drawer header span { flex: 1; }
+  #coll-import-panel { padding: 12px 14px; border-bottom: 1px solid #2c2c32; }
+  #coll-import-panel textarea {
+    width: 100%; height: 72px; resize: vertical;
+    background: #0f0f11; border: 1px solid #2c2c32; color: #eee;
+    border-radius: 4px; padding: 6px 8px; font-family: inherit; font-size: 11px;
+  }
+  #coll-import-panel .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  #coll-import-panel input[type=file] { flex: 1; font-size: 10px; color: #8a8a92; }
   #coll-list { flex: 1; overflow-y: auto; padding: 12px 14px; }
   #coll-list .empty { color: #666; line-height: 1.6; }
   .coll-item { border: 1px solid #2c2c32; border-radius: 4px; background: #141417; padding: 8px; margin-bottom: 10px; }
@@ -304,10 +312,20 @@
   <header>
     <span>Collection</span>
     <button id="coll-compare" type="button" disabled>Compare</button>
+    <button id="coll-import" type="button" title="Add exported design JSON files to the collection">Import</button>
     <button id="coll-export" type="button" disabled title="Download every entry as a PNG plus metadata JSON">Export all</button>
     <button id="coll-clear" type="button">Clear</button>
     <button id="coll-close" type="button" aria-label="Close">×</button>
   </header>
+  <div id="coll-import-panel" hidden>
+    <textarea id="coll-import-text" spellcheck="false"
+      placeholder="Paste an exported design JSON (the .json saved next to the PNG)…"></textarea>
+    <div class="row">
+      <input type="file" id="coll-import-file" accept=".json,application/json" multiple>
+      <button id="coll-import-add" type="button" disabled>Add to collection</button>
+    </div>
+    <p class="hint" id="coll-import-note">Or choose one or more exported .json files.</p>
+  </div>
   <div id="coll-list"></div>
 </aside>
 <div id="compare" role="dialog" aria-label="Compare designs">
@@ -1194,6 +1212,67 @@
     exportEntries(store.entries());
   });
 
+  // ── Import ────────────────────────────────────────────────────────────────
+  // The inverse of Export: paste the .json sidecar (or pick the files) and the
+  // designs join the collection as ordinary entries — Load and Compare from
+  // there. Nothing about the current editing state is touched.
+
+  (function wireImport() {
+    var panel = document.getElementById('coll-import-panel');
+    var text = document.getElementById('coll-import-text');
+    var file = document.getElementById('coll-import-file');
+    var add = document.getElementById('coll-import-add');
+    var note = document.getElementById('coll-import-note');
+
+    document.getElementById('coll-import').addEventListener('click', function () {
+      panel.hidden = !panel.hidden;
+      if (!panel.hidden) text.focus();
+    });
+
+    function parsedFromText() { return Coll.parseExportedDesign(text.value); }
+
+    text.addEventListener('input', function () {
+      var d = parsedFromText();
+      add.disabled = !d;
+      note.textContent = d
+        ? 'Design found: ' + (d.palette.name || 'untitled') + ' · ' + d.source + ' · seed ' + d.seed
+        : (text.value.trim() ? 'Not an exported design JSON.' : 'Or choose one or more exported .json files.');
+    });
+
+    function addDesigns(designs) {
+      var added = 0, dupes = 0, bad = 0;
+      designs.forEach(function (d) {
+        if (!d) { bad++; return; }
+        if (store.has(d)) { dupes++; return; }
+        store.add(d, Date.now());
+        added++;
+      });
+      note.textContent = added + ' added'
+        + (dupes ? ', ' + dupes + ' already in the collection' : '')
+        + (bad ? ', ' + bad + ' not design JSON' : '') + '.';
+      if (added) { text.value = ''; add.disabled = true; }
+    }
+
+    add.addEventListener('click', function () { addDesigns([parsedFromText()]); });
+
+    file.addEventListener('change', function () {
+      var files = Array.prototype.slice.call(this.files || []);
+      this.value = '';
+      if (!files.length) return;
+      var texts = [];
+      var left = files.length;
+      files.forEach(function (f, i) {
+        var r = new FileReader();
+        r.onload = function () { texts[i] = r.result; if (!--left) finish(); };
+        r.onerror = function () { texts[i] = null; if (!--left) finish(); };
+        r.readAsText(f);
+      });
+      function finish() {
+        addDesigns(texts.map(function (t) { return t == null ? null : Coll.parseExportedDesign(t); }));
+      }
+    });
+  })();
+
   tab.addEventListener('click', function () { setDrawer(!drawer.classList.contains('open')); });
   document.getElementById('coll-close').addEventListener('click', function () { setDrawer(false); });
   document.getElementById('coll-compare').addEventListener('click', openCompare);
@@ -1415,7 +1494,11 @@
       onChange: function (p) {
         palette = p;
         redrawAll();
-      }
+      },
+      // A pasted export JSON restores the whole design — source, seed, palette,
+      // shader settings — not just its colors.
+      parseDesign: Coll.parseExportedDesign,
+      onDesign: restore
     });
   }
 
