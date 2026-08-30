@@ -213,6 +213,13 @@
     // string to replace the tooltip with something that tells the author where
     // the setting *does* work; a bare `true` gets the generic wording.
     var inertGeometry = !!opts.inertGeometry;
+    // Optional full-design import: a host that owns more state than a palette
+    // (the lab: source, seed, shader settings) can pass `parseDesign(text)` →
+    // truthy design object, and `onDesign(design)` to receive it. The import
+    // panel then recognizes a pasted design JSON and hands it over whole,
+    // instead of stripping it for hex codes. Both or neither.
+    var parseDesign = typeof opts.parseDesign === 'function' && typeof opts.onDesign === 'function'
+      ? opts.parseDesign : null;
     var dragFrom = -1;   // row being dragged, for the drop indicator
     var INERT_WHY = typeof opts.inertGeometry === 'string' ? opts.inertGeometry
       : 'Shape size has no meaning in this preview — a shader has no per-shape hook. '
@@ -347,6 +354,9 @@
       panel.appendChild(note);
 
       var actions = el('div', 'pp-btn-row');
+      var designBtn = el('button', 'pp-btn', 'Load design');
+      designBtn.style.display = 'none';
+      actions.appendChild(designBtn);
       var replaceBtn = el('button', 'pp-btn', 'Replace palette');
       var addBtn = el('button', 'pp-btn', 'Add to palette');
       var cancelBtn = el('button', 'pp-btn', 'Cancel');
@@ -356,8 +366,29 @@
       panel.appendChild(actions);
 
       var hexes = [];
+      var design = null;
 
       function parse() {
+        design = parseDesign ? parseDesign(ta.value) : null;
+        if (design) {
+          // A design JSON contains hex codes, so this check comes first — the
+          // hex path would happily shred it into a weightless palette.
+          hexes = [];
+          swatches.textContent = '';
+          (design.palette.colors || []).forEach(function (c) {
+            var sw = el('i');
+            sw.style.background = c.color;
+            sw.title = (c.name || c.id || '') + ' ' + c.color;
+            swatches.appendChild(sw);
+          });
+          note.textContent = 'Exported design — ' + (design.palette.name || 'untitled') + ' · '
+            + design.source + ' · seed ' + design.seed + '. Load design restores all of it.';
+          designBtn.style.display = '';
+          replaceBtn.disabled = true;
+          addBtn.disabled = true;
+          return;
+        }
+        designBtn.style.display = 'none';
         hexes = PP.parseHexList(ta.value);
         swatches.textContent = '';
         hexes.forEach(function (h) {
@@ -387,6 +418,13 @@
 
       ta.addEventListener('input', parse);
       parse();
+
+      designBtn.addEventListener('click', function () {
+        if (!design) return;
+        var d = design;
+        close();
+        opts.onDesign(d);
+      });
 
       toggleBtn.addEventListener('click', function () {
         panel.classList.toggle('pp-open');

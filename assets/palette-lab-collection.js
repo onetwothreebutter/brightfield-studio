@@ -269,7 +269,30 @@
     return out;
   }
 
+  // ── Importing an exported design ────────────────────────────────────────
+  // The inverse of buildExportMeta: given the JSON sidecar an export wrote (or
+  // just its labSnapshot block, or a raw snapshot someone hand-built), return a
+  // normalized snapshot the lab can restore or add to the collection — or null
+  // if the text is not a design. Pure and forgiving on the way in, strict on
+  // the way out: whatever parses is reduced to exactly the snapshot fields.
+  function parseExportedDesign(text) {
+    var raw;
+    try { raw = typeof text === 'string' ? JSON.parse(text) : text; } catch (e) { return null; }
+    if (!raw || typeof raw !== 'object') return null;
+    // The sidecar wraps the snapshot; accept the snapshot bare as well.
+    var snap = raw.labSnapshot || raw;
+    if (typeof raw.format === 'string' && raw.format.indexOf('brightfield-lab-design/') !== 0) return null;
+    if (!snap || typeof snap !== 'object') return null;
+    if (typeof snap.source !== 'string' || !snap.source) return null;
+    if (snap.seed == null || snap.seed === '') return null;
+    var pal = snap.palette;
+    if (!pal || typeof pal !== 'object' || !Array.isArray(pal.colors) || !pal.colors.length) return null;
+    if (!pal.colors.every(function (c) { return c && typeof c.color === 'string'; })) return null;
+    return makeSnapshot(snap);
+  }
+
   window.PaletteLabCollection = {
+    parseExportedDesign: parseExportedDesign,
     STORE_ORIGIN: STORE_ORIGIN,
     exportBaseName: exportBaseName,
     buildExportMeta: buildExportMeta,

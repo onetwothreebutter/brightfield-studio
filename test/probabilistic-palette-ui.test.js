@@ -71,6 +71,37 @@ describe('import panel', () => {
     expect(group.checked).toBe(true);
   });
 
+  it('recognizes a full design JSON when the host provides the hooks', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const got = [];
+    UI.mount(host, {
+      parseDesign: (t) => { try { const d = JSON.parse(t); return d && d.source ? d : null; } catch (e) { return null; } },
+      onDesign: (d) => got.push(d)
+    });
+    const btn = (label) => Array.from(host.querySelectorAll('button')).find((b) => b.textContent === label);
+    btn('Import').dispatchEvent(new window.Event('click'));
+    const ta = host.querySelector('.pp-import textarea');
+    const design = { source: 'rise-shirt', seed: 's', palette: { name: 'X', colors: [{ color: '#606C38' }] } };
+    ta.value = JSON.stringify(design);
+    ta.dispatchEvent(new window.Event('input'));
+    // The design path wins over the hex path — the JSON contains hex codes.
+    expect(btn('Replace palette').disabled).toBe(true);
+    expect(btn('Load design').style.display).toBe('');
+    expect(host.querySelector('.pp-import .pp-hint').textContent).toMatch(/Exported design.*rise-shirt/);
+    btn('Load design').dispatchEvent(new window.Event('click'));
+    expect(got).toHaveLength(1);
+    expect(got[0].source).toBe('rise-shirt');
+    // Panel closed and cleared, and without the hooks nothing changes.
+    expect(host.querySelector('.pp-import').classList.contains('pp-open')).toBe(false);
+    const plain = mountLab();
+    plain.btn('Import').dispatchEvent(new window.Event('click'));
+    plain.ta().value = JSON.stringify(design);
+    plain.ta().dispatchEvent(new window.Event('input'));
+    expect(plain.btn('Load design').style.display).toBe('none');
+    expect(plain.btn('Replace palette').disabled).toBe(false);  // hex path still parses it
+  });
+
   it('reports prose and single colors, and cancel clears', () => {
     const lab = mountLab();
     const ta = lab.ta();
