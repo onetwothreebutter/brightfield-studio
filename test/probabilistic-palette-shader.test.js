@@ -601,7 +601,16 @@ describe('shaders that opt into size groups', () => {
     if (joint) return { form: 'joint', args: argsOf(joint) };
     const col = src.match(CALL('paletteGroupedColor'));
     const ink = src.match(CALL('paletteElementPrinted'));
-    if (col && ink) return { form: 'split', args: argsOf(col).concat(argsOf(ink)[0]) };
+    if (col && ink) {
+      // Normalized to the joint form's shape: [col, size, elementId, weight?].
+      // The colour call names the element itself once the spark is wired (so
+      // the spark can land on it); the ink call supplies the id otherwise, and
+      // its second argument is the weight when it is not the constant 1.0.
+      const c = argsOf(col), k = argsOf(ink);
+      const args = [c[0], c[1], c.length >= 3 ? c[2] : k[0]];
+      if (k.length >= 2 && k[1] !== '1.0') args.push(k[1]);
+      return { form: 'split', args };
+    }
     return null;
   };
 
@@ -632,12 +641,13 @@ describe('shaders that opt into size groups', () => {
   it('shader-base declares the uniforms the shaders call', () => {
     const src = readFileSync(join(__dirname, '../assets/shader-base.js'), 'utf8');
     ['u_group_mode', 'u_group_count', 'u_group_bounds', 'u_group_colors',
-      'u_group_seed', 'u_group_density']
+      'u_group_seed', 'u_group_density', 'u_spark_color', 'u_spark_chance', 'u_spark_seed']
       .forEach((u) => expect(src).toContain(u));
+    expect(src).toContain('vec3 paletteSparkOr(vec3 col, highp float elementId)');
+    expect(src).toContain('vec3 paletteGroupedColor(vec3 col, float size, highp float elementId)');
     expect(src).toContain('vec3 paletteGroupColor(float size)');
     expect(src).toContain('vec3 applyPaletteGroups(vec3 col, float size)');
     expect(src).toContain('vec3 applyPaletteGroups(vec3 col, float size, highp float elementId)');
-    expect(src).toContain('vec3 paletteGroupedColor(vec3 col, float size)');
   });
 
   it('qualifies the 32-bit path highp, which a fragment shader will not do for it', () => {
@@ -784,5 +794,108 @@ describe('shaders that opt into size groups', () => {
     const src = readFileSync(join(__dirname, '../assets/shader-base.js'), 'utf8');
     expect(src).toContain('uniform float u_group_bounds[7]');
     expect(src).toContain('uniform vec3  u_group_colors[8]');
+  });
+});
+
+describe('per-element spark under size groups', () => {
+  const grouped = (mutate) => {
+    const p = preset();
+    p.sizeGroups = { enabled: true, mode: 'bands', maxGroups: 4 };
+    if (mutate) mutate(p);
+    return p;
+  };
+  const sparkOf = (p) => p.colors.find((c) => c.spark);
+
+  it('keeps the spark out of every cohort — that is the engine rule this exists for', () => {
+    for (let i = 0; i < 40; i++) {
+      const { groups } = map('rise-shirt', { palette: grouped(), seed: 's' + i, variation: 0 });
+      groups.cohorts.forEach((c) => expect(c.hex.toUpperCase()).not.toBe(sparkOf(grouped()).color.toUpperCase()));
+    }
+  });
+
+  it('sends the spark as a per-element roll instead: colour, chance and its own seed', () => {
+    const p = grouped();
+    const { values, groups } = map('rise-shirt', { palette: p, seed: 's1', variation: 0 });
+    expect(values.u_spark_color).toEqual(window.ShaderDefs.hexToRgb(sparkOf(p).color, 'u_spark_color'));
+    expect(values.u_spark_chance).toBeGreaterThan(0);
+    expect(values.u_spark_chance).toBeLessThanOrEqual(1);
+    expect(groups.spark).toEqual({ hex: sparkOf(p).color, colorIndex: p.colors.indexOf(sparkOf(p)), chance: values.u_spark_chance });
+    // Distinct stream from the print roll, so a spark never moves a print decision.
+    expect(values.u_spark_seed).toBe(PP.deriveSeed('s1', 'element-spark'));
+    expect(values.u_spark_seed).not.toBe(values.u_group_seed);
+  });
+
+  it('caps the chance at maxShare, and it tracks the weight below that', () => {
+    const capped = grouped((p) => { sparkOf(p).weight = 60; sparkOf(p).conditions.maxShare = 0.05; });
+    expect(map('rise-shirt', { palette: capped, seed: 's1', variation: 0 }).values.u_spark_chance).toBeCloseTo(0.05, 12);
+    const low = grouped((p) => { sparkOf(p).weight = 1; delete sparkOf(p).conditions.maxShare; });
+    const high = grouped((p) => { sparkOf(p).weight = 30; delete sparkOf(p).conditions.maxShare; });
+    const lc = map('rise-shirt', { palette: low, seed: 's1', variation: 0 }).values.u_spark_chance;
+    const hc = map('rise-shirt', { palette: high, seed: 's1', variation: 0 }).values.u_spark_chance;
+    expect(hc).toBeGreaterThan(lc);
+    expect(hc).toBeCloseTo(30 / (39 + 25 + 17 + 11 + 6 + 30), 6);
+  });
+
+  it('is off — chance 0 — without a spark, or with grouping off', () => {
+    const none = grouped((p) => { p.colors.forEach((c) => { delete c.spark; }); });
+    const v = map('rise-shirt', { palette: none, seed: 's1', variation: 0 });
+    expect(v.values.u_spark_chance).toBe(0);
+    expect(v.groups.spark).toBeNull();
+    const off = preset();
+    expect(map('rise-shirt', { palette: off, seed: 's1', variation: 0 }).values.u_spark_chance).toBeUndefined();
+  });
+
+  it('lands the heaviest spark and adds the others to the odds', () => {
+    const two = grouped((p) => {
+      p.colors.push({ id: 'x', name: 'X', color: '#FF00FF', weight: 8, spark: true, variationScale: 0 });
+      delete sparkOf(p).conditions.maxShare;
+    });
+    const { values, groups } = map('rise-shirt', { palette: two, seed: 's1', variation: 0 });
+    expect(groups.spark.hex).toBe('#FF00FF');
+    const total = two.colors.reduce((a, c) => a + c.weight, 0);
+    expect(values.u_spark_chance).toBeCloseTo((8 + 2) / total, 6);
+  });
+
+  it('is what the wired shaders draw through', () => {
+    const rise = readFileSync(join(__dirname, '../assets/rise-shirt.js'), 'utf8');
+    expect(rise).toMatch(/paletteGroupedColor\([^;]*dotId\)/);
+    ['circle-on-line', 'line-circle', 'three-square'].forEach((n) => {
+      const src = readFileSync(join(__dirname, `../assets/${n}.js`), 'utf8');
+      expect(src).toMatch(/applyPaletteGroups\(/);   // spark is inside that helper
+    });
+  });
+});
+
+describe('assigner.sparks() — the policy the adapter consumes', () => {
+  const mk = (colors) => PP.createAssigner(
+    PP.createPalette({ name: 'T', generativeWeights: false, colors }), { seed: 's1', totalShapes: 8 });
+
+  it('the heaviest spark by ACTUAL share wins even when maxShare caps its chance', () => {
+    const s = mk([
+      { id: 'a', color: '#111111', weight: 60 },
+      { id: 'heavy', color: '#AA0000', weight: 30, spark: true, conditions: { maxShare: 0.02 } },
+      { id: 'light', color: '#00AA00', weight: 3, spark: true }
+    ]).sparks();
+    expect(s.colorIndex).toBe(1);
+    expect(s.color).toBe('#AA0000');
+    // Chance sums the CAPPED shares: min(30/93, 0.02) + 3/93.
+    expect(s.chance).toBeCloseTo(0.02 + 3 / 93, 12);
+  });
+
+  it('skips a spark whose colour would crash a renderer, expands #abc shorthand', () => {
+    const broken = mk([
+      { id: 'a', color: '#111111', weight: 60 },
+      { id: 'bad', weight: 5, spark: true }
+    ]).sparks();
+    expect(broken).toBeNull();
+    const short = mk([
+      { id: 'a', color: '#111111', weight: 60 },
+      { id: 's', color: '#abc', weight: 5, spark: true }
+    ]).sparks();
+    expect(short.color).toBe('#aabbcc');
+  });
+
+  it('is null with no sparks', () => {
+    expect(mk([{ id: 'a', color: '#111111', weight: 60 }]).sparks()).toBeNull();
   });
 });

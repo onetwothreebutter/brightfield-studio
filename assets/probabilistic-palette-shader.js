@@ -274,10 +274,12 @@
       forGroups = JSON.parse(JSON.stringify(palette));
       forGroups.sizeGroups.maxGroups = GROUP_MAX;
     }
-    var groups = PP.createAssigner(forGroups, {
+    var assigner = PP.createAssigner(forGroups, {
       seed: seed, totalShapes: shapes.length, shapes: shapes
-    }).groups();
+    });
+    var groups = assigner.groups();
     if (!groups) return null;
+    var spark = assigner.sparks();
 
     var bounds = groups.bounds.slice(0, GROUP_MAX - 1);
     var count = Math.min(GROUP_MAX, bounds.length + 1);
@@ -318,8 +320,24 @@
       // other derived seed, so turning grouping on can't shift the slot draws.
       u_group_seed: PP.deriveSeed(seed, 'element-print'),
       u_group_density: density,
-      // Not uploaded — the host's read of what each cohort became.
-      cohorts: cohorts
+      // The cohort draw excludes sparks by design, so without this a grouped
+      // shader could never show one at any weight — measured 0/40 designs on
+      // rise-shirt. The GLSL rolls per element instead; the policy (which
+      // colour, what chance, maxShare capping the chance) is the engine's
+      // `assigner.sparks()`, so it cannot drift from the CPU path. One colour
+      // uniform: the heaviest spark lands, the others only add to the odds.
+      // Size conditions are dropped as for the slot draw; region and afterColor
+      // cannot apply — a fragment has no position or neighbour the CPU can see
+      // — which IS a divergence from the ungrouped slot draw, where the real
+      // assigner honours both. The chance is per element, and the seed is its
+      // own stream so a spark never moves a print/skip decision.
+      u_spark_color: spark ? Defs.hexToRgb(spark.color, 'u_spark_color') : [0, 0, 0],
+      u_spark_chance: spark ? spark.chance : 0,
+      u_spark_seed: spark ? PP.deriveSeed(seed, 'element-spark') : 0,
+      // Not uploaded — the host's read of what each cohort became, and of the
+      // spark riding over them (null when the palette has none).
+      cohorts: cohorts,
+      spark: spark ? { hex: spark.color, colorIndex: spark.colorIndex, chance: spark.chance } : null
     };
   }
 
@@ -364,6 +382,9 @@
       values.u_group_colors  = groups.u_group_colors;
       values.u_group_seed    = groups.u_group_seed;
       values.u_group_density = groups.u_group_density;
+      values.u_spark_color   = groups.u_spark_color;
+      values.u_spark_chance  = groups.u_spark_chance;
+      values.u_spark_seed    = groups.u_spark_seed;
     }
 
     var keys = colorSlots(def, values);

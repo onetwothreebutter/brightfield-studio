@@ -158,7 +158,7 @@
     '  // Group, then invert, then mask — in that order. Masking first meant an',
     '  // unprinted dot was vec3(0), and inverting it printed pure white ink where',
     '  // the shirt was supposed to show through.',
-    '  vec3 dotBase     = paletteGroupedColor(paletteAt(mixFactor), 1.0 - cellMix);',
+    '  vec3 dotBase     = paletteGroupedColor(paletteAt(mixFactor), 1.0 - cellMix, dotId);',
     '  vec3 invertedPal = 1.0 - dotBase;',
     '  vec3 activePal   = mix(dotBase, invertedPal, u_invert_text);',
     '  activePal       *= mix(1.0, paletteElementPrinted(dotId, 1.0), step(0.5, u_group_mode));',
