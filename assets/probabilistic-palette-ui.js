@@ -213,6 +213,13 @@
     // string to replace the tooltip with something that tells the author where
     // the setting *does* work; a bare `true` gets the generic wording.
     var inertGeometry = !!opts.inertGeometry;
+    // Optional full-design import: a host that owns more state than a palette
+    // (the lab: source, seed, shader settings) can pass `parseDesign(text)` →
+    // truthy design object, and `onDesign(design)` to receive it. The import
+    // panel then recognizes a pasted design JSON and hands it over whole,
+    // instead of stripping it for hex codes. Both or neither.
+    var parseDesign = typeof opts.parseDesign === 'function' && typeof opts.onDesign === 'function'
+      ? opts.parseDesign : null;
     var dragFrom = -1;   // row being dragged, for the drop indicator
     var INERT_WHY = typeof opts.inertGeometry === 'string' ? opts.inertGeometry
       : 'Shape size has no meaning in this preview — a shader has no per-shape hook. '
@@ -347,6 +354,9 @@
       panel.appendChild(note);
 
       var actions = el('div', 'pp-btn-row');
+      var designBtn = el('button', 'pp-btn', 'Load design');
+      designBtn.style.display = 'none';
+      actions.appendChild(designBtn);
       var replaceBtn = el('button', 'pp-btn', 'Replace palette');
       var addBtn = el('button', 'pp-btn', 'Add to palette');
       var cancelBtn = el('button', 'pp-btn', 'Cancel');
@@ -356,16 +366,57 @@
       panel.appendChild(actions);
 
       var hexes = [];
+      var design = null;
 
-      function parse() {
-        hexes = PP.parseHexList(ta.value);
+      function renderSwatches(items) {
         swatches.textContent = '';
-        hexes.forEach(function (h) {
+        items.forEach(function (it) {
           var sw = el('i');
-          sw.style.background = h;
-          sw.title = h;
+          sw.style.background = it.color;
+          sw.title = it.title;
           swatches.appendChild(sw);
         });
+      }
+
+      function parse() {
+        // The hook's contract is only "truthy design object", and it may throw;
+        // honour that rather than trusting the one in-repo caller's shape —
+        // same validate-don't-trust posture as registerSizeField.
+        design = null;
+        if (parseDesign) {
+          try { design = parseDesign(ta.value) || null; } catch (e) { design = null; }
+          if (design && !(design.palette && Array.isArray(design.palette.colors))) design = null;
+        }
+        if (design) {
+          // A design JSON contains hex codes, so this check comes first — the
+          // hex path would happily shred it into a weightless palette.
+          hexes = [];
+          renderSwatches(design.palette.colors.map(function (c) {
+            return { color: c.color, title: (c.name || c.id || '') + ' ' + c.color };
+          }));
+          note.textContent = design.unavailable
+            ? 'Exported design for “' + design.source + '”, which this build cannot render — ' + design.unavailable
+            : 'Exported design — ' + (design.palette.name || 'untitled') + ' · '
+              + design.source + ' · seed ' + design.seed + '. Load design restores all of it.';
+          designBtn.style.display = design.unavailable ? 'none' : '';
+          replaceBtn.disabled = true;
+          addBtn.disabled = true;
+          return;
+        }
+        designBtn.style.display = 'none';
+        // A broken design JSON must not fall through to the hex parser: the
+        // sidecar's base64 blob is a dense source of accidental 6-hex-digit
+        // runs, and one click would replace the palette with shredded junk.
+        if (parseDesign && /^\s*\{/.test(ta.value)) {
+          hexes = [];
+          swatches.textContent = '';
+          note.textContent = 'This looks like a design JSON but did not parse — check for truncation.';
+          replaceBtn.disabled = true;
+          addBtn.disabled = true;
+          return;
+        }
+        hexes = PP.parseHexList(ta.value);
+        renderSwatches(hexes.map(function (h) { return { color: h, title: h }; }));
         if (!hexes.length) {
           note.textContent = ta.value.trim() ? 'No hex codes found' : 'Paste hex codes — commas, spaces, newlines or a Coolors URL all work.';
         } else if (hexes.length === 1) {
@@ -387,6 +438,13 @@
 
       ta.addEventListener('input', parse);
       parse();
+
+      designBtn.addEventListener('click', function () {
+        if (!design) return;
+        var d = design;
+        close();
+        opts.onDesign(d);
+      });
 
       toggleBtn.addEventListener('click', function () {
         panel.classList.toggle('pp-open');

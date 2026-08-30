@@ -411,6 +411,16 @@ grid badges and compare overlay are wired in `palette-lab.html`.
   and drift — so re-keeping a design you already have is a no-op, and a grid
   cell's ✓ badge is answered against the *live* state: change the palette and
   the same seed is a different design, so the badge goes away.
+- **Import is the inverse of Export.** The drawer's Import panel (paste or
+  .json file picker) adds exported designs back as ordinary entries;
+  `parseExportedDesign` accepts the sidecar or a bare `labSnapshot`, validates,
+  and reduces to exactly the snapshot shape, so `keyOf` round-trips and a
+  re-import of something already kept is reported as a duplicate, not added.
+  Pasting a design JSON into the *editor's* Import box is also recognized —
+  the design path must win over the hex path there, because a design JSON is
+  full of hex codes the hex parser would happily shred into a weightless
+  palette. The editor stays palette-scoped via two mount hooks
+  (`parseDesign`/`onDesign`); the lab wires them to the collection module.
 - **Compare shows every kept entry**, not a ticked subset — the collection is
   the shortlist. A tile's Remove only takes it out of that view.
 - **Export** writes a 1800×2400 PNG (the print-export size, flattened on black
@@ -485,8 +495,13 @@ it) plus at least one condition — `maxSize`, `minSize`, `region`, `afterColor`
 or `maxShare` — so they read as a find rather than a texture.
 
 ### Importing a palette
-Hex lists only — no image extraction, no network fetch. In the palette lab hit
-**Import**, paste, and check the swatch readout before committing:
+Hex lists or an exported design JSON — no image extraction, no network fetch.
+In the palette lab hit **Import**, paste, and check the swatch readout before
+committing. A pasted **design sidecar** is recognized first (a design JSON is
+full of hex codes the hex path would shred): the panel shows the design and a
+**Load design** button that restores the whole lab, and greys the two palette
+buttons out. Text that merely *looks* like JSON is refused rather than shredded.
+For hex lists:
 
 - Any separator works (comma, newline, space, hyphen), so a Coolors URL pastes
   as-is: `https://coolors.co/palette/606c38-283618-fefae0-dda15e-bc6c25`.
