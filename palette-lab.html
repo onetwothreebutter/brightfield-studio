@@ -529,7 +529,15 @@
       // overridden, so the distribution has to count cohorts instead — the
       // stops are no longer what put color on the shirt.
       var grouped = mapped.groups && handles[sourceName] && handles[sourceName].supportsGroups;
-      previewSlots = grouped ? mapped.groups.cohorts : mapped.slots;
+      // The spark joins the units the distribution table counts — it is real
+      // ink on the design now, and a structurally-permanent 0.0% Slots row
+      // reads as spark accounting being broken. The cohort count for the meta
+      // line comes from u_group_count, not this array's length.
+      previewSlots = grouped
+        ? mapped.groups.cohorts.concat(mapped.groups.spark
+          ? [{ key: 'spark', hex: mapped.groups.spark.hex, printed: true,
+               colorIndex: mapped.groups.spark.colorIndex }] : [])
+        : mapped.slots;
       previewTally = null;
       syncGroupSupport();
 
@@ -541,7 +549,7 @@
       // carries, so this is the odds an *average* element takes ink, not the
       // share of the canvas that ends up printed. The Area column measures that.
       document.getElementById('preview-meta').textContent = grouped
-        ? previewSlots.length + ' size groups · '
+        ? mapped.groups.u_group_count + ' size groups · '
           + Math.round(mapped.groups.u_group_density * 100) + '% print density'
         : previewSlots.length + ' color slots · ' + printed + ' inked';
       drawSlots(mapped);
@@ -633,7 +641,11 @@
         var ss = document.createElement('i');
         ss.style.background = spark.hex;
         ss.style.borderRadius = '50%';
-        ss.title = 'Spark · ' + spark.hex + ' · lands on ' + (spark.chance * 100).toFixed(1) + '% of elements';
+        // The spark colour survives on an element only if the print roll also
+        // keeps it, so with dropElements on the visible rate is chance x density.
+        var visible = spark.chance * mapped.groups.u_group_density;
+        var pct = (visible * 100).toFixed(visible < 0.01 ? 2 : 1);
+        ss.title = 'Spark · ' + spark.hex + ' · shows on ~' + pct + '% of elements';
         host.appendChild(ss);
       }
       hint.className = 'hint';
@@ -642,7 +654,8 @@
         + 'gradient. Print density rolls per element inside the cohort, so a swatch is the tier\'s color and '
         + 'the shirt breaks through it at ' + Math.round((1 - mapped.groups.u_group_density) * 100) + '%.'
         + (spark ? ' The round swatch is the spark: kept out of the cohort draw so it never becomes a tier, '
-          + 'it lands on single elements at ' + (spark.chance * 100).toFixed(1) + '%.' : '');
+          + 'it shows on single elements at ~' + (spark.chance * mapped.groups.u_group_density * 100).toFixed(1)
+          + '%.' : '');
       return;
     }
     mapped.slots.forEach(function (s) {

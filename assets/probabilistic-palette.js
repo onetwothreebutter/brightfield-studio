@@ -752,6 +752,40 @@
         };
       },
       shares: function () { return stats.variedShares.slice(); },
+      // The spark policy for a caller that rolls per element itself (the shader
+      // adapter): which colour lands and with what chance. Owned here so a
+      // change to how sparks draw reaches every consumer — the adapter used to
+      // re-derive this and drifted. The winner is the *heaviest* spark by its
+      // actual share; maxShare caps only the chance, exactly as it caps counts
+      // rather than reweighting the draw in sparkOverride. Position and
+      // neighbour conditions (region, afterColor) cannot apply — the caller
+      // has no per-element context — and size conditions are the caller's to
+      // drop, as the slot draw does. Colours that would crash a renderer
+      // (missing or non-#rrggbb after shorthand expansion) are skipped.
+      sparks: function () {
+        var chance = 0, best = -1, bestShare = 0;
+        colors.forEach(function (c, i) {
+          if (!c || !c.spark) return;
+          var hex = String(c.color || '');
+          if (/^#[0-9a-fA-F]{3}$/.test(hex)) {
+            hex = '#' + hex.charAt(1) + hex.charAt(1) + hex.charAt(2) + hex.charAt(2) + hex.charAt(3) + hex.charAt(3);
+          }
+          if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+          var share = stats.variedShares[i] || 0;
+          if (share <= 0) return;
+          var cap = c.conditions && typeof c.conditions.maxShare === 'number'
+            ? clamp(c.conditions.maxShare, 0, 1) : 1;
+          chance += Math.min(share, cap);
+          if (share > bestShare) { bestShare = share; best = i; }
+        });
+        chance = clamp(chance, 0, 1);
+        if (best < 0 || chance <= 0) return null;
+        var winner = String(colors[best].color);
+        if (/^#[0-9a-fA-F]{3}$/.test(winner)) {
+          winner = '#' + winner.charAt(1) + winner.charAt(1) + winner.charAt(2) + winner.charAt(2) + winner.charAt(3) + winner.charAt(3);
+        }
+        return { chance: chance, colorIndex: best, color: winner };
+      },
       // Observed distribution, for the preview's "what actually came out" read.
       tally: function () {
         var total = stats.printedCount || 1;

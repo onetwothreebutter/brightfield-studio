@@ -279,7 +279,7 @@
     });
     var groups = assigner.groups();
     if (!groups) return null;
-    var spark = sparkUniforms(forGroups, assigner.shares(), seed);
+    var spark = assigner.sparks();
 
     var bounds = groups.bounds.slice(0, GROUP_MAX - 1);
     var count = Math.min(GROUP_MAX, bounds.length + 1);
@@ -320,50 +320,24 @@
       // other derived seed, so turning grouping on can't shift the slot draws.
       u_group_seed: PP.deriveSeed(seed, 'element-print'),
       u_group_density: density,
-      u_spark_color: spark.color,
-      u_spark_chance: spark.chance,
-      u_spark_seed: spark.seed,
+      // The cohort draw excludes sparks by design, so without this a grouped
+      // shader could never show one at any weight — measured 0/40 designs on
+      // rise-shirt. The GLSL rolls per element instead; the policy (which
+      // colour, what chance, maxShare capping the chance) is the engine's
+      // `assigner.sparks()`, so it cannot drift from the CPU path. One colour
+      // uniform: the heaviest spark lands, the others only add to the odds.
+      // Size conditions are dropped as for the slot draw; region and afterColor
+      // cannot apply — a fragment has no position or neighbour the CPU can see
+      // — which IS a divergence from the ungrouped slot draw, where the real
+      // assigner honours both. The chance is per element, and the seed is its
+      // own stream so a spark never moves a print/skip decision.
+      u_spark_color: spark ? Defs.hexToRgb(spark.color, 'u_spark_color') : [0, 0, 0],
+      u_spark_chance: spark ? spark.chance : 0,
+      u_spark_seed: spark ? PP.deriveSeed(seed, 'element-spark') : 0,
       // Not uploaded — the host's read of what each cohort became, and of the
       // spark riding over them (null when the palette has none).
       cohorts: cohorts,
-      spark: spark.info
-    };
-  }
-
-  // The cohort draw excludes sparks by design, so without this a grouped shader
-  // could never show one at any weight — measured 0/40 designs on rise-shirt.
-  // The GLSL rolls per element instead, exactly as the CPU's sparkOverride does
-  // per shape: one roll against the sparks' combined share.
-  //
-  // One colour uniform, so with several sparks the heaviest is the one that
-  // lands and the others only add to the odds; a palette wanting two distinct
-  // finds on a shader needs two uniforms this does not have. `maxShare` caps
-  // the chance rather than the count — a fragment cannot count — which is the
-  // same intent expressed as a fraction of elements. Size and region
-  // conditions are dropped as they are for the slot draw: a dot has no
-  // position or size the CPU can see.
-  function sparkUniforms(palette, shares, seed) {
-    var colors = palette.colors || [];
-    var chance = 0, best = -1, bestShare = 0;
-    colors.forEach(function (c, i) {
-      if (!c || !c.spark) return;
-      var share = shares[i] || 0;
-      if (share <= 0) return;
-      var cap = c.conditions && typeof c.conditions.maxShare === 'number' ? c.conditions.maxShare : 1;
-      share = Math.min(share, Math.max(0, cap));
-      chance += share;
-      if (share > bestShare) { bestShare = share; best = i; }
-    });
-    chance = Math.max(0, Math.min(1, chance));
-    if (best < 0 || chance <= 0) {
-      return { color: [0, 0, 0], chance: 0, seed: 0, info: null };
-    }
-    return {
-      color: Defs.hexToRgb(colors[best].color, 'u_spark_color'),
-      chance: chance,
-      // Its own stream: a spark must never move a print/skip decision.
-      seed: PP.deriveSeed(seed, 'element-spark'),
-      info: { hex: colors[best].color, colorIndex: best, chance: chance }
+      spark: spark ? { hex: spark.color, colorIndex: spark.colorIndex, chance: spark.chance } : null
     };
   }
 

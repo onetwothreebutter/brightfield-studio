@@ -648,7 +648,6 @@ describe('shaders that opt into size groups', () => {
     expect(src).toContain('vec3 paletteGroupColor(float size)');
     expect(src).toContain('vec3 applyPaletteGroups(vec3 col, float size)');
     expect(src).toContain('vec3 applyPaletteGroups(vec3 col, float size, highp float elementId)');
-    expect(src).toContain('vec3 paletteGroupedColor(vec3 col, float size)');
   });
 
   it('qualifies the 32-bit path highp, which a fragment shader will not do for it', () => {
@@ -864,5 +863,39 @@ describe('per-element spark under size groups', () => {
       const src = readFileSync(join(__dirname, `../assets/${n}.js`), 'utf8');
       expect(src).toMatch(/applyPaletteGroups\(/);   // spark is inside that helper
     });
+  });
+});
+
+describe('assigner.sparks() — the policy the adapter consumes', () => {
+  const mk = (colors) => PP.createAssigner(
+    PP.createPalette({ name: 'T', generativeWeights: false, colors }), { seed: 's1', totalShapes: 8 });
+
+  it('the heaviest spark by ACTUAL share wins even when maxShare caps its chance', () => {
+    const s = mk([
+      { id: 'a', color: '#111111', weight: 60 },
+      { id: 'heavy', color: '#AA0000', weight: 30, spark: true, conditions: { maxShare: 0.02 } },
+      { id: 'light', color: '#00AA00', weight: 3, spark: true }
+    ]).sparks();
+    expect(s.colorIndex).toBe(1);
+    expect(s.color).toBe('#AA0000');
+    // Chance sums the CAPPED shares: min(30/93, 0.02) + 3/93.
+    expect(s.chance).toBeCloseTo(0.02 + 3 / 93, 12);
+  });
+
+  it('skips a spark whose colour would crash a renderer, expands #abc shorthand', () => {
+    const broken = mk([
+      { id: 'a', color: '#111111', weight: 60 },
+      { id: 'bad', weight: 5, spark: true }
+    ]).sparks();
+    expect(broken).toBeNull();
+    const short = mk([
+      { id: 'a', color: '#111111', weight: 60 },
+      { id: 's', color: '#abc', weight: 5, spark: true }
+    ]).sparks();
+    expect(short.color).toBe('#aabbcc');
+  });
+
+  it('is null with no sparks', () => {
+    expect(mk([{ id: 'a', color: '#111111', weight: 60 }]).sparks()).toBeNull();
   });
 });
