@@ -279,3 +279,26 @@ describe('importing an exported design', () => {
     expect(parsed.junk).toBeUndefined();
   });
 });
+
+describe('review fixes', () => {
+  it('clamps imported detail and variation to the lab controls', () => {
+    const s = Coll.makeSnapshot(snap({ source: 'scatter', shaderValues: null, detail: 24, variation: 3 }));
+    expect(s.detail).toBe(8);
+    expect(s.variation).toBe(1);
+    expect(Coll.makeSnapshot(snap({ detail: -5, variation: -1, shaderValues: null, source: 'scatter' })))
+      .toMatchObject({ detail: 2, variation: 0 });
+    expect(Coll.makeSnapshot(snap({ detail: NaN, shaderValues: null, source: 'scatter' })).detail).toBeNull();
+  });
+
+  it('addMany writes and notifies once for the whole batch', () => {
+    const store = Coll.createStore({ storage: fakeStorage() });
+    let n = 0;
+    store.onChange(() => { n++; });
+    const r = store.addMany([snap({ seed: 'a' }), snap({ seed: 'b' }), snap({ seed: 'a' })], 5);
+    expect(r).toEqual({ added: 2, dupes: 1 });
+    expect(n).toBe(1);
+    expect(store.size()).toBe(2);
+    expect(store.addMany([snap({ seed: 'a' })], 6)).toEqual({ added: 0, dupes: 1 });
+    expect(n).toBe(1);   // nothing added → no notify
+  });
+});

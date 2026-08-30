@@ -495,8 +495,13 @@ it) plus at least one condition — `maxSize`, `minSize`, `region`, `afterColor`
 or `maxShare` — so they read as a find rather than a texture.
 
 ### Importing a palette
-Hex lists only — no image extraction, no network fetch. In the palette lab hit
-**Import**, paste, and check the swatch readout before committing:
+Hex lists or an exported design JSON — no image extraction, no network fetch.
+In the palette lab hit **Import**, paste, and check the swatch readout before
+committing. A pasted **design sidecar** is recognized first (a design JSON is
+full of hex codes the hex path would shred): the panel shows the design and a
+**Load design** button that restores the whole lab, and greys the two palette
+buttons out. Text that merely *looks* like JSON is refused rather than shredded.
+For hex lists:
 
 - Any separator works (comma, newline, space, hyphen), so a Coolors URL pastes
   as-is: `https://coolors.co/palette/606c38-283618-fefae0-dda15e-bc6c25`.

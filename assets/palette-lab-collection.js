@@ -54,8 +54,13 @@
       seed: String(input.seed),
       palette: clone(input.palette),
       shaderValues: input.shaderValues ? clone(input.shaderValues) : null,
-      detail: typeof input.detail === 'number' ? input.detail : null,
-      variation: typeof input.variation === 'number' ? input.variation : 0,
+      // Clamped to the lab's real control ranges: an imported hand-edited or
+      // version-skewed sidecar must restore to a design this lab can actually
+      // hold, not to detail 24 on a slider that ends at 8.
+      detail: typeof input.detail === 'number' && isFinite(input.detail)
+        ? Math.min(8, Math.max(2, Math.round(input.detail))) : null,
+      variation: typeof input.variation === 'number' && isFinite(input.variation)
+        ? Math.min(1, Math.max(0, input.variation)) : 0,
       thumbnail: typeof input.thumbnail === 'string' ? input.thumbnail : null
     };
   }
@@ -156,6 +161,26 @@
         write();
         notify();
         return true;
+      },
+      // Batch add: one storage write and one notify for the whole list, not
+      // one per file — a big import otherwise costs N full serializations of
+      // every thumbnail and N drawer rebuilds, N-1 of each discarded unseen.
+      addMany: function (snaps, now) {
+        var added = 0, dupes = 0;
+        snaps.forEach(function (snap) {
+          var s = makeSnapshot(snap);
+          var key = keyOf(s);
+          if (findByKey(key)) { dupes++; return; }
+          counter += 1;
+          s.id = 'c' + counter.toString(36) + '-' + hashString(key);
+          s.addedAt = typeof now === 'number' ? now : 0;
+          s.selected = false;
+          s.key = key;
+          entries.push(s);
+          added++;
+        });
+        if (added) { write(); notify(); }
+        return { added: added, dupes: dupes };
       },
       // Add if absent, remove if present. Returns true when the snapshot is in
       // the collection afterwards.

@@ -368,35 +368,55 @@
       var hexes = [];
       var design = null;
 
+      function renderSwatches(items) {
+        swatches.textContent = '';
+        items.forEach(function (it) {
+          var sw = el('i');
+          sw.style.background = it.color;
+          sw.title = it.title;
+          swatches.appendChild(sw);
+        });
+      }
+
       function parse() {
-        design = parseDesign ? parseDesign(ta.value) : null;
+        // The hook's contract is only "truthy design object", and it may throw;
+        // honour that rather than trusting the one in-repo caller's shape —
+        // same validate-don't-trust posture as registerSizeField.
+        design = null;
+        if (parseDesign) {
+          try { design = parseDesign(ta.value) || null; } catch (e) { design = null; }
+          if (design && !(design.palette && Array.isArray(design.palette.colors))) design = null;
+        }
         if (design) {
           // A design JSON contains hex codes, so this check comes first — the
           // hex path would happily shred it into a weightless palette.
           hexes = [];
-          swatches.textContent = '';
-          (design.palette.colors || []).forEach(function (c) {
-            var sw = el('i');
-            sw.style.background = c.color;
-            sw.title = (c.name || c.id || '') + ' ' + c.color;
-            swatches.appendChild(sw);
-          });
-          note.textContent = 'Exported design — ' + (design.palette.name || 'untitled') + ' · '
-            + design.source + ' · seed ' + design.seed + '. Load design restores all of it.';
-          designBtn.style.display = '';
+          renderSwatches(design.palette.colors.map(function (c) {
+            return { color: c.color, title: (c.name || c.id || '') + ' ' + c.color };
+          }));
+          note.textContent = design.unavailable
+            ? 'Exported design for “' + design.source + '”, which this build cannot render — ' + design.unavailable
+            : 'Exported design — ' + (design.palette.name || 'untitled') + ' · '
+              + design.source + ' · seed ' + design.seed + '. Load design restores all of it.';
+          designBtn.style.display = design.unavailable ? 'none' : '';
           replaceBtn.disabled = true;
           addBtn.disabled = true;
           return;
         }
         designBtn.style.display = 'none';
+        // A broken design JSON must not fall through to the hex parser: the
+        // sidecar's base64 blob is a dense source of accidental 6-hex-digit
+        // runs, and one click would replace the palette with shredded junk.
+        if (parseDesign && /^\s*\{/.test(ta.value)) {
+          hexes = [];
+          swatches.textContent = '';
+          note.textContent = 'This looks like a design JSON but did not parse — check for truncation.';
+          replaceBtn.disabled = true;
+          addBtn.disabled = true;
+          return;
+        }
         hexes = PP.parseHexList(ta.value);
-        swatches.textContent = '';
-        hexes.forEach(function (h) {
-          var sw = el('i');
-          sw.style.background = h;
-          sw.title = h;
-          swatches.appendChild(sw);
-        });
+        renderSwatches(hexes.map(function (h) { return { color: h, title: h }; }));
         if (!hexes.length) {
           note.textContent = ta.value.trim() ? 'No hex codes found' : 'Paste hex codes — commas, spaces, newlines or a Coolors URL all work.';
         } else if (hexes.length === 1) {

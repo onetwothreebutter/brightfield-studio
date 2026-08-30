@@ -997,6 +997,10 @@
     }
     if (thumbCache[entry.id]) { ctx.drawImage(thumbCache[entry.id], 0, 0); return c; }
     renderSnapshot(entry, ctx, c.width, c.height, function () {
+      // An unknown source draws nothing; persisting the untouched canvas would
+      // pin an all-black JPEG over the entry forever (the dataURL fast path
+      // never re-renders) while eating the quota write() protects.
+      if (!knownSource(entry.source)) return;
       thumbCache[entry.id] = c;
       store.setThumbnail(entry.id, c.toDataURL('image/jpeg', 0.85));
     });
@@ -1004,11 +1008,12 @@
   }
 
   function sourceLabel(name) { return SHAPE_SOURCES[name] || shaderLabels[name] || name; }
+  function knownSource(name) { return !!(SHAPE_SOURCES[name] || SHADERS[name]); }
 
   // Puts the whole lab back to the state that produced an entry.
   function restore(entry) {
     var wasShapes = isShapes();
-    if (!SHAPE_SOURCES[entry.source] && !SHADERS[entry.source]) return;
+    if (!knownSource(entry.source)) return false;
     sourceName = entry.source;
     sourceSel.value = sourceName;
     palette = JSON.parse(JSON.stringify(entry.palette));
@@ -1199,9 +1204,19 @@
   // Sequential: one shared canvas, and browsers throttle a burst of downloads.
   function exportEntries(list) {
     var btn = document.getElementById('coll-export');
+    // An entry whose source this build lacks (imported from a newer branch)
+    // cannot render; skipping up front keeps one bad entry from killing the
+    // loop — withShader would queue a callback nothing ever resolves.
+    var skipped = list.filter(function (e) { return !knownSource(e.source); }).length;
+    list = list.filter(function (e) { return knownSource(e.source); });
     var i = 0;
     function next() {
-      if (i >= list.length) { btn.textContent = 'Export all'; renderDrawer(); return; }
+      if (i >= list.length) {
+        btn.textContent = skipped ? 'Skipped ' + skipped + ' unknown' : 'Export all';
+        if (skipped) setTimeout(function () { btn.textContent = 'Export all'; renderDrawer(); }, 2500);
+        else renderDrawer();
+        return;
+      }
       var e = list[i++];
       btn.textContent = 'Exporting ' + i + '/' + list.length;
       renderExportImage(e, function (canvas, values) {
@@ -1252,21 +1267,27 @@
         : (text.value.trim() ? 'Not an exported design JSON.' : 'Or choose one or more exported .json files.');
     });
 
+    // Returns how many were added; clearing the paste box is the caller's
+    // decision — the file picker must not wipe a design pasted but not yet
+    // added.
     function addDesigns(designs) {
-      var added = 0, dupes = 0, bad = 0;
+      var bad = 0, unknown = 0, good = [];
       designs.forEach(function (d) {
         if (!d) { bad++; return; }
-        if (store.has(d)) { dupes++; return; }
-        store.add(d, Date.now());
-        added++;
+        if (!knownSource(d.source)) { unknown++; return; }
+        good.push(d);
       });
-      note.textContent = added + ' added'
-        + (dupes ? ', ' + dupes + ' already in the collection' : '')
+      var r = store.addMany(good, Date.now());
+      note.textContent = r.added + ' added'
+        + (r.dupes ? ', ' + r.dupes + ' already in the collection' : '')
+        + (unknown ? ', ' + unknown + ' for a source this build lacks' : '')
         + (bad ? ', ' + bad + ' not design JSON' : '') + '.';
-      if (added) { text.value = ''; add.disabled = true; }
+      return r.added;
     }
 
-    add.addEventListener('click', function () { addDesigns([parsedFromText()]); });
+    add.addEventListener('click', function () {
+      if (addDesigns([parsedFromText()])) { text.value = ''; add.disabled = true; }
+    });
 
     file.addEventListener('change', function () {
       var files = Array.prototype.slice.call(this.files || []);
@@ -1510,7 +1531,14 @@
       },
       // A pasted export JSON restores the whole design — source, seed, palette,
       // shader settings — not just its colors.
-      parseDesign: Coll.parseExportedDesign,
+      parseDesign: function (text) {
+        var d = Coll.parseExportedDesign(text);
+        if (d && !knownSource(d.source)) {
+          d.unavailable = 'it has no shader or generator by that name. Import it in the Collection '
+            + 'drawer on a build that does.';
+        }
+        return d;
+      },
       onDesign: restore
     });
   }
