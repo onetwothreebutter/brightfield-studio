@@ -32,7 +32,7 @@
           {%- assign words = shader_slug | split: '-' -%}
           {%- capture shader_label -%}{%- for word in words -%}{{ word | capitalize }}{%- unless forloop.last %} {% endunless -%}{%- endfor -%}{%- endcapture -%}
           <div class="community-card-group">
-            <h3 class="community-card-group__heading">{{ shader_label }}</h3>
+            <h3 class="community-card-group__heading">{{ shader_label | escape }}</h3>
             <div class="product-grid">
               {%- for product in community_col.products -%}
                 {%- if product.metafields.custom.shader == shader_slug -%}

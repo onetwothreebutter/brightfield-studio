@@ -2299,6 +2299,14 @@ async function handleCommunitySubmit(request, env, origin) {
   if (!mockupUrl || !creatorName || !shader) {
     return new Response(JSON.stringify({ error: 'Missing required fields: mockupUrl, creatorName, shader' }), { status: 400, headers });
   }
+  // This endpoint is unauthenticated and `shader` flows into a custom.shader
+  // metafield the theme renders, a product tag, and admin UI — clamp it to the
+  // slug charset at the door rather than trusting every downstream consumer to
+  // escape it.
+  const cleanShader = String(shader).toLowerCase().replace(/[^a-z0-9-]/g, '');
+  if (!cleanShader) {
+    return new Response(JSON.stringify({ error: 'Invalid shader' }), { status: 400, headers });
+  }
   if (values != null && !isPlainObject(values)) {
     return new Response(JSON.stringify({ error: 'Invalid values' }), { status: 400, headers });
   }
@@ -2306,7 +2314,7 @@ async function handleCommunitySubmit(request, env, origin) {
   const id = crypto.randomUUID();
   const submission = {
     id,
-    shader,
+    shader:           cleanShader,
     productHandle:    productHandle || '',
     designUrl:        designUrl || '',
     mockupUrl,
