@@ -2301,9 +2301,11 @@ async function handleCommunitySubmit(request, env, origin) {
   }
   // This endpoint is unauthenticated and `shader` flows into a custom.shader
   // metafield the theme renders, a product tag, and admin UI — clamp it to the
-  // slug charset at the door rather than trusting every downstream consumer to
-  // escape it.
-  const cleanShader = String(shader).toLowerCase().replace(/[^a-z0-9-]/g, '');
+  // slug charset (non-strings included: JSON lets objects/arrays through the
+  // truthiness check above). Defense in depth, not the only guard: the
+  // unauthenticated /create-product path also writes this metafield verbatim,
+  // so render-side escaping stays load-bearing everywhere the value surfaces.
+  const cleanShader = typeof shader === 'string' ? shader.toLowerCase().replace(/[^a-z0-9-]/g, '') : '';
   if (!cleanShader) {
     return new Response(JSON.stringify({ error: 'Invalid shader' }), { status: 400, headers });
   }
