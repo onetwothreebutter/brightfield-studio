@@ -1,7 +1,23 @@
 {%- assign community_col = collections['community-designs'] -%}
 {%- paginate community_col.products by 24 -%}
 
-{%- assign shader_defs = 'rise-shirt:Rise Shirt,stacked-gradient:Stacked Gradient,four-circles:Four Circles,echo-text:Echo Text,three-square:Three Square,line-text:Line Text,line-circle:Line Circle,scaling-letters:Scaling Letters,chladni:Chladni,outline-pulse:Outline Pulse,circle-on-line:Circle on Line' | split: ',' -%}
+{%- comment -%}
+  Group slugs come from each product's own shader metafield rather than a
+  hand-kept registry — a registry copy here silently dropped scribble-glyph
+  and contour-pareidolia designs (saved to the collection but never
+  rendered). Order is first appearance within the paginated collection.
+{%- endcomment -%}
+{%- assign shader_slugs_str = ',' -%}
+{%- for product in community_col.products -%}
+  {%- assign s = product.metafields.custom.shader -%}
+  {%- if s != blank -%}
+    {%- assign needle = s | prepend: ',' | append: ',' -%}
+    {%- unless shader_slugs_str contains needle -%}
+      {%- assign shader_slugs_str = shader_slugs_str | append: s | append: ',' -%}
+    {%- endunless -%}
+  {%- endif -%}
+{%- endfor -%}
+{%- assign shader_slugs = shader_slugs_str | remove_first: ',' | split: ',' -%}
 
 <section class="community-designs-page section-padding">
   <div class="container">
@@ -12,28 +28,19 @@
       <p class="community-designs-page__empty">No designs yet &mdash; be the first to share one!</p>
     {%- else -%}
       <div id="community-page-container">
-        {%- for shader_def in shader_defs -%}
-          {%- assign parts = shader_def | split: ':' -%}
-          {%- assign shader_slug = parts[0] -%}
-          {%- assign shader_label = parts[1] -%}
-          {%- assign has_designs = false -%}
-          {%- for product in community_col.products -%}
-            {%- if product.metafields.custom.shader == shader_slug -%}
-              {%- assign has_designs = true -%}
-            {%- endif -%}
-          {%- endfor -%}
-          {%- if has_designs -%}
-            <div class="community-card-group">
-              <h3 class="community-card-group__heading">{{ shader_label }}</h3>
-              <div class="product-grid">
-                {%- for product in community_col.products -%}
-                  {%- if product.metafields.custom.shader == shader_slug -%}
-                    {%- render 'community-card', product: product -%}
-                  {%- endif -%}
-                {%- endfor -%}
-              </div>
+        {%- for shader_slug in shader_slugs -%}
+          {%- assign words = shader_slug | split: '-' -%}
+          {%- capture shader_label -%}{%- for word in words -%}{{ word | capitalize }}{%- unless forloop.last %} {% endunless -%}{%- endfor -%}{%- endcapture -%}
+          <div class="community-card-group">
+            <h3 class="community-card-group__heading">{{ shader_label }}</h3>
+            <div class="product-grid">
+              {%- for product in community_col.products -%}
+                {%- if product.metafields.custom.shader == shader_slug -%}
+                  {%- render 'community-card', product: product -%}
+                {%- endif -%}
+              {%- endfor -%}
             </div>
-          {%- endif -%}
+          </div>
         {%- endfor -%}
       </div>
 

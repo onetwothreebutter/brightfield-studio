@@ -1267,12 +1267,8 @@ async function handleListDesigns(request, env, origin) {
 
 async function handleDeleteDesign(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
+  const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
   const { id, deviceId, deviceToken } = body;
   if (!id || !deviceId) {
@@ -2357,10 +2353,8 @@ async function handleCommunityList(request, env, origin) {
 
 async function handleCommunityLike(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
-  let body;
-  try { body = await request.json(); } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
+  const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
   const { id, deviceId, deviceToken } = body;
   if (!id || !deviceId) {
@@ -2424,10 +2418,8 @@ async function handleCommunityModerate(request, env, origin, newStatus) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
   }
 
-  let body;
-  try { body = await request.json(); } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
+  const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
   const { id } = body;
   if (!id) {
@@ -2686,10 +2678,8 @@ async function handleReviewsModerate(request, env, origin, newStatus) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
   }
 
-  let body;
-  try { body = await request.json(); } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
+  const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
   const { id } = body;
   if (!id) {
@@ -3159,10 +3149,8 @@ async function handleRemoveBg(request, env, origin) {
     return new Response(JSON.stringify({ error: 'IMAGES binding not configured' }), { status: 503, headers });
   }
 
-  let body;
-  try { body = await request.json(); } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
+  const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
   const { url } = body;
   if (!url) {
