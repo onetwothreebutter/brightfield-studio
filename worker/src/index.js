@@ -12,7 +12,7 @@ const PRINT_HEIGHT = 2400;
 // Garment color used for order fulfillment. The storefront doesn't offer a
 // color choice, so every custom-design order is fulfilled in one fixed color —
 // matches the Black/M variant (4017) already used as the canonical example
-// elsewhere in this repo (worker/test-upload.mjs, worker/fetch-printfiles.mjs).
+// elsewhere in this repo (worker/fetch-printfiles.mjs).
 // Override with the PRINTFUL_GARMENT_COLOR var/secret if that ever changes.
 const DEFAULT_PRINTFUL_GARMENT_COLOR = 'Black';
 
@@ -415,10 +415,6 @@ export default {
     const method   = request.method;
     const pathname = url.pathname;
 
-    if (method === 'POST' && pathname === '/generate-mockup') {
-      return handleGenerateMockup(request, env, origin);
-    }
-
     if (method === 'GET' && pathname === '/list-designs') {
       return handleListDesigns(request, env, origin);
     }
@@ -455,11 +451,7 @@ export default {
 
     if (method === 'GET'  && pathname === '/admin-ui') return handleAdminUI(request, env);
 
-    if (method === 'GET'  && pathname === '/admin/list-designs') return handleAdminListDesigns(request, env);
-    if (method === 'POST' && pathname === '/admin/patch-design-url') return handleAdminPatchDesignUrl(request, env);
     if (method === 'GET'  && pathname === '/admin/gc-dry-run') return handleGcDryRun(request, env);
-
-    if (method === 'GET'  && pathname === '/download-mockup') return handleDownloadMockup(request, env, origin);
 
     if (method === 'POST' && pathname === '/remove-bg') return handleRemoveBg(request, env, origin);
 
@@ -483,196 +475,6 @@ export default {
     await runScheduledGc(env);
   },
 };
-
-async function handleGenerateMockup(request, env, origin) {
-  const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
-
-  if (!(await checkRateLimit(env, 'RATE_LIMITER_GENERATE_MOCKUP', request))) {
-    return rateLimitedResponse(headers);
-  }
-
-  const { body, error, status } = await readLimitedJson(request, MAX_SINGLE_IMAGE_BODY_BYTES);
-  if (error) return new Response(JSON.stringify({ error }), { status, headers });
-
-  const { image, variant_id, deviceId, shader, productHandle, values, skipBgRemoval } = body;
-  if (!image || !variant_id) {
-    return new Response(JSON.stringify({ error: 'Missing image or variant_id' }), { status: 400, headers });
-  }
-  if (typeof image !== 'string' || image.length * 3 / 4 > MAX_IMAGE_BYTES) {
-    return new Response(JSON.stringify({ error: 'Image too large' }), { status: 413, headers });
-  }
-
-  // 1. Decode base64 PNG and upload to R2
-  const imageKey = `designs/${crypto.randomUUID()}.png`;
-  let imageData;
-  try { imageData = Uint8Array.from(atob(image), c => c.charCodeAt(0)); }
-  catch { return new Response(JSON.stringify({ error: 'Invalid image encoding' }), { status: 400, headers }); }
-
-  await env.MOCKUP_STAGING.put(imageKey, imageData, {
-    httpMetadata: { contentType: 'image/png' }
-  });
-
-  // Served through the worker's /img/ route (Printful fetches this externally)
-  const imageUrl = imgUrl(imageKey);
-
-  try {
-    // 2. Create Printful mockup task
-    // Note: catch block returns a JSON error response; finally always cleans up R2
-    const taskRes = await fetch(`${PRINTFUL_API}/mockup-generator/create-task/${PRODUCT_ID}`, {
-      method:  'POST',
-      headers: {
-        'Authorization': `Bearer ${env.PRINTFUL_API_KEY}`,
-        'Content-Type':  'application/json',
-      },
-      body: JSON.stringify({
-        variant_ids: [Number(variant_id)],
-        format: 'jpg',
-        files: [{
-          placement: 'front',
-          image_url: imageUrl,
-          position: {
-            area_width:  PRINT_WIDTH,
-            area_height: PRINT_HEIGHT,
-            width:       PRINT_WIDTH,
-            height:      PRINT_HEIGHT,
-            top:  0,
-            left: 0,
-          }
-        }]
-      })
-    });
-
-    const taskJson = await taskRes.json();
-    console.log('[mockup] Printful create-task response:', JSON.stringify(taskJson));
-    if (taskJson.code !== 200) {
-      throw new Error(taskJson.result || taskJson.error || JSON.stringify(taskJson));
-    }
-
-    const taskKey = taskJson.result.task_key;
-
-    // 3. Poll for result (max 20 attempts, 1.5s apart)
-    let mockupUrl = null;
-    for (let i = 0; i < 20; i++) {
-      await sleep(1500);
-      const resultRes  = await fetch(`${PRINTFUL_API}/mockup-generator/task?task_key=${taskKey}`, {
-        headers: { 'Authorization': `Bearer ${env.PRINTFUL_API_KEY}` }
-      });
-      const resultJson = await resultRes.json();
-      console.log('[mockup] Printful poll result:', JSON.stringify(resultJson.result));
-      const status     = resultJson.result?.status;
-
-      if (status === 'completed') {
-        mockupUrl = resultJson.result.mockups?.[0]?.mockup_url;
-        break;
-      }
-      if (status === 'failed') {
-        const detail = resultJson.result?.error || JSON.stringify(resultJson.result);
-        throw new Error(`Printful mockup generation failed: ${detail}`);
-      }
-    }
-
-    if (!mockupUrl) {
-      throw new Error('Mockup generation timed out');
-    }
-
-    // 4. Re-host the Printful mockup in R2 so the URL doesn't expire
-    const mockupImageRes = await fetch(mockupUrl);
-    let downloadUrl = null;
-    if (mockupImageRes.ok) {
-      let mockupData        = await mockupImageRes.arrayBuffer();
-      let mockupContentType = 'image/jpeg';
-      let mockupExt         = 'jpg';
-
-      // Remove background via Cloudflare Images (best-effort — falls back to original on failure)
-      if (env.IMAGES && !skipBgRemoval) {
-        try {
-          const processed = await env.IMAGES
-            .input(mockupData)
-            .transform({ segment: 'foreground' })
-            .output({ format: 'image/png' });
-          mockupData        = await processed.response().arrayBuffer();
-          mockupContentType = 'image/png';
-          mockupExt         = 'png';
-        } catch (imgErr) {
-          console.error('Background removal failed, using original:', imgErr.message);
-        }
-      }
-
-      const mockupKey = `mockups/${crypto.randomUUID()}.${mockupExt}`;
-      await env.MOCKUP_STAGING.put(mockupKey, mockupData, {
-        httpMetadata: { contentType: mockupContentType }
-      });
-      mockupUrl = imgUrl(mockupKey);
-      const shaderSlug = (shader || '').replace(/[^a-z0-9-]/g, '') || 'design';
-      downloadUrl = `${new URL(request.url).origin}/download-mockup?key=${encodeURIComponent(mockupKey)}&shader=${encodeURIComponent(shaderSlug)}`;
-    }
-
-    // 5. Keep the design file in R2 — merchant needs the URL to submit to Printful when fulfilling
-    // 6. Save design entry for the device gallery (best-effort)
-    let deviceToken = null;
-    if (deviceId) {
-      const entry = {
-        id: crypto.randomUUID(),
-        shader: shader || '',
-        productHandle: productHandle || '',
-        designUrl: imageUrl,
-        mockupUrl,
-        values: values || {},
-        timestamp: Math.floor(Date.now() / 1000),
-      };
-      deviceToken = await saveDesignEntry(env, deviceId, entry).catch(() => null);
-    }
-
-    const responseBody = { mockup_url: mockupUrl, design_url: imageUrl };
-    if (downloadUrl) responseBody.download_url = downloadUrl;
-    // First-claim token for this deviceId (#544) — client persists it and sends
-    // it back on future /delete-design and /community/like calls.
-    if (deviceToken) responseBody.deviceToken = deviceToken;
-    return new Response(JSON.stringify(responseBody), { status: 200, headers });
-
-  } catch (err) {
-    // Clean up orphaned R2 file on failure only
-    env.MOCKUP_STAGING.delete(imageKey).catch(() => {});
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
-  }
-}
-
-async function handleDownloadMockup(request, env, origin) {
-  const params = new URL(request.url).searchParams;
-  const key    = params.get('key');
-  const shader = (params.get('shader') || '').replace(/[^a-z0-9-]/g, '') || 'design';
-  if (!key) return new Response('Missing key', { status: 400, headers: corsHeaders(origin) });
-  const obj = await env.MOCKUP_STAGING.get(key);
-  if (!obj) return new Response('Not found', { status: 404, headers: corsHeaders(origin) });
-  // Use client-supplied local datetime if present, otherwise fall back to UTC
-  const dt = (params.get('dt') || '').replace(/[^a-z0-9-]/g, '');
-  let datetime = dt;
-  if (!datetime) {
-    const now     = new Date();
-    const year    = now.getUTCFullYear();
-    const month   = String(now.getUTCMonth() + 1).padStart(2, '0');
-    const day     = String(now.getUTCDate()).padStart(2, '0');
-    const h24     = now.getUTCHours();
-    const ampm    = h24 >= 12 ? 'pm' : 'am';
-    const hour    = h24 % 12 || 12;
-    const minutes = String(now.getUTCMinutes()).padStart(2, '0');
-    datetime = `${year}-${month}-${day}-${hour}${minutes}${ampm}`;
-  }
-  const ext         = key.endsWith('.png') ? 'png' : 'jpg';
-  const contentType = ext === 'png' ? 'image/png' : 'image/jpeg';
-  const filename = `my-${shader}-design--brightfield--${datetime}.${ext}`;
-  return new Response(obj.body, {
-    headers: {
-      'Content-Type': contentType,
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      ...corsHeaders(origin),
-    },
-  });
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 async function handleSavePreview(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
@@ -1432,7 +1234,7 @@ async function writeJson(env, key, data) {
 // community submission's like count (#544).
 //
 // Fix: the first time a deviceId is used to save something (saveDesignEntry,
-// called from handleGenerateMockup / handleSavePreview), the worker mints an
+// called from handleSavePreview), the worker mints an
 // HMAC-SHA256(deviceId) token and persists a "claim" record for that deviceId
 // at device-tokens/{deviceId}.json. From then on, writes keyed on that
 // deviceId (handleDeleteDesign, handleCommunityLike) require a valid
@@ -2091,9 +1893,9 @@ async function handleOrderPaidWebhook(request, env, ctx) {
       printfulItems.push({
         variant_id: printfulVariantId,
         quantity: li.fulfillQty,
-        // Same files/position shape as the mockup-task call in
-        // handleGenerateMockup above — Printful's order file-attachment shape
-        // mirrors the mockup-generator one.
+        // Printful's order file-attachment shape: front placement stretched
+        // over the full print area (mirrors the mockup-generator API's files
+        // shape).
         files: [{
           placement: 'front',
           image_url: designUrl,
@@ -2562,7 +2364,11 @@ async function handleReviewsSubmit(request, env, origin) {
   return new Response(JSON.stringify({ id }), { status: 201, headers });
 }
 
-// Public: approved reviews for a single product, newest first.
+// Public: approved reviews for a single product, newest first. No storefront
+// consumer today — product pages read the review metafields, which mirror only
+// the 20 newest approved reviews — so this stays as the sole *public* read
+// path past that mirror (capped at the newest 200 submissions store-wide; a
+// future "all reviews" page).
 async function handleReviewsList(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
   const url = new URL(request.url);
@@ -2792,44 +2598,6 @@ async function handleShare(request, env, id) {
 }
 
 // ── Shopify Admin App UI ──────────────────────────────────────────────────────
-
-async function handleAdminPatchDesignUrl(request, env) {
-  const isAdmin = await requireAdmin(request, env);
-  if (!isAdmin) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
-
-  let body;
-  try { body = await request.json(); } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-  }
-
-  const { id, designUrl } = body;
-  if (!id || !designUrl) return new Response(JSON.stringify({ error: 'Missing id or designUrl' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-
-  const submission = await readJson(env, `community/submissions/${id}.json`);
-  if (!submission) return new Response(JSON.stringify({ error: 'Submission not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-
-  submission.designUrl = designUrl;
-  await writeJson(env, `community/submissions/${id}.json`, submission);
-
-  return new Response(JSON.stringify({ ok: true, id, designUrl }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-}
-
-async function handleAdminListDesigns(request, env) {
-  const isAdmin = await requireAdmin(request, env);
-  if (!isAdmin) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
-
-  const results = [];
-  let cursor;
-  do {
-    const page = await env.MOCKUP_STAGING.list({ prefix: 'designs/', cursor, limit: 1000 });
-    for (const obj of page.objects) {
-      results.push({ key: obj.key, uploaded: obj.uploaded, size: obj.size });
-    }
-    cursor = page.truncated ? page.cursor : null;
-  } while (cursor);
-
-  return new Response(JSON.stringify(results), { status: 200, headers: { 'Content-Type': 'application/json' } });
-}
 
 function handleAdminUI(request, env) {
   const clientId = env.SHOPIFY_APP_CLIENT_ID || '';
@@ -3543,9 +3311,8 @@ async function gcRunProductPass(env, { dryRun }) {
 
 // Phase 2: sweep R2 blobs under the GC-eligible prefixes. Reference-checked
 // prefixes (designs/, mockups/) survive if their key is in referencedKeys;
-// age-only prefixes are eligible purely on the uploaded timestamp. Mirrors
-// the pagination shape of handleAdminListDesigns above (R2 .list() cursor/
-// truncated).
+// age-only prefixes are eligible purely on the uploaded timestamp. Standard
+// R2 .list() cursor/truncated pagination.
 async function gcSweepBlobs(env, { dryRun, referencedKeys }) {
   const result = { checked: 0, deleted: [], kept: [] };
   const cutoffMs = Date.now() - GC_BLOB_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;

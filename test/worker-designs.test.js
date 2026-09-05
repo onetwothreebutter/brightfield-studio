@@ -1,5 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import worker from '../worker/src/index.js';
+
+// Coverage for the device design gallery: GET /list-designs, plus the
+// saveDesignEntry semantics reached through POST /save-preview. Validation,
+// URL shapes, first-time deviceToken minting, and rate limiting for
+// /save-preview are pinned in test/worker-create-product.test.js; the tests
+// here pin only what no other suite does.
 
 // ── R2 in-memory mock ─────────────────────────────────────────────────────────
 function makeR2() {
@@ -22,35 +28,11 @@ function makeEnv(r2 = makeR2(), overrides = {}) {
   return { MOCKUP_STAGING: r2, PRINTFUL_API_KEY: 'test-key', R2_PUBLIC_DOMAIN: 'r2.example.com', ...overrides };
 }
 
-// Rate-limit binding mock — same shape as the real Workers Rate Limiting
-// binding's `limit()` method: an async function returning { success }.
-function makeRateLimiter(success = true) {
-  return { limit: vi.fn(async () => ({ success })) };
-}
-
 function makeRequest(method, path, body, origin = 'https://brightfield-2.myshopify.com') {
   const init = { method, headers: { Origin: origin, 'Content-Type': 'application/json' } };
   if (body) init.body = JSON.stringify(body);
   return new Request(`https://worker.example.com${path}`, init);
 }
-
-// Printful API mock — returns a completed mockup on the first poll
-function makePrintfulFetch(mockupUrl = 'https://printful.com/mockup.jpg') {
-  return vi.fn(async (url) => {
-    if (url.includes('create-task')) {
-      return { json: async () => ({ code: 200, result: { task_key: 'task-abc' } }) };
-    }
-    if (url.includes('task?task_key')) {
-      return { json: async () => ({ result: { status: 'completed', mockups: [{ mockup_url: mockupUrl }] } }) };
-    }
-    if (url === mockupUrl) {
-      return { ok: true, arrayBuffer: async () => new ArrayBuffer(0) };
-    }
-    throw new Error('Unexpected fetch: ' + url);
-  });
-}
-
-afterEach(() => vi.unstubAllGlobals());
 
 // ── GET /list-designs ─────────────────────────────────────────────────────────
 
@@ -92,113 +74,33 @@ describe('GET /list-designs', () => {
   });
 });
 
-// ── POST /generate-mockup — validation ─────────────────────────────────────────
+// ── POST /save-preview — design entry semantics ───────────────────────────────
+// Ported from the deleted /generate-mockup suite; both routes shared
+// saveDesignEntry(), and /save-preview is the surviving caller.
 
-describe('POST /generate-mockup — validation', () => {
-  it('returns 413 when the raw body exceeds the size cap', async () => {
-    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
-      image: 'A'.repeat(11_500_000),
-      variant_id: 4017,
-    }), makeEnv());
-    expect(res.status).toBe(413);
-  });
+function saveBody(extra = {}) {
+  return {
+    designImage: btoa('fake-png'),
+    mockupImage: btoa('fake-jpg'),
+    shader: 'echo-text',
+    productHandle: 'echo-text-shirt',
+    values: {},
+    ...extra,
+  };
+}
 
-  it('returns 413 when the image exceeds the decoded-image cap', async () => {
-    // Passes the body cap but exceeds the 8 MB decoded-image cap.
-    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
-      image: 'A'.repeat(11_200_000),
-      variant_id: 4017,
-    }), makeEnv());
-    expect(res.status).toBe(413);
-  });
-
-  it('returns 400 on invalid JSON', async () => {
-    const req = new Request('https://worker.example.com/generate-mockup', {
-      method: 'POST',
-      headers: { Origin: 'https://brightfield-2.myshopify.com', 'Content-Type': 'application/json' },
-      body: '{not json',
-    });
-    const res = await worker.fetch(req, makeEnv());
-    expect(res.status).toBe(400);
-  });
-
-  it('returns 400 (not an unhandled exception) for a syntactically invalid base64 image', async () => {
-    // '!' is not a valid base64 character — atob() throws on it. Passes the
-    // string-type and size checks (it's short), so this only ever hits the
-    // atob() call itself.
-    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
-      image: '!'.repeat(100),
-      variant_id: 4017,
-    }), makeEnv());
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error).toBe('Invalid image encoding');
-  });
-});
-
-// ── POST /generate-mockup — design saving ─────────────────────────────────────
-
-describe('POST /generate-mockup — design saving', () => {
-  const MOCKUP_URL = 'https://printful.com/mockup.jpg';
-
-  beforeEach(() => {
-    vi.stubGlobal('fetch', makePrintfulFetch(MOCKUP_URL));
-  });
-
-  it('saves a design entry to R2 when deviceId is present', async () => {
-    const r2 = makeR2();
-    await worker.fetch(makeRequest('POST', '/generate-mockup', {
-      image: btoa('fake-png'),
-      variant_id: 4017,
-      deviceId: 'dev-1',
-      shader: 'echo-text',
-      productHandle: 'echo-text-shirt',
-      values: { u_speed: 1.5 },
-    }), makeEnv(r2));
-
-    const saveCall = r2.put.mock.calls.find(([k]) => k.startsWith('device-designs/'));
-    expect(saveCall).toBeDefined();
-
-    const saved = JSON.parse(saveCall[1]);
-    expect(saved).toHaveLength(1);
-    expect(saved[0]).toMatchObject({
-      shader: 'echo-text',
-      productHandle: 'echo-text-shirt',
-      mockupUrl: expect.stringContaining('share.brightfield.studio/img/mockups/'),
-      values: { u_speed: 1.5 },
-    });
-    expect(saved[0].id).toBeTruthy();
-    expect(saved[0].timestamp).toBeGreaterThan(0);
-  });
-
-  it('does NOT write device-designs when deviceId is absent', async () => {
-    const r2 = makeR2();
-    await worker.fetch(makeRequest('POST', '/generate-mockup', {
-      image: btoa('fake-png'),
-      variant_id: 4017,
-    }), makeEnv(r2));
-
-    const designSave = r2.put.mock.calls.find(([k]) => k.startsWith('device-designs/'));
-    expect(designSave).toBeUndefined();
-  });
-
-  it('prepends new entry so newest is first', async () => {
+describe('POST /save-preview — design entry semantics', () => {
+  it('prepends the new entry so newest is first', async () => {
     const r2 = makeR2();
     const existing = [{ id: 'old', shader: 'circle-on-line', timestamp: 1000 }];
     r2._store.set('device-designs/dev-2.json', JSON.stringify(existing));
 
-    await worker.fetch(makeRequest('POST', '/generate-mockup', {
-      image: btoa('fake-png'),
-      variant_id: 4017,
-      deviceId: 'dev-2',
-      shader: 'echo-text',
-      productHandle: 'echo-text-shirt',
-      values: {},
-    }), makeEnv(r2));
+    await worker.fetch(makeRequest('POST', '/save-preview', saveBody({ deviceId: 'dev-2' })), makeEnv(r2));
 
     const saveCall = r2.put.mock.calls.find(([k]) => k === 'device-designs/dev-2.json');
+    expect(saveCall).toBeDefined();
     const saved = JSON.parse(saveCall[1]);
-    expect(saved[0].shader).toBe('echo-text');    // newest first
+    expect(saved[0].shader).toBe('echo-text');       // newest first
     expect(saved[1].shader).toBe('circle-on-line');  // old entry preserved
   });
 
@@ -207,72 +109,20 @@ describe('POST /generate-mockup — design saving', () => {
     const existing = Array.from({ length: 20 }, (_, i) => ({ id: String(i), shader: 'old' }));
     r2._store.set('device-designs/dev-3.json', JSON.stringify(existing));
 
-    await worker.fetch(makeRequest('POST', '/generate-mockup', {
-      image: btoa('fake-png'),
-      variant_id: 4017,
-      deviceId: 'dev-3',
-      shader: 'echo-text',
-      productHandle: 'echo-text-shirt',
-      values: {},
-    }), makeEnv(r2));
+    await worker.fetch(makeRequest('POST', '/save-preview', saveBody({ deviceId: 'dev-3' })), makeEnv(r2));
 
     const saveCall = r2.put.mock.calls.find(([k]) => k === 'device-designs/dev-3.json');
     expect(JSON.parse(saveCall[1])).toHaveLength(21);
-  });
-
-  it('still returns mockup_url and design_url on success', async () => {
-    const r2 = makeR2();
-    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
-      image: btoa('fake-png'),
-      variant_id: 4017,
-      deviceId: 'dev-4',
-      shader: 'echo-text',
-      productHandle: 'echo-text-shirt',
-      values: {},
-    }), makeEnv(r2));
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.mockup_url).toContain('share.brightfield.studio/img/mockups/');
-    expect(body.design_url).toContain('share.brightfield.studio/img/designs/');
-  });
-
-  // ── Device token minting (#544) ─────────────────────────────────────────────
-  // First save for a deviceId mints+persists an HMAC claim (device-tokens/) and
-  // hands the token back so /delete-design and /community/like can be
-  // authorized later. See saveDesignEntry() / claimDeviceId() in index.js.
-
-  it('mints and returns a deviceToken on first save when DEVICE_ID_SECRET is configured', async () => {
-    const r2 = makeR2();
-    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
-      image: btoa('fake-png'),
-      variant_id: 4017,
-      deviceId: 'dev-new',
-      shader: 'echo-text',
-      productHandle: 'echo-text-shirt',
-      values: {},
-    }), makeEnv(r2, { DEVICE_ID_SECRET: 'test-secret' }));
-
-    const body = await res.json();
-    expect(body.deviceToken).toBeTruthy();
-
-    const claimCall = r2.put.mock.calls.find(([k]) => k === 'device-tokens/dev-new.json');
-    expect(claimCall).toBeDefined();
-    expect(JSON.parse(claimCall[1])).toMatchObject({ token: body.deviceToken });
   });
 
   it('does not mint a second token (or include deviceToken) once a deviceId is already claimed', async () => {
     const r2 = makeR2();
     r2._store.set('device-tokens/dev-existing.json', JSON.stringify({ token: 'old-token', claimedAt: 1 }));
 
-    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
-      image: btoa('fake-png'),
-      variant_id: 4017,
-      deviceId: 'dev-existing',
-      shader: 'echo-text',
-      productHandle: 'echo-text-shirt',
-      values: {},
-    }), makeEnv(r2, { DEVICE_ID_SECRET: 'test-secret' }));
+    const res = await worker.fetch(
+      makeRequest('POST', '/save-preview', saveBody({ deviceId: 'dev-existing' })),
+      makeEnv(r2, { DEVICE_ID_SECRET: 'test-secret' })
+    );
 
     const body = await res.json();
     expect(body.deviceToken).toBeUndefined();
@@ -281,59 +131,13 @@ describe('POST /generate-mockup — design saving', () => {
 
   it('omits deviceToken (fails open, no crash) when DEVICE_ID_SECRET is not configured', async () => {
     const r2 = makeR2();
-    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
-      image: btoa('fake-png'),
-      variant_id: 4017,
-      deviceId: 'dev-nosecret',
-      shader: 'echo-text',
-      productHandle: 'echo-text-shirt',
-      values: {},
-    }), makeEnv(r2)); // no DEVICE_ID_SECRET override
+    const res = await worker.fetch(
+      makeRequest('POST', '/save-preview', saveBody({ deviceId: 'dev-nosecret' })),
+      makeEnv(r2) // no DEVICE_ID_SECRET override
+    );
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.deviceToken).toBeUndefined();
-  });
-
-  // ── Rate limiting (RATE_LIMITER_GENERATE_MOCKUP binding) ────────────────────
-
-  it('succeeds normally when the rate limiter reports under-limit', async () => {
-    const r2 = makeR2();
-    const env = makeEnv(r2, { RATE_LIMITER_GENERATE_MOCKUP: makeRateLimiter(true) });
-    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
-      image: btoa('fake-png'),
-      variant_id: 4017,
-    }), env);
-    expect(res.status).toBe(200);
-    expect(env.RATE_LIMITER_GENERATE_MOCKUP.limit).toHaveBeenCalledWith({ key: expect.any(String) });
-  });
-
-  it('returns 429 with a JSON error when the rate limiter reports over-limit, without calling Printful', async () => {
-    const printfulFetch = makePrintfulFetch();
-    vi.stubGlobal('fetch', printfulFetch);
-    const r2 = makeR2();
-    const env = makeEnv(r2, { RATE_LIMITER_GENERATE_MOCKUP: makeRateLimiter(false) });
-    const req = makeRequest('POST', '/generate-mockup', { image: btoa('fake-png'), variant_id: 4017 });
-    req.headers.set('CF-Connecting-IP', '203.0.113.5');
-    const res = await worker.fetch(req, env);
-    expect(res.status).toBe(429);
-    expect(res.headers.get('Content-Type')).toBe('application/json');
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://brightfield-2.myshopify.com');
-    const body = await res.json();
-    expect(body.error).toBeTruthy();
-    expect(printfulFetch).not.toHaveBeenCalled();
-    expect(r2.put).not.toHaveBeenCalled();
-  });
-
-  it('fails open (request succeeds) when the rate limiter binding throws', async () => {
-    const r2 = makeR2();
-    const env = makeEnv(r2, {
-      RATE_LIMITER_GENERATE_MOCKUP: { limit: vi.fn(async () => { throw new Error('binding misconfigured'); }) },
-    });
-    const res = await worker.fetch(makeRequest('POST', '/generate-mockup', {
-      image: btoa('fake-png'),
-      variant_id: 4017,
-    }), env);
-    expect(res.status).toBe(200);
   });
 });
