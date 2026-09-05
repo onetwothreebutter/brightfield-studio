@@ -925,20 +925,6 @@ h6 {
     color: var(--color-text-muted);
 }
 
-.product-customize-desc {
-    display: none;
-    border-top: 1px solid var(--color-border);
-    padding-top: 2rem;
-    color: var(--color-text);
-    font-size: 0.9375rem;
-}
-
-.product-customize-desc__steps {
-    margin-top: 1rem;
-    padding-left: 1.25rem;
-    line-height: 1.8;
-}
-
 .product-customize-actions {
     display: none;
 }
@@ -1620,47 +1606,6 @@ dialog.mobile-nav[open]::backdrop {
     min-height: 140px;
 }
 
-/* ─── Media Tabs ─────────────────────────────────────────── */
-.media-tabs {
-    display: flex;
-    gap: 0.375rem;
-    margin-bottom: 0.75rem;
-    transition: opacity 0.25s;
-}
-
-.media-tab {
-    padding: 0.35rem 0.9rem;
-    font-family: var(--font-body);
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    background: transparent;
-    color: var(--color-text);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-@media (max-width: 900px) {
-    .media-tab {
-        padding: 0.65rem 1.2rem;
-        min-height: 2.75rem;
-    }
-}
-
-.media-tab:hover {
-    border-color: var(--color-primary);
-    color: var(--color-text);
-}
-
-.media-tab.is-active {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background: var(--color-primary-dim);
-}
-
 .product-customize-hint {
     display: block;
     margin: 0;
@@ -1722,28 +1667,6 @@ dialog.mobile-nav[open]::backdrop {
     display: none;
     overflow-y: auto;
     max-height: var(--gui-max-h, 70vh);
-}
-
-.shader-gui__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.45rem 0.75rem;
-    background: var(--color-surface-2);
-    border-bottom: 1px solid var(--color-border);
-}
-
-.shader-gui__title {
-    font-size: 0.65rem;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--color-text);
-}
-
-.shader-gui__header-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
 }
 
 .shader-gui__mobile-bar {
@@ -1936,39 +1859,6 @@ dialog.mobile-nav[open]::backdrop {
     flex: 1;
     overflow-y: auto;
     padding: 1.25rem;
-}
-.mockup-modal__body--compare {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-}
-.mockup-modal__compare-col {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    flex: 1;
-    min-width: 0;
-}
-.mockup-modal__compare-label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-text-muted, #888);
-    margin-bottom: 6px;
-}
-.mockup-modal__printful-status {
-    font-size: 13px;
-    color: var(--color-text-muted, #888);
-    padding: 20px 0;
-}
-.mockup-modal__compare-dl {
-    margin-top: 8px;
-}
-@media (max-width: 600px) {
-    .mockup-modal__body--compare {
-        flex-direction: column;
-    }
 }
 .mockup-modal__img {
     width: 100%;
@@ -3078,12 +2968,6 @@ dialog.mobile-nav[open]::backdrop {
     color: var(--color-text-muted);
     margin: 0 0 1.25rem;
 }
-.community-designs__empty-msg {
-    color: var(--color-text-muted);
-    font-size: 0.9375rem;
-    text-align: center;
-    padding: 2rem 0;
-}
 .community-card .product-card__media {
     aspect-ratio: 3 / 4;
 }
@@ -3097,66 +2981,12 @@ dialog.mobile-nav[open]::backdrop {
     color: #e05;
     border-color: #e05;
 }
-.community-designs__header {
-    margin-bottom: 1rem;
-}
-.recent-designs__heading,
-.community-designs__heading {
+.recent-designs__heading {
     font-size: 1rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--color-text);
     margin: 0 0 1rem;
-}
-.community-designs__strip {
-    display: flex;
-    gap: 12px;
-    overflow-x: auto;
-    padding-bottom: 8px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-border) transparent;
-}
-.community-designs__card {
-    flex: 0 0 120px;
-    cursor: pointer;
-    transition: opacity var(--transition-fast);
-}
-.community-designs__card:hover {
-    opacity: 0.8;
-}
-.community-designs__card-img {
-    width: 120px;
-    height: 180px;
-    object-fit: cover;
-    display: block;
-    border-radius: var(--radius);
-    border: 1px solid var(--color-border);
-}
-.community-designs__card-label {
-    padding: 5px 0;
-}
-.community-designs__card-name {
-    display: block;
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--color-text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.community-designs__card-shader {
-    display: block;
-    font-size: 0.65rem;
-    text-transform: capitalize;
-    color: var(--color-text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.community-designs__card-time {
-    display: block;
-    font-size: 0.65rem;
-    color: var(--color-text-muted);
 }
 .community-designs__like-btn {
     display: inline-flex;
@@ -3203,23 +3033,6 @@ dialog.mobile-nav[open]::backdrop {
     border-color: var(--color-text);
 }
 
-/* Community Designs full page — grid layout */
-.community-designs__strip--grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 20px;
-    overflow-x: visible;
-    padding-bottom: 0;
-}
-.community-designs__strip--grid .community-designs__card {
-    flex: none;
-    width: 100%;
-}
-.community-designs__strip--grid .community-designs__card-img {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 2 / 3;
-}
 .community-designs-page__heading {
     font-size: 1.5rem;
     margin-bottom: 0.25rem;
