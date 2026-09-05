@@ -38,6 +38,7 @@ Non-negotiable:
 - `sections/main-product.liquid` — renders base snippet then the correct shader snippet via `{% case shader_file %}`
 - `assets/shader-defs.js` — **generated**, do not edit. `npm run build:shader-defs` concatenates `snippets/shader-controls-*.liquid` into a plain script (`window.ShaderDefs`) for the dev pages, which can't render Liquid. Every control array and `customAfterBuild` is the snippet's own source, so nothing is retyped and nothing can drift; `test/shader-defs.test.js` fails if the committed file and the snippets disagree. **Edit the snippet, then regenerate.**
 - `scripts/build-shader-defs.mjs` — that generator.
+- `assets/line-circle.js` — **generated**, do not edit. `npm run build:line-circle` builds it from `assets/circle-on-line.js`; the twins share everything except two deliberate deltas the build script applies (vignette darkens color instead of fading alpha; no cohort-labels block). Edit circle-on-line.js or the transforms in `scripts/build-line-circle.mjs`, then regenerate — `test/line-circle-build.test.js` fails if the committed file and the generator disagree.
 - `assets/shader-gui.js` — the control panel those defs render into (`ShaderGUI.build(el, def, opts)`), including the dependency show/hide rules. Injects its own stylesheet.
 
 ### `ShaderGUI.build(container, def, opts)`

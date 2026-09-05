@@ -1,3 +1,12 @@
+// GENERATED FILE — do not edit by hand.
+//
+// Built from assets/circle-on-line.js by scripts/build-line-circle.mjs
+// (npm run build:line-circle). The twins share everything except two
+// deliberate deltas the build script applies: the vignette darkens color
+// instead of fading alpha, and the cohort-labels debug block is absent.
+// Edit circle-on-line.js (or the build script), then regenerate;
+// test/line-circle-build.test.js fails if this file and the generator
+// disagree.
 (function () {
   'use strict';
 
@@ -136,17 +145,17 @@
     '  float cellHi   = pow((lineId + 1.0) / u_line_count, invP);',
     '  // How much of the design this stripe carries, relative to an average one.',
     '  // The lines are evenly spaced in `warped`, not in t, so the power warp',
-    '  // stretches the first cell and crushes the last: at the default power and',
-    '  // line count, line 0 spans several times the average cell. Left flat, one',
-    '  // roll takes out the whole dome — this is the same t-extent the geometry is',
-    '  // drawn from, so the weight cannot drift from what is on screen.',
+    '  // stretches the first cell and crushes the last: at the default power 2.5',
+    '  // and 20 lines, line 0 spans ~6x the average cell and line 19 ~0.4x. Left',
+    '  // flat, one roll takes out the whole dome — this is the same t-extent the',
+    '  // geometry is drawn from, so the weight cannot drift from what is on screen.',
     '  float lineWgt  = (cellHi - cellLo) * u_line_count;',
     '  // This stripe\'s thickness within the design\'s own top→bottom range —',
     '  // sampled once for the whole stripe, at its midpoint, NOT at this',
     '  // fragment. A stripe has exactly one thickness, so asking where the',
     '  // fragment happens to sit lets a cohort boundary fall inside a line and',
     '  // paint its top half one colour and its bottom half another. `lineWidth`',
-    '  // above stays per-fragment: that is the geometry, and it is what makes the',
+    '  // below stays per-fragment: that is the geometry, and it is what makes the',
     '  // stripes thicken smoothly down the circle.',
     '  float lineSpan = abs(u_width_bot - u_width_top);',
     '  float lineT    = pow((lineId + 0.5) / u_line_count, invP);',
@@ -212,10 +221,8 @@
     '  float vigMask = computeVigMask(dUV);',
     '  float alpha;',
     '  if (u_grain_mode >= 3.5) {',
-    '    // Half-tone: size each dot by the design coverage over its whole cell',
-    '    // (3x3 supersample) instead of per-pixel alpha, so dots shrink smoothly',
-    '    // approaching design edges (circle rim, stripe gaps, triangle/center',
-    '    // cutouts) rather than getting sliced by the alpha boundary.',
+    '    // Half-tone: size each dot by design coverage over its cell (3x3',
+    '    // supersample) so dots shrink toward design edges instead of slicing.',
     '    vec2 cellFrag  = halftoneCellCenter(u_distress_scale);',
     '    float cellSize = max(2.0, u_distress_scale / 10.0);',
     '    float covSum = 0.0;',
@@ -229,8 +236,6 @@
     '        inkSum += smp.rgb * smp.a;',
     '      }',
     '    }',
-    '    // Alpha-weighted ink color: edge dots keep the design color even when',
-    '    // the cell center itself sits outside the design.',
     '    vec3 dotColor  = covSum > 0.001 ? inkSum / covSum : finalColor;',
     '    float coverage = covSum / 9.0;',
     '    float cellVig  = computeVigMask(cellFrag / u_resolution);',
