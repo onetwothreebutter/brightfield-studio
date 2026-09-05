@@ -4,7 +4,7 @@ A custom Shopify theme for Brightfield Studio — a generative art store selling
 
 ## Overview
 
-Brightfield Studio sells GLSL shader T-shirts that customers can customize in-browser using live WebGL rendering. The key differentiator is real-time shader customization (color, intensity, and other per-product params) with a Printful mockup preview before ordering.
+Brightfield Studio sells GLSL shader T-shirts that customers can customize in-browser using live WebGL rendering. The key differentiator is real-time shader customization (color, intensity, and other per-product params) with a live on-shirt mockup preview — composited client-side — before ordering.
 
 ## Tech Stack
 
@@ -68,7 +68,7 @@ scripts/install-hooks.sh
 shopify theme dev --store brightfield-2.myshopify.com
 # Local preview: http://127.0.0.1:9292
 
-# 3. Run Worker locally (if editing mockup pipeline)
+# 3. Run Worker locally (if editing the worker)
 cd worker && npm run dev
 # Local Worker: http://127.0.0.1:8787
 ```
