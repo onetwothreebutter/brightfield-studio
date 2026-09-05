@@ -9,8 +9,8 @@ Brightfield Studio sells GLSL shader T-shirts that customers can customize in-br
 ## Tech Stack
 
 - **Shopify Liquid** — custom theme, no base theme
-- **Vanilla JS + WebGL 1.0** — GLSL fragment shaders rendered client-side
-- **Cloudflare Workers + R2** — mockup generation, community gallery, and shader state sharing
+- **Vanilla JS + WebGL2** — GLSL fragment shaders (`#version 300 es`) rendered client-side
+- **Cloudflare Workers + R2** — design image hosting, product creation, Printful order fulfillment, community gallery, reviews, and shader state sharing
 - **Printful API** — print-on-demand fulfillment
 
 ## Architecture
@@ -18,7 +18,7 @@ Brightfield Studio sells GLSL shader T-shirts that customers can customize in-br
 The project has two parts:
 
 - **Theme** (`sections/`, `assets/`, `layout/`) — Shopify theme files served by Shopify CDN
-- **Worker** (`worker/`) — Cloudflare Worker handling: mockup generation (canvas PNG → Printful), community design gallery (submit / approve / like), and shader state sharing (save/restore short-ID share links)
+- **Worker** (`worker/`) — Cloudflare Worker handling: design image hosting in R2, custom product creation, Printful order fulfillment (orders/paid webhook), community design gallery (submit / approve / like), product reviews, shader state sharing (save/restore share links), and storage GC
 
 Key files:
 
@@ -30,7 +30,7 @@ Key files:
 | `sections/homepage-shader-demo.liquid` | Homepage shader demo with controls and Copy Link sharing |
 | `sections/hero.liquid` | Homepage hero with plasma canvas |
 | `assets/theme.css` | All styles |
-| `worker/src/index.js` | Cloudflare Worker: mockup generation, community gallery, shader state sharing |
+| `worker/src/index.js` | Cloudflare Worker: image hosting, product creation, order fulfillment, community gallery, reviews, shader state sharing |
 
 ## Shader System
 
@@ -48,7 +48,7 @@ The Copy Link button on both the product page and homepage demo saves the curren
 4. On the homepage demo, the auto-cycling loop is suppressed
 
 Worker endpoints:
-- `POST /save-shader-state` — accepts `{ state: {...} }`, stores in R2, returns `{ id }` (6-char alphanumeric)
+- `POST /save-shader-state` — accepts `{ state: {...} }`, stores in R2, returns `{ id }` (UUID)
 - `GET /get-shader-state/:id` — returns the stored state JSON
 
 ## How to Create a New Shirt
@@ -82,10 +82,10 @@ cd worker && npm run dev
 
 ## Deployment
 
-```bash
-# Theme (after PR merge — verify locally first)
-shopify theme push --store brightfield-2.myshopify.com
+Merging to `main` deploys automatically via GitHub Actions (`.github/workflows/test.yml`): after tests pass, the theme is pushed to Shopify and the Worker is deployed with Wrangler. Verify locally (`npm run dev`) before merging.
 
-# Worker (if worker/ changed)
-cd worker && npm run deploy
+```bash
+# Manual pushes, if ever needed:
+npm run push                 # theme
+cd worker && npm run deploy  # worker
 ```
