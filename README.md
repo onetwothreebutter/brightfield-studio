@@ -18,7 +18,7 @@ Brightfield Studio sells GLSL shader T-shirts that customers can customize in-br
 The project has two parts:
 
 - **Theme** (`sections/`, `assets/`, `layout/`) — Shopify theme files served by Shopify CDN
-- **Worker** (`worker/`) — Cloudflare Worker handling: design image hosting in R2, custom product creation, Printful order fulfillment (orders/paid webhook), community design gallery (submit / approve / like), product reviews, shader state sharing (save/restore share links), and storage GC
+- **Worker** (`worker/`) — Cloudflare Worker handling: design image hosting in R2, custom product creation, Printful order fulfillment (orders/paid webhook), community design gallery (submit / approve / like), product reviews, shader state sharing (save/restore share links), and storage GC. Legacy mockup-generation endpoints (`/generate-mockup`, `/download-mockup`) remain routed pending removal.
 
 Key files:
 
