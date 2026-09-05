@@ -16,5 +16,12 @@ config/settings_data.json
 # Local shader previews
 preview/
 
+# Test artifacts (Playwright defaults)
+test-results/
+playwright-report/
+
+# process-product-images.mjs default output
+bg-removed/
+
 # Local secrets
 *.env
