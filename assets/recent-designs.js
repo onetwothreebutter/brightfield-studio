@@ -2,7 +2,7 @@
   var WORKER_URL = 'https://brightfield-mockup-worker.eric-d-johnson.workers.dev';
   var DEVICE_KEY = 'brightfield_device_id';
   // Signed HMAC token for DEVICE_KEY, minted by the worker the first time this
-  // deviceId saves a design (/generate-mockup or /save-preview response) and
+  // deviceId saves a design (/save-preview response) and
   // required on /delete-design and /community/like from then on (#544 —
   // prevents spoofing another device's deviceId to delete its designs or
   // tamper with its likes).
@@ -92,8 +92,8 @@
     try { return localStorage.getItem(TOKEN_KEY) || null; } catch (e) { return null; }
   }
 
-  // Persists a deviceToken minted by the worker (returned from /generate-mockup,
-  // /save-preview, /delete-design, or /community/like — see #544). Called
+  // Persists a deviceToken minted by the worker (returned from /save-preview,
+  // /delete-design, or /community/like — see #544). Called
   // whenever a response includes one, so a legacy deviceId gets upgraded the
   // moment it's claimed.
   function setDeviceToken(token) {
