@@ -402,17 +402,36 @@
 
     // ── circle-on-line ────────────────────────────────────────────────────
     register('circle-on-line', function (body) {
+        // circle-on-line and line-circle share one control set — only these defaults
+        // differ. The shared array and preset wiring live in
+        // snippets/shader-line-circle-family.liquid; edit it, then
+        // `npm run build:shader-defs`.
+        var LC_DEFAULTS = {
+          u_radius: 0.4,
+          u_line_count: 20,
+          u_power: 2.5,
+          u_width_top: 0.05,
+          u_width_bot: 0.75,
+          u_color_mode: 0,
+          u_center_circle_radius: 0.04
+        };
+        // Shared control set for the circle-on-line / line-circle twins. The two
+        // shaders differ only in the defaults declared by each shader-controls-*
+        // snippet as LC_DEFAULTS before rendering this file. Named outside the
+        // shader-controls- prefix on purpose: build-shader-defs.mjs and
+        // shader-finish-controls.test.js both glob that prefix to enumerate shaders,
+        // and this file is not one.
         var controls = [
           // ── Shape ─────────────────────────────────────────────────────────────────
           { type: 'header', label: 'Shape' },
-          { key: 'u_radius',     label: 'Radius',       type: 'range', min: 0.05, max: 0.5,  step: 0.01, value: 0.4, noRandomize: true  },
-          { key: 'u_line_count', label: 'Lines',         type: 'range', min: 2,    max: 80,   step: 1,    value: 20   },
-          { key: 'u_power',      label: 'Power',         type: 'range', min: 0.5,  max: 6.0,  step: 0.1,  value: 2.5  },
-          { key: 'u_width_top',  label: 'Width Top',     type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.05, noRandomize: true },
-          { key: 'u_width_bot',  label: 'Width Bottom',  type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.75, noRandomize: true },
+          { key: 'u_radius',     label: 'Radius',       type: 'range', min: 0.05, max: 0.5,  step: 0.01, value: LC_DEFAULTS.u_radius, noRandomize: true  },
+          { key: 'u_line_count', label: 'Lines',         type: 'range', min: 2,    max: 80,   step: 1,    value: LC_DEFAULTS.u_line_count   },
+          { key: 'u_power',      label: 'Power',         type: 'range', min: 0.5,  max: 6.0,  step: 0.1,  value: LC_DEFAULTS.u_power  },
+          { key: 'u_width_top',  label: 'Width Top',     type: 'range', min: 0,    max: 1.0,  step: 0.01, value: LC_DEFAULTS.u_width_top, noRandomize: true },
+          { key: 'u_width_bot',  label: 'Width Bottom',  type: 'range', min: 0,    max: 1.0,  step: 0.01, value: LC_DEFAULTS.u_width_bot, noRandomize: true },
           // ── Color Palette ──────────────────────────────────────────────────────────
           { type: 'header', label: 'Color Palette' },
-          { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
+          { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: LC_DEFAULTS.u_color_mode,
             tip: 'Off = cosine palette. On = 4-stop linear gradient from top to bottom.' },
           { key: '_lc_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow', swatchPreview: 'cosine',
             options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
@@ -441,7 +460,7 @@
           // ── Center Circle ──────────────────────────────────────────────────────────
           { type: 'header', label: 'Center Circle' },
           { key: 'u_center_circle_enabled', label: 'Enabled', type: 'toggle', value: 1, noRandomize: true },
-          { key: 'u_center_circle_radius',  label: 'Radius',  type: 'range', min: 0.01, max: 0.45, step: 0.005, value: 0.04 },
+          { key: 'u_center_circle_radius',  label: 'Radius',  type: 'range', min: 0.01, max: 0.45, step: 0.005, value: LC_DEFAULTS.u_center_circle_radius },
           // ── Text Overlay ───────────────────────────────────────────────────────────
           { type: 'header', label: 'Text Overlay' },
           { key: 'u_text_enabled', label: 'Text Overlay', type: 'toggle', value: 0, textDirty: true, noRandomize: true },
@@ -940,17 +959,36 @@
 
     // ── line-circle ───────────────────────────────────────────────────────
     register('line-circle', function (body) {
+        // circle-on-line and line-circle share one control set — only these defaults
+        // differ. The shared array and preset wiring live in
+        // snippets/shader-line-circle-family.liquid; edit it, then
+        // `npm run build:shader-defs`.
+        var LC_DEFAULTS = {
+          u_radius: 0.34,
+          u_line_count: 23,
+          u_power: 4.4,
+          u_width_top: 0.4,
+          u_width_bot: 0.67,
+          u_color_mode: 1,
+          u_center_circle_radius: 0.27
+        };
+        // Shared control set for the circle-on-line / line-circle twins. The two
+        // shaders differ only in the defaults declared by each shader-controls-*
+        // snippet as LC_DEFAULTS before rendering this file. Named outside the
+        // shader-controls- prefix on purpose: build-shader-defs.mjs and
+        // shader-finish-controls.test.js both glob that prefix to enumerate shaders,
+        // and this file is not one.
         var controls = [
           // ── Shape ─────────────────────────────────────────────────────────────────
           { type: 'header', label: 'Shape' },
-          { key: 'u_radius',     label: 'Radius',       type: 'range', min: 0.05, max: 0.5,  step: 0.01, value: 0.34, noRandomize: true  },
-          { key: 'u_line_count', label: 'Lines',         type: 'range', min: 2,    max: 80,   step: 1,    value: 23   },
-          { key: 'u_power',      label: 'Power',         type: 'range', min: 0.5,  max: 6.0,  step: 0.1,  value: 4.4  },
-          { key: 'u_width_top',  label: 'Width Top',     type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.4, noRandomize: true },
-          { key: 'u_width_bot',  label: 'Width Bottom',  type: 'range', min: 0,    max: 1.0,  step: 0.01, value: 0.67, noRandomize: true },
+          { key: 'u_radius',     label: 'Radius',       type: 'range', min: 0.05, max: 0.5,  step: 0.01, value: LC_DEFAULTS.u_radius, noRandomize: true  },
+          { key: 'u_line_count', label: 'Lines',         type: 'range', min: 2,    max: 80,   step: 1,    value: LC_DEFAULTS.u_line_count   },
+          { key: 'u_power',      label: 'Power',         type: 'range', min: 0.5,  max: 6.0,  step: 0.1,  value: LC_DEFAULTS.u_power  },
+          { key: 'u_width_top',  label: 'Width Top',     type: 'range', min: 0,    max: 1.0,  step: 0.01, value: LC_DEFAULTS.u_width_top, noRandomize: true },
+          { key: 'u_width_bot',  label: 'Width Bottom',  type: 'range', min: 0,    max: 1.0,  step: 0.01, value: LC_DEFAULTS.u_width_bot, noRandomize: true },
           // ── Color Palette ──────────────────────────────────────────────────────────
           { type: 'header', label: 'Color Palette' },
-          { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 1,
+          { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: LC_DEFAULTS.u_color_mode,
             tip: 'Off = cosine palette. On = 4-stop linear gradient from top to bottom.' },
           { key: '_lc_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow', swatchPreview: 'cosine',
             options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
@@ -979,7 +1017,7 @@
           // ── Center Circle ──────────────────────────────────────────────────────────
           { type: 'header', label: 'Center Circle' },
           { key: 'u_center_circle_enabled', label: 'Enabled', type: 'toggle', value: 1, noRandomize: true },
-          { key: 'u_center_circle_radius',  label: 'Radius',  type: 'range', min: 0.01, max: 0.45, step: 0.005, value: 0.27 },
+          { key: 'u_center_circle_radius',  label: 'Radius',  type: 'range', min: 0.01, max: 0.45, step: 0.005, value: LC_DEFAULTS.u_center_circle_radius },
           // ── Text Overlay ───────────────────────────────────────────────────────────
           { type: 'header', label: 'Text Overlay' },
           { key: 'u_text_enabled', label: 'Text Overlay', type: 'toggle', value: 0, textDirty: true, noRandomize: true },
