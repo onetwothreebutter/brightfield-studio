@@ -2366,8 +2366,8 @@ async function handleReviewsSubmit(request, env, origin) {
 
 // Public: approved reviews for a single product, newest first. No storefront
 // consumer today — product pages read the review metafields, which mirror only
-// the 20 newest approved reviews — so this stays as the sole read path to the
-// full approved history (a future "all reviews" page).
+// the 20 newest approved reviews — so this stays as the sole *public* read
+// path past that mirror (first 200 submissions; a future "all reviews" page).
 async function handleReviewsList(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
   const url = new URL(request.url);
