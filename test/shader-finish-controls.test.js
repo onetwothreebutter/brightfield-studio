@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { snippet } from '../scripts/build-shader-defs.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -41,8 +42,10 @@ describe('Shader Finish section controls', () => {
 
   describe('Liquid snippets — all shaders have pos/scale controls with noRandomize', () => {
     for (const shader of shaders) {
-      const snippetPath = join(ROOT, 'snippets', `shader-controls-${shader}.liquid`);
-      const src = readFileSync(snippetPath, 'utf8');
+      // Resolve nested {% render %} the same way build-shader-defs does, so a
+      // snippet that delegates to a shared family file is judged on its
+      // effective source, not the two-line stub.
+      const src = snippet(`shader-controls-${shader}`);
 
       for (const key of REQUIRED_CONTROLS) {
         it(`${shader}: has '${key}' with noRandomize: true`, () => {
