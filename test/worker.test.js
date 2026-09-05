@@ -347,6 +347,24 @@ describe('POST /community/like', () => {
     expect((await res.json()).likes).toBe(2);
   });
 
+  // Direct call-site pins for the shared readLimitedJson parse — the other
+  // converted handlers get this only transitively through the helper.
+  it('returns 400 with the Invalid JSON error on a malformed body', async () => {
+    const req = new Request('http://worker/community/like', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{not json',
+    });
+    const res = await worker.fetch(req, env);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('Invalid JSON');
+  });
+
+  it('returns 413 when the body exceeds the state-size cap', async () => {
+    const res = await worker.fetch(post('/community/like', { id: 'x'.repeat(70000), deviceId: 'dev-1' }), env);
+    expect(res.status).toBe(413);
+  });
+
   it('returns 400 when id is missing', async () => {
     const res = await worker.fetch(post('/community/like', { deviceId: 'dev-1' }), env);
     expect(res.status).toBe(400);

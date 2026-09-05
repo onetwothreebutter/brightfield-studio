@@ -1069,12 +1069,8 @@ async function handleListDesigns(request, env, origin) {
 
 async function handleDeleteDesign(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
+  const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
   const { id, deviceId, deviceToken } = body;
   if (!id || !deviceId) {
@@ -2105,6 +2101,16 @@ async function handleCommunitySubmit(request, env, origin) {
   if (!mockupUrl || !creatorName || !shader) {
     return new Response(JSON.stringify({ error: 'Missing required fields: mockupUrl, creatorName, shader' }), { status: 400, headers });
   }
+  // This endpoint is unauthenticated and `shader` flows into a custom.shader
+  // metafield the theme renders, a product tag, and admin UI — clamp it to the
+  // slug charset (non-strings included: JSON lets objects/arrays through the
+  // truthiness check above). Defense in depth, not the only guard: the
+  // unauthenticated /create-product path also writes this metafield verbatim,
+  // so render-side escaping stays load-bearing everywhere the value surfaces.
+  const cleanShader = typeof shader === 'string' ? shader.toLowerCase().replace(/[^a-z0-9-]/g, '') : '';
+  if (!cleanShader) {
+    return new Response(JSON.stringify({ error: 'Invalid shader' }), { status: 400, headers });
+  }
   if (values != null && !isPlainObject(values)) {
     return new Response(JSON.stringify({ error: 'Invalid values' }), { status: 400, headers });
   }
@@ -2112,7 +2118,7 @@ async function handleCommunitySubmit(request, env, origin) {
   const id = crypto.randomUUID();
   const submission = {
     id,
-    shader,
+    shader:           cleanShader,
     productHandle:    productHandle || '',
     designUrl:        designUrl || '',
     mockupUrl,
@@ -2159,10 +2165,8 @@ async function handleCommunityList(request, env, origin) {
 
 async function handleCommunityLike(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
-  let body;
-  try { body = await request.json(); } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
+  const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
   const { id, deviceId, deviceToken } = body;
   if (!id || !deviceId) {
@@ -2226,10 +2230,8 @@ async function handleCommunityModerate(request, env, origin, newStatus) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
   }
 
-  let body;
-  try { body = await request.json(); } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
+  const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
   const { id } = body;
   if (!id) {
@@ -2492,10 +2494,8 @@ async function handleReviewsModerate(request, env, origin, newStatus) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
   }
 
-  let body;
-  try { body = await request.json(); } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
+  const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
   const { id } = body;
   if (!id) {
@@ -2927,10 +2927,8 @@ async function handleRemoveBg(request, env, origin) {
     return new Response(JSON.stringify({ error: 'IMAGES binding not configured' }), { status: 503, headers });
   }
 
-  let body;
-  try { body = await request.json(); } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers });
-  }
+  const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
+  if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
   const { url } = body;
   if (!url) {
