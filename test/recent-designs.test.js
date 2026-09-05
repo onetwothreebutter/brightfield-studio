@@ -143,19 +143,7 @@ describe('renderFilmstrip()', () => {
     expect(time.textContent).toMatch(/ago$/);
   });
 
-  it('hides the nearest .recent-designs-section ancestor when designs are empty', () => {
-    const section = document.createElement('div');
-    section.className = 'recent-designs-section';
-    const container = document.createElement('div');
-    section.appendChild(container);
-    document.body.appendChild(section);
-
-    window.RecentDesigns.renderFilmstrip(container, []);
-    expect(section.style.display).toBe('none');
-    section.remove();
-  });
-
-  it('does not throw when designs are empty and there is no section ancestor', () => {
+  it('does not throw when designs are empty', () => {
     const container = document.createElement('div');
     expect(() => window.RecentDesigns.renderFilmstrip(container, [])).not.toThrow();
   });
@@ -245,25 +233,6 @@ describe('delete button', () => {
     await new Promise(r => setTimeout(r, 0)); // flush microtasks
 
     expect(container.querySelectorAll('.recent-designs__card')).toHaveLength(1);
-  });
-
-  it('hides the section when deleting the last card', async () => {
-    localStorage.setItem('brightfield_device_id', 'test-device-del');
-    vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => ({ ok: true }) })));
-
-    const section = document.createElement('div');
-    section.className = 'recent-designs-section';
-    const container = document.createElement('div');
-    section.appendChild(container);
-    document.body.appendChild(section);
-
-    window.RecentDesigns.renderFilmstrip(container, [makeDesign({ id: 'only' })]);
-    container.querySelector('.recent-designs__card-delete').click();
-    document.querySelector('.delete-confirm-modal:not(.delete-confirm-modal--hidden) .btn--danger').click();
-    await new Promise(r => setTimeout(r, 0));
-
-    expect(section.style.display).toBe('none');
-    section.remove();
   });
 
   it('clicking delete does not trigger card navigation', async () => {

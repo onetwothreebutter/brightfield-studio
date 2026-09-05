@@ -88,50 +88,6 @@
     document.body.removeChild(ta);
   }
 
-  // ── Shader grouping ──────────────────────────────────────────────────────────
-  // Reads data-shader on each .community-card and wraps groups in labelled divs.
-
-  function formatShaderName(shader) {
-    return (shader || 'Unknown').replace(/-/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
-  }
-
-  function groupByShader(container) {
-    if (!container) return;
-
-    var cards = Array.prototype.slice.call(container.querySelectorAll('.community-card'));
-    if (!cards.length) return;
-
-    // Collect groups preserving order
-    var groups = {};
-    var order = [];
-    cards.forEach(function (card) {
-      var shader = card.getAttribute('data-shader') || 'unknown';
-      if (!groups[shader]) { groups[shader] = []; order.push(shader); }
-      groups[shader].push(card);
-    });
-
-    // Only wrap if there are multiple shaders
-    if (order.length <= 1) return;
-
-    container.innerHTML = '';
-    order.forEach(function (shader) {
-      var group = document.createElement('div');
-      group.className = 'community-card-group';
-
-      var heading = document.createElement('h3');
-      heading.className = 'community-card-group__heading';
-      heading.textContent = formatShaderName(shader);
-      group.appendChild(heading);
-
-      var grid = document.createElement('div');
-      grid.className = 'product-grid';
-      groups[shader].forEach(function (card) { grid.appendChild(card); });
-      group.appendChild(grid);
-
-      container.appendChild(group);
-    });
-  }
-
   // ── Fetch ────────────────────────────────────────────────────────────────────
 
   function fetchCommunityDesigns(shader, productHandle) {
@@ -305,60 +261,6 @@
     container.appendChild(grid);
   }
 
-  // ── Filmstrip render ─────────────────────────────────────────────────────────
-  // Dynamically builds community design cards into a horizontal filmstrip.
-  // opts: { getDeviceId, onCardClick }
-
-  function renderStrip(container, designs, opts) {
-    container.innerHTML = '';
-    if (!designs || !designs.length) return;
-
-    opts = opts || {};
-
-    var strip = document.createElement('div');
-    strip.className = 'recent-designs__strip';
-
-    designs.forEach(function (design) {
-      var shaderLabel = (design.shader || '').replace(/-/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
-
-      var card = document.createElement('article');
-      card.className = 'product-card community-card recent-designs__card';
-      card.setAttribute('data-shader', design.shader || '');
-
-      var imgWrap = document.createElement('div');
-      imgWrap.className = 'recent-designs__card-img-wrap';
-
-      var img = document.createElement('img');
-      img.src = design.mockupUrl || '';
-      img.alt = shaderLabel + ' by ' + (design.creatorName || 'Anonymous');
-      img.className = 'recent-designs__card-img';
-      img.loading = 'lazy';
-      imgWrap.appendChild(img);
-
-      var label = document.createElement('div');
-      label.className = 'recent-designs__card-label';
-      var nameEl = document.createElement('span');
-      nameEl.className = 'recent-designs__card-name';
-      nameEl.textContent = design.creatorName || 'Anonymous';
-      label.appendChild(nameEl);
-
-      card.appendChild(imgWrap);
-      card.appendChild(label);
-      card.appendChild(buildCardActions(design, opts));
-
-      card.addEventListener('click', function () {
-        if (opts.onCardClick) opts.onCardClick(design);
-      });
-
-      strip.appendChild(card);
-    });
-
-    var scrollWrap = document.createElement('div');
-    scrollWrap.className = 'recent-designs__scroll';
-    scrollWrap.appendChild(strip);
-    container.appendChild(scrollWrap);
-  }
-
   // ── Hydration ────────────────────────────────────────────────────────────────
   // Fetches like counts for all visible submission IDs and wires button events.
 
@@ -434,9 +336,7 @@
   window.CommunityDesigns = {
     fetchCommunityDesigns: fetchCommunityDesigns,
     renderGrid:            renderGrid,
-    renderStrip:           renderStrip,
     hydrateInteractions:   hydrateInteractions,
-    groupByShader:         groupByShader,
     toggleLike:            toggleLike,
     getDeviceId:           getDeviceId,
     getDeviceToken:        getDeviceToken,
