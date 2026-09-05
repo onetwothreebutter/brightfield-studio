@@ -233,11 +233,7 @@
 
   function renderFilmstrip(container, designs, onCardClick) {
     container.innerHTML = '';
-    if (!designs || !designs.length) {
-      var section = container.closest('.recent-designs-section');
-      if (section) section.style.display = 'none';
-      return;
-    }
+    if (!designs || !designs.length) return;
 
     designs = designs.slice(0, 20);
 
@@ -288,10 +284,6 @@
             deleteDesign(d.id).then(function (result) {
               if (!result || !result.ok) return;
               c.remove();
-              if (!strip.querySelector('.recent-designs__card')) {
-                var section = container.closest('.recent-designs-section');
-                if (section) section.style.display = 'none';
-              }
             });
           });
         });

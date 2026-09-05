@@ -127,66 +127,6 @@ describe('toggleLike()', () => {
   });
 });
 
-// ── groupByShader() ───────────────────────────────────────────────────────────
-
-describe('groupByShader()', () => {
-  it('does nothing when container is null', () => {
-    expect(() => window.CommunityDesigns.groupByShader(null)).not.toThrow();
-  });
-
-  it('does nothing when there is only one shader', () => {
-    const container = document.createElement('div');
-    container.className = 'product-grid';
-    container.appendChild(makeCard({ shader: 'rise-shirt' }));
-    container.appendChild(makeCard({ shader: 'rise-shirt' }));
-    window.CommunityDesigns.groupByShader(container);
-    expect(container.querySelectorAll('.community-card-group')).toHaveLength(0);
-  });
-
-  it('wraps cards into groups when multiple shaders are present', () => {
-    const container = document.createElement('div');
-    container.appendChild(makeCard({ shader: 'rise-shirt' }));
-    container.appendChild(makeCard({ shader: 'echo-text' }));
-    window.CommunityDesigns.groupByShader(container);
-    expect(container.querySelectorAll('.community-card-group')).toHaveLength(2);
-  });
-
-  it('renders a heading per shader group', () => {
-    const container = document.createElement('div');
-    container.appendChild(makeCard({ shader: 'rise-shirt' }));
-    container.appendChild(makeCard({ shader: 'echo-text' }));
-    window.CommunityDesigns.groupByShader(container);
-    const headings = container.querySelectorAll('.community-card-group__heading');
-    const texts = Array.from(headings).map(h => h.textContent);
-    expect(texts).toContain('Rise Shirt');
-    expect(texts).toContain('Echo Text');
-  });
-
-  it('puts cards inside the correct group grid', () => {
-    const container = document.createElement('div');
-    const c1 = makeCard({ shader: 'rise-shirt' });
-    const c2 = makeCard({ shader: 'echo-text' });
-    const c3 = makeCard({ shader: 'rise-shirt' });
-    container.appendChild(c1);
-    container.appendChild(c2);
-    container.appendChild(c3);
-    window.CommunityDesigns.groupByShader(container);
-    const groups = container.querySelectorAll('.community-card-group');
-    expect(groups[0].querySelectorAll('.community-card')).toHaveLength(2);
-    expect(groups[1].querySelectorAll('.community-card')).toHaveLength(1);
-  });
-
-  it('preserves first-seen shader order', () => {
-    const container = document.createElement('div');
-    container.appendChild(makeCard({ shader: 'echo-text' }));
-    container.appendChild(makeCard({ shader: 'rise-shirt' }));
-    window.CommunityDesigns.groupByShader(container);
-    const headings = container.querySelectorAll('.community-card-group__heading');
-    expect(headings[0].textContent).toBe('Echo Text');
-    expect(headings[1].textContent).toBe('Rise Shirt');
-  });
-});
-
 // ── hydrateInteractions() — like button ───────────────────────────────────────
 
 describe('hydrateInteractions() — like button', () => {

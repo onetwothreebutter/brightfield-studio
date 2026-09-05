@@ -64,8 +64,6 @@
       {%- assign mockup_url = product.metafields.custom.mockup_url | default: '' -%}
       <div class="product-media">
 
-        <div class="media-tabs"></div>
-
         <!-- Photo panel -->
         <div class="media-panel is-active" data-panel="photo">
           <div class="product-media__main">
@@ -585,7 +583,7 @@
 <script>
 // ── Tab switcher ─────────────────────────────────────────────────────────────
 (function () {
-  var tabs          = document.querySelectorAll('.media-tab, [data-tab]');
+  var tabs          = document.querySelectorAll('[data-tab]');
   var panels        = document.querySelectorAll('.media-panel');
   var price         = document.querySelector('.product-price');
   var orderForm     = document.getElementById('product-order-form');
@@ -1729,36 +1727,6 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
   window.addEventListener('product-shader-mode', function () {
     requestAnimationFrame(applyFade);
   });
-}());
-
-// ── Fade media-tabs when sticky canvas is stuck ───────────────────────────────
-// The canvas sticks at top:10px once the user scrolls past the product title.
-// Detect this by watching whether the title's bottom edge has cleared that threshold.
-(function () {
-  var mediaTabs     = document.querySelector('.media-tabs');
-  var titleMobile   = document.querySelector('.product-title-mobile');
-  var productLayout = document.querySelector('.product-layout');
-  if (!mediaTabs || !productLayout) return;
-
-  var STICKY_TOP = 10; // matches top:10px in CSS
-
-  function applyTabsFade() {
-    if (window.innerWidth > 900 || !productLayout.classList.contains('shader-mode')) {
-      mediaTabs.style.opacity       = '';
-      mediaTabs.style.pointerEvents = '';
-      return;
-    }
-    // Stuck = the title has scrolled above the sticky threshold
-    var stuck = titleMobile
-      ? titleMobile.getBoundingClientRect().bottom < STICKY_TOP
-      : false;
-    mediaTabs.style.opacity       = stuck ? '0.25' : '1';
-    mediaTabs.style.pointerEvents = stuck ? 'none'  : '';
-  }
-
-  document.addEventListener('scroll', applyTabsFade, { passive: true });
-  window.addEventListener('resize', applyTabsFade);
-  window.addEventListener('product-shader-mode', applyTabsFade);
 }());
 
 // ── Preview on Shirt ──────────────────────────────────────────────────────────
