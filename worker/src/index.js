@@ -599,7 +599,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
   // any future caller land here — and the custom.shader metafield the theme
   // groups on must hold the same byte-exact slug as the shader- tag derived
   // below, or one shader renders as two identically-headed groups.
-  shader = cleanShaderSlug(shader);
+  shader = cleanShaderSlug(shader).slice(0, 60);
   const shaderTag = 'shader-' + (shader || 'unknown');
 
   // Resize the mockup to ≤2000px wide so it stays under Shopify's 25 MP limit
@@ -1001,7 +1001,7 @@ async function handleCreateProduct(request, env, origin) {
   // in createShopifyProduct). Reject rather than rewrite when a present value
   // isn't already the canonical slug, so a drifted client surfaces as a 400
   // instead of silently grouping its designs somewhere else.
-  if (shader != null && (typeof shader !== 'string' || cleanShaderSlug(shader) !== shader)) {
+  if (shader != null && (typeof shader !== 'string' || cleanShaderSlug(shader) !== shader || shader.length > 60)) {
     return new Response(JSON.stringify({ error: 'Invalid shader' }), { status: 400, headers });
   }
   // extraTags flow verbatim into Shopify product tags on an unauthenticated
@@ -2204,11 +2204,28 @@ async function handleCommunitySubmit(request, env, origin) {
   // consumer (/community/list filtering, the product-page strip, the tag the
   // product script src is derived from). createShopifyProduct normalizes
   // again at approve time, so pre-clamp legacy submissions stay safe too.
-  if (cleanShaderSlug(shader) !== shader || !shader) {
+  if (cleanShaderSlug(shader) !== shader || !shader || shader.length > 60) {
     return new Response(JSON.stringify({ error: 'Invalid shader' }), { status: 400, headers });
   }
   if (values != null && !isPlainObject(values)) {
     return new Response(JSON.stringify({ error: 'Invalid values' }), { status: 400, headers });
+  }
+  // The remaining fields land in R2 verbatim and, on approve, in GraphQL
+  // String! variables. A JSON object/array slips through the truthiness
+  // checks (same trap the shader guard closes) and then fails the productCreate
+  // mutation — whose error the approve path swallows, stranding the submission
+  // approved-but-productless. Reject at the door instead.
+  const stringFields = [
+    ['productHandle', productHandle], ['designUrl', designUrl], ['mockupUrl', mockupUrl],
+    ['checkoutImageUrl', checkoutImageUrl], ['creatorName', creatorName], ['creatorEmail', creatorEmail],
+  ];
+  for (const [field, value] of stringFields) {
+    if (value != null && typeof value !== 'string') {
+      return new Response(JSON.stringify({ error: `Invalid ${field}` }), { status: 400, headers });
+    }
+  }
+  if (creatorName.length > 120) {
+    return new Response(JSON.stringify({ error: 'Invalid creatorName' }), { status: 400, headers });
   }
 
   const id = crypto.randomUUID();

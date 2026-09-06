@@ -238,6 +238,24 @@ describe('POST /community/submit', () => {
     expect((await res.json()).error).toBe('Invalid shader');
   });
 
+  it('rejects an over-long shader that would blow the Shopify tag limit on approve', async () => {
+    const res = await worker.fetch(
+      post('/community/submit', { shader: 'a'.repeat(61), mockupUrl: 'https://x.com/m.jpg', creatorName: 'Jane' }),
+      env
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('Invalid shader');
+  });
+
+  it('rejects a non-string creatorName that would fail productCreate after approval', async () => {
+    const res = await worker.fetch(
+      post('/community/submit', { shader: 'rise-shirt', mockupUrl: 'https://x.com/m.jpg', creatorName: { a: 1 } }),
+      env
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('Invalid creatorName');
+  });
+
   it('returns 413 for a multi-byte body over the cap that a UTF-16 count would admit', async () => {
     // ~65k CJK characters are under 65,536 code units but ~195KB of UTF-8 —
     // the cap must count bytes on the wire, not string length.
