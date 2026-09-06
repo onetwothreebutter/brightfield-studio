@@ -47,7 +47,7 @@
         var key = keyOf(state);
         var cur = current();
         if (cur && cur.key === key) return false;
-        now = typeof now === 'number' ? now : 0;
+        now = typeof now === 'number' ? now : Date.now();
         // Drop the redo tail: a new edit after an undo is a new branch.
         stack.length = index + 1;
         // The base step (index 0) is never merged into — it is what the first
@@ -67,6 +67,11 @@
         lastAt = now;
         return true;
       },
+      // Ends the merge window: the next record is a step of its own however
+      // soon it follows. For click-driven actions — a source switch, a
+      // thumbnail, a Load — which must never fold into a slider drag that
+      // happened to precede them, or into each other.
+      breakMerge: function () { lastAt = -Infinity; },
       canUndo: function () { return index > 0; },
       canRedo: function () { return index >= 0 && index < stack.length - 1; },
       // Both return a copy of the step landed on, or null when there is none.

@@ -911,6 +911,7 @@
       // The grid stays put — its seeds are derived from the base seed only
       // when it is rebuilt — but the preview seed is part of the working
       // state, so it is recorded and saved like any other change.
+      discrete();
       commit();
       drawPreview();
     });
@@ -1065,6 +1066,7 @@
 
   function restore(entry) {
     if (!applyState(entry)) return false;
+    discrete();
     redrawAll();
     return true;
   }
@@ -1384,18 +1386,34 @@
   // drag collapses into one.
 
   var Hist = window.PaletteLabHistory;
-  var history = Hist.createHistory({ keyOf: Coll.keyOf, limit: 100, coalesceMs: 500 });
+  // A step is the snapshot plus the per-shader settings map, and the key
+  // covers both: a snapshot alone carries only the *current* shader's values,
+  // so undoing Reset lab (which empties the map) would hand back a lab that
+  // had forgotten what was tuned on every other shader.
+  var history = Hist.createHistory({
+    keyOf: function (step) { return Coll.keyOf(step.state) + '|' + Coll.hashString(JSON.stringify(step.settings)); },
+    limit: 100, coalesceMs: 500
+  });
   var session = Hist.createSession({ storage: safeStorage() });
   var applyingHistory = false;
 
-  function workingState() { return Coll.makeSnapshot(currentSnapshot(seed, null)); }
+  function workingStep() {
+    // The snapshot first: for a shader it calls settingsFor, which may add the
+    // shader's defaults to the map, and the map is captured after that.
+    var state = Coll.makeSnapshot(currentSnapshot(seed, null));
+    return { state: state, settings: settings };
+  }
 
   function commit() {
-    var state = workingState();
-    session.save({ state: state, settings: settings });
-    if (!applyingHistory) history.record(state, Date.now());
+    var step = workingStep();
+    session.save(step);
+    if (!applyingHistory) history.record(step, Date.now());
     syncHistoryButtons();
   }
+
+  // A click is a step of its own: it must not fold into the slider drag that
+  // preceded it, and two clicks in quick succession are two steps.
+  function discrete() { history.breakMerge(); }
 
   function syncHistoryButtons() {
     var d = history.depth();
@@ -1410,10 +1428,13 @@
   // Landing on a step renders it through the ordinary restore path, whose
   // redraw would record the step it just landed on as a new one — hence the
   // flag. The session is still saved, so a reload after an undo stays undone.
-  function goTo(state) {
-    if (!state) return;
+  function goTo(step) {
+    if (!step) return;
     applyingHistory = true;
-    try { restore(state); } finally { applyingHistory = false; }
+    try {
+      settings = step.settings && typeof step.settings === 'object' ? step.settings : {};
+      restore(step.state);
+    } finally { applyingHistory = false; }
     syncHistoryButtons();
   }
 
@@ -1422,6 +1443,7 @@
   // Reset is an ordinary edit, so it is itself undoable. Other shaders' tuned
   // settings go too — the point is the opening state, not just the palette.
   document.getElementById('reset-lab').addEventListener('click', function () {
+    discrete();
     settings = {};
     restore(defaultState());
   });
@@ -1440,6 +1462,7 @@
     var redo = (k === 'z' && ev.shiftKey) || k === 'y';
     if (k !== 'z' && k !== 'y') return;
     if (inTextField(ev.target)) return;
+    if (compare.classList.contains('open')) return;
     ev.preventDefault();
     goTo(redo ? history.redo() : history.undo());
   });
@@ -1707,6 +1730,7 @@
 
   sourceSel.addEventListener('change', function () {
     var wasShapes = isShapes();
+    discrete();
     sourceName = this.value;
     if (isShapes() !== wasShapes) applyMode();
     else if (!isShapes()) { buildShaderPanel(); mountEditor(false); }
@@ -1714,6 +1738,7 @@
   });
 
   document.getElementById('reset-shader').addEventListener('click', function () {
+    discrete();
     delete settings[sourceName];
     buildShaderPanel();
     redrawAll();
@@ -1739,6 +1764,7 @@
     // Walks a deterministic chain off the current seed rather than reaching for
     // Math.random — the sequence of "new seed" clicks is itself reproducible.
     var rng = PP.makeRng(PP.deriveSeed(seed, 'reseed'));
+    discrete();
     seed = 'bf-' + Math.floor(rng() * 1e9).toString(36);
     document.getElementById('seed').value = seed;
     redrawAll();
@@ -1777,13 +1803,15 @@
   // Read before anything renders: mounting the editor re-emits its palette,
   // which redraws and saves the session — and would overwrite the one being
   // restored. Nothing rendered during startup is an undo step either; the
-  // redraw below records whatever the lab opened on as the base step, so the
-  // first edit is undoable back to it.
+  // base step is recorded synchronously once the lab is on its opening state,
+  // not by the fonts-ready redraw below — that can lag a second on a cold
+  // font cache, and an edit in between would have become the base instead.
   var savedSession = session.load();
   applyingHistory = true;
   applyMode();
   loadSession(savedSession);
   applyingHistory = false;
+  commit();
   initCollection();
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(redrawAll);

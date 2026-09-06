@@ -91,6 +91,20 @@ describe('history', () => {
     expect(h.undo().palette.colors[0].weight).toBe(2);
   });
 
+  it('breakMerge makes the next record its own step inside the window', () => {
+    // Browsing thumbnails at three a second must not collapse into one step.
+    const h = H.createHistory({ coalesceMs: 500 });
+    h.record(state(1), 0);
+    h.record(state(2), 1000);
+    h.breakMerge();
+    h.record(state(3), 1010);
+    expect(h.size()).toBe(3);
+    // and the window reopens after it: a drag following the click still merges
+    h.record(state(4), 1020);
+    expect(h.size()).toBe(3);
+    expect(h.undo().palette.colors[0].weight).toBe(2);
+  });
+
   it('drops the redo tail when a new step is recorded after an undo', () => {
     const h = H.createHistory({ coalesceMs: 0 });
     h.record(state(1), 0);
