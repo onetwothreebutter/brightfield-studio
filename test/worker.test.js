@@ -229,6 +229,98 @@ describe('POST /community/submit', () => {
     expect(res.status).toBe(400);
   });
 
+  it('rejects a shader that is not already the canonical slug (no silent rewrite)', async () => {
+    const res = await worker.fetch(
+      post('/community/submit', { shader: 'Rise_Shirt', mockupUrl: 'https://x.com/m.jpg', creatorName: 'Jane' }),
+      env
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('Invalid shader');
+  });
+
+  it('returns 413 for a multi-byte body over the cap that a UTF-16 count would admit', async () => {
+    // ~65k CJK characters are under 65,536 code units but ~195KB of UTF-8 —
+    // the cap must count bytes on the wire, not string length.
+    const res = await worker.fetch(
+      post('/community/submit', {
+        shader: 'rise-shirt', mockupUrl: 'https://x.com/m.jpg', creatorName: 'Jane',
+        values: { blob: '日'.repeat(65000) },
+      }),
+      env
+    );
+    expect(res.status).toBe(413);
+  });
+
+  // ── Rate limiting (RATE_LIMITER_COMMUNITY_SUBMIT binding) ──────────────────
+
+  it('returns 429 when the rate limiter reports over-limit, before any R2 write', async () => {
+    const r2 = makeR2();
+    const limiter = { calls: 0, limit: async () => { limiter.calls++; return { success: false }; } };
+    const limited = { ...makeEnv(r2), RATE_LIMITER_COMMUNITY_SUBMIT: limiter };
+    const res = await worker.fetch(
+      post('/community/submit', { shader: 'rise-shirt', mockupUrl: 'https://x.com/m.jpg', creatorName: 'Jane' }),
+      limited
+    );
+    expect(res.status).toBe(429);
+    expect(limiter.calls).toBe(1);
+    expect(r2._store.size).toBe(0);
+  });
+
+  it('proceeds normally when the rate limiter reports under-limit', async () => {
+    const limiter = { limit: async () => ({ success: true }) };
+    const limited = { ...makeEnv(), RATE_LIMITER_COMMUNITY_SUBMIT: limiter };
+    const res = await worker.fetch(
+      post('/community/submit', { shader: 'rise-shirt', mockupUrl: 'https://x.com/m.jpg', creatorName: 'Jane' }),
+      limited
+    );
+    expect(res.status).toBe(201);
+  });
+
+  // ── community/list.json compare-and-swap ───────────────────────────────────
+
+  it('retries the shared-list prepend when a conditional put loses the race', async () => {
+    // Etag-aware R2 mock: the first conditional put fails (simulating a
+    // concurrent writer landing in between), forcing a re-read + retry.
+    const store = new Map();
+    let etagCounter = 0;
+    let failNextConditionalPut = true;
+    let putAttempts = 0;
+    const r2 = {
+      _store: store,
+      async get(key) {
+        if (!store.has(key)) return null;
+        const rec = store.get(key);
+        return { text: async () => rec.value, etag: rec.etag };
+      },
+      async put(key, value, opts) {
+        if (opts && opts.onlyIf && !(opts.onlyIf instanceof Headers)) {
+          putAttempts++;
+          if (failNextConditionalPut) {
+            failNextConditionalPut = false;
+            return null; // R2 signals a failed precondition with null
+          }
+          const cur = store.get(key);
+          if (!cur || cur.etag !== opts.onlyIf.etagMatches) return null;
+        }
+        store.set(key, { value: String(value), etag: 'etag-' + (++etagCounter) });
+        return {};
+      },
+      async delete(key) { store.delete(key); },
+    };
+    // Seed an existing list so the update takes the etagMatches branch.
+    store.set('community/list.json', { value: JSON.stringify(['existing-id']), etag: 'etag-' + (++etagCounter) });
+
+    const res = await worker.fetch(
+      post('/community/submit', { shader: 'rise-shirt', mockupUrl: 'https://x.com/m.jpg', creatorName: 'Jane' }),
+      makeEnv(r2)
+    );
+    expect(res.status).toBe(201);
+    const list = JSON.parse(store.get('community/list.json').value);
+    expect(putAttempts).toBeGreaterThanOrEqual(2); // lost once, retried
+    expect(list[0]).not.toBe('existing-id');       // new id prepended
+    expect(list).toContain('existing-id');         // nothing lost
+  });
+
   it('returns 400 when creatorName is missing', async () => {
     const res = await worker.fetch(
       post('/community/submit', { shader: 'rise-shirt', mockupUrl: 'https://x.com/m.jpg' }),
@@ -276,6 +368,32 @@ describe('GET /community/list', () => {
     // shopifyProductHandle not set (Shopify product creation failed)
     const res = await worker.fetch(get('/community/list'), env);
     expect(await res.json()).toHaveLength(0);
+  });
+
+  it('still returns approved designs buried behind 100+ newer pending submissions', async () => {
+    // Slicing the raw id list before the status filter starved approved
+    // entries out of the response once pending/rejected ids crowded the
+    // newest 100 — the product-page strip went permanently empty while the
+    // Liquid community page (driven by the products) kept showing them.
+    const r2 = makeR2();
+    const seeded = makeEnv(r2);
+    const ids = [];
+    for (let i = 0; i < 110; i++) {
+      const id = `pending-${i}`;
+      ids.push(id);
+      r2._store.set(`community/submissions/${id}.json`, JSON.stringify({ id, status: 'pending', shader: 'rise-shirt' }));
+    }
+    for (let i = 0; i < 5; i++) {
+      const id = `approved-${i}`;
+      ids.push(id); // older than every pending entry
+      r2._store.set(`community/submissions/${id}.json`, JSON.stringify({
+        id, status: 'approved', shader: 'rise-shirt', shopifyProductHandle: `h-${i}`, productHandle: 'rise-shirt',
+      }));
+    }
+    r2._store.set('community/list.json', JSON.stringify(ids));
+
+    const res = await worker.fetch(get('/community/list'), seeded);
+    expect(await res.json()).toHaveLength(5);
   });
 
   it('strips creatorEmail from results', async () => {
@@ -363,6 +481,19 @@ describe('POST /community/like', () => {
   it('returns 413 when the body exceeds the state-size cap', async () => {
     const res = await worker.fetch(post('/community/like', { id: 'x'.repeat(70000), deviceId: 'dev-1' }), env);
     expect(res.status).toBe(413);
+  });
+
+  it('returns 400 (not an unhandled 500) for a body of literal null', async () => {
+    // 'null' is valid JSON but destructures with a TypeError; the shared
+    // parser must reject non-object bodies before any handler touches them.
+    const req = new Request('http://worker/community/like', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: 'null',
+    });
+    const res = await worker.fetch(req, env);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('Invalid JSON');
   });
 
   it('returns 400 when id is missing', async () => {
@@ -584,6 +715,36 @@ describe('GET /community/pending?status=', () => {
 describe('re-moderation', () => {
   let env;
   beforeEach(() => { env = makeEnv(); });
+
+  it('re-approving a submission that already has a product does not create a second one', async () => {
+    const { id } = await submitDesign(env);
+    await approveDesign(env, id, 'existing-handle'); // sets shopifyProductHandle
+    // Give it a product id, as a successful first approval would have.
+    const key = `community/submissions/${id}.json`;
+    const sub = JSON.parse(await (await env.MOCKUP_STAGING.get(key)).text());
+    sub.shopifyProductId = 'gid://shopify/Product/111';
+    await env.MOCKUP_STAGING.put(key, JSON.stringify(sub));
+
+    await worker.fetch(post('/community/reject', { id }, adminHeaders()), env);
+
+    // Creation path starts with a Shopify fetch; count outbound calls to
+    // prove the guard short-circuits before it.
+    const realFetch = globalThis.fetch;
+    let fetchCalls = 0;
+    globalThis.fetch = async (...args) => { fetchCalls++; throw new Error('offline'); };
+    let res;
+    try {
+      res = await worker.fetch(post('/community/approve', { id }, adminHeaders()), env);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+
+    expect(res.status).toBe(200);
+    expect(fetchCalls).toBe(0);
+    const after = JSON.parse(await (await env.MOCKUP_STAGING.get(key)).text());
+    expect(after.status).toBe('approved');
+    expect(after.shopifyProductId).toBe('gid://shopify/Product/111'); // unchanged
+  });
 
   it('can reject an already-approved design', async () => {
     const { id } = await submitDesign(env);

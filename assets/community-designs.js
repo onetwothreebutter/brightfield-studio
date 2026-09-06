@@ -67,7 +67,10 @@
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ id: id, deviceId: deviceId, deviceToken: getDeviceToken() })
     })
-      .then(function (r) { return r.json(); })
+      // Error responses (400/401/413) must resolve to null like network
+      // failures do — parsing them as success wrote 'undefined' into the
+      // count and force-cleared the liked state on a *rejected* request.
+      .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (result) {
         if (result && result.deviceToken) setDeviceToken(result.deviceToken);
         return result;
@@ -96,7 +99,7 @@
     if (productHandle) params.push('productHandle=' + encodeURIComponent(productHandle));
     var url = WORKER_URL + '/community/list' + (params.length ? '?' + params.join('&') : '');
     return fetch(url)
-      .then(function (r) { return r.json(); })
+      .then(function (r) { return r.ok ? r.json() : []; })
       .catch(function () { return []; });
   }
 

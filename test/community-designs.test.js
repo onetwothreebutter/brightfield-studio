@@ -78,7 +78,7 @@ afterEach(() => {
 
 describe('toggleLike()', () => {
   it('POSTs to /community/like with id, deviceId, and deviceToken', async () => {
-    const mockFetch = vi.fn(async () => ({ json: async () => ({ likes: 4, liked: true }) }));
+    const mockFetch = vi.fn(async () => ({ ok: true, json: async () => ({ likes: 4, liked: true }) }));
     vi.stubGlobal('fetch', mockFetch);
 
     await window.CommunityDesigns.toggleLike('abc-123', 'device-xyz');
@@ -91,13 +91,21 @@ describe('toggleLike()', () => {
   });
 
   it('returns { likes, liked } from response', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => ({ likes: 7, liked: false }) })));
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ likes: 7, liked: false }) })));
     const result = await window.CommunityDesigns.toggleLike('abc-123', 'dev-1');
     expect(result).toEqual({ likes: 7, liked: false });
   });
 
   it('returns null on network error', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+    const result = await window.CommunityDesigns.toggleLike('abc-123', 'dev-1');
+    expect(result).toBeNull();
+  });
+
+  it('returns null on an error response instead of parsing it as success', async () => {
+    // A 413/401/400 body parsed as success wrote 'undefined' into the count
+    // and force-cleared the liked state on a *rejected* request.
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 413, json: async () => ({ error: 'Payload too large' }) })));
     const result = await window.CommunityDesigns.toggleLike('abc-123', 'dev-1');
     expect(result).toBeNull();
   });
@@ -109,7 +117,7 @@ describe('toggleLike()', () => {
 
   it('sends the stored deviceToken (via RecentDesigns), if any', async () => {
     window.RecentDesigns.setDeviceToken('stored-token-abc');
-    const mockFetch = vi.fn(async () => ({ json: async () => ({ likes: 1, liked: true }) }));
+    const mockFetch = vi.fn(async () => ({ ok: true, json: async () => ({ likes: 1, liked: true }) }));
     vi.stubGlobal('fetch', mockFetch);
 
     await window.CommunityDesigns.toggleLike('abc-123', 'device-xyz');
@@ -119,7 +127,7 @@ describe('toggleLike()', () => {
   });
 
   it('persists a deviceToken returned in the response', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => ({ likes: 1, liked: true, deviceToken: 'new-token-xyz' }) })));
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ likes: 1, liked: true, deviceToken: 'new-token-xyz' }) })));
 
     await window.CommunityDesigns.toggleLike('abc-123', 'device-xyz');
 
@@ -165,7 +173,7 @@ describe('hydrateInteractions() — like button', () => {
     document.body.appendChild(card);
 
     const mockFetch = vi.fn(async (url) => {
-      if (url.includes('/community/like')) return { json: async () => ({ likes: 5, liked: true }) };
+      if (url.includes('/community/like')) return { ok: true, json: async () => ({ likes: 5, liked: true }) };
       return { ok: true, json: async () => ({ likes: 3 }) };
     });
     vi.stubGlobal('fetch', mockFetch);
@@ -186,7 +194,7 @@ describe('hydrateInteractions() — like button', () => {
     document.body.appendChild(card);
 
     vi.stubGlobal('fetch', vi.fn(async (url) => {
-      if (url.includes('/community/like')) return { json: async () => ({ likes: 1, liked: true }) };
+      if (url.includes('/community/like')) return { ok: true, json: async () => ({ likes: 1, liked: true }) };
       return { ok: true, json: async () => ({ likes: 0 }) };
     }));
 
@@ -207,7 +215,7 @@ describe('hydrateInteractions() — like button', () => {
     document.body.appendChild(card);
 
     vi.stubGlobal('fetch', vi.fn(async (url) => {
-      if (url.includes('/community/like')) return { json: async () => ({ likes: 0, liked: false }) };
+      if (url.includes('/community/like')) return { ok: true, json: async () => ({ likes: 0, liked: false }) };
       return { ok: true, json: async () => ({ likes: 1 }) };
     }));
 
