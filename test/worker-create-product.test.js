@@ -538,6 +538,24 @@ describe('POST /create-product', () => {
     expect(createVars.input.tags).toEqual(expect.arrayContaining(['e2e-test']));
   });
 
+  it('returns 400 for extraTags outside the slug charset (they land verbatim in product tags)', async () => {
+    const res = await worker.fetch(
+      makeRequest('POST', '/create-product', createProductBody({ extraTags: ['<img src=x>'] })),
+      makeEnv()
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('Invalid extraTags');
+  });
+
+  it('returns 400 for a shader that is not already the canonical slug', async () => {
+    const res = await worker.fetch(
+      makeRequest('POST', '/create-product', createProductBody({ shader: 'Rise Shirt!' })),
+      makeEnv()
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('Invalid shader');
+  });
+
   it('returns 422 with the Shopify error message when productCreate reports userErrors', async () => {
     vi.stubGlobal('fetch', makeShopifyFetch({ productCreateUserErrors: [{ field: ['title'], message: 'Title cannot be blank' }] }));
     const res = await worker.fetch(makeRequest('POST', '/create-product', createProductBody()), makeEnv());

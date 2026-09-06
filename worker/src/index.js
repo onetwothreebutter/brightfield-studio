@@ -219,6 +219,13 @@ function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
+// Canonical shader-slug charset. Everything that writes the custom.shader
+// metafield or a shader- tag goes through this, so the theme's byte-exact
+// grouping/filter comparisons can rely on one normal form.
+function cleanShaderSlug(v) {
+  return typeof v === 'string' ? v.toLowerCase().replace(/[^a-z0-9-]/g, '') : '';
+}
+
 // ── Rate limiting ────────────────────────────────────────────────────────────
 // Uses Cloudflare's native Workers Rate Limiting binding (GA since 2025-09-19;
 // https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/),
@@ -262,13 +269,43 @@ function rateLimitedResponse(headers) {
   );
 }
 
-// Reads and parses a JSON body, rejecting bodies over maxBytes before parsing.
-// Returns { body } on success, or { error, status } for the caller to return.
+// Reads and parses a JSON body, bounding it to maxBytes of actual UTF-8 and
+// guaranteeing `body` is a plain object. Returns { body } on success, or
+// { error, status } for the caller to return.
 async function readLimitedJson(request, maxBytes) {
-  const text = await request.text();
-  if (text.length > maxBytes) return { error: 'Payload too large', status: 413 };
-  try { return { body: JSON.parse(text) }; }
+  // Reject declared-oversized bodies before buffering anything. Content-Length
+  // is advisory (absent on chunked requests, and it can lie), so the actual
+  // byte count is re-checked after the read — same two-step as the order
+  // webhook. This is what keeps a huge POST from being materialized as a JS
+  // string just to be told 413.
+  const declared = parseInt(request.headers.get('Content-Length'), 10);
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    return { error: 'Payload too large', status: 413 };
+  }
+
+  // The read itself can reject (client stream failing mid-body). Outside a
+  // try it escapes the handler as an unhandled no-CORS 500; the old inline
+  // try { request.json() } blocks caught this, so the shared helper must too.
+  let text;
+  try { text = await request.text(); }
   catch { return { error: 'Invalid JSON', status: 400 }; }
+
+  // Byte length, not string length: 65k CJK characters are ~195KB on the wire
+  // and in R2, three times what a UTF-16 code-unit count admits.
+  if (new TextEncoder().encode(text).length > maxBytes) {
+    return { error: 'Payload too large', status: 413 };
+  }
+
+  let body;
+  try { body = JSON.parse(text); }
+  catch { return { error: 'Invalid JSON', status: 400 }; }
+
+  // Every caller immediately destructures fields off the body. `null` parses
+  // as valid JSON but throws out of that destructure — an unhandled no-CORS
+  // 500 — and an array/scalar body is never meaningful to these endpoints.
+  if (!isPlainObject(body)) return { error: 'Invalid JSON', status: 400 };
+
+  return { body };
 }
 
 // ── Image serving ────────────────────────────────────────────────────────────
@@ -556,6 +593,15 @@ export function pickSizeVariant(sizeVariants, requestedSize) {
 async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUrl, shader, productTitle, price, tags, creatorName, values, submissionId, sourceProductHandle, requestedSize }) {
   const logPrefix = '[createShopifyProduct]';
 
+  // Normalize the slug at the one choke point every writer shares. The two
+  // unauthenticated doors (/community/submit, /create-product) validate at
+  // their edges too, but pre-clamp submissions replayed at approve time and
+  // any future caller land here — and the custom.shader metafield the theme
+  // groups on must hold the same byte-exact slug as the shader- tag derived
+  // below, or one shader renders as two identically-headed groups.
+  shader = cleanShaderSlug(shader).slice(0, 60);
+  const shaderTag = 'shader-' + (shader || 'unknown');
+
   // Resize the mockup to ≤2000px wide so it stays under Shopify's 25 MP limit
   let shopifyImageUrl = null;
   const mediaSource = checkoutImageUrl || designUrl || mockupUrl;
@@ -630,7 +676,7 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
         title:  productTitle,
         status: 'ACTIVE',
         vendor: 'Brightfield Studio',
-        tags,
+        tags: [shaderTag, ...(Array.isArray(tags) ? tags : [])],
         descriptionHtml: '',
         metafields: [
           // Hide generated per-customer products from storefront search, the
@@ -951,6 +997,20 @@ async function handleCreateProduct(request, env, origin) {
   if (!designUrl || !mockupUrl || !variantId) {
     return new Response(JSON.stringify({ error: 'Missing designUrl, mockupUrl, or variantId' }), { status: 400, headers });
   }
+  // shader lands in the custom.shader metafield and shader- tag (normalized
+  // in createShopifyProduct). Reject rather than rewrite when a present value
+  // isn't already the canonical slug, so a drifted client surfaces as a 400
+  // instead of silently grouping its designs somewhere else.
+  if (shader != null && (typeof shader !== 'string' || cleanShaderSlug(shader) !== shader || shader.length > 60)) {
+    return new Response(JSON.stringify({ error: 'Invalid shader' }), { status: 400, headers });
+  }
+  // extraTags flow verbatim into Shopify product tags on an unauthenticated
+  // route; clamp them to short slug-charset strings (the only shipping caller
+  // is the e2e suite's ['e2e-test']).
+  const validTag = (t) => typeof t === 'string' && /^[a-z0-9][a-z0-9-]{0,59}$/.test(t);
+  if (extraTags != null && (!Array.isArray(extraTags) || extraTags.length > 10 || !extraTags.every(validTag))) {
+    return new Response(JSON.stringify({ error: 'Invalid extraTags' }), { status: 400, headers });
+  }
 
   // Idempotency guard: a client-side timeout on this request doesn't mean
   // createShopifyProduct() failed server-side — it can finish creating a real
@@ -1015,7 +1075,7 @@ async function handleCreateProduct(request, env, origin) {
       shader,
       productTitle: `Custom ${variant.product?.title || 'Design'}`,
       price,
-      tags: ['custom-design', `shader-${shader || 'unknown'}`, ...(Array.isArray(extraTags) ? extraTags : [])],
+      tags: ['custom-design', ...(extraTags || [])],
       values,
       sourceProductHandle: productHandle,
       requestedSize,
@@ -1219,6 +1279,35 @@ async function writeJson(env, key, data) {
   await env.MOCKUP_STAGING.put(key, JSON.stringify(data), {
     httpMetadata: { contentType: 'application/json' },
   });
+}
+
+// Prepends an id to a shared JSON-array key with an R2 compare-and-swap.
+// A plain read-modify-write drops whichever concurrent unshift loses the race
+// — the id's submission JSON then exists in R2 but nothing enumerates it, so
+// it can never be approved. `etagMatches` with a real etag parses correctly
+// (the workerd#2572 wildcard bug only bites `If-None-Match: *`, which the
+// create-if-absent branch avoids via the Headers form, same as the order
+// webhook's claim). A stored object without an etag (the simpler test mocks)
+// falls back to an unconditional put, which in a single-threaded test is
+// exactly the old behavior. The final attempt is unconditional so a stampede
+// degrades to last-writer-wins instead of failing the request outright.
+async function prependToSharedList(env, key, id) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const last = attempt === 4;
+    const obj = await env.MOCKUP_STAGING.get(key);
+    let list = [];
+    if (obj) {
+      try { list = JSON.parse(await obj.text()) || []; } catch { list = []; }
+    }
+    list.unshift(id);
+    const opts = { httpMetadata: { contentType: 'application/json' } };
+    if (!last) {
+      if (obj && obj.etag) opts.onlyIf = { etagMatches: obj.etag };
+      else if (!obj) opts.onlyIf = new Headers({ 'If-None-Match': '*' });
+    }
+    const res = await env.MOCKUP_STAGING.put(key, JSON.stringify(list), opts);
+    if (res !== null) return;
+  }
 }
 
 // ── Device tokens (HMAC-signed deviceId) ─────────────────────────────────────
@@ -1582,10 +1671,9 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   // submit a Printful order for the same Shopify order.
   //
   // Claim the key up front with an R2 conditional write: `If-None-Match: *`,
-  // so the put only succeeds if the key doesn't exist yet. This is the only
-  // compare-and-swap in this worker — the other multi-writer key,
-  // community/list.json, is still a plain read-modify-write (see
-  // handleCommunitySubmit) and has the race described above.
+  // so the put only succeeds if the key doesn't exist yet. The other
+  // multi-writer key, community/list.json, uses the same idea with
+  // etagMatches — see prependToSharedList().
   // The value starts as a `pending` placeholder and gets overwritten with the
   // completed record (containing printfulOrderId) once the Printful order is
   // actually created. Every exit path that isn't full success releases the
@@ -2094,6 +2182,14 @@ async function handleOrderPaidWebhook(request, env, ctx) {
 
 async function handleCommunitySubmit(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+
+  // Unauthenticated, two R2 writes per call, and the sole writer of the
+  // shared community/list.json index — the same spam argument the reviews
+  // limiter's comment makes applies at least as strongly here.
+  if (!(await checkRateLimit(env, 'RATE_LIMITER_COMMUNITY_SUBMIT', request))) {
+    return rateLimitedResponse(headers);
+  }
+
   const { body, error, status } = await readLimitedJson(request, MAX_STATE_BYTES);
   if (error) return new Response(JSON.stringify({ error }), { status, headers });
 
@@ -2102,23 +2198,40 @@ async function handleCommunitySubmit(request, env, origin) {
     return new Response(JSON.stringify({ error: 'Missing required fields: mockupUrl, creatorName, shader' }), { status: 400, headers });
   }
   // This endpoint is unauthenticated and `shader` flows into a custom.shader
-  // metafield the theme renders, a product tag, and admin UI — clamp it to the
-  // slug charset (non-strings included: JSON lets objects/arrays through the
-  // truthiness check above). Defense in depth, not the only guard: the
-  // unauthenticated /create-product path also writes this metafield verbatim,
-  // so render-side escaping stays load-bearing everywhere the value surfaces.
-  const cleanShader = typeof shader === 'string' ? shader.toLowerCase().replace(/[^a-z0-9-]/g, '') : '';
-  if (!cleanShader) {
+  // metafield the theme renders and groups on. Reject rather than rewrite
+  // when the value isn't already the canonical slug — a silent rewrite stores
+  // a slug the client never sent, which then mismatches every byte-exact
+  // consumer (/community/list filtering, the product-page strip, the tag the
+  // product script src is derived from). createShopifyProduct normalizes
+  // again at approve time, so pre-clamp legacy submissions stay safe too.
+  if (cleanShaderSlug(shader) !== shader || !shader || shader.length > 60) {
     return new Response(JSON.stringify({ error: 'Invalid shader' }), { status: 400, headers });
   }
   if (values != null && !isPlainObject(values)) {
     return new Response(JSON.stringify({ error: 'Invalid values' }), { status: 400, headers });
   }
+  // The remaining fields land in R2 verbatim and, on approve, in GraphQL
+  // String! variables. A JSON object/array slips through the truthiness
+  // checks (same trap the shader guard closes) and then fails the productCreate
+  // mutation — whose error the approve path swallows, stranding the submission
+  // approved-but-productless. Reject at the door instead.
+  const stringFields = [
+    ['productHandle', productHandle], ['designUrl', designUrl], ['mockupUrl', mockupUrl],
+    ['checkoutImageUrl', checkoutImageUrl], ['creatorName', creatorName], ['creatorEmail', creatorEmail],
+  ];
+  for (const [field, value] of stringFields) {
+    if (value != null && typeof value !== 'string') {
+      return new Response(JSON.stringify({ error: `Invalid ${field}` }), { status: 400, headers });
+    }
+  }
+  if (creatorName.length > 120) {
+    return new Response(JSON.stringify({ error: 'Invalid creatorName' }), { status: 400, headers });
+  }
 
   const id = crypto.randomUUID();
   const submission = {
     id,
-    shader:           cleanShader,
+    shader,
     productHandle:    productHandle || '',
     designUrl:        designUrl || '',
     mockupUrl,
@@ -2132,10 +2245,7 @@ async function handleCommunitySubmit(request, env, origin) {
   };
 
   await writeJson(env, `community/submissions/${id}.json`, submission);
-
-  const list = (await readJson(env, 'community/list.json')) || [];
-  list.unshift(id);
-  await writeJson(env, 'community/list.json', list);
+  await prependToSharedList(env, 'community/list.json', id);
 
   return new Response(JSON.stringify({ id }), { status: 201, headers });
 }
@@ -2147,7 +2257,13 @@ async function handleCommunityList(request, env, origin) {
   const productHandleFilter = url.searchParams.get('productHandle');
 
   const list = (await readJson(env, 'community/list.json')) || [];
-  const ids = list.slice(0, 100);
+  // Filter to approved BEFORE capping the response. Pending and rejected ids
+  // share this list, so slicing the raw newest-100 first starved approved
+  // designs out of the product-page strip entirely once total submissions
+  // passed 100 — while the Liquid community page (driven by the products
+  // themselves) kept showing them. The id read stays bounded so a bloated
+  // index can't fan out unbounded R2 reads.
+  const ids = list.slice(0, 1000);
 
   const submissions = (
     await Promise.all(ids.map(id => readJson(env, `community/submissions/${id}.json`)))
@@ -2157,7 +2273,7 @@ async function handleCommunityList(request, env, origin) {
     if (shaderFilter        && s.shader        !== shaderFilter)        return false;
     if (productHandleFilter && s.productHandle !== productHandleFilter) return false;
     return true;
-  });
+  }).slice(0, 100);
 
   const sanitized = filtered.map(({ creatorEmail: _omit, ...rest }) => rewriteLegacyImgUrls(env, rest));
   return new Response(JSON.stringify(sanitized), { status: 200, headers });
@@ -2245,7 +2361,12 @@ async function handleCommunityModerate(request, env, origin, newStatus) {
 
   submission.status = newStatus;
 
-  if (newStatus === 'approved' && submission.productHandle) {
+  if (newStatus === 'approved' && submission.productHandle && submission.shopifyProductId) {
+    // Re-approving (approve → reject → approve, or an admin double-click)
+    // must not mint a second product: the first stays ACTIVE and tagged
+    // community-design, so a duplicate orphans it into the community grid.
+    console.log('[community/approve] product already exists for submission', id, '— skipping creation');
+  } else if (newStatus === 'approved' && submission.productHandle) {
     try {
       const sourceVariant = await getDefaultVariantForHandle(env, submission.productHandle);
       if (sourceVariant) {
@@ -2256,7 +2377,7 @@ async function handleCommunityModerate(request, env, origin, newStatus) {
           shader:              submission.shader,
           productTitle:        `Community ${sourceVariant.productTitle.replace(/^Community\s+/, '')}`,
           price:               sourceVariant.price,
-          tags:                ['community-design', `shader-${submission.shader || 'unknown'}`],
+          tags:                ['community-design'],
           creatorName:         submission.creatorName,
           values:              submission.values,
           submissionId:        id,
