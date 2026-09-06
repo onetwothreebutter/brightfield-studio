@@ -382,6 +382,32 @@ rendered text must carry `textDirty: true`** — including ones not named `text`
   first 7 boundaries of a 12-band solution are not an 8-band one. The editor
   slider caps at 8; stored or pasted palette JSON need not.
 
+### Working state persists and is undoable
+`assets/palette-lab-history.js` (`PaletteLabHistory`, DOM-free, tested in
+`test/palette-lab-history.test.js`) holds a bounded undo/redo stack and the
+session store. Every change the lab redraws for goes through `commit()` in
+`palette-lab.html`: it saves the working state (source, seed, palette, shader
+settings, detail, drift, plus the per-shader `settings` map) to
+`localStorage`, and records a step.
+- **The step is the collection's snapshot, keyed by `keyOf`**, so an editor
+  remount re-emitting the palette it was given is not a step, and a burst of
+  records inside 500 ms (a slider drag) is one step. The base step (index 0)
+  and a step reached by undo/redo are never merged into.
+- **Read the session before anything renders.** `ProbabilisticPaletteUI.mount`
+  calls `rebuild()` → `changed()` → `onChange`, and the lab's `onChange` is
+  `redrawAll` → `commit`. So `applyMode()` at startup *saves the session*
+  before `loadSession` would have read it. The lab reads it into a local
+  first, suppresses recording with `applyingHistory` through startup, and
+  lets the fonts-ready redraw record the base step.
+- **Undo/redo/Load/Reset lab all go through `applyState` + `restore`**,
+  which is the collection's Load path. `goTo` sets `applyingHistory` so the
+  redraw it triggers does not re-record the step it landed on; the session is
+  still saved, so a reload after an undo stays undone.
+- **Ctrl/Cmd+Z is left to the browser inside text fields** (the seed box,
+  color names, import textareas) and answers everywhere else. Reset lab is an
+  ordinary edit and therefore undoable; Clear collection is outside the
+  history and asks first.
+
 ### Right-column panels reorder by dragging their header
 Preview, Shader controls, Observed ink and Generate samples (`data-panel` ids
 in `#right-column`) drag by their `h2`; the order persists in `localStorage`

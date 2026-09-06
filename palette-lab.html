@@ -53,6 +53,10 @@
     font-size: 10px; flex: 0 0 auto;
   }
   #right-column .panel.collapsed > h2 { margin-bottom: 0; }
+  .panel > h2 .history { display: flex; gap: 4px; margin-left: auto; }
+  #preview-meta { margin-left: 14px; margin-right: 12px; }
+  .panel > h2 .history button[disabled] { opacity: 0.38; cursor: default; }
+  .panel > h2 .history button[disabled]:hover { border-color: #2c2c32; color: #eee; }
   #right-column .panel.collapsed > :not(h2) { display: none; }
 
   .panel h2 {
@@ -231,7 +235,15 @@
 
   <div id="right-column">
     <div class="panel" data-panel="preview">
-      <h2><span>Preview</span><span id="preview-meta"></span></h2>
+      <h2>
+        <span>Preview</span>
+        <span id="preview-meta"></span>
+        <span class="history">
+          <button id="undo" type="button" disabled title="Undo (Ctrl/Cmd+Z)">Undo</button>
+          <button id="redo" type="button" disabled title="Redo (Ctrl/Cmd+Shift+Z)">Redo</button>
+          <button id="reset-lab" type="button" title="Back to the lab's opening state — undoable">Reset lab</button>
+        </span>
+      </h2>
       <div class="ctl">
         <label for="seed">Seed</label>
         <input type="text" id="seed" value="brightfield-001" style="flex:1">
@@ -298,7 +310,8 @@
       <div class="samples" id="samples"></div>
       <p class="hint">
         Click any thumbnail to load its seed into the preview above. Hover and hit <b>+</b> (or shift-click)
-        to keep it in the collection on the right.
+        to keep it in the collection on the right. Everything you change here is kept across reloads and
+        can be undone with <b>Ctrl/Cmd+Z</b>; Reset lab in the preview header goes back to the opening state.
       </p>
     </div>
   </div>
@@ -344,6 +357,7 @@
 <script src="assets/probabilistic-palette-shader.js"></script>
 <script src="assets/probabilistic-palette-ui.js"></script>
 <script src="assets/palette-lab-collection.js"></script>
+<script src="assets/palette-lab-history.js"></script>
 <script>
 (function () {
   'use strict';
@@ -364,13 +378,19 @@
   var W = GL_CANVAS.width;
   var H = GL_CANVAS.height;
 
-  var palette = PP.clonePalette(PP.PRESETS['Brightfield / Black 01'], 'Brightfield / Black 01');
-  // The lab opens with grouping on and the gap floored, so the first thing on
-  // screen is the tiering behaviour being tuned rather than a flat palette.
-  // 0.001 sits below the shaders' 64-sample field spacing, which is the only
-  // setting that prises cohorts out of a continuous size field at all.
-  palette.sizeGroups = Object.assign({}, palette.sizeGroups, { enabled: true, minGap: 0.001 });
-  var seed = document.getElementById('seed').value;
+  // What a fresh lab opens with, and what Reset lab goes back to. Grouping is
+  // on and the gap floored, so the first thing on screen is the tiering
+  // behaviour being tuned rather than a flat palette: 0.001 sits below the
+  // shaders' 64-sample field spacing, which is the only setting that prises
+  // cohorts out of a continuous size field at all.
+  function defaultState() {
+    var p = PP.clonePalette(PP.PRESETS['Brightfield / Black 01'], 'Brightfield / Black 01');
+    p.sizeGroups = Object.assign({}, p.sizeGroups, { enabled: true, minGap: 0.001 });
+    return { source: 'subdivision', seed: 'brightfield-001', palette: p,
+             shaderValues: null, detail: 6, variation: 0 };
+  }
+  var palette = defaultState().palette;
+  var seed = defaultState().seed;
 
   // Two families of source. The shaders are what ships; the shape generators are
   // where per-shape palette rules — size groups, size curves, inheritance —
@@ -888,6 +908,10 @@
         n.classList.remove('active');
       });
       c.classList.add('active');
+      // The grid stays put — its seeds are derived from the base seed only
+      // when it is rebuilt — but the preview seed is part of the working
+      // state, so it is recorded and saved like any other change.
+      commit();
       drawPreview();
     });
     var keep = document.createElement('button');
@@ -909,6 +933,7 @@
   }
 
   function redrawAll() {
+    commit();
     drawPreview();
     scheduleSamples();
   }
@@ -1010,10 +1035,12 @@
   function sourceLabel(name) { return SHAPE_SOURCES[name] || shaderLabels[name] || name; }
   function knownSource(name) { return !!(SHAPE_SOURCES[name] || SHADERS[name]); }
 
-  // Puts the whole lab back to the state that produced an entry.
-  function restore(entry) {
+  // Puts the whole lab back to the state that produced an entry — a kept
+  // design, a pasted export, an undo step, or the saved session — without
+  // rendering; restore() below is this plus a redraw.
+  function applyState(entry) {
     var wasShapes = isShapes();
-    if (!knownSource(entry.source)) return false;
+    if (!entry || !knownSource(entry.source)) return false;
     sourceName = entry.source;
     sourceSel.value = sourceName;
     palette = JSON.parse(JSON.stringify(entry.palette));
@@ -1033,7 +1060,13 @@
     // globals just set; the cheaper path only applies within one family.
     if (isShapes() !== wasShapes) applyMode();
     else { if (!isShapes()) buildShaderPanel(); mountEditor(isShapes()); }
+    return true;
+  }
+
+  function restore(entry) {
+    if (!applyState(entry)) return false;
     redrawAll();
+    return true;
   }
 
   var drawer = document.getElementById('coll-drawer');
@@ -1312,7 +1345,11 @@
   document.getElementById('coll-compare').addEventListener('click', openCompare);
   document.getElementById('compare-close').addEventListener('click', closeCompare);
   document.getElementById('coll-clear').addEventListener('click', function () {
-    if (!store.size()) return;
+    var n = store.size();
+    if (!n) return;
+    // Not undoable — the collection is outside the working-state history —
+    // so it asks, the same as Delete saved in the editor.
+    if (!window.confirm('Remove all ' + n + ' kept design' + (n === 1 ? '' : 's') + ' from the collection?')) return;
     store.clear();
   });
   document.addEventListener('keydown', function (ev) {
@@ -1337,6 +1374,93 @@
       var ui = JSON.parse(window.localStorage.getItem(UI_KEY) || 'null');
       if (ui && ui.open) setDrawer(true);
     } catch (e) { /* private mode */ }
+  }
+
+  // ── Working state: undo, redo, session ────────────────────────────────────
+  // Every change the lab redraws for goes through commit(): the current state
+  // is saved so a reload comes back to it, and pushed as an undo step. The
+  // step is the same snapshot shape the collection keeps, keyed the same way,
+  // so an editor remount re-emitting its palette is not a step and a slider
+  // drag collapses into one.
+
+  var Hist = window.PaletteLabHistory;
+  var history = Hist.createHistory({ keyOf: Coll.keyOf, limit: 100, coalesceMs: 500 });
+  var session = Hist.createSession({ storage: safeStorage() });
+  var applyingHistory = false;
+
+  function workingState() { return Coll.makeSnapshot(currentSnapshot(seed, null)); }
+
+  function commit() {
+    var state = workingState();
+    session.save({ state: state, settings: settings });
+    if (!applyingHistory) history.record(state, Date.now());
+    syncHistoryButtons();
+  }
+
+  function syncHistoryButtons() {
+    var d = history.depth();
+    var undo = document.getElementById('undo');
+    var redo = document.getElementById('redo');
+    undo.disabled = !history.canUndo();
+    redo.disabled = !history.canRedo();
+    undo.title = 'Undo (Ctrl/Cmd+Z)' + (d.back ? ' · ' + d.back + ' step' + (d.back === 1 ? '' : 's') : '');
+    redo.title = 'Redo (Ctrl/Cmd+Shift+Z)' + (d.forward ? ' · ' + d.forward + ' step' + (d.forward === 1 ? '' : 's') : '');
+  }
+
+  // Landing on a step renders it through the ordinary restore path, whose
+  // redraw would record the step it just landed on as a new one — hence the
+  // flag. The session is still saved, so a reload after an undo stays undone.
+  function goTo(state) {
+    if (!state) return;
+    applyingHistory = true;
+    try { restore(state); } finally { applyingHistory = false; }
+    syncHistoryButtons();
+  }
+
+  document.getElementById('undo').addEventListener('click', function () { goTo(history.undo()); });
+  document.getElementById('redo').addEventListener('click', function () { goTo(history.redo()); });
+  // Reset is an ordinary edit, so it is itself undoable. Other shaders' tuned
+  // settings go too — the point is the opening state, not just the palette.
+  document.getElementById('reset-lab').addEventListener('click', function () {
+    settings = {};
+    restore(defaultState());
+  });
+
+  // A text field keeps the browser's own undo for what is typed in it; the
+  // lab's history answers everywhere else, sliders and checkboxes included.
+  function inTextField(el) {
+    if (!el) return false;
+    if (el.tagName === 'TEXTAREA' || el.isContentEditable) return true;
+    return el.tagName === 'INPUT' && /^(text|number|search|url|email|password)$/i.test(el.type);
+  }
+
+  document.addEventListener('keydown', function (ev) {
+    if (!(ev.metaKey || ev.ctrlKey) || ev.altKey) return;
+    var k = String(ev.key || '').toLowerCase();
+    var redo = (k === 'z' && ev.shiftKey) || k === 'y';
+    if (k !== 'z' && k !== 'y') return;
+    if (inTextField(ev.target)) return;
+    ev.preventDefault();
+    goTo(redo ? history.redo() : history.undo());
+  });
+
+  // The saved session is applied over the fresh defaults at startup; anything
+  // unusable (no session, a source this build lacks, a hand-edited file) is
+  // simply the fresh lab. Other shaders' settings ride along in the session
+  // so switching back to one finds what was tuned there.
+  function loadSession(saved) {
+    if (!saved || !saved.state || typeof saved.state !== 'object') return false;
+    var state = Coll.parseExportedDesign(saved.state);
+    if (!state || !knownSource(state.source)) return false;
+    if (saved.settings && typeof saved.settings === 'object' && !Array.isArray(saved.settings)) {
+      settings = {};
+      Object.keys(saved.settings).forEach(function (name) {
+        if (SHADERS[name] && saved.settings[name] && typeof saved.settings[name] === 'object') {
+          settings[name] = saved.settings[name];
+        }
+      });
+    }
+    return applyState(state);
   }
 
   // ── Panel order ───────────────────────────────────────────────────────────
@@ -1650,7 +1774,16 @@
   // Text overlays are part of several of these designs, so wait for the web
   // fonts before the first render — otherwise the first grid bakes in a
   // fallback face and only a reload fixes it.
+  // Read before anything renders: mounting the editor re-emits its palette,
+  // which redraws and saves the session — and would overwrite the one being
+  // restored. Nothing rendered during startup is an undo step either; the
+  // redraw below records whatever the lab opened on as the base step, so the
+  // first edit is undoable back to it.
+  var savedSession = session.load();
+  applyingHistory = true;
   applyMode();
+  loadSession(savedSession);
+  applyingHistory = false;
   initCollection();
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(redrawAll);
