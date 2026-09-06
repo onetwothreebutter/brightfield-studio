@@ -382,6 +382,47 @@ rendered text must carry `textDirty: true`** — including ones not named `text`
   first 7 boundaries of a 12-band solution are not an 8-band one. The editor
   slider caps at 8; stored or pasted palette JSON need not.
 
+### Working state persists and is undoable
+`assets/palette-lab-history.js` (`PaletteLabHistory`, DOM-free, tested in
+`test/palette-lab-history.test.js`) holds a bounded undo/redo stack and the
+session store. Every change the lab redraws for goes through `commit()` in
+`palette-lab.html`: it saves the working step to `localStorage` and records
+it.
+- **A step is `{ state, settings }`** — the collection's snapshot plus the
+  whole per-shader `settings` map — and the key covers both. A snapshot alone
+  carries only the current shader's values, so undoing Reset lab (which
+  empties the map) would hand back a lab that had forgotten every other
+  shader's tuning. Keyed on the snapshot's `keyOf`, an editor remount
+  re-emitting the palette it was given is not a step.
+- **Records inside 500 ms merge into one step** (a slider drag), never into
+  the base step or a step reached by undo/redo. Click-driven actions call
+  `discrete()` (`history.breakMerge()`) first — thumbnail, source switch,
+  New seed, Reset to defaults, Reset lab, and `restore` (Load, Load design) —
+  so a click never folds into the drag before it and two quick clicks are two
+  steps. In `restore` the break comes *before* `applyState`: the editor
+  remount inside it re-emits and records the loaded state, so a break placed
+  after it arrives too late. The settings map is hashed with sorted keys —
+  Reset to defaults deletes and re-seeds the current shader, which moves it
+  to the end of the map, and an order-sensitive key recorded a dead step.
+- **Read the session before anything renders, and record the base step
+  synchronously.** `ProbabilisticPaletteUI.mount` calls `rebuild()` →
+  `changed()` → `onChange`, and the lab's `onChange` is `redrawAll` →
+  `commit`. So `applyMode()` at startup *saves the session* before
+  `loadSession` would have read it. The lab reads it into a local first,
+  suppresses recording with `applyingHistory` through startup, then calls
+  `commit()` itself. Leaving that to the fonts-ready redraw was a race: on a
+  cold font cache it lags a second, and an edit in between became the base.
+- **Undo/redo/Load/Reset lab all go through `applyState` + `restore`**,
+  which is the collection's Load path. `goTo` sets `applyingHistory` so the
+  redraw it triggers does not re-record the step it landed on; the session is
+  still saved, so a reload after an undo stays undone.
+- **Ctrl/Cmd+Z, Shift+Z and Y are left to the browser inside text and
+  number fields** (the seed box, weights, color names, import textareas), are
+  ignored under the compare overlay, and answer everywhere else. Clear
+  collection is outside the history and asks first.
+- Undoing a thumbnail click regenerates the grid (it goes through
+  `redrawAll`), where the click itself only redrew the preview.
+
 ### Right-column panels reorder by dragging their header
 Preview, Shader controls, Observed ink and Generate samples (`data-panel` ids
 in `#right-column`) drag by their `h2`; the order persists in `localStorage`
