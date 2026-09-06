@@ -399,7 +399,11 @@ it.
   `discrete()` (`history.breakMerge()`) first — thumbnail, source switch,
   New seed, Reset to defaults, Reset lab, and `restore` (Load, Load design) —
   so a click never folds into the drag before it and two quick clicks are two
-  steps.
+  steps. In `restore` the break comes *before* `applyState`: the editor
+  remount inside it re-emits and records the loaded state, so a break placed
+  after it arrives too late. The settings map is hashed with sorted keys —
+  Reset to defaults deletes and re-seeds the current shader, which moves it
+  to the end of the map, and an order-sensitive key recorded a dead step.
 - **Read the session before anything renders, and record the base step
   synchronously.** `ProbabilisticPaletteUI.mount` calls `rebuild()` →
   `changed()` → `onChange`, and the lab's `onChange` is `redrawAll` →

@@ -151,6 +151,13 @@ describe('history', () => {
     expect(h.record(state(2, { seed: 't' }), 2000)).toBe(true);
   });
 
+  it('reads the clock when no timestamp is passed', () => {
+    const h = H.createHistory({ coalesceMs: 500 });
+    expect(h.record(state(1))).toBe(true);
+    expect(h.record(state(2))).toBe(true);
+    expect(h.size()).toBe(2);
+  });
+
   it('clears', () => {
     const h = H.createHistory({ coalesceMs: 0 });
     h.record(state(1), 0);

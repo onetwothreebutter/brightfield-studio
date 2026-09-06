@@ -1065,8 +1065,11 @@
   }
 
   function restore(entry) {
-    if (!applyState(entry)) return false;
+    // Before applyState, not after: the editor remount inside it re-emits and
+    // records the loaded state, so a break placed after it arrives too late
+    // and a Load inside 500 ms of a slider drag overwrote the drag's step.
     discrete();
+    if (!applyState(entry)) return false;
     redrawAll();
     return true;
   }
@@ -1390,8 +1393,15 @@
   // covers both: a snapshot alone carries only the *current* shader's values,
   // so undoing Reset lab (which empties the map) would hand back a lab that
   // had forgotten what was tuned on every other shader.
+  // The map is hashed with its keys sorted: Reset to defaults deletes and
+  // re-seeds the current shader, which moves it to the end of the map, and an
+  // order-sensitive hash recorded a step whose undo did nothing.
+  function settingsHash(map) {
+    map = map || {};
+    return Coll.hashString(JSON.stringify(Object.keys(map).sort().map(function (k) { return [k, map[k]]; })));
+  }
   var history = Hist.createHistory({
-    keyOf: function (step) { return Coll.keyOf(step.state) + '|' + Coll.hashString(JSON.stringify(step.settings)); },
+    keyOf: function (step) { return Coll.keyOf(step.state) + '|' + settingsHash(step.settings); },
     limit: 100, coalesceMs: 500
   });
   var session = Hist.createSession({ storage: safeStorage() });
@@ -1808,9 +1818,10 @@
   // font cache, and an edit in between would have become the base instead.
   var savedSession = session.load();
   applyingHistory = true;
-  applyMode();
-  loadSession(savedSession);
-  applyingHistory = false;
+  try {
+    applyMode();
+    loadSession(savedSession);
+  } finally { applyingHistory = false; }
   commit();
   initCollection();
   if (document.fonts && document.fonts.ready) {
