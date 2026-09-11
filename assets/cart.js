@@ -24,6 +24,11 @@
 
   var lines = {}; // key -> line state
 
+  // Latest cart totals, seeded from the Liquid render and replaced by every
+  // /cart/change.js response, so begin_checkout reports what the shopper sees
+  // after client-side edits rather than the page-load snapshot.
+  var latestCart = { item_count: config.itemCount || 0, total_price: config.totalPrice || 0 };
+
   // ── Money formatting ──────────────────────────────────────────────────────
   // Mirrors the `money` filter using the shop's actual money_format setting
   // (same approach as homepage-shader-demo.liquid) instead of assuming "$X.XX".
@@ -75,6 +80,7 @@
   // ── Cart-level totals ──────────────────────────────────────────────────────
 
   function updateSubtotal(cart) {
+    latestCart = cart;
     if (subtotalEl && typeof cart.total_price === 'number') {
       subtotalEl.textContent = formatMoney(cart.total_price, MONEY_FORMAT);
     }
@@ -322,6 +328,25 @@
     });
   }
 
+  // ── Analytics ──────────────────────────────────────────────────────────────
+  // begin_checkout fires only for the Checkout button: "Update Cart" is also a
+  // submit button on this form, and e.submitter is null on a programmatic
+  // form.submit(). Never preventDefault here — navigation to checkout must not
+  // wait on analytics, and bfTrack's sinks queue their own network sends.
+  function wireCheckoutTracking() {
+    cartForm.addEventListener('submit', function (e) {
+      var btn = e.submitter;
+      if (!btn || btn.name !== 'checkout') return;
+      if (typeof window.bfTrack !== 'function') return;
+      window.bfTrack('begin_checkout', {
+        value: (latestCart.total_price || 0) / 100,
+        currency: config.currency,
+        item_count: latestCart.item_count
+      });
+    });
+  }
+
   initLines();
   wireNote();
+  wireCheckoutTracking();
 }());

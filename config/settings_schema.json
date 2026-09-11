@@ -25,7 +25,20 @@
         "type": "text",
         "id": "ga4_measurement_id",
         "label": "Google Analytics 4 Measurement ID",
-        "info": "e.g. G-XXXXXXXXXX. Leave blank to disable analytics."
+        "info": "e.g. G-XXXXXXXXXX. Leave blank to disable Google Analytics."
+      },
+      {
+        "type": "text",
+        "id": "posthog_project_key",
+        "label": "PostHog project API key",
+        "info": "e.g. phc_… (Project settings → Project API key). Leave blank to disable PostHog."
+      },
+      {
+        "type": "text",
+        "id": "posthog_api_host",
+        "label": "PostHog API host",
+        "default": "https://us.i.posthog.com",
+        "info": "Use https://eu.i.posthog.com for EU Cloud."
       }
     ]
   }

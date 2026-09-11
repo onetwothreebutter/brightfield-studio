@@ -27,6 +27,7 @@ Non-negotiable:
 - Products opt into shader UI via tag `shader-[filename]` (e.g. `shader-rise-shirt`)
 - Shader GUI params shared via `window._shaderState.values` (written by inline GUI script, read by deferred shader JS)
 - Each page section loads its own shader script — not globally
+- Analytics: `snippets/analytics.liquid` (rendered from `layout/theme.liquid`) registers each provider — GA4, PostHog — as a sink behind its own theme setting and `request.design_mode == false`, and syncs Shopify's Customer Privacy consent to all of them once. Fire events with `window.bfTrack(name, params)`; never call `gtag`/`posthog` from a section. The logic `<script data-bf-analytics>` carries no Liquid so `test/analytics.test.js` can execute it verbatim.
 
 ## Shader system
 
