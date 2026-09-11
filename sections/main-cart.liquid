@@ -166,7 +166,10 @@
 
 <script>
   window._cartConfig = {
-    moneyFormat: {{ shop.money_format | json }}
+    moneyFormat: {{ shop.money_format | json }},
+    itemCount: {{ cart.item_count }},
+    totalPrice: {{ cart.total_price }},
+    currency: {{ cart.currency.iso_code | json }}
   };
 </script>
 <script src="{{ 'cart.js' | asset_url }}" defer></script>

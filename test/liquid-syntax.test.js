@@ -50,4 +50,14 @@ describe('Liquid syntax', () => {
 
     expect(errors).toEqual([]);
   });
+
+  it('routes analytics through snippets/analytics.liquid, never inline in the layout', () => {
+    // Every provider (GA4, PostHog) registers as a sink in the snippet so that
+    // consent sync is written once and bfTrack fans out. A vendor call creeping
+    // back into theme.liquid would bypass both.
+    const theme = readFileSync(join(ROOT, 'layout', 'theme.liquid'), 'utf8');
+    expect(theme).toMatch(/\{%-?\s*render\s+'analytics'\s*-?%\}/);
+    expect(theme).not.toMatch(/gtag\(/);
+    expect(theme).not.toMatch(/posthog/i);
+  });
 });
