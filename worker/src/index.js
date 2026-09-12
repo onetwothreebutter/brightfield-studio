@@ -48,7 +48,7 @@ async function getShopifyToken(env) {
     // handler, which reflects err.message straight back to the client (see the
     // catch block around createShopifyProduct() below). Never embed response body
     // content in the thrown message.
-    console.error(`[getShopifyToken] non-JSON response (status ${res.status}):`, rawText.slice(0, 200));
+    phLog(env, 'error', '[getShopifyToken] non-JSON response from the Shopify token endpoint', { status: res.status, body: rawText.slice(0, 200) });
     throw new Error(`Token endpoint returned non-JSON (status ${res.status})`);
   }
   if (!data.access_token) {
@@ -56,7 +56,7 @@ async function getShopifyToken(env) {
     // unauthenticated /create-product client verbatim. Shopify's OAuth error
     // body is normally just { error, error_description } with no secrets, but
     // don't reflect arbitrary upstream JSON to a public caller regardless.
-    console.error('[getShopifyToken] token endpoint response missing access_token:', JSON.stringify(data));
+    phLog(env, 'error', '[getShopifyToken] token endpoint response missing access_token', { response: JSON.stringify(data) });
     throw new Error(`Failed to get Shopify token (status ${res.status})`);
   }
   _shopifyToken = data.access_token;
@@ -78,7 +78,7 @@ async function shopifyAdmin(env, query, variables) {
     }
   );
   const data = await res.json();
-  if (data?.errors) console.error('[shopifyAdmin] errors:', JSON.stringify(data.errors));
+  if (data?.errors) phLog(env, 'error', '[shopifyAdmin] GraphQL errors', { errors: JSON.stringify(data.errors) });
   return data;
 }
 
@@ -250,7 +250,7 @@ async function checkRateLimit(env, bindingName, request) {
     // this request" — not a 500 on every request to an otherwise-healthy
     // endpoint. A broken abuse-prevention layer should never be able to take
     // the whole endpoint down; anonymous flooding is the lesser risk.
-    console.warn(`[rate-limit] ${bindingName} check failed, failing open:`, err.message);
+    phLog(env, 'warn', '[rate-limit] limiter check failed — failing open', { limiter: bindingName, error: err.message });
     return true;
   }
 }
@@ -404,66 +404,15 @@ async function handleServeImage(request, env, ctx) {
 
 export default {
   async fetch(request, env, ctx) {
-    const origin = request.headers.get('Origin') || '';
-
-    // CORS preflight
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: corsHeaders(origin) });
+    try {
+      return await routeRequest(request, env, ctx);
+    } finally {
+      // One batch per invocation, after the response is decided — every
+      // return in routeRequest is a route, and none of them should have to
+      // remember to flush. ctx.waitUntil keeps the POST alive past the
+      // response.
+      flushPhLogs(env, ctx);
     }
-
-    const url      = new URL(request.url);
-    const method   = request.method;
-    const pathname = url.pathname;
-
-    if (method === 'GET' && pathname === '/list-designs') {
-      return handleListDesigns(request, env, origin);
-    }
-
-    if (method === 'POST' && pathname === '/delete-design') {
-      return handleDeleteDesign(request, env, origin);
-    }
-
-    if (method === 'POST' && pathname === '/community/submit')  return handleCommunitySubmit(request, env, origin);
-    if (method === 'GET'  && pathname === '/community/list')    return handleCommunityList(request, env, origin);
-    if (method === 'POST' && pathname === '/community/like')    return handleCommunityLike(request, env, origin);
-    if (method === 'GET'  && pathname === '/community/pending') return handleCommunityPending(request, env, origin);
-    if (method === 'POST' && pathname === '/community/approve') return handleCommunityModerate(request, env, origin, 'approved');
-    if (method === 'POST' && pathname === '/community/reject')  return handleCommunityModerate(request, env, origin, 'rejected');
-    if (method === 'GET'  && pathname.startsWith('/community/design/')) return handleCommunityDesign(request, env, origin, pathname.slice('/community/design/'.length));
-
-    if (method === 'POST' && pathname === '/reviews/submit')   return handleReviewsSubmit(request, env, origin);
-    if (method === 'GET'  && pathname === '/reviews/list')     return handleReviewsList(request, env, origin);
-    if (method === 'GET'  && pathname === '/reviews/pending')  return handleReviewsPending(request, env, origin);
-    if (method === 'POST' && pathname === '/reviews/approve')  return handleReviewsModerate(request, env, origin, 'approved');
-    if (method === 'POST' && pathname === '/reviews/reject')   return handleReviewsModerate(request, env, origin, 'rejected');
-
-    if (method === 'POST' && pathname === '/save-shader-state')           return handleSaveShaderState(request, env, origin);
-    if (method === 'GET'  && pathname.startsWith('/get-shader-state/'))   return handleGetShaderState(request, env, origin);
-    if (method === 'POST' && pathname === '/create-share')                return handleCreateShare(request, env, origin);
-
-    // Must precede the share.brightfield.studio catch-all below
-    if (method === 'GET' && pathname.startsWith('/img/')) return handleServeImage(request, env, ctx);
-
-    // Custom domain: share.brightfield.studio/{id}
-    if (method === 'GET' && url.hostname === 'share.brightfield.studio') return handleShare(request, env, pathname.slice(1));
-
-    if (method === 'GET'  && pathname.startsWith('/share/')) return handleShare(request, env, pathname.slice(7));
-
-    if (method === 'GET'  && pathname === '/admin-ui') return handleAdminUI(request, env);
-
-    if (method === 'GET'  && pathname === '/admin/gc-dry-run') return handleGcDryRun(request, env);
-
-    if (method === 'POST' && pathname === '/remove-bg') return handleRemoveBg(request, env, origin);
-
-    if (method === 'POST' && pathname === '/save-preview')    return handleSavePreview(request, env, origin);
-    if (method === 'POST' && pathname === '/create-product')  return handleCreateProduct(request, env, origin);
-
-    // Shopify webhook — server-to-server, HMAC-authenticated (not browser CORS,
-    // see handleOrderPaidWebhook). Registered on the orders/paid topic; see
-    // wrangler.toml + PR description for the (manual, one-time) registration step.
-    if (method === 'POST' && pathname === '/webhook/order-paid') return handleOrderPaidWebhook(request, env, ctx);
-
-    return new Response('Not found', { status: 404 });
   },
 
   // Cloudflare Workers Cron Trigger (see wrangler.toml [triggers] crons).
@@ -472,9 +421,78 @@ export default {
   // model. Deletion is gated behind env.GC_DRY_RUN (see gcIsDryRun()) — unset
   // or anything other than "false" runs dry-run (log only, delete nothing).
   async scheduled(event, env, ctx) {
-    await runScheduledGc(env);
+    try {
+      await runScheduledGc(env);
+    } finally {
+      flushPhLogs(env, ctx);
+    }
   },
 };
+
+// The router proper. Split out of fetch() only so the log flush above has a
+// single place to sit; the routing itself is unchanged.
+async function routeRequest(request, env, ctx) {
+  const origin = request.headers.get('Origin') || '';
+
+  // CORS preflight
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders(origin) });
+  }
+
+  const url      = new URL(request.url);
+  const method   = request.method;
+  const pathname = url.pathname;
+
+  if (method === 'GET' && pathname === '/list-designs') {
+    return handleListDesigns(request, env, origin);
+  }
+
+  if (method === 'POST' && pathname === '/delete-design') {
+    return handleDeleteDesign(request, env, origin);
+  }
+
+  if (method === 'POST' && pathname === '/community/submit')  return handleCommunitySubmit(request, env, origin);
+  if (method === 'GET'  && pathname === '/community/list')    return handleCommunityList(request, env, origin);
+  if (method === 'POST' && pathname === '/community/like')    return handleCommunityLike(request, env, origin);
+  if (method === 'GET'  && pathname === '/community/pending') return handleCommunityPending(request, env, origin);
+  if (method === 'POST' && pathname === '/community/approve') return handleCommunityModerate(request, env, origin, 'approved');
+  if (method === 'POST' && pathname === '/community/reject')  return handleCommunityModerate(request, env, origin, 'rejected');
+  if (method === 'GET'  && pathname.startsWith('/community/design/')) return handleCommunityDesign(request, env, origin, pathname.slice('/community/design/'.length));
+
+  if (method === 'POST' && pathname === '/reviews/submit')   return handleReviewsSubmit(request, env, origin);
+  if (method === 'GET'  && pathname === '/reviews/list')     return handleReviewsList(request, env, origin);
+  if (method === 'GET'  && pathname === '/reviews/pending')  return handleReviewsPending(request, env, origin);
+  if (method === 'POST' && pathname === '/reviews/approve')  return handleReviewsModerate(request, env, origin, 'approved');
+  if (method === 'POST' && pathname === '/reviews/reject')   return handleReviewsModerate(request, env, origin, 'rejected');
+
+  if (method === 'POST' && pathname === '/save-shader-state')           return handleSaveShaderState(request, env, origin);
+  if (method === 'GET'  && pathname.startsWith('/get-shader-state/'))   return handleGetShaderState(request, env, origin);
+  if (method === 'POST' && pathname === '/create-share')                return handleCreateShare(request, env, origin);
+
+  // Must precede the share.brightfield.studio catch-all below
+  if (method === 'GET' && pathname.startsWith('/img/')) return handleServeImage(request, env, ctx);
+
+  // Custom domain: share.brightfield.studio/{id}
+  if (method === 'GET' && url.hostname === 'share.brightfield.studio') return handleShare(request, env, pathname.slice(1));
+
+  if (method === 'GET'  && pathname.startsWith('/share/')) return handleShare(request, env, pathname.slice(7));
+
+  if (method === 'GET'  && pathname === '/admin-ui') return handleAdminUI(request, env);
+
+  if (method === 'GET'  && pathname === '/admin/gc-dry-run') return handleGcDryRun(request, env);
+
+  if (method === 'POST' && pathname === '/remove-bg') return handleRemoveBg(request, env, origin);
+
+  if (method === 'POST' && pathname === '/save-preview')    return handleSavePreview(request, env, origin);
+  if (method === 'POST' && pathname === '/create-product')  return handleCreateProduct(request, env, origin);
+
+  // Shopify webhook — server-to-server, HMAC-authenticated (not browser CORS,
+  // see handleOrderPaidWebhook). Registered on the orders/paid topic; see
+  // wrangler.toml + PR description for the (manual, one-time) registration step.
+  if (method === 'POST' && pathname === '/webhook/order-paid') return handleOrderPaidWebhook(request, env, ctx);
+
+  return new Response('Not found', { status: 404 });
+}
 
 async function handleSavePreview(request, env, origin) {
   const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
@@ -1622,7 +1640,7 @@ async function capturePurchase(env, order, shopifyOrderId) {
   try {
     event = await purchaseEventFromOrder(order, shopifyOrderId);
   } catch (err) {
-    console.error('[order-paid] could not build purchase event for order', order?.name, ':', err.message);
+    phLog(env, 'error', '[order-paid] could not build purchase event', { orderName: order?.name, error: err.message });
     return;
   }
   if (!event) {
@@ -1642,13 +1660,137 @@ async function capturePurchase(env, order, shopifyOrderId) {
       signal: AbortSignal.timeout(POSTHOG_CAPTURE_TIMEOUT_MS),
     });
     if (!res.ok) {
-      console.error('[order-paid] PostHog rejected purchase event for order', order.name, '(status', res.status + ')');
+      phLog(env, 'error', '[order-paid] PostHog rejected the purchase event', { orderName: order.name, status: res.status, posthogDistinctId: event.distinct_id });
       return;
     }
     console.log('[order-paid] captured purchase for order', order.name);
   } catch (err) {
-    console.error('[order-paid] PostHog capture failed for order', order.name, ':', err.message);
+    phLog(env, 'error', '[order-paid] PostHog capture failed', { orderName: order.name, error: err.message, posthogDistinctId: event.distinct_id });
   }
+}
+
+// ── Logs (PostHog Logs / OTLP) ──────────────────────────────────────────────
+// PostHog Logs is a plain OTLP/HTTP endpoint, so this is a fetch() and a JSON
+// body. The OpenTelemetry Node SDK its docs lead with is Node-only and does not
+// run on workerd; there is nothing PostHog-specific to install either way.
+//
+// Same POSTHOG_PROJECT_KEY / POSTHOG_API_HOST as capturePurchase() above.
+// Unset means logs stay in Cloudflare's own observability exactly as they do
+// today — phLog() always writes to the console first, so nothing visible in
+// `wrangler tail` stops being visible. PostHog is the second copy: the one that
+// can be queried alongside the events and session replays the same shopper
+// produced, and the one that outlives Cloudflare's retention window.
+//
+// Deliberately NOT a wholesale replacement for the console.log calls in this
+// file. The per-request debug chatter (token fetches, image resizes) is there
+// to be read in a tail, not to be retained and alerted on; only the handful of
+// lines that indicate something is actually wrong go through here.
+const OTEL_SEVERITY = { trace: 1, debug: 5, info: 9, warn: 13, error: 17, fatal: 21 };
+
+// Records accumulate here and are flushed once per invocation rather than one
+// HTTP request per line — a single order-paid webhook logs a handful of lines
+// and they belong in one payload. Module-level, so a flush can carry records
+// from a concurrent request in the same isolate; harmless, because every record
+// carries its own timestamp and attributes, and the alternative is threading a
+// context object through every function in this file.
+let phLogBuffer = [];
+
+// A runaway loop must not turn a log buffer into a memory leak. Past this,
+// records are dropped rather than rotated: in a cascade the first error is the
+// one worth having.
+const PH_LOG_BUFFER_MAX = 200;
+
+export function otlpLogRecord(level, message, attrs = {}, nowMs = Date.now()) {
+  return {
+    // Workers report time in whole milliseconds and the clock does not advance
+    // during synchronous execution, so several records from one invocation can
+    // share a timestamp. Their order comes from their order in the payload.
+    timeUnixNano: `${nowMs}000000`,
+    severityNumber: OTEL_SEVERITY[level] || OTEL_SEVERITY.info,
+    severityText: level.toUpperCase(),
+    body: { stringValue: String(message) },
+    // Everything is sent as a string: these are log attributes to filter on,
+    // not metrics, and one key arriving as an int on one path and a string on
+    // another is how a log search quietly stops matching. null/undefined are
+    // dropped instead of becoming the text "null".
+    attributes: Object.entries(attrs || {})
+      .filter(([, v]) => v !== null && v !== undefined)
+      .map(([key, v]) => ({ key, value: { stringValue: String(v) } })),
+  };
+}
+
+export function otlpLogPayload(records) {
+  return {
+    resourceLogs: [{
+      resource: {
+        attributes: [
+          { key: 'service.name', value: { stringValue: 'brightfield-worker' } },
+        ],
+      },
+      scopeLogs: [{ scope: { name: 'brightfield-mockup-worker' }, logRecords: records }],
+    }],
+  };
+}
+
+// Mirrors to the console and queues for PostHog. Never throws — a log that can
+// fail a request is worse than no log.
+//
+// `attrs` is how a log becomes searchable: pass `posthogDistinctId` wherever
+// one is in hand (posthogDistinctIdFromOrder), since that is the attribute
+// PostHog matches to attach a log to the person whose session produced it.
+export function phLog(env, level, message, attrs) {
+  const write = (level === 'error' || level === 'fatal') ? console.error
+    : level === 'warn' ? console.warn
+    : console.log;
+  const hasAttrs = attrs && Object.keys(attrs).length > 0;
+  // JSON.stringify throws on a circular object, and this mirror runs before
+  // anything is buffered — unguarded, a bad attribute would take down the very
+  // call site that was trying to report a problem.
+  let rendered = '';
+  if (hasAttrs) { try { rendered = JSON.stringify(attrs); } catch (err) { rendered = '[unserializable attributes]'; } }
+  if (hasAttrs) write(message, rendered); else write(message);
+
+  if (!env?.POSTHOG_PROJECT_KEY) return;
+  if (phLogBuffer.length >= PH_LOG_BUFFER_MAX) return;
+  try {
+    phLogBuffer.push(otlpLogRecord(level, message, attrs));
+  } catch (err) {
+    console.error('[logs] could not build log record:', err.message);
+  }
+}
+
+// Called once per invocation, from fetch() and scheduled(). The buffer is
+// swapped out before the await rather than cleared after it, so records logged
+// while this batch is in flight belong to the next flush instead of being lost.
+export function flushPhLogs(env, ctx) {
+  if (!phLogBuffer.length) return Promise.resolve();
+  const records = phLogBuffer;
+  phLogBuffer = [];
+  if (!env?.POSTHOG_PROJECT_KEY) return Promise.resolve();
+
+  const host = String(env.POSTHOG_API_HOST || POSTHOG_DEFAULT_HOST).replace(/\/+$/, '');
+  const sent = fetch(`${host}/i/v1/logs`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${env.POSTHOG_PROJECT_KEY}`,
+    },
+    body: JSON.stringify(otlpLogPayload(records)),
+  }).then((res) => {
+    // console.error, not phLog: a failed flush logging into the buffer it just
+    // drained would become the next flush's payload, and a persistent failure
+    // would log about itself forever.
+    if (!res.ok) console.error('[logs] PostHog rejected log batch (status', res.status + ')');
+  }).catch((err) => {
+    console.error('[logs] PostHog log flush failed:', err.message);
+  });
+
+  // Without waitUntil the request can be torn down with the POST still in
+  // flight. The promise is also returned, so a caller that is already inside a
+  // waitUntil (capturePurchase, below) can chain this flush onto the work it is
+  // keeping alive rather than nesting a second waitUntil inside the first.
+  if (ctx?.waitUntil) ctx.waitUntil(sent);
+  return sent;
 }
 
 async function handleOrderPaidWebhook(request, env, ctx) {
@@ -1942,7 +2084,12 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   // the event's uuid is derived from the order id, so a redelivery (Printful
   // 502, 409 race, released claim) re-sends the same event and PostHog keeps
   // one. In tests ctx is absent and the send is awaited instead.
-  const purchaseCapture = capturePurchase(env, order, shopifyOrderId);
+  // The flush is chained rather than left to fetch()'s finally: this runs in
+  // waitUntil, which resumes *after* that flush has already gone out, so
+  // anything capturePurchase logs would otherwise sit in the buffer until some
+  // later invocation happens to flush it — or be lost when the isolate goes.
+  const purchaseCapture = capturePurchase(env, order, shopifyOrderId)
+    .then(() => flushPhLogs(env));
   if (ctx?.waitUntil) ctx.waitUntil(purchaseCapture); else await purchaseCapture;
 
   // The line-item query fetches a single page. If the order has more, the
@@ -1997,7 +2144,7 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   const needsVariantMap = relevant.some(li => li.cls.type === 'custom');
   const variantMap = needsVariantMap ? await getPrintfulVariantMap(env) : null;
   if (needsVariantMap && !variantMap) {
-    console.error('[order-paid] could not load Printful size -> variant map for order', order.name);
+    phLog(env, 'error', '[order-paid] could not load the Printful size -> variant map — order cannot be fulfilled', { orderName: order.name, posthogDistinctId: posthogDistinctIdFromOrder(order) });
     await releaseClaim();
     return new Response(JSON.stringify({ error: 'Printful catalog lookup failed' }), { status: 502, headers });
   }
@@ -2075,7 +2222,7 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   // completely. 422 rather than 502 because the upstreams are healthy — it's
   // the order's own data that needs a human.
   if (skippedItems.length || !printfulItems.length) {
-    console.error('[order-paid] refusing to partially fulfill order', order.name, '— unusable line items:', JSON.stringify(skippedItems));
+    phLog(env, 'error', '[order-paid] refusing to partially fulfill — order has unusable line items', { orderName: order.name, skippedItems: JSON.stringify(skippedItems), posthogDistinctId: posthogDistinctIdFromOrder(order) });
     await recordFulfillmentFailure(env, shopifyOrderId, {
       shopifyOrderName: order.name,
       reason: 'unusable line items',
@@ -2088,7 +2235,7 @@ async function handleOrderPaidWebhook(request, env, ctx) {
 
   const shipping = order.shippingAddress;
   if (!shipping) {
-    console.error('[order-paid] order has Printful-relevant line items but no shipping address:', order.name);
+    phLog(env, 'error', '[order-paid] order has Printful-relevant line items but no shipping address', { orderName: order.name, posthogDistinctId: posthogDistinctIdFromOrder(order) });
     await recordFulfillmentFailure(env, shopifyOrderId, {
       shopifyOrderName: order.name,
       reason: 'missing shipping address',
@@ -2150,7 +2297,7 @@ async function handleOrderPaidWebhook(request, env, ctx) {
     // Cloudflare's logs on every single order.
     console.log('[order-paid] Printful order-create ok (code', printfulJson.code + ', id', printfulJson.result?.id + ', status', printfulJson.result?.status + ')');
   } catch (err) {
-    console.error('[order-paid] Printful order creation failed for order', order.name, ':', err.message);
+    phLog(env, 'error', '[order-paid] Printful order creation failed', { orderName: order.name, error: err.message, posthogDistinctId: posthogDistinctIdFromOrder(order) });
     // A rejection is not an outage. If Printful answered at all, it evaluated
     // this specific order and said no — and the reasons it says no are mostly
     // permanent properties of the order that no number of redeliveries will
@@ -2217,7 +2364,7 @@ async function handleOrderPaidWebhook(request, env, ctx) {
   // redelivery would then resubmit it. A duplicate Printful order is the more
   // expensive mistake, so this write always lands.
   await writeJson(env, idempotencyKey, record).catch((err) => {
-    console.error('[order-paid] failed to persist idempotency record for order', order.name, '— a redelivery could create a duplicate Printful order:', err.message);
+    phLog(env, 'error', '[order-paid] failed to persist the idempotency record — a redelivery could create a duplicate Printful order', { orderName: order.name, error: err.message, posthogDistinctId: posthogDistinctIdFromOrder(order) });
   });
 
   // Clear any failure record from an earlier refused attempt: this order just
@@ -3547,6 +3694,6 @@ async function runScheduledGc(env) {
       },
     }));
   } catch (err) {
-    console.error('[gc] scheduled run failed:', err.message, err.stack);
+    phLog(env, 'error', '[gc] scheduled run failed', { dryRun, error: err.message, stack: err.stack });
   }
 }
