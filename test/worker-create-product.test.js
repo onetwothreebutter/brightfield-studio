@@ -154,17 +154,8 @@ function makeShopifyFetch(overrides = {}) {
     if (query.includes('mutation UpdateVariants')) {
       return jsonRes({ data: { productVariantsBulkUpdate: { productVariants: [], userErrors: [] } } });
     }
-    if (query.includes('mutation ResetInventoryPolicy')) {
-      return jsonRes({ data: { productVariantsBulkUpdate: { productVariants: [], userErrors: [] } } });
-    }
     if (query.includes('mutation UpdateInventoryItem')) {
-      return jsonRes({ data: { inventoryItemUpdate: { inventoryItem: { id: 'inv', sku: 'CUSTOM-1' }, userErrors: [] } } });
-    }
-    if (query.includes('mutation UntrackInventoryItem')) {
-      return jsonRes({ data: { inventoryItemUpdate: { inventoryItem: { id: 'inv', tracked: false }, userErrors: [] } } });
-    }
-    if (query.includes('mutation ActivateInventory')) {
-      return jsonRes({ data: { inventoryActivate: { inventoryLevel: { id: 'lvl' }, userErrors: [] } } });
+      return jsonRes({ data: { inventoryItemUpdate: { inventoryItem: { id: 'inv', sku: 'CUSTOM-1', tracked: false }, userErrors: [] } } });
     }
     if (query.includes('publications(')) {
       return jsonRes({ data: { publications: { edges: [{ node: { id: 'gid://shopify/Publication/1', name: 'Online Store' } }] } } });
@@ -174,9 +165,6 @@ function makeShopifyFetch(overrides = {}) {
         return jsonRes({ data: { publishablePublish: { publishable: null, userErrors: [{ field: 'id', message: 'nope' }] } } });
       }
       return jsonRes({ data: { publishablePublish: { publishable: { id: 'gid://shopify/Product/999', status: 'ACTIVE' }, userErrors: [] } } });
-    }
-    if (query.includes('fulfillmentServices')) {
-      return jsonRes({ data: { shop: { fulfillmentServices: [{ handle: 'printful', serviceName: 'Printful', location: { id: 'gid://shopify/Location/1' } }] } } });
     }
     if (query.includes('mutation AssignShippingProfile')) {
       return jsonRes({ data: { deliveryProfileUpdate: { profile: { id: 'p', name: 'US Flat Rate' }, userErrors: [] } } });
@@ -439,6 +427,36 @@ describe('POST /create-product', () => {
     const priceCall = fetchMock.calls.find((c) => c.url.includes('graphql.json') && JSON.parse(c.opts.body).query.includes('mutation UpdateVariants'));
     const priceVars = JSON.parse(priceCall.opts.body).variables;
     expect(priceVars.variants.every((v) => v.price === '25.00')).toBe(true);
+  });
+
+  it('never tracks inventory on the generated variants, so the storefront can never see them sold out', async () => {
+    const fetchMock = makeShopifyFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(makeRequest('POST', '/create-product', createProductBody()), makeEnv());
+    expect(res.status).toBe(200);
+
+    const graphql = fetchMock.calls
+      .filter((c) => c.url.includes('graphql.json'))
+      .map((c) => JSON.parse(c.opts.body));
+
+    // Every inventory item gets its SKU and tracked:false in the same mutation —
+    // there is no window in which the item is tracked at quantity 0.
+    const skuCalls = graphql.filter((b) => b.query.includes('mutation UpdateInventoryItem'));
+    expect(skuCalls.length).toBeGreaterThan(0);
+    for (const b of skuCalls) {
+      expect(b.variables.input.sku).toMatch(/^CUSTOM-\d+-/);
+      expect(b.variables.input.tracked).toBe(false);
+    }
+
+    // inventoryActivate creates a tracked, qty-0, policy-DENY level at the
+    // Printful location, which is exactly the sold-out state this guards against.
+    // Fulfillment is worker → Printful API off the orders/paid webhook, so the
+    // location is never consulted and must not be activated (or looked up).
+    expect(graphql.some((b) => b.query.includes('inventoryActivate'))).toBe(false);
+    expect(graphql.some((b) => b.query.includes('fulfillmentServices'))).toBe(false);
+    expect(graphql.some((b) => b.query.includes('mutation ResetInventoryPolicy'))).toBe(false);
+    expect(graphql.some((b) => b.query.includes('mutation UntrackInventoryItem'))).toBe(false);
   });
 
   it('reads own-domain media straight from R2 for the IMAGES resize (no self-fetch)', async () => {

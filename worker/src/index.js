@@ -19,7 +19,6 @@ const DEFAULT_PRINTFUL_GARMENT_COLOR = 'Black';
 let _shopifyToken = null;
 let _shopifyTokenExpiry = 0;
 let _onlineStorePublicationId = null;
-let _printfulLocationId = null;
 let _printfulSizes = null;
 let _printfulVariantMap = null;
 
@@ -90,16 +89,6 @@ async function getOnlineStorePublicationId(env) {
   const match = edges.find(e => e.node.name === 'Online Store');
   if (match) _onlineStorePublicationId = match.node.id;
   return _onlineStorePublicationId;
-}
-
-async function getPrintfulLocationId(env) {
-  if (_printfulLocationId) return _printfulLocationId;
-  const data = await shopifyAdmin(env, `query { shop { fulfillmentServices { handle serviceName location { id } } } }`);
-  const services = data?.data?.shop?.fulfillmentServices || [];
-  console.log('[fulfillmentServices] available:', services.map(s => s.handle));
-  const match = services.find(s => s.handle?.toLowerCase().includes('printful') || s.serviceName?.toLowerCase().includes('printful'));
-  if (match?.location?.id) _printfulLocationId = match.location.id;
-  return _printfulLocationId;
 }
 
 const CANONICAL_SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
@@ -737,7 +726,16 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     // Non-fatal: product exists, just price may be wrong
   }
 
-  // Step 2b: set SKU on each inventory item (required by Printful before inventoryActivate)
+  // Step 2b: set SKU on each inventory item and leave it untracked.
+  //
+  // Fulfillment goes from the orders/paid webhook straight to the Printful API
+  // (see handleOrderPaidWebhook below), keyed on this SKU — Shopify inventory levels
+  // play no part. So the variants are never activated at the Printful location:
+  // inventoryActivate creates a tracked, quantity-0, policy-DENY level, and the
+  // product is genuinely sold out until later mutations repair it. Shopify's cart
+  // availability read lags those repairs by long enough that shoppers hit
+  // "The product 'X - M' is already sold out." on /cart/add.js. An item that is
+  // never tracked can never be observed sold out, stale cache or not.
   const skuPrefix = tags?.includes('community-design') ? 'COMMUNITY' : 'CUSTOM';
   const baseTimestamp = Date.now();
   for (const sv of sizeVariants) {
@@ -747,88 +745,20 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     const skuData = await shopifyAdmin(env,
       `mutation UpdateInventoryItem($id: ID!, $input: InventoryItemInput!) {
         inventoryItemUpdate(id: $id, input: $input) {
-          inventoryItem { id sku }
+          inventoryItem { id sku tracked }
           userErrors { field message }
         }
       }`,
-      { id: invGid, input: { sku: `${skuPrefix}-${baseTimestamp}-${sizeLabel}` } }
+      { id: invGid, input: { sku: `${skuPrefix}-${baseTimestamp}-${sizeLabel}`, tracked: false } }
     );
     const skuErrors = skuData?.data?.inventoryItemUpdate?.userErrors;
     if (skuErrors?.length) console.error(logPrefix, 'SKU update errors for', sizeLabel, ':', JSON.stringify(skuErrors));
-    else console.log(logPrefix, 'SKU set:', skuData?.data?.inventoryItemUpdate?.inventoryItem?.sku);
-  }
-
-  // Step 2c: activate inventory at the Printful fulfillment service location for each size variant
-  const printfulLocationId = await getPrintfulLocationId(env);
-  console.log(logPrefix, 'Printful location ID:', printfulLocationId);
-  if (printfulLocationId) {
-    for (const sv of sizeVariants) {
-      const invGid = sv.inventoryItem?.id;
-      if (!invGid) continue;
-      const activateData = await shopifyAdmin(env,
-        `mutation ActivateInventory($inventoryItemId: ID!, $locationId: ID!) {
-          inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId) {
-            inventoryLevel { id }
-            userErrors { field message }
-          }
-        }`,
-        { inventoryItemId: invGid, locationId: printfulLocationId }
-      );
-      const activateErrors = activateData?.data?.inventoryActivate?.userErrors;
-      if (activateErrors?.length) {
-        console.error(logPrefix, 'inventoryActivate errors:', JSON.stringify(activateErrors));
-      } else {
-        console.log(logPrefix, 'inventory activated at Printful location for variant', sv.id);
-      }
-    }
-  } else {
-    console.warn(logPrefix, 'skipping inventoryActivate — missing locationId');
-  }
-
-  // Step 2d: re-apply inventoryPolicy:CONTINUE after inventoryActivate, which resets it to DENY
-  const policyData = await shopifyAdmin(env,
-    `mutation ResetInventoryPolicy($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants { id inventoryPolicy }
-        userErrors { field message }
-      }
-    }`,
-    {
-      productId: newProductGid,
-      variants: sizeVariants.map(v => ({ id: v.id, inventoryPolicy: 'CONTINUE' })),
-    }
-  );
-  const policyErrors = policyData?.data?.productVariantsBulkUpdate?.userErrors;
-  if (policyErrors?.length) {
-    console.error(logPrefix, 'inventoryPolicy re-apply errors:', JSON.stringify(policyErrors));
-  } else {
-    const policies = policyData?.data?.productVariantsBulkUpdate?.productVariants?.map(v => v.inventoryPolicy);
-    console.log(logPrefix, 'inventoryPolicy re-applied:', policies);
-  }
-
-  // Step 2e: set tracked:false on each inventory item so the storefront never shows
-  // "sold out". Printful-managed locations reject manual quantity edits, so setting
-  // quantities is unreliable; untracked items are always purchasable regardless of policy.
-  // Printful fulfillment relies on order webhooks, not Shopify inventory levels.
-  for (const sv of sizeVariants) {
-    const invGid = sv.inventoryItem?.id;
-    if (!invGid) continue;
-    const trackData = await shopifyAdmin(env,
-      `mutation UntrackInventoryItem($id: ID!, $input: InventoryItemInput!) {
-        inventoryItemUpdate(id: $id, input: $input) {
-          inventoryItem { id tracked }
-          userErrors { field message }
-        }
-      }`,
-      { id: invGid, input: { tracked: false } }
-    );
-    const trackErrors = trackData?.data?.inventoryItemUpdate?.userErrors;
-    if (trackErrors?.length) {
-      console.error(logPrefix, 'inventoryItemUpdate tracked:false errors:', JSON.stringify(trackErrors));
-    } else {
-      console.log(logPrefix, 'inventory untracked for item', invGid);
+    else {
+      const item = skuData?.data?.inventoryItemUpdate?.inventoryItem;
+      console.log(logPrefix, 'SKU set:', item?.sku, 'tracked:', item?.tracked);
     }
   }
+
 
   const newVariantId = firstSizeVariantGid.replace('gid://shopify/ProductVariant/', '');
   const newProductId = newProductGid.replace('gid://shopify/Product/', '');
@@ -3291,7 +3221,7 @@ const GC_SCOPE_CHECK_QUERY = `
   }
 `;
 
-// Cached like _printfulSizes / _printfulLocationId above — check once per
+// Cached like _printfulSizes / _printfulVariantMap above — check once per
 // isolate lifetime, reuse for every product in the pass rather than firing
 // an extra Admin API call per candidate. `null` means "not yet checked" so it
 // stays distinguishable from a checked-and-false result; a fresh import (as
