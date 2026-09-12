@@ -19,9 +19,9 @@ const DEFAULT_PRINTFUL_GARMENT_COLOR = 'Black';
 let _shopifyToken = null;
 let _shopifyTokenExpiry = 0;
 let _onlineStorePublicationId = null;
-let _printfulLocationId = null;
 let _printfulSizes = null;
 let _printfulVariantMap = null;
+let _printfulLocationId = null;
 
 async function getShopifyToken(env) {
   if (_shopifyToken && Date.now() < _shopifyTokenExpiry) return _shopifyToken;
@@ -82,16 +82,10 @@ async function shopifyAdmin(env, query, variables) {
   return data;
 }
 
-async function getOnlineStorePublicationId(env) {
-  if (_onlineStorePublicationId) return _onlineStorePublicationId;
-  const data = await shopifyAdmin(env, `query { publications(first: 20) { edges { node { id name } } } }`);
-  const edges = data?.data?.publications?.edges || [];
-  console.log('[publications] available:', edges.map(e => e.node.name));
-  const match = edges.find(e => e.node.name === 'Online Store');
-  if (match) _onlineStorePublicationId = match.node.id;
-  return _onlineStorePublicationId;
-}
-
+// The Printful fulfillment service's location. A generated variant needs an
+// inventory level there so Shopify routes its fulfillment order to Printful
+// (one shipment group at checkout, and the Printful app can close the order
+// out with tracking once it ships) — see PR #389 / #393.
 async function getPrintfulLocationId(env) {
   if (_printfulLocationId) return _printfulLocationId;
   const data = await shopifyAdmin(env, `query { shop { fulfillmentServices { handle serviceName location { id } } } }`);
@@ -100,6 +94,27 @@ async function getPrintfulLocationId(env) {
   const match = services.find(s => s.handle?.toLowerCase().includes('printful') || s.serviceName?.toLowerCase().includes('printful'));
   if (match?.location?.id) _printfulLocationId = match.location.id;
   return _printfulLocationId;
+}
+
+// A GraphQL response can fail without userErrors: a top-level `errors` array
+// (THROTTLED, a bad query) arrives with HTTP 200 and no `data`, and
+// shopifyAdmin() only logs it. Callers that look at userErrors alone read that
+// as success. Returns the failure to report, or null when `data.<field>` is
+// actually there.
+function graphqlFailure(data, field) {
+  if (data?.errors?.length) return data.errors;
+  if (!data?.data?.[field]) return [{ message: `no ${field} in response` }];
+  return null;
+}
+
+async function getOnlineStorePublicationId(env) {
+  if (_onlineStorePublicationId) return _onlineStorePublicationId;
+  const data = await shopifyAdmin(env, `query { publications(first: 20) { edges { node { id name } } } }`);
+  const edges = data?.data?.publications?.edges || [];
+  console.log('[publications] available:', edges.map(e => e.node.name));
+  const match = edges.find(e => e.node.name === 'Online Store');
+  if (match) _onlineStorePublicationId = match.node.id;
+  return _onlineStorePublicationId;
 }
 
 const CANONICAL_SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
@@ -717,7 +732,84 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
   }
   const firstSizeVariantGid = matchedSizeVariant.id;
 
-  // Step 2a: set price on all size variants
+  // Step 2a: untrack each inventory item and set its SKU, in one mutation.
+  //
+  // The SKU is what the orders/paid webhook keys fulfillment on (see
+  // parseCustomSku() / handleOrderPaidWebhook below). Untracking comes first,
+  // before the item is stocked anywhere: activating a still-tracked item at a
+  // location creates a quantity-0 level, and the product is genuinely sold out
+  // until a later mutation repairs it. Shopify's cart availability read lagged
+  // that repair long enough for shoppers to hit "The product 'X - M' is already
+  // sold out." on /cart/add.js. Untracked first, the worker never creates the
+  // sold-out state, so there is nothing for a stale read to observe.
+  const skuPrefix = tags?.includes('community-design') ? 'COMMUNITY' : 'CUSTOM';
+  const baseTimestamp = Date.now();
+  const untrackedItems = [];
+  for (const sv of sizeVariants) {
+    const invGid = sv.inventoryItem?.id;
+    const sizeLabel = sv.selectedOptions?.find(o => o.name === 'Size')?.value || 'ONE';
+    if (!invGid) {
+      console.error(logPrefix, 'no inventory item id for', sizeLabel, '— variant ships with no SKU and default tracking');
+      continue;
+    }
+    const skuData = await shopifyAdmin(env,
+      `mutation UpdateInventoryItem($id: ID!, $input: InventoryItemInput!) {
+        inventoryItemUpdate(id: $id, input: $input) {
+          inventoryItem { id sku tracked }
+          userErrors { field message }
+        }
+      }`,
+      { id: invGid, input: { sku: buildCustomSku(skuPrefix, baseTimestamp, sizeLabel), tracked: false } }
+    );
+    const skuErrors = graphqlFailure(skuData, 'inventoryItemUpdate') || skuData.data.inventoryItemUpdate.userErrors;
+    if (skuErrors?.length) {
+      console.error(logPrefix, 'SKU update errors for', sizeLabel, ':', JSON.stringify(skuErrors));
+      continue;
+    }
+    const item = skuData.data.inventoryItemUpdate.inventoryItem;
+    console.log(logPrefix, 'SKU set:', item?.sku, 'tracked:', item?.tracked);
+    untrackedItems.push({ variantId: sv.id, invGid, sizeLabel });
+  }
+
+  // Step 2b: stock each (now untracked) item at the Printful location. This is
+  // fulfillment routing, not inventory: without a level there Shopify assigns
+  // the fulfillment order to the store's default location, mixed orders split
+  // into two shipment groups at checkout, and the Printful app cannot mark the
+  // custom item shipped (PR #389). Only items that untracked successfully are
+  // activated — activating a tracked item is the sold-out state described above.
+  const printfulLocationId = await getPrintfulLocationId(env);
+  console.log(logPrefix, 'Printful location ID:', printfulLocationId);
+  if (printfulLocationId) {
+    for (const { invGid, sizeLabel } of untrackedItems) {
+      const activateData = await shopifyAdmin(env,
+        `mutation ActivateInventory($inventoryItemId: ID!, $locationId: ID!) {
+          inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId) {
+            inventoryLevel { id item { tracked } }
+            userErrors { field message }
+          }
+        }`,
+        { inventoryItemId: invGid, locationId: printfulLocationId }
+      );
+      const activateErrors = graphqlFailure(activateData, 'inventoryActivate') || activateData.data.inventoryActivate.userErrors;
+      if (activateErrors?.length) {
+        console.error(logPrefix, 'inventoryActivate errors for', sizeLabel, ':', JSON.stringify(activateErrors));
+        continue;
+      }
+      const tracked = activateData.data.inventoryActivate.inventoryLevel?.item?.tracked;
+      // Should never fire — tracked lives on the item, not the level — but if
+      // Shopify ever re-tracks on activation this is the log line that says so.
+      if (tracked === true) console.error(logPrefix, 'inventoryActivate re-tracked item for', sizeLabel);
+      else console.log(logPrefix, 'inventory activated at Printful location for', sizeLabel);
+    }
+  } else {
+    console.warn(logPrefix, 'skipping inventoryActivate — missing locationId');
+  }
+
+  // Step 2c: set price on all size variants. inventoryPolicy CONTINUE is inert
+  // while the items are untracked (Shopify consults the policy only for tracked
+  // items) and is set last, after activation, as the defence for the case where
+  // something outside this worker — the Printful app's sync, an admin edit —
+  // turns tracking back on at quantity 0.
   const updateData = await shopifyAdmin(env,
     `mutation UpdateVariants($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
       productVariantsBulkUpdate(productId: $productId, variants: $variants) {
@@ -731,103 +823,10 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     }
   );
 
-  const updateErrors = updateData?.data?.productVariantsBulkUpdate?.userErrors;
+  const updateErrors = graphqlFailure(updateData, 'productVariantsBulkUpdate') || updateData.data.productVariantsBulkUpdate.userErrors;
   if (updateErrors?.length) {
     console.error(logPrefix, 'variant update errors:', JSON.stringify(updateErrors));
     // Non-fatal: product exists, just price may be wrong
-  }
-
-  // Step 2b: set SKU on each inventory item (required by Printful before inventoryActivate)
-  const skuPrefix = tags?.includes('community-design') ? 'COMMUNITY' : 'CUSTOM';
-  const baseTimestamp = Date.now();
-  for (const sv of sizeVariants) {
-    const invGid = sv.inventoryItem?.id;
-    if (!invGid) continue;
-    const sizeLabel = sv.selectedOptions?.find(o => o.name === 'Size')?.value || 'ONE';
-    const skuData = await shopifyAdmin(env,
-      `mutation UpdateInventoryItem($id: ID!, $input: InventoryItemInput!) {
-        inventoryItemUpdate(id: $id, input: $input) {
-          inventoryItem { id sku }
-          userErrors { field message }
-        }
-      }`,
-      { id: invGid, input: { sku: `${skuPrefix}-${baseTimestamp}-${sizeLabel}` } }
-    );
-    const skuErrors = skuData?.data?.inventoryItemUpdate?.userErrors;
-    if (skuErrors?.length) console.error(logPrefix, 'SKU update errors for', sizeLabel, ':', JSON.stringify(skuErrors));
-    else console.log(logPrefix, 'SKU set:', skuData?.data?.inventoryItemUpdate?.inventoryItem?.sku);
-  }
-
-  // Step 2c: activate inventory at the Printful fulfillment service location for each size variant
-  const printfulLocationId = await getPrintfulLocationId(env);
-  console.log(logPrefix, 'Printful location ID:', printfulLocationId);
-  if (printfulLocationId) {
-    for (const sv of sizeVariants) {
-      const invGid = sv.inventoryItem?.id;
-      if (!invGid) continue;
-      const activateData = await shopifyAdmin(env,
-        `mutation ActivateInventory($inventoryItemId: ID!, $locationId: ID!) {
-          inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId) {
-            inventoryLevel { id }
-            userErrors { field message }
-          }
-        }`,
-        { inventoryItemId: invGid, locationId: printfulLocationId }
-      );
-      const activateErrors = activateData?.data?.inventoryActivate?.userErrors;
-      if (activateErrors?.length) {
-        console.error(logPrefix, 'inventoryActivate errors:', JSON.stringify(activateErrors));
-      } else {
-        console.log(logPrefix, 'inventory activated at Printful location for variant', sv.id);
-      }
-    }
-  } else {
-    console.warn(logPrefix, 'skipping inventoryActivate — missing locationId');
-  }
-
-  // Step 2d: re-apply inventoryPolicy:CONTINUE after inventoryActivate, which resets it to DENY
-  const policyData = await shopifyAdmin(env,
-    `mutation ResetInventoryPolicy($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants { id inventoryPolicy }
-        userErrors { field message }
-      }
-    }`,
-    {
-      productId: newProductGid,
-      variants: sizeVariants.map(v => ({ id: v.id, inventoryPolicy: 'CONTINUE' })),
-    }
-  );
-  const policyErrors = policyData?.data?.productVariantsBulkUpdate?.userErrors;
-  if (policyErrors?.length) {
-    console.error(logPrefix, 'inventoryPolicy re-apply errors:', JSON.stringify(policyErrors));
-  } else {
-    const policies = policyData?.data?.productVariantsBulkUpdate?.productVariants?.map(v => v.inventoryPolicy);
-    console.log(logPrefix, 'inventoryPolicy re-applied:', policies);
-  }
-
-  // Step 2e: set tracked:false on each inventory item so the storefront never shows
-  // "sold out". Printful-managed locations reject manual quantity edits, so setting
-  // quantities is unreliable; untracked items are always purchasable regardless of policy.
-  // Printful fulfillment relies on order webhooks, not Shopify inventory levels.
-  for (const sv of sizeVariants) {
-    const invGid = sv.inventoryItem?.id;
-    if (!invGid) continue;
-    const trackData = await shopifyAdmin(env,
-      `mutation UntrackInventoryItem($id: ID!, $input: InventoryItemInput!) {
-        inventoryItemUpdate(id: $id, input: $input) {
-          inventoryItem { id tracked }
-          userErrors { field message }
-        }
-      }`,
-      { id: invGid, input: { tracked: false } }
-    );
-    const trackErrors = trackData?.data?.inventoryItemUpdate?.userErrors;
-    if (trackErrors?.length) {
-      console.error(logPrefix, 'inventoryItemUpdate tracked:false errors:', JSON.stringify(trackErrors));
-    } else {
-      console.log(logPrefix, 'inventory untracked for item', invGid);
-    }
   }
 
   const newVariantId = firstSizeVariantGid.replace('gid://shopify/ProductVariant/', '');
@@ -1021,7 +1020,8 @@ async function handleCreateProduct(request, env, origin) {
       requestedSize,
     });
   } catch (err) {
-    // createShopifyProduct() runs ~15 sequential Admin API calls; a rejection can
+    // createShopifyProduct() runs a couple of dozen sequential Admin API calls
+    // (two per size variant plus a handful of fixed ones); a rejection can
     // mean Shopify rejected the input (err.status set to 422 at the throw site
     // above, already logged there) or that one of those calls failed at the
     // network/transport level partway through (no err.status — defaults to 502,
@@ -1326,12 +1326,19 @@ async function authorizeDeviceWrite(env, deviceId, deviceToken) {
 // cart line-item property out of a paid order and upload it to Printful.
 //
 // Custom-design SKUs are distinguished from normal catalog SKUs by prefix (see
-// createShopifyProduct()'s skuPrefix + inventoryItemUpdate call above):
+// createShopifyProduct()'s Step 2a and buildCustomSku() below):
 // `CUSTOM-{timestamp}-{size}` for direct custom-design purchases,
 // `COMMUNITY-{timestamp}-{size}` for community-gallery-approved designs turned
 // into products. Both are handled identically here — the design_url metafield
 // lives on the generated product either way.
 const CUSTOM_SKU_RE = /^(CUSTOM|COMMUNITY)-(\d+)-(.+)$/;
+
+// The producer side of CUSTOM_SKU_RE — createShopifyProduct() builds every
+// generated SKU through this so the grammar lives in one place and a test can
+// round-trip it through parseCustomSku().
+export function buildCustomSku(prefix, timestamp, size) {
+  return `${prefix}-${timestamp}-${size}`;
+}
 
 // Parses a size-suffixed custom/community SKU. Returns null for a normal
 // catalog SKU (or anything else that doesn't match), so callers can filter an
