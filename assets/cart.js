@@ -333,10 +333,40 @@
   // submit button on this form, and e.submitter is null on a programmatic
   // form.submit(). Never preventDefault here — navigation to checkout must not
   // wait on analytics, and bfTrack's sinks queue their own network sends.
+  //
+  // The same submit is where the purchase gets stitched to the analytics
+  // person. The theme never sees checkout, so the only way an order can
+  // carry the shopper's PostHog id is as a cart attribute: an
+  // `attributes[…]` field on this form is saved by Shopify when the form
+  // posts to /cart, lands on the order as a note attribute, and the worker's
+  // orders/paid webhook reads it back and captures `purchase` server-side.
+  // Underscore-prefixed so it stays out of the customer-facing order page.
+  // bfAnalyticsId() is null for an opted-out shopper, and then no field is
+  // sent at all — an empty attribute would still be a stored key on the
+  // order. Written at submit time, not page load, because the id is only
+  // available once the PostHog script has loaded and consent has resolved.
+  var ANALYTICS_ID_ATTRIBUTE = 'attributes[_posthog_distinct_id]';
+  function stampAnalyticsId() {
+    var id = typeof window.bfAnalyticsId === 'function' ? window.bfAnalyticsId() : null;
+    var input = cartForm.querySelector('input[name="' + ANALYTICS_ID_ATTRIBUTE + '"]');
+    if (!id) {
+      if (input) input.remove();
+      return;
+    }
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = ANALYTICS_ID_ATTRIBUTE;
+      cartForm.appendChild(input);
+    }
+    input.value = id;
+  }
+
   function wireCheckoutTracking() {
     cartForm.addEventListener('submit', function (e) {
       var btn = e.submitter;
       if (!btn || btn.name !== 'checkout') return;
+      stampAnalyticsId();
       if (typeof window.bfTrack !== 'function') return;
       window.bfTrack('begin_checkout', {
         value: (latestCart.total_price || 0) / 100,

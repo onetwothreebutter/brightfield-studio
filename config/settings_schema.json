@@ -39,6 +39,13 @@
         "label": "PostHog API host",
         "default": "https://us.i.posthog.com",
         "info": "Use https://eu.i.posthog.com for EU Cloud."
+      },
+      {
+        "type": "checkbox",
+        "id": "posthog_session_replay",
+        "label": "PostHog session replay",
+        "default": true,
+        "info": "Records consented sessions (inputs masked, shader canvas at low frame rate). Session replay must also be enabled in the PostHog project settings."
       }
     ]
   }
