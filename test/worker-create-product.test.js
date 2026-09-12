@@ -2,23 +2,24 @@
 //
 // Coverage for /save-preview and /create-product — the two endpoints behind the
 // custom-shader-design Add to Cart flow (see sections/main-product.liquid). These
-// had zero test coverage before: createShopifyProduct() alone drives ~15 sequential
-// Shopify Admin API calls, several of which are only best-effort (logged, not
+// had zero test coverage before: createShopifyProduct() alone drives a couple of
+// dozen sequential Shopify Admin API calls, several of which are only best-effort (logged, not
 // fatal), so it's the most failure-prone part of the checkout path and the part
 // least protected against regressions.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// getShopifyToken/getPrintfulSizes/getOnlineStorePublicationId/getPrintfulLocationId
+// getShopifyToken/getPrintfulSizes/getOnlineStorePublicationId/getPrintfulLocationId/gcProductHasOrder's scope check
 // are cached in module-level `let` variables, not per-request state. Re-importing
 // the module fresh for every test (instead of importing once at the top) keeps
 // those caches from leaking between tests.
-let worker, pickSizeVariant;
+let worker, pickSizeVariant, parseCustomSku;
 
 beforeEach(async () => {
   vi.resetModules();
   const mod = await import('../worker/src/index.js');
   worker = mod.default;
   pickSizeVariant = mod.pickSizeVariant;
+  parseCustomSku = mod.parseCustomSku;
 });
 
 afterEach(() => vi.unstubAllGlobals());
@@ -155,7 +156,18 @@ function makeShopifyFetch(overrides = {}) {
       return jsonRes({ data: { productVariantsBulkUpdate: { productVariants: [], userErrors: [] } } });
     }
     if (query.includes('mutation UpdateInventoryItem')) {
+      // A top-level `errors` reply (THROTTLED etc.) arrives as HTTP 200 with no
+      // `data` — the shape a userErrors-only check misreads as success.
+      if (overrides.skuUpdateThrottled) {
+        return jsonRes({ errors: [{ message: 'Throttled', extensions: { code: 'THROTTLED' } }] });
+      }
       return jsonRes({ data: { inventoryItemUpdate: { inventoryItem: { id: 'inv', sku: 'CUSTOM-1', tracked: false }, userErrors: [] } } });
+    }
+    if (query.includes('mutation ActivateInventory')) {
+      return jsonRes({ data: { inventoryActivate: { inventoryLevel: { id: 'lvl', item: { tracked: false } }, userErrors: [] } } });
+    }
+    if (query.includes('fulfillmentServices')) {
+      return jsonRes({ data: { shop: { fulfillmentServices: [{ handle: 'printful', serviceName: 'Printful', location: { id: 'gid://shopify/Location/1' } }] } } });
     }
     if (query.includes('publications(')) {
       return jsonRes({ data: { publications: { edges: [{ node: { id: 'gid://shopify/Publication/1', name: 'Online Store' } }] } } });
@@ -429,7 +441,7 @@ describe('POST /create-product', () => {
     expect(priceVars.variants.every((v) => v.price === '25.00')).toBe(true);
   });
 
-  it('never tracks inventory on the generated variants, so the storefront can never see them sold out', async () => {
+  it('untracks every variant before stocking it at the Printful location, and never re-tracks it', async () => {
     const fetchMock = makeShopifyFetch();
     vi.stubGlobal('fetch', fetchMock);
 
@@ -440,23 +452,56 @@ describe('POST /create-product', () => {
       .filter((c) => c.url.includes('graphql.json'))
       .map((c) => JSON.parse(c.opts.body));
 
-    // Every inventory item gets its SKU and tracked:false in the same mutation —
-    // there is no window in which the item is tracked at quantity 0.
+    // One untrack+SKU mutation per size variant (the mock yields S/M/L).
     const skuCalls = graphql.filter((b) => b.query.includes('mutation UpdateInventoryItem'));
-    expect(skuCalls.length).toBeGreaterThan(0);
+    expect(skuCalls).toHaveLength(3);
     for (const b of skuCalls) {
-      expect(b.variables.input.sku).toMatch(/^CUSTOM-\d+-/);
       expect(b.variables.input.tracked).toBe(false);
+      // The SKU the producer writes must be one the orders/paid webhook parses,
+      // or every custom line item classifies as an ordinary catalog item.
+      expect(parseCustomSku(b.variables.input.sku)).toMatchObject({ prefix: 'CUSTOM' });
+    }
+    expect(skuCalls.map((b) => parseCustomSku(b.variables.input.sku).size)).toEqual(['S', 'M', 'L']);
+
+    // Each item is stocked at the Printful location (fulfillment routing, PR
+    // #389) — but only after its own untrack call, so a tracked qty-0 level
+    // never exists.
+    const activateCalls = graphql.filter((b) => b.query.includes('mutation ActivateInventory'));
+    expect(activateCalls).toHaveLength(3);
+    expect(activateCalls.every((b) => b.variables.locationId === 'gid://shopify/Location/1')).toBe(true);
+    for (const a of activateCalls) {
+      const untrackIdx = graphql.findIndex((b) => b.query.includes('mutation UpdateInventoryItem') && b.variables.id === a.variables.inventoryItemId);
+      expect(untrackIdx).toBeGreaterThanOrEqual(0);
+      expect(graphql.indexOf(a)).toBeGreaterThan(untrackIdx);
     }
 
-    // inventoryActivate creates a tracked, qty-0, policy-DENY level at the
-    // Printful location, which is exactly the sold-out state this guards against.
-    // Fulfillment is worker → Printful API off the orders/paid webhook, so the
-    // location is never consulted and must not be activated (or looked up).
-    expect(graphql.some((b) => b.query.includes('inventoryActivate'))).toBe(false);
-    expect(graphql.some((b) => b.query.includes('fulfillmentServices'))).toBe(false);
+    // Nothing else touches tracking: no request outside the untrack call may
+    // mention `tracked`, and the old repair passes stay gone.
+    const others = graphql.filter((b) => !b.query.includes('mutation UpdateInventoryItem'));
+    expect(others.some((b) => /tracked/.test(JSON.stringify(b.variables ?? {})))).toBe(false);
+    expect(others.some((b) => /tracked\s*:/.test(b.query))).toBe(false);
     expect(graphql.some((b) => b.query.includes('mutation ResetInventoryPolicy'))).toBe(false);
     expect(graphql.some((b) => b.query.includes('mutation UntrackInventoryItem'))).toBe(false);
+  });
+
+  it('treats a top-level GraphQL error on the untrack call as a failure and does not stock that item', async () => {
+    const fetchMock = makeShopifyFetch({ skuUpdateThrottled: true });
+    vi.stubGlobal('fetch', fetchMock);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const res = await worker.fetch(makeRequest('POST', '/create-product', createProductBody()), makeEnv());
+    expect(res.status).toBe(200); // still best-effort, like userErrors
+
+    const graphql = fetchMock.calls
+      .filter((c) => c.url.includes('graphql.json'))
+      .map((c) => JSON.parse(c.opts.body));
+    // A still-tracked item must not be activated: that is the sold-out state.
+    expect(graphql.some((b) => b.query.includes('mutation ActivateInventory'))).toBe(false);
+    expect(errorSpy.mock.calls.some((c) => c.join(' ').includes('SKU update errors') && c.join(' ').includes('Throttled'))).toBe(true);
+    expect(logSpy.mock.calls.some((c) => c.join(' ').includes('SKU set:'))).toBe(false);
+    errorSpy.mockRestore();
+    logSpy.mockRestore();
   });
 
   it('reads own-domain media straight from R2 for the IMAGES resize (no self-fetch)', async () => {
@@ -570,7 +615,7 @@ describe('POST /create-product', () => {
     expect(res.status).toBe(422);
   });
 
-  // createShopifyProduct() runs ~15 sequential Admin API calls; only the first
+  // createShopifyProduct() runs a couple of dozen sequential Admin API calls; only the first
   // (productCreate) is exercised here, but any of them failing at the transport
   // level (not a Shopify userErrors response) should classify the same way — a
   // 502, matching the GetVariant lookup's classification above, not a 422 as if
@@ -624,13 +669,29 @@ describe('POST /create-product', () => {
   });
 
   it('falls back to the default variant when productOptionsCreate (size setup) fails non-fatally', async () => {
-    vi.stubGlobal('fetch', makeShopifyFetch({ optionsCreateFails: true }));
+    const fetchMock = makeShopifyFetch({ optionsCreateFails: true });
+    vi.stubGlobal('fetch', fetchMock);
     const res = await worker.fetch(makeRequest('POST', '/create-product', createProductBody()), makeEnv());
     // The size-option step is best-effort — a failure there should not abort the
     // whole product creation, since the shopper still gets an addable product.
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.variantId).toBe('9991'); // original default variant, no Size option
+
+    // The default variant still gets a parseable SKU (size 'ONE') and is untracked
+    // before it is stocked — the guarantees above must hold on this path too,
+    // since it is the variant the shopper actually buys.
+    const graphql = fetchMock.calls
+      .filter((c) => c.url.includes('graphql.json'))
+      .map((c) => JSON.parse(c.opts.body));
+    const skuCalls = graphql.filter((b) => b.query.includes('mutation UpdateInventoryItem'));
+    expect(skuCalls).toHaveLength(1);
+    expect(skuCalls[0].variables.id).toBe('gid://shopify/InventoryItem/8881');
+    expect(skuCalls[0].variables.input.tracked).toBe(false);
+    expect(parseCustomSku(skuCalls[0].variables.input.sku)).toMatchObject({ prefix: 'CUSTOM', size: 'ONE' });
+    const activateCalls = graphql.filter((b) => b.query.includes('mutation ActivateInventory'));
+    expect(activateCalls).toHaveLength(1);
+    expect(activateCalls[0].variables.inventoryItemId).toBe('gid://shopify/InventoryItem/8881');
   });
 
   it('falls back to REST publish when the GraphQL publishablePublish call fails', async () => {

@@ -2056,7 +2056,7 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
           createProductKey:  orderDesign.createProductKey
         };
         console.log('[create-product] POST', cpBody);
-        var CREATE_PRODUCT_TIMEOUT_MS = 45000; // createShopifyProduct runs ~15 sequential Admin API calls
+        var CREATE_PRODUCT_TIMEOUT_MS = 45000; // createShopifyProduct runs a couple of dozen sequential Admin API calls (two per size)
         return fetchWithTimeout(workerUrl + '/create-product', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2088,8 +2088,8 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
               properties: cartProps
             });
             // A freshly created product takes a few seconds to propagate to the
-            // storefront cache; POSTing /cart/add.js before then returns 422
-            // "sold out". Rapid repeat POSTs to /cart/add.js from one IP trip
+            // storefront cache; POSTing /cart/add.js before then returns 404
+            // "Cannot find variant". Rapid repeat POSTs from one IP trip
             // Shopify's platform-level bot protection (429 + challenge page,
             // served by Shopify's own CDN — not merchant-configurable, cannot
             // be bypassed by headers or merchant Cloudflare rules). So instead
@@ -2187,8 +2187,12 @@ if (window.location.hash === '#shader' || window.location.hash.indexOf('#s=') ==
                     console.warn('[add-to-cart] attempt', attempt, 'failed — status:', r.status, 'desc:', desc);
                     var d = desc.toLowerCase();
                     // 429/503 are transient (bot challenge / unavailable, non-JSON
-                    // body so desc is empty); sold-out / cannot-find mean the cart
-                    // endpoint's cache still lags the availability poll above.
+                    // body so desc is empty); cannot-find means the cart endpoint's
+                    // cache still lags the availability poll above. The worker no
+                    // longer creates a sold-out state (variants are untracked before
+                    // they are stocked anywhere), so 'sold out' here is a defence
+                    // against something outside the worker re-tracking the variant
+                    // at quantity 0, not a window we expect to hit.
                     if (r.status === 429 || r.status === 503 ||
                         d.indexOf('cannot find') !== -1 ||
                         d.indexOf('sold out') !== -1) {
