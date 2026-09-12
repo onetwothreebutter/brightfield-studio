@@ -180,8 +180,14 @@ describe('analytics snippet — PostHog init', () => {
     const ph = run({ ...BOTH, posthogReplay: true });
     const opts = ph.init.mock.calls[0][1];
     expect(opts.disable_session_recording).toBe(false);
-    expect(opts.session_recording).toMatchObject({ maskAllInputs: true, recordCanvas: true });
-    expect(opts.session_recording.canvasFps).toBeLessThanOrEqual(5);
+    expect(opts.session_recording.maskAllInputs).toBe(true);
+    // posthog-js reads canvas settings only from session_recording.captureCanvas,
+    // and canvasQuality is a string there. Top-level keys are silently ignored.
+    const canvas = opts.session_recording.captureCanvas;
+    expect(canvas.recordCanvas).toBe(true);
+    expect(canvas.canvasFps).toBeLessThanOrEqual(5);
+    expect(typeof canvas.canvasQuality).toBe('string');
+    expect(opts.session_recording).not.toHaveProperty('recordCanvas');
   });
 
   it('leaves session replay off when the setting is off or absent', () => {
@@ -338,11 +344,18 @@ describe('cart.js — purchase attribution attribute', () => {
     expect(workerSrc).toContain("const POSTHOG_DISTINCT_ID_ATTRIBUTE = '_posthog_distinct_id';");
   });
 
-  it('stamps the attribute on the Checkout submit only, and never preventDefaults', () => {
+  it('stamps the attribute on every submit, before the submitter check, and never preventDefaults', () => {
     const wire = cartSrc.slice(cartSrc.indexOf('function wireCheckoutTracking'), cartSrc.indexOf('initLines();'));
-    expect(wire).toContain("btn.name !== 'checkout') return;");
-    expect(wire).toContain('stampAnalyticsId();');
     expect(wire).not.toContain('preventDefault');
+    // Browsers without SubmitEvent.submitter must still stamp; only the
+    // begin_checkout event is gated on which button was pressed.
+    expect(wire.indexOf('stampAnalyticsId();')).toBeLessThan(wire.indexOf("btn.name !== 'checkout') return;"));
+  });
+
+  it('submits the field empty, not omitted, when there is no id — so a revoked consent clears a stored one', () => {
+    const stamp = cartSrc.slice(cartSrc.indexOf('function stampAnalyticsId'), cartSrc.indexOf('function wireCheckoutTracking'));
+    expect(stamp).toContain("input.value = id || '';");
+    expect(stamp).not.toContain('.remove()');
   });
 });
 

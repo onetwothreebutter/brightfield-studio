@@ -1544,6 +1544,7 @@ function formatPrintfulError(json) {
 // from nowhere.
 const POSTHOG_DISTINCT_ID_ATTRIBUTE = '_posthog_distinct_id';
 const POSTHOG_DEFAULT_HOST = 'https://us.i.posthog.com';
+const POSTHOG_CAPTURE_TIMEOUT_MS = 5000;
 
 export function posthogDistinctIdFromOrder(order) {
   const attrs = Array.isArray(order?.customAttributes) ? order.customAttributes : [];
@@ -1598,10 +1599,13 @@ export async function purchaseEventFromOrder(order, shopifyOrderId) {
       // the same thing under the same names.
       value: Number.isFinite(value) ? value : null,
       currency: money?.currencyCode || null,
-      item_count: lineItems.reduce((n, li) => n + (Number.isInteger(li.currentQuantity) ? li.currentQuantity : (li.quantity || 0)), 0),
+      // Same rules as fulfillment, via the same helpers, so what PostHog is
+      // told matches what Printful is told for the same order. A line item
+      // with no usable count adds nothing here rather than refusing the event.
+      item_count: lineItems.reduce((n, li) => n + (fulfillableQuantity(li) ?? 0), 0),
       line_items: lineItems.length,
       skus,
-      custom_design_count: lineItems.filter(li => parseCustomSku(li.sku)).length,
+      custom_design_count: lineItems.filter(li => classifyLineItem(li).type === 'custom').length,
       $lib: 'brightfield-worker',
     },
   };
@@ -1631,6 +1635,11 @@ async function capturePurchase(env, order, shopifyOrderId) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ api_key: env.POSTHOG_PROJECT_KEY, ...event }),
+      // This runs under waitUntil, which Shopify's webhook timeout does not
+      // bound, so an ingest that accepts the connection and never answers
+      // would hold the invocation to the platform cap and stall the log flush
+      // chained after it. The catch below logs the AbortError like any other.
+      signal: AbortSignal.timeout(POSTHOG_CAPTURE_TIMEOUT_MS),
     });
     if (!res.ok) {
       console.error('[order-paid] PostHog rejected purchase event for order', order.name, '(status', res.status + ')');

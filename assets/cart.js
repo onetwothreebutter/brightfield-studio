@@ -341,32 +341,37 @@
   // posts to /cart, lands on the order as a note attribute, and the worker's
   // orders/paid webhook reads it back and captures `purchase` server-side.
   // Underscore-prefixed so it stays out of the customer-facing order page.
-  // bfAnalyticsId() is null for an opted-out shopper, and then no field is
-  // sent at all — an empty attribute would still be a stored key on the
-  // order. Written at submit time, not page load, because the id is only
-  // available once the PostHog script has loaded and consent has resolved.
+  // bfAnalyticsId() is null for an opted-out shopper, and then the field is
+  // sent *empty* rather than omitted: Shopify merges attributes on a /cart
+  // POST and leaves keys that are not submitted untouched, so a shopper who
+  // clicked Checkout while opted in and then revoked consent would otherwise
+  // keep the earlier id on their cart for its lifetime. An empty value
+  // overwrites it, and the worker treats empty as absent. Written at submit
+  // time, not page load, because the id is only available once the PostHog
+  // script has loaded and consent has resolved.
   var ANALYTICS_ID_ATTRIBUTE = 'attributes[_posthog_distinct_id]';
   function stampAnalyticsId() {
     var id = typeof window.bfAnalyticsId === 'function' ? window.bfAnalyticsId() : null;
     var input = cartForm.querySelector('input[name="' + ANALYTICS_ID_ATTRIBUTE + '"]');
-    if (!id) {
-      if (input) input.remove();
-      return;
-    }
     if (!input) {
       input = document.createElement('input');
       input.type = 'hidden';
       input.name = ANALYTICS_ID_ATTRIBUTE;
       cartForm.appendChild(input);
     }
-    input.value = id;
+    input.value = id || '';
   }
 
   function wireCheckoutTracking() {
     cartForm.addEventListener('submit', function (e) {
+      // Stamped on every submit, before the submitter check: both buttons
+      // POST to /cart, so the attribute is harmless on "Update Cart", and
+      // browsers without SubmitEvent.submitter (WebKit before 15.4) would
+      // otherwise skip it silently — indistinguishable, downstream, from a
+      // shopper who declined.
+      stampAnalyticsId();
       var btn = e.submitter;
       if (!btn || btn.name !== 'checkout') return;
-      stampAnalyticsId();
       if (typeof window.bfTrack !== 'function') return;
       window.bfTrack('begin_checkout', {
         value: (latestCart.total_price || 0) / 100,

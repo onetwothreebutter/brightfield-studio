@@ -1872,6 +1872,19 @@ describe('purchaseEventFromOrder', () => {
     }
   });
 
+  it('counts units with the fulfillment rules, not its own', async () => {
+    const ev = await purchaseEventFromOrder(attributedOrder({
+      lineItems: { edges: [
+        // negative currentQuantity is unusable → falls back to quantity, as fulfillableQuantity does
+        { node: { sku: 'CUSTOM-1699999999999-M', quantity: 2, currentQuantity: -1, product: { id: 'p' } } },
+        // neither usable → contributes nothing rather than refusing the event
+        { node: { sku: 'TEE-BLK-L', quantity: '2', product: { id: 'p', metafield: null }, variant: null } },
+      ] },
+    }), 1);
+    expect(ev.properties.item_count).toBe(2);
+    expect(ev.properties.custom_design_count).toBe(1);
+  });
+
   it('tolerates a missing total and timestamp rather than refusing the event', async () => {
     const ev = await purchaseEventFromOrder(attributedOrder({ currentTotalPriceSet: null, processedAt: null }), 1);
     expect(ev.properties.value).toBeNull();
@@ -1977,6 +1990,16 @@ describe('POST /webhook/order-paid — purchase attribution', () => {
 
     expect((await worker.fetch(await webhookRequest({ id: 555000111 }), env)).status).toBe(422);
     expect(fetchMock.calls.posthog).toHaveLength(0);
+  });
+
+  it('bounds the PostHog request with a timeout', async () => {
+    const env = posthogEnv();
+    const fetchMock = makeUpstreamFetch({ order: attributedOrder() });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    const call = fetchMock.calls.find(c => c.url.endsWith('/i/v0/e/'));
+    expect(call.opts.signal).toBeInstanceOf(AbortSignal);
   });
 
   it('a PostHog outage or rejection never changes the webhook outcome', async () => {

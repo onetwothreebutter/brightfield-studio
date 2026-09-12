@@ -130,10 +130,14 @@
           // The shader is a WebGL canvas, and a replay without it is a blank
           // rectangle with sliders moving next to it. Low frame rate and
           // quality keep the recording size in check; the controls are what
-          // matter, not smooth animation.
-          recordCanvas: true,
-          canvasFps: 4,
-          canvasQuality: 0.4
+          // matter, not smooth animation. These live under captureCanvas —
+          // the SDK reads nothing canvas-related at the top level, and
+          // quality is a string there.
+          captureCanvas: {
+            recordCanvas: true,
+            canvasFps: 4,
+            canvasQuality: '0.4'
+          }
         },
         capture_pageview: true,
         autocapture: true
