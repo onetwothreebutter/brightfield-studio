@@ -133,6 +133,14 @@ namespace_id = "1004"
 #                                it at checkout). Unset — as it is right now — means no
 #                                purchase attribution; everything else is unaffected. See
 #                                capturePurchase() in src/index.js.
+#                                The same key also turns on PostHog Logs: the handful of
+#                                phLog() call sites (auth failures, a fail-open rate limiter,
+#                                an order that cannot be fulfilled) send an OTLP batch per
+#                                invocation to POSTHOG_API_HOST/i/v1/logs. Unset, those lines
+#                                still reach the console and [observability.logs] above
+#                                exactly as they always have — phLog() mirrors first and
+#                                sends second. See phLog()/flushPhLogs() in src/index.js.
+#                                Note this is billed separately from events by log volume.
 #   POSTHOG_API_HOST           - defaults to https://us.i.posthog.com; set to
 #                                https://eu.i.posthog.com for EU Cloud (match the theme).
 #                                Same `wrangler secret put` route, for the same reason.
