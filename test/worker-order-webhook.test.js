@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // fresh for every test (instead of importing once at the top) keeps those
 // caches from leaking between tests.
 let worker, parseCustomSku, classifyLineItem, fulfillableQuantity;
+let posthogDistinctIdFromOrder, purchaseEventUuid, purchaseEventFromOrder;
 
 beforeEach(async () => {
   vi.resetModules();
@@ -22,6 +23,9 @@ beforeEach(async () => {
   parseCustomSku = mod.parseCustomSku;
   classifyLineItem = mod.classifyLineItem;
   fulfillableQuantity = mod.fulfillableQuantity;
+  posthogDistinctIdFromOrder = mod.posthogDistinctIdFromOrder;
+  purchaseEventUuid = mod.purchaseEventUuid;
+  purchaseEventFromOrder = mod.purchaseEventFromOrder;
 });
 
 afterEach(() => vi.unstubAllGlobals());
@@ -132,6 +136,7 @@ function jsonRes(obj) {
 // Printful catalog (size -> variant id), and Printful's order-create endpoint.
 function makeUpstreamFetch(overrides = {}) {
   const calls = [];
+  calls.posthog = [];
   const fn = vi.fn(async (url, opts = {}) => {
     const u = typeof url === 'string' ? url : url.toString();
     calls.push({ url: u, opts });
@@ -186,6 +191,14 @@ function makeUpstreamFetch(overrides = {}) {
         return jsonRes({ code: 200, result: { external_id: body.external_id, status: 'draft' } });
       }
       return jsonRes({ code: 200, result: { id: 99881, external_id: body.external_id, status: 'draft' } });
+    }
+
+    // PostHog capture — any host, since POSTHOG_API_HOST is configurable.
+    if (u.endsWith('/i/v0/e/')) {
+      calls.posthog.push({ url: u, body: JSON.parse(opts.body) });
+      if (overrides.posthogTransportFails) throw new TypeError('Network connection lost');
+      if (overrides.posthogRejects) return { ok: false, status: 400, json: async () => ({}), text: async () => '' };
+      return jsonRes({ status: 'Ok' });
     }
 
     if (u.includes('/admin/api/')) {
@@ -1776,5 +1789,242 @@ describe('POST /webhook/order-paid — Printful error reporting', () => {
 
     const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
     expect((await res.json()).error).toMatch(/Invalid recipient/);
+  });
+});
+
+// ── Purchase attribution (PostHog) ──────────────────────────────────────────
+
+const DISTINCT_ID = '0192a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b';
+
+function attributedOrder(overrides = {}) {
+  return defaultOrder({
+    processedAt: '2026-09-10T18:22:05Z',
+    customAttributes: [{ key: '_posthog_distinct_id', value: DISTINCT_ID }],
+    currentTotalPriceSet: { shopMoney: { amount: '42.50', currencyCode: 'USD' } },
+    ...overrides,
+  });
+}
+
+function posthogEnv(overrides = {}) {
+  return makeEnv({ POSTHOG_PROJECT_KEY: 'phc_worker_test', ...overrides });
+}
+
+describe('posthogDistinctIdFromOrder', () => {
+  it('reads the cart attribute the theme writes', () => {
+    expect(posthogDistinctIdFromOrder(attributedOrder())).toBe(DISTINCT_ID);
+  });
+
+  it('returns null when the attribute is absent, blank, or not a string', () => {
+    expect(posthogDistinctIdFromOrder(defaultOrder())).toBeNull();
+    expect(posthogDistinctIdFromOrder({ customAttributes: null })).toBeNull();
+    expect(posthogDistinctIdFromOrder(attributedOrder({ customAttributes: [{ key: '_posthog_distinct_id', value: '   ' }] }))).toBeNull();
+    expect(posthogDistinctIdFromOrder(attributedOrder({ customAttributes: [{ key: '_posthog_distinct_id', value: 12 }] }))).toBeNull();
+  });
+
+  it('ignores other attributes and rejects an id PostHog would not accept', () => {
+    expect(posthogDistinctIdFromOrder(attributedOrder({ customAttributes: [{ key: 'gift', value: 'yes' }] }))).toBeNull();
+    expect(posthogDistinctIdFromOrder(attributedOrder({ customAttributes: [{ key: '_posthog_distinct_id', value: 'x'.repeat(201) }] }))).toBeNull();
+  });
+});
+
+describe('purchaseEventUuid', () => {
+  it('is deterministic per order and differs between orders', async () => {
+    const a = await purchaseEventUuid(555000111);
+    expect(a).toBe(await purchaseEventUuid(555000111));
+    expect(a).toBe(await purchaseEventUuid('555000111'));
+    expect(a).not.toBe(await purchaseEventUuid(555000112));
+  });
+
+  it('is laid out as an RFC 4122 version-5 UUID', async () => {
+    expect(await purchaseEventUuid(1)).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
+});
+
+describe('purchaseEventFromOrder', () => {
+  it('is null for an order with no distinct_id, so nothing is captured under an invented person', async () => {
+    expect(await purchaseEventFromOrder(defaultOrder(), 555000111)).toBeNull();
+  });
+
+  it('carries GA4-shaped commerce properties and the order timestamp, and nothing personal', async () => {
+    const ev = await purchaseEventFromOrder(attributedOrder({
+      lineItems: { edges: [
+        { node: { sku: 'CUSTOM-1699999999999-M', quantity: 2, currentQuantity: 1, title: 'Custom Dot Rise', product: { id: 'p' } } },
+        { node: inhouseLineItem() },
+      ] },
+    }), 555000111);
+    expect(ev.event).toBe('purchase');
+    expect(ev.distinct_id).toBe(DISTINCT_ID);
+    expect(ev.timestamp).toBe('2026-09-10T18:22:05Z');
+    expect(ev.uuid).toBe(await purchaseEventUuid(555000111));
+    expect(ev.properties).toMatchObject({
+      order_id: '555000111',
+      order_name: '#1042',
+      value: 42.5,
+      currency: 'USD',
+      item_count: 2,          // currentQuantity wins: 1 custom + 1 in-house
+      line_items: 2,
+      skus: ['CUSTOM-1699999999999-M', 'TEE-BLK-M'],
+      custom_design_count: 1,
+    });
+    const flat = JSON.stringify(ev);
+    for (const pii of ['buyer@example.com', 'Jane', 'Doe', '123 Main St', '5035551234', '97201']) {
+      expect(flat).not.toContain(pii);
+    }
+  });
+
+  it('counts units with the fulfillment rules, not its own', async () => {
+    const ev = await purchaseEventFromOrder(attributedOrder({
+      lineItems: { edges: [
+        // negative currentQuantity is unusable → falls back to quantity, as fulfillableQuantity does
+        { node: { sku: 'CUSTOM-1699999999999-M', quantity: 2, currentQuantity: -1, product: { id: 'p' } } },
+        // neither usable → contributes nothing rather than refusing the event
+        { node: { sku: 'TEE-BLK-L', quantity: '2', product: { id: 'p', metafield: null }, variant: null } },
+      ] },
+    }), 1);
+    expect(ev.properties.item_count).toBe(2);
+    expect(ev.properties.custom_design_count).toBe(1);
+  });
+
+  it('tolerates a missing total and timestamp rather than refusing the event', async () => {
+    const ev = await purchaseEventFromOrder(attributedOrder({ currentTotalPriceSet: null, processedAt: null }), 1);
+    expect(ev.properties.value).toBeNull();
+    expect(ev.properties.currency).toBeNull();
+    expect(ev.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+});
+
+describe('POST /webhook/order-paid — purchase attribution', () => {
+  it('captures a purchase against the distinct_id carried on the order', async () => {
+    const env = posthogEnv();
+    const fetchMock = makeUpstreamFetch({ order: attributedOrder() });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(200);
+
+    expect(fetchMock.calls.posthog).toHaveLength(1);
+    const { url, body } = fetchMock.calls.posthog[0];
+    expect(url).toBe('https://us.i.posthog.com/i/v0/e/');
+    expect(body.api_key).toBe('phc_worker_test');
+    expect(body.event).toBe('purchase');
+    expect(body.distinct_id).toBe(DISTINCT_ID);
+    expect(body.properties.order_name).toBe('#1042');
+  });
+
+  it('honours a custom host and strips a trailing slash', async () => {
+    const env = posthogEnv({ POSTHOG_API_HOST: 'https://eu.i.posthog.com/' });
+    const fetchMock = makeUpstreamFetch({ order: attributedOrder() });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(fetchMock.calls.posthog[0].url).toBe('https://eu.i.posthog.com/i/v0/e/');
+  });
+
+  it('captures for an order this handler otherwise ignores — a purchase is a purchase', async () => {
+    const env = posthogEnv();
+    const fetchMock = makeUpstreamFetch({
+      order: attributedOrder({ lineItems: { edges: [{ node: { sku: 'MUG-01', quantity: 1, title: 'Mug', product: { id: 'p', metafield: null }, variant: null } }] } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect((await res.json()).ignored).toBe(true);
+    expect(fetchMock.calls.posthog).toHaveLength(1);
+    expect(fetchMock.calls.posthog[0].body.properties.custom_design_count).toBe(0);
+  });
+
+  it('sends the same uuid and timestamp on redelivery, so PostHog keeps one event', async () => {
+    const env = posthogEnv();
+    // First delivery: Printful is down → 502 → Shopify redelivers.
+    const failing = makeUpstreamFetch({ order: attributedOrder(), printfulOrderTransportFails: true });
+    vi.stubGlobal('fetch', failing);
+    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), env)).status).toBe(502);
+
+    const ok = makeUpstreamFetch({ order: attributedOrder() });
+    vi.stubGlobal('fetch', ok);
+    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), env)).status).toBe(200);
+
+    expect(failing.calls.posthog).toHaveLength(1);
+    expect(ok.calls.posthog).toHaveLength(1);
+    const [first, second] = [failing.calls.posthog[0].body, ok.calls.posthog[0].body];
+    expect(second.uuid).toBe(first.uuid);
+    expect(second.timestamp).toBe(first.timestamp);
+    expect(second.distinct_id).toBe(first.distinct_id);
+  });
+
+  it('does not capture again on an idempotency hit', async () => {
+    const env = posthogEnv();
+    const fetchMock = makeUpstreamFetch({ order: attributedOrder() });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect((await res.json()).alreadyProcessed).toBe(true);
+    expect(fetchMock.calls.posthog).toHaveLength(1);
+  });
+
+  it('captures nothing when the order carries no distinct_id', async () => {
+    const env = posthogEnv();
+    const fetchMock = makeUpstreamFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(200);
+    expect(fetchMock.calls.posthog).toHaveLength(0);
+  });
+
+  it('captures nothing when POSTHOG_PROJECT_KEY is unset', async () => {
+    const env = makeEnv();
+    const fetchMock = makeUpstreamFetch({ order: attributedOrder() });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    expect(res.status).toBe(200);
+    expect(fetchMock.calls.posthog).toHaveLength(0);
+  });
+
+  it('captures nothing for an order that is not paid', async () => {
+    const env = posthogEnv();
+    const fetchMock = makeUpstreamFetch({ order: attributedOrder({ displayFinancialStatus: 'PENDING' }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect((await worker.fetch(await webhookRequest({ id: 555000111 }), env)).status).toBe(422);
+    expect(fetchMock.calls.posthog).toHaveLength(0);
+  });
+
+  it('bounds the PostHog request with a timeout', async () => {
+    const env = posthogEnv();
+    const fetchMock = makeUpstreamFetch({ order: attributedOrder() });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    const call = fetchMock.calls.find(c => c.url.endsWith('/i/v0/e/'));
+    expect(call.opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('a PostHog outage or rejection never changes the webhook outcome', async () => {
+    for (const failure of [{ posthogTransportFails: true }, { posthogRejects: true }]) {
+      const env = posthogEnv();
+      const fetchMock = makeUpstreamFetch({ order: attributedOrder(), ...failure });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const res = await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+      const json = await res.json();
+      expect(res.status).toBe(200);
+      expect(json.printfulOrderId).toBe(99881);
+      expect(fetchMock.calls.posthog).toHaveLength(1);
+    }
+  });
+
+  it('never sends the shopper\'s email, name, or address to PostHog', async () => {
+    const env = posthogEnv();
+    const fetchMock = makeUpstreamFetch({ order: attributedOrder() });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await worker.fetch(await webhookRequest({ id: 555000111 }), env);
+    const flat = JSON.stringify(fetchMock.calls.posthog[0].body);
+    for (const pii of ['buyer@example.com', 'Jane', 'Doe', '123 Main St', '5035551234', '97201']) {
+      expect(flat).not.toContain(pii);
+    }
   });
 });

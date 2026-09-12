@@ -20,12 +20,14 @@ if (/\{[{%]/.test(logicSrc)) {
 }
 
 // The theme-facing surface: only the config object is Liquid-rendered.
-function makePosthogStub() {
+function makePosthogStub({ optedIn = false, distinctId = 'ph-distinct-123' } = {}) {
   return {
     init: vi.fn(),
     capture: vi.fn(),
     opt_in_capturing: vi.fn(),
-    opt_out_capturing: vi.fn()
+    opt_out_capturing: vi.fn(),
+    has_opted_in_capturing: vi.fn(() => optedIn),
+    get_distinct_id: vi.fn(() => distinctId)
   };
 }
 
@@ -81,6 +83,7 @@ beforeEach(() => {
   delete window.dataLayer;
   delete window.gtag;
   delete window.bfTrack;
+  delete window.bfAnalyticsId;
   delete window.bfAnalyticsConfig;
   delete window.posthog;
   delete window.Shopify;
@@ -158,7 +161,7 @@ describe('analytics snippet — bfTrack fan-out', () => {
 });
 
 describe('analytics snippet — PostHog init', () => {
-  it('initialises opted out of capture and persistence, without session replay', () => {
+  it('initialises opted out of capture and persistence', () => {
     const ph = run(BOTH);
     expect(ph.init).toHaveBeenCalledTimes(1);
     const [key, opts] = ph.init.mock.calls[0];
@@ -168,10 +171,28 @@ describe('analytics snippet — PostHog init', () => {
       opt_out_capturing_by_default: true,
       opt_out_persistence_by_default: true,
       opt_out_capturing_persistence_type: 'localStorage',
-      disable_session_recording: true,
       capture_pageview: true,
       autocapture: true
     });
+  });
+
+  it('enables session replay with masked inputs and canvas capture when the theme setting is on', () => {
+    const ph = run({ ...BOTH, posthogReplay: true });
+    const opts = ph.init.mock.calls[0][1];
+    expect(opts.disable_session_recording).toBe(false);
+    expect(opts.session_recording.maskAllInputs).toBe(true);
+    // posthog-js reads canvas settings only from session_recording.captureCanvas,
+    // and canvasQuality is a string there. Top-level keys are silently ignored.
+    const canvas = opts.session_recording.captureCanvas;
+    expect(canvas.recordCanvas).toBe(true);
+    expect(canvas.canvasFps).toBeLessThanOrEqual(5);
+    expect(typeof canvas.canvasQuality).toBe('string');
+    expect(opts.session_recording).not.toHaveProperty('recordCanvas');
+  });
+
+  it('leaves session replay off when the setting is off or absent', () => {
+    expect(run({ ...BOTH, posthogReplay: false }).init.mock.calls[0][1].disable_session_recording).toBe(true);
+    expect(run(BOTH).init.mock.calls[0][1].disable_session_recording).toBe(true);
   });
 
   it('honours the configured host and strips a trailing slash', () => {
@@ -182,6 +203,48 @@ describe('analytics snippet — PostHog init', () => {
   it('falls back to US Cloud when the host is blank', () => {
     const ph = run({ ...BOTH, posthogHost: null });
     expect(ph.init.mock.calls[0][1].api_host).toBe('https://us.i.posthog.com');
+  });
+});
+
+describe('analytics snippet — bfAnalyticsId', () => {
+  it('is defined and null when no provider is configured', () => {
+    run({ ga4: null, posthogKey: null, designMode: false }, { posthog: null });
+    expect(typeof window.bfAnalyticsId).toBe('function');
+    expect(window.bfAnalyticsId()).toBeNull();
+  });
+
+  it('is null for a GA4-only configuration', () => {
+    run({ ga4: 'G-TEST', posthogKey: null, designMode: false }, { posthog: null });
+    expect(window.bfAnalyticsId()).toBeNull();
+  });
+
+  it('returns the PostHog distinct_id once the shopper has opted in', () => {
+    run(BOTH, { posthog: makePosthogStub({ optedIn: true }) });
+    expect(window.bfAnalyticsId()).toBe('ph-distinct-123');
+  });
+
+  it('returns null while the shopper is opted out, even though the SDK has an id', () => {
+    const ph = makePosthogStub({ optedIn: false });
+    run(BOTH, { posthog: ph });
+    expect(window.bfAnalyticsId()).toBeNull();
+    expect(ph.get_distinct_id).not.toHaveBeenCalled();
+  });
+
+  it('returns null before array.js has loaded (the loader stub returns undefined)', () => {
+    run(BOTH, { posthog: makePosthogStub({ optedIn: undefined, distinctId: undefined }) });
+    expect(window.bfAnalyticsId()).toBeNull();
+  });
+
+  it('returns null rather than throwing when the SDK throws', () => {
+    const ph = makePosthogStub({ optedIn: true });
+    ph.get_distinct_id.mockImplementation(() => { throw new Error('boom'); });
+    run(BOTH, { posthog: ph });
+    expect(window.bfAnalyticsId()).toBeNull();
+  });
+
+  it('is null in the theme editor', () => {
+    run({ ...BOTH, designMode: true }, { posthog: makePosthogStub({ optedIn: true }) });
+    expect(window.bfAnalyticsId()).toBeNull();
   });
 });
 
@@ -270,11 +333,38 @@ describe('analytics snippet — consent sync', () => {
   });
 });
 
+describe('cart.js — purchase attribution attribute', () => {
+  const cartSrc = readFileSync(join(ROOT, 'assets', 'cart.js'), 'utf8');
+
+  it('writes the id into the cart attribute the worker reads back', () => {
+    // The two sides name the attribute independently; this is the only place
+    // the two spellings are checked against each other.
+    expect(cartSrc).toContain("'attributes[_posthog_distinct_id]'");
+    const workerSrc = readFileSync(join(ROOT, 'worker', 'src', 'index.js'), 'utf8');
+    expect(workerSrc).toContain("const POSTHOG_DISTINCT_ID_ATTRIBUTE = '_posthog_distinct_id';");
+  });
+
+  it('stamps the attribute on every submit, before the submitter check, and never preventDefaults', () => {
+    const wire = cartSrc.slice(cartSrc.indexOf('function wireCheckoutTracking'), cartSrc.indexOf('initLines();'));
+    expect(wire).not.toContain('preventDefault');
+    // Browsers without SubmitEvent.submitter must still stamp; only the
+    // begin_checkout event is gated on which button was pressed.
+    expect(wire.indexOf('stampAnalyticsId();')).toBeLessThan(wire.indexOf("btn.name !== 'checkout') return;"));
+  });
+
+  it('submits the field empty, not omitted, when there is no id — so a revoked consent clears a stored one', () => {
+    const stamp = cartSrc.slice(cartSrc.indexOf('function stampAnalyticsId'), cartSrc.indexOf('function wireCheckoutTracking'));
+    expect(stamp).toContain("input.value = id || '';");
+    expect(stamp).not.toContain('.remove()');
+  });
+});
+
 describe('analytics snippet — Liquid surface', () => {
   it('renders the config from theme settings and design mode', () => {
     expect(liquid).toContain('ga4: {{ settings.ga4_measurement_id | json }}');
     expect(liquid).toContain('posthogKey: {{ settings.posthog_project_key | json }}');
     expect(liquid).toContain("posthogHost: {{ settings.posthog_api_host | default: 'https://us.i.posthog.com' | json }}");
+    expect(liquid).toContain('posthogReplay: {{ settings.posthog_session_replay | json }}');
     expect(liquid).toContain('designMode: {{ request.design_mode | json }}');
   });
 
@@ -287,7 +377,7 @@ describe('analytics snippet — Liquid surface', () => {
     const stub = liquid.match(/o="([^"]+)"\.split\(" "\)/);
     expect(stub).not.toBeNull();
     const queued = stub[1].split(' ');
-    for (const m of ['init', 'capture', 'opt_in_capturing', 'opt_out_capturing']) {
+    for (const m of ['init', 'capture', 'opt_in_capturing', 'opt_out_capturing', 'has_opted_in_capturing', 'get_distinct_id']) {
       expect(queued).toContain(m);
     }
   });
@@ -295,6 +385,6 @@ describe('analytics snippet — Liquid surface', () => {
   it('declares the settings the config reads', () => {
     const schema = JSON.parse(readFileSync(join(ROOT, 'config', 'settings_schema.json'), 'utf8'));
     const ids = schema.flatMap((g) => (g.settings || []).map((s) => s.id));
-    expect(ids).toEqual(expect.arrayContaining(['ga4_measurement_id', 'posthog_project_key', 'posthog_api_host']));
+    expect(ids).toEqual(expect.arrayContaining(['ga4_measurement_id', 'posthog_project_key', 'posthog_api_host', 'posthog_session_replay']));
   });
 });

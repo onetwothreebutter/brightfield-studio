@@ -121,6 +121,21 @@ namespace_id = "1004"
 # scope granted, this restriction doesn't apply and GC behaves as before.
 #
 # Optional vars/secrets:
+#   POSTHOG_PROJECT_KEY        - PostHog project API key (phc_…); the same public key the
+#                                theme's "PostHog project API key" setting holds. Set it
+#                                with `npx wrangler secret put POSTHOG_PROJECT_KEY` even
+#                                though it is public: a plain Variable added in the
+#                                dashboard is wiped by every CI `wrangler deploy` (no
+#                                keep_vars), after which attribution stops silently. When set,
+#                                the orders/paid webhook captures a `purchase` event against
+#                                the shopper's distinct_id carried on the order as the
+#                                `_posthog_distinct_id` cart attribute (assets/cart.js writes
+#                                it at checkout). Unset — as it is right now — means no
+#                                purchase attribution; everything else is unaffected. See
+#                                capturePurchase() in src/index.js.
+#   POSTHOG_API_HOST           - defaults to https://us.i.posthog.com; set to
+#                                https://eu.i.posthog.com for EU Cloud (match the theme).
+#                                Same `wrangler secret put` route, for the same reason.
 #   PRINTFUL_GARMENT_COLOR     - garment color used when mapping a custom-design order's SKU
 #                                size to a Printful catalog variant (see getPrintfulVariantMap()
 #                                in src/index.js). Defaults to 'Black' if unset. Only matters

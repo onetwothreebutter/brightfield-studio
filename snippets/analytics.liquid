@@ -17,6 +17,7 @@
     ga4: {{ settings.ga4_measurement_id | json }},
     posthogKey: {{ settings.posthog_project_key | json }},
     posthogHost: {{ settings.posthog_api_host | default: 'https://us.i.posthog.com' | json }},
+    posthogReplay: {{ settings.posthog_session_replay | json }},
     designMode: {{ request.design_mode | json }}
   };
 </script>
@@ -48,6 +49,11 @@
         try { sinks[i](eventName, params || {}); } catch (e) { /* analytics never breaks the page */ }
       }
     };
+
+    // Overridden by the PostHog block below when it is configured; every
+    // caller can rely on it existing and returning null when there is no id
+    // to attribute to.
+    window.bfAnalyticsId = function () { return null; };
 
     function syncConsent(analyticsAllowed, marketingAllowed) {
       for (var i = 0; i < consentListeners.length; i++) {
@@ -114,7 +120,25 @@
         // because the load-time sync below writes "denied" for every visitor
         // who hasn't consented — and that write must not set a cookie.
         opt_out_capturing_persistence_type: 'localStorage',
-        disable_session_recording: true,
+        // Replay is gated by the same opt-in as everything else: the SDK only
+        // starts a recording once opt_in_capturing() has run. The theme
+        // setting is the merchant's switch; PostHog's project settings are the
+        // other half and have to be on too.
+        disable_session_recording: !cfg.posthogReplay,
+        session_recording: {
+          maskAllInputs: true,
+          // The shader is a WebGL canvas, and a replay without it is a blank
+          // rectangle with sliders moving next to it. Low frame rate and
+          // quality keep the recording size in check; the controls are what
+          // matter, not smooth animation. These live under captureCanvas —
+          // the SDK reads nothing canvas-related at the top level, and
+          // quality is a string there.
+          captureCanvas: {
+            recordCanvas: true,
+            canvasFps: 4,
+            canvasQuality: '0.4'
+          }
+        },
         capture_pageview: true,
         autocapture: true
       });
@@ -122,6 +146,19 @@
       sinks.push(function (eventName, params) {
         window.posthog.capture(eventName, params);
       });
+
+      // The cart form writes this into a cart attribute at checkout so the
+      // worker's orders/paid webhook can attribute the purchase to this
+      // browser's PostHog person. Null until array.js has loaded and the
+      // shopper is opted in — a distinct_id from an opted-out visitor would be
+      // a throwaway, and sending it would store an identifier they declined.
+      window.bfAnalyticsId = function () {
+        try {
+          if (!window.posthog.has_opted_in_capturing()) return null;
+          var id = window.posthog.get_distinct_id();
+          return typeof id === 'string' && id ? id : null;
+        } catch (e) { return null; }
+      };
 
       consentListeners.push(function (analyticsAllowed) {
         if (analyticsAllowed) {

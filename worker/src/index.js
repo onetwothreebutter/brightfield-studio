@@ -1527,6 +1527,130 @@ function formatPrintfulError(json) {
   return JSON.stringify(redacted);
 }
 
+// ── Purchase attribution (PostHog) ──────────────────────────────────────────
+// The storefront stops seeing the shopper at checkout, so the browser-side
+// funnel ends at begin_checkout. assets/cart.js writes the shopper's PostHog
+// distinct_id into this cart attribute on the Checkout submit; Shopify carries
+// it onto the order, and this webhook is the first place the store's own code
+// sees a paid order — so it is where `purchase` gets captured, server-side,
+// against that same person.
+//
+// The attribute is only ever present for a shopper who had opted in to
+// analytics (bfAnalyticsId() returns null otherwise), so its absence is the
+// normal case for a declined consent, a Shop Pay / dynamic-checkout purchase
+// that skipped the cart page, or an order placed before this shipped. Those
+// are skipped, not captured under an invented id: a person record with no
+// browser history is noise that would show up in every funnel as a purchase
+// from nowhere.
+const POSTHOG_DISTINCT_ID_ATTRIBUTE = '_posthog_distinct_id';
+const POSTHOG_DEFAULT_HOST = 'https://us.i.posthog.com';
+const POSTHOG_CAPTURE_TIMEOUT_MS = 5000;
+
+export function posthogDistinctIdFromOrder(order) {
+  const attrs = Array.isArray(order?.customAttributes) ? order.customAttributes : [];
+  const hit = attrs.find(a => a?.key === POSTHOG_DISTINCT_ID_ATTRIBUTE);
+  const value = typeof hit?.value === 'string' ? hit.value.trim() : '';
+  // PostHog caps distinct_id at 200 characters; anything longer is not one of
+  // its ids and would be rejected at ingestion anyway.
+  if (!value || value.length > 200) return null;
+  return value;
+}
+
+// One event per order, no matter how many times the webhook is delivered.
+// PostHog deduplicates on (distinct_id, uuid, timestamp), so all three have to
+// be stable across deliveries: the uuid is a hash of the order id and the
+// timestamp is the order's own processedAt rather than the clock. The hash is
+// laid out as a version-5, RFC 4122 UUID so it passes PostHog's uuid
+// validation; it is not a registered v5 namespace, just the same shape.
+export async function purchaseEventUuid(shopifyOrderId) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`brightfield-purchase:${shopifyOrderId}`));
+  const b = new Uint8Array(digest).slice(0, 16);
+  b[6] = (b[6] & 0x0f) | 0x50;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const hex = Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+// Builds the capture payload, or null when the order carries no distinct_id.
+// Deliberately nothing personal: no email, no name, no address. The event
+// attaches to a person PostHog already knows by its own id; the order in
+// Shopify is where the customer's details live.
+export async function purchaseEventFromOrder(order, shopifyOrderId) {
+  const distinctId = posthogDistinctIdFromOrder(order);
+  if (!distinctId) return null;
+
+  const lineItems = (order.lineItems?.edges || []).map(e => e.node);
+  const money = order.currentTotalPriceSet?.shopMoney;
+  const value = Number(money?.amount);
+  const skus = lineItems.map(li => li.sku).filter(sku => typeof sku === 'string' && sku);
+  const timestamp = typeof order.processedAt === 'string' && order.processedAt
+    ? order.processedAt
+    : new Date().toISOString();
+
+  return {
+    event: 'purchase',
+    distinct_id: distinctId,
+    uuid: await purchaseEventUuid(shopifyOrderId),
+    timestamp,
+    properties: {
+      order_id: String(shopifyOrderId),
+      order_name: order.name,
+      // GA4's `purchase` shape, so a PostHog funnel and a GA4 report count
+      // the same thing under the same names.
+      value: Number.isFinite(value) ? value : null,
+      currency: money?.currencyCode || null,
+      // Same rules as fulfillment, via the same helpers, so what PostHog is
+      // told matches what Printful is told for the same order. A line item
+      // with no usable count adds nothing here rather than refusing the event.
+      item_count: lineItems.reduce((n, li) => n + (fulfillableQuantity(li) ?? 0), 0),
+      line_items: lineItems.length,
+      skus,
+      custom_design_count: lineItems.filter(li => classifyLineItem(li).type === 'custom').length,
+      $lib: 'brightfield-worker',
+    },
+  };
+}
+
+// Fire-and-forget: never throws, never affects the webhook's response.
+// POSTHOG_PROJECT_KEY unset means the feature is off — the same key the theme
+// uses (it is public; the SDK ships it to every browser), so there is nothing
+// secret to protect here, only a second copy to keep in step with the theme
+// setting.
+async function capturePurchase(env, order, shopifyOrderId) {
+  if (!env.POSTHOG_PROJECT_KEY) return;
+  let event;
+  try {
+    event = await purchaseEventFromOrder(order, shopifyOrderId);
+  } catch (err) {
+    console.error('[order-paid] could not build purchase event for order', order?.name, ':', err.message);
+    return;
+  }
+  if (!event) {
+    console.log('[order-paid] order', order.name, 'carries no', POSTHOG_DISTINCT_ID_ATTRIBUTE, '— purchase not attributed');
+    return;
+  }
+  const host = String(env.POSTHOG_API_HOST || POSTHOG_DEFAULT_HOST).replace(/\/+$/, '');
+  try {
+    const res = await fetch(`${host}/i/v0/e/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: env.POSTHOG_PROJECT_KEY, ...event }),
+      // This runs under waitUntil, which Shopify's webhook timeout does not
+      // bound, so an ingest that accepts the connection and never answers
+      // would hold the invocation to the platform cap and stall the log flush
+      // chained after it. The catch below logs the AbortError like any other.
+      signal: AbortSignal.timeout(POSTHOG_CAPTURE_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      console.error('[order-paid] PostHog rejected purchase event for order', order.name, '(status', res.status + ')');
+      return;
+    }
+    console.log('[order-paid] captured purchase for order', order.name);
+  } catch (err) {
+    console.error('[order-paid] PostHog capture failed for order', order.name, ':', err.message);
+  }
+}
+
 async function handleOrderPaidWebhook(request, env, ctx) {
   const headers = { 'Content-Type': 'application/json' };
   // No CORS headers: Shopify calls this server-to-server, not from a browser —
@@ -1724,6 +1848,10 @@ async function handleOrderPaidWebhook(request, env, ctx) {
           name
           email
           displayFinancialStatus
+          # Read by capturePurchase(), not by fulfillment.
+          processedAt
+          customAttributes { key value }
+          currentTotalPriceSet { shopMoney { amount currencyCode } }
           shippingAddress {
             firstName
             lastName
@@ -1805,6 +1933,17 @@ async function handleOrderPaidWebhook(request, env, ctx) {
     await releaseClaim();
     return new Response(JSON.stringify({ error: 'Order is not paid', financialStatus }), { status: 422, headers });
   }
+
+  // Analytics, before any Printful decision: a purchase is a purchase whether
+  // or not this handler has anything to make for it, and the ignore path a
+  // few lines down returns early. Off the response's critical path — Shopify
+  // is waiting on this request, and PostHog is not something an order should
+  // block on. Every exit past this point is idempotent for PostHog because
+  // the event's uuid is derived from the order id, so a redelivery (Printful
+  // 502, 409 race, released claim) re-sends the same event and PostHog keeps
+  // one. In tests ctx is absent and the send is awaited instead.
+  const purchaseCapture = capturePurchase(env, order, shopifyOrderId);
+  if (ctx?.waitUntil) ctx.waitUntil(purchaseCapture); else await purchaseCapture;
 
   // The line-item query fetches a single page. If the order has more, the
   // items beyond it were never seen here — classifying only what came back
