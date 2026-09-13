@@ -771,12 +771,19 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
     untrackedItems.push({ variantId: sv.id, invGid, sizeLabel });
   }
 
-  // Step 2b: stock each (now untracked) item at the Printful location. This is
-  // fulfillment routing, not inventory: without a level there Shopify assigns
-  // the fulfillment order to the store's default location, mixed orders split
-  // into two shipment groups at checkout, and the Printful app cannot mark the
-  // custom item shipped (PR #389). Only items that untracked successfully are
-  // activated — activating a tracked item is the sold-out state described above.
+  // Step 2b: stock each (now untracked) item at the Printful location, and
+  // nowhere else. This is fulfillment routing, not inventory: Shopify assigns a
+  // fulfillment order to a location that stocks the item. Shopify stocks every
+  // new variant at the store's own location on creation, so after activating
+  // at Printful the item is stocked at both — and with the default routing
+  // rules a custom-only order ships "from the closest location", which for a
+  // shopper nearer the store address than Printful is the store. The Printful
+  // draft still gets created, but the Shopify order sits unfulfilled at the
+  // store location and the Printful app cannot close it out with tracking.
+  // Deactivating every non-Printful level leaves exactly the state the
+  // Printful-synced in-house products are in: stocked at Printful only.
+  // Only items that untracked successfully are activated — activating a
+  // tracked item is the sold-out state described above.
   const printfulLocationId = await getPrintfulLocationId(env);
   console.log(logPrefix, 'Printful location ID:', printfulLocationId);
   if (printfulLocationId) {
@@ -784,7 +791,13 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
       const activateData = await shopifyAdmin(env,
         `mutation ActivateInventory($inventoryItemId: ID!, $locationId: ID!) {
           inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId) {
-            inventoryLevel { id item { tracked } }
+            inventoryLevel {
+              id
+              item {
+                tracked
+                inventoryLevels(first: 10) { edges { node { id location { id name } } } }
+              }
+            }
             userErrors { field message }
           }
         }`,
@@ -795,11 +808,28 @@ async function createShopifyProduct(env, { designUrl, mockupUrl, checkoutImageUr
         console.error(logPrefix, 'inventoryActivate errors for', sizeLabel, ':', JSON.stringify(activateErrors));
         continue;
       }
-      const tracked = activateData.data.inventoryActivate.inventoryLevel?.item?.tracked;
+      const level = activateData.data.inventoryActivate.inventoryLevel;
       // Should never fire — tracked lives on the item, not the level — but if
       // Shopify ever re-tracks on activation this is the log line that says so.
-      if (tracked === true) console.error(logPrefix, 'inventoryActivate re-tracked item for', sizeLabel);
+      if (level?.item?.tracked === true) console.error(logPrefix, 'inventoryActivate re-tracked item for', sizeLabel);
       else console.log(logPrefix, 'inventory activated at Printful location for', sizeLabel);
+
+      const otherLevels = (level?.item?.inventoryLevels?.edges || [])
+        .map(e => e.node)
+        .filter(l => l.location?.id && l.location.id !== printfulLocationId);
+      for (const other of otherLevels) {
+        const deactivateData = await shopifyAdmin(env,
+          `mutation DeactivateInventory($inventoryLevelId: ID!) {
+            inventoryDeactivate(inventoryLevelId: $inventoryLevelId) {
+              userErrors { field message }
+            }
+          }`,
+          { inventoryLevelId: other.id }
+        );
+        const deactivateErrors = graphqlFailure(deactivateData, 'inventoryDeactivate') || deactivateData.data.inventoryDeactivate.userErrors;
+        if (deactivateErrors?.length) console.error(logPrefix, 'inventoryDeactivate errors for', sizeLabel, 'at', other.location.name, ':', JSON.stringify(deactivateErrors));
+        else console.log(logPrefix, 'unstocked', sizeLabel, 'at', other.location.name);
+      }
     }
   } else {
     console.warn(logPrefix, 'skipping inventoryActivate — missing locationId');

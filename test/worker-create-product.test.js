@@ -164,7 +164,19 @@ function makeShopifyFetch(overrides = {}) {
       return jsonRes({ data: { inventoryItemUpdate: { inventoryItem: { id: 'inv', sku: 'CUSTOM-1', tracked: false }, userErrors: [] } } });
     }
     if (query.includes('mutation ActivateInventory')) {
-      return jsonRes({ data: { inventoryActivate: { inventoryLevel: { id: 'lvl', item: { tracked: false } }, userErrors: [] } } });
+      // After activation the item is stocked at two places: the store's own
+      // location (Shopify adds that on product creation) and Printful.
+      const invId = JSON.parse(opts.body).variables.inventoryItemId;
+      return jsonRes({ data: { inventoryActivate: { inventoryLevel: { id: 'lvl', item: {
+        tracked: false,
+        inventoryLevels: { edges: [
+          { node: { id: `lvl-store-${invId}`, location: { id: 'gid://shopify/Location/99', name: '1780 360th St SW' } } },
+          { node: { id: `lvl-printful-${invId}`, location: { id: 'gid://shopify/Location/1', name: 'Printful' } } },
+        ] },
+      } }, userErrors: [] } } });
+    }
+    if (query.includes('mutation DeactivateInventory')) {
+      return jsonRes({ data: { inventoryDeactivate: { userErrors: [] } } });
     }
     if (query.includes('fulfillmentServices')) {
       return jsonRes({ data: { shop: { fulfillmentServices: [{ handle: 'printful', serviceName: 'Printful', location: { id: 'gid://shopify/Location/1' } }] } } });
@@ -475,6 +487,16 @@ describe('POST /create-product', () => {
       expect(graphql.indexOf(a)).toBeGreaterThan(untrackIdx);
     }
 
+    // Each item ends up stocked at Printful only — the store's own level, which
+    // Shopify adds on creation, is deactivated so a custom-only order cannot
+    // route to the store address under "ship from the closest location".
+    const deactivateCalls = graphql.filter((b) => b.query.includes('mutation DeactivateInventory'));
+    expect(deactivateCalls.map((b) => b.variables.inventoryLevelId).sort()).toEqual([
+      'lvl-store-gid://shopify/InventoryItem/8881',
+      'lvl-store-gid://shopify/InventoryItem/8882',
+      'lvl-store-gid://shopify/InventoryItem/8883',
+    ]);
+
     // Nothing else touches tracking: no request outside the untrack call may
     // mention `tracked`, and the old repair passes stay gone.
     const others = graphql.filter((b) => !b.query.includes('mutation UpdateInventoryItem'));
@@ -692,6 +714,8 @@ describe('POST /create-product', () => {
     const activateCalls = graphql.filter((b) => b.query.includes('mutation ActivateInventory'));
     expect(activateCalls).toHaveLength(1);
     expect(activateCalls[0].variables.inventoryItemId).toBe('gid://shopify/InventoryItem/8881');
+    const deactivateCalls = graphql.filter((b) => b.query.includes('mutation DeactivateInventory'));
+    expect(deactivateCalls.map((b) => b.variables.inventoryLevelId)).toEqual(['lvl-store-gid://shopify/InventoryItem/8881']);
   });
 
   it('falls back to REST publish when the GraphQL publishablePublish call fails', async () => {
