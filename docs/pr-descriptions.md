@@ -71,7 +71,7 @@ This section is what keeps a merged PR from quietly being half-shipped.
 
 The command and its real result, with counts:
 
-> `npm test` — 569 passed, 19 files.
+> `npm test` — 763 passed, 24 files.
 
 Rules:
 
