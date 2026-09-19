@@ -30,7 +30,7 @@ Key files:
 | `sections/homepage-shader-demo.liquid` | Homepage shader demo with controls and Share-link sharing |
 | `sections/hero.liquid` | Homepage hero with plasma canvas |
 | `assets/theme.css` | Main stylesheet (a few sections carry their own `{% stylesheet %}` blocks) |
-| `worker/src/index.js` | Cloudflare Worker: image hosting, product creation, order fulfillment, community gallery, reviews, shader state sharing |
+| `worker/src/index.js` | Cloudflare Worker — every endpoint (full feature list under Architecture above) |
 
 ## Shader System
 
@@ -40,10 +40,11 @@ Key files:
 
 ## Share Links
 
-The two pages share differently:
+Three share surfaces exist:
 
 - **Homepage demo — Share button**: saves the current shader state to R2 via `POST /save-shader-state` and copies a short URL (`#share=<id>`) to the clipboard.
 - **Product page — Share button**: captures the canvas as a JPEG and POSTs it with the shader state to `POST /create-share`; the Worker stores both and returns an absolute share-page URL (`https://share.brightfield.studio/<id>`), which is what gets copied. That page carries the design image in its Open Graph/Twitter meta tags (so link previews show it) and immediately redirects the visitor to the product with a `?bfr=<base64-state>#shader` URL that restores the design.
+- **Community gallery cards** copy the same `https://share.brightfield.studio/<id>` URL form for approved submissions. For those ids the share page serves metadata from `community/submissions/` and redirects to the product (or the community page) **without** a `?bfr=` restore payload — the restore link is a direct-share feature.
 
 Both pages still restore `#share=` URLs. When one is loaded:
 
@@ -58,7 +59,7 @@ Worker endpoints:
 - `POST /save-shader-state` — accepts `{ state: {...} }`, stores in R2, returns `{ id }` (UUID)
 - `GET /get-shader-state/:id` — returns the stored state JSON
 - `POST /create-share` — accepts `{ image, shader, productHandle, values }`, stores the JPEG + metadata in R2, returns `{ id, url }`
-- `GET https://share.brightfield.studio/<id>` — the share page itself (every GET on that host treats the path as the id; the same page is also at `GET /share/:id` on the workers.dev domain)
+- `GET https://share.brightfield.studio/<id>` — the share page itself (a hostname catch-all: a GET on that host not matching an earlier route treats the path as the id — `/img/*` and the other host-agnostic routes still win there, which matters since design images themselves are served from that host; the same page is also at `GET /share/:id` on the workers.dev domain)
 
 ## How to Create a New Shirt
 
@@ -75,9 +76,9 @@ For a shader that doesn't exist yet, first follow "Adding a new shader" in `CLAU
 # 1. Install git hooks
 scripts/install-hooks.sh
 
-# 2. Run theme dev server
-shopify theme dev --store brightfield-2.myshopify.com
-# Local preview: http://127.0.0.1:9292
+# 2. Run theme dev server (picks a free port, 9292 preferred)
+npm run dev
+# Local preview: the URL the CLI prints (http://127.0.0.1:9292 when free)
 
 # 3. Run Worker locally (if editing the worker)
 cd worker && npm run dev

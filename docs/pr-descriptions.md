@@ -69,9 +69,11 @@ This section is what keeps a merged PR from quietly being half-shipped.
 
 ### Testing
 
-The command and its real result, with counts:
+The command and its real result, with the counts your own run printed — never
+a number copied from an example (a literal count written here has gone stale
+twice):
 
-> `npm test` — 763 passed, 24 files.
+> `npm test` — N passed, M files.
 
 Rules:
 

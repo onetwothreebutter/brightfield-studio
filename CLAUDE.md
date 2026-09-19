@@ -15,7 +15,7 @@ Non-negotiable:
 - Explain why the *obvious* fix doesn't work whenever one exists — that paragraph is the point of the description.
 - For shader/visual changes, state explicitly whether existing designs render identically at default values.
 - **Not done here** is required if anything is deferred (manual admin steps, secrets, follow-ups).
-- Testing shows the real command and counts (`npm test` — 763 passed, 24 files). If local visual verification hasn't happened, say so — never imply it did.
+- Testing shows the real command and the counts your run actually printed (`npm test` — N passed, M files); never copy a count from an example — literals here have gone stale twice. If local visual verification hasn't happened, say so — never imply it did.
 - Don't restate the diff file by file.
 
 ## Dev commands
@@ -78,10 +78,10 @@ Never redefine these locally in a shader snippet — they are already in scope:
 
 ### Naming conventions
 - Cosine palette uniforms: `u_a`, `u_b`, `u_c`, `u_d` (vec3)
-- Color mode: `u_color_mode` — 0 = cosine palette, 1 = 4-stop. This is the convention for new shaders, not a universal fact: echo-text is 0=Flat/1=4-Stop/2=Cosine, scaling-letters is 0=Flat/1=4-Stop, and chladni has no mode control at all — match modes by option *label*, never by assuming a value (the palette adapter does exactly this).
+- Color mode: `u_color_mode` — 0 = cosine palette, 1 = 4-stop. This is the convention for new shaders, not a universal fact: echo-text is 0=Flat/1=4-Stop/2=Cosine, scaling-letters is 0=Flat/1=4-Stop, and chladni has no mode control at all. Where the mode is a `select`, match by option *label* rather than assuming a value — the palette adapter does exactly that; where it's a toggle (circle-on-line, line-circle, line-text, scribble-glyph, contour-pareidolia, three-square) the adapter falls back to assuming 1 = 4-stop when the def has 4-stop slots, so a toggle-mode shader must keep On = 4-stop.
 - `paletteDependent: true` — row visible when `u_color_mode` = 0
 - `stopDependent: true` — row visible when `u_color_mode` = 1
-- Outline: `outlineEnabled` (toggle), `outlineWidth` (range), `u_outline_color` (color). Exception: echo-text predates the convention and uses `u_outline_enabled`/`u_outline_width`.
+- Outline: `outlineEnabled` (toggle), `outlineWidth` (range), `u_outline_color` (color). Exceptions: echo-text predates the convention and uses `u_outline_enabled`/`u_outline_width`; contour-pareidolia reuses the `u_outline_width` key for its Border Width control (no toggle, no color).
 
 ### Font select control
 ```javascript
@@ -119,7 +119,7 @@ The Finish section is always the last section in the controls array, and it is b
 - `FINISH_CONTROLS_POST` — `u_vignette_top/bottom/left/right` (0–20), `u_vignette_anchor_x/y` (0–1, default 0.5), `u_pos_x`/`u_pos_y` (−0.5–0.5), `u_scale` (0.2–3.0)
 - `FINISH_CONTROLS` — PRE concatenated with POST
 
-Everything in the section is `noRandomize: true` (line-text deliberately swaps that for `randomMin`/`randomMax` on its four vignette *edge* rows — its anchor rows stay `noRandomize`). A shader with nothing to add concatenates `FINISH_CONTROLS` wholesale; a shader with Finish extras or its own position/vignette defaults uses `FINISH_CONTROLS_PRE`, then its extras, then either `FINISH_CONTROLS_POST` or hand-written POST rows carrying shader-specific `value:`s (chladni, rise-shirt, line-text, stacked-gradient and three-square do this). One outlier: outline-pulse writes its own `Finish` header, inserts `u_transparent_bg` *before* `FINISH_CONTROLS_PRE.slice(1)` (slicing off the shared header), then takes `FINISH_CONTROLS_POST` wholesale.
+The shared entries are all `noRandomize: true` (line-text deliberately swaps that for `randomMin`/`randomMax` on its four vignette *edge* rows — its anchor rows stay `noRandomize`), but a shader-specific extra doesn't inherit the flag: outline-pulse's `u_transparent_bg` omits it, so the global Randomize coin-flips that toggle. Composition in practice: most shaders concatenate `FINISH_CONTROLS` wholesale; chladni, rise-shirt, line-text, stacked-gradient and three-square use `FINISH_CONTROLS_PRE` then hand-written POST rows carrying shader-specific `value:`s; echo-text concatenates `FINISH_CONTROLS` wholesale and then patches `u_pos_y` via `.map()`; and outline-pulse writes its own `Finish` header, inserts `u_transparent_bg` *before* `FINISH_CONTROLS_PRE.slice(1)` (slicing off the shared header), then takes `FINISH_CONTROLS_POST` wholesale. No shader currently places an extra between PRE and POST.
 
 **GLSL uniforms to declare in every shader:**
 ```glsl
@@ -132,7 +132,7 @@ uniform float u_pos_x;
 uniform float u_pos_y;
 uniform float u_scale;
 ```
-The vignette and halftone uniforms (`u_vignette_top/bottom/left/right`, `u_vignette_anchor_x/y`, `u_halftone_angle/_luma/_shape`) are declared once in `window.ShaderBase.commonGLSL`, which every fragment source concatenates — **do not redeclare them** (a duplicate declaration is a GLSL compile error). They still need `setup()` locations and `render()` calls like everything else (`u_halftone_angle` is converted degrees → radians in `render()`).
+The vignette and halftone uniforms (`u_vignette_top/bottom/left/right`, `u_vignette_anchor_x/y`, `u_halftone_angle/_luma/_shape`) are declared once in `window.ShaderBase.commonGLSL` — and nothing includes that for you: `create()` just joins `fragSrc`, so every shader adds a `window.ShaderBase.commonGLSL,` entry to its own `fragSrc` array (it also carries `computeVigMask`/`applyDistress`, so omitting it fails to compile). **Do not redeclare its uniforms** (a duplicate declaration is a GLSL compile error). They still need `setup()` locations and `render()` calls like everything else (`u_halftone_angle` is converted degrees → radians in `render()`; known gap: scribble-glyph never wires `u_halftone_shape`, so its Dot Shape select is dead).
 
 Note the GLSL keeps a single `u_distress`/`u_distress_scale` pair even though the panel has five: `render()` selects the active grain mode's control value on the CPU and feeds that one uniform:
 ```js
@@ -140,7 +140,7 @@ var _gm = Math.round(v.u_grain_mode != null ? parseFloat(v.u_grain_mode) : 0);
 gl.uniform1f(u.distress,      v['u_distress_' + _gm]       != null ? v['u_distress_' + _gm]       : (v.u_distress       != null ? v.u_distress       : 0.0));
 gl.uniform1f(u.distressScale, v['u_distress_scale_' + _gm] != null ? v['u_distress_scale_' + _gm] : (v.u_distress_scale != null ? v.u_distress_scale : 80.0));
 ```
-(The inner fallback keeps designs saved before the per-mode split rendering correctly.)
+(The inner fallback only ever fires where `values` is assigned wholesale — the manual/lab harness. On the product page every control key is pre-seeded with its default and both restore paths drop unknown keys, so a pre-split design's saved `u_distress` is discarded there and the per-mode default applies instead.)
 
 **UV position/scale transform — apply at the very top of `main()`, right after computing `uv`:**
 ```glsl
@@ -179,7 +179,7 @@ fragColor = vec4(encoded * alpha, alpha);
 Known deviation: `assets/echo-text.js` currently outputs with no gamma encode at all — don't copy it as a reference for this step.
 
 ### ctx.font weight
-Always use bold: `ctx.font = 'bold ' + fontSize + 'px ' + fontFamily` (existing deviations: scaling-letters uses `'600 '`, stacked-gradient `'700 '`)
+Always use bold: `ctx.font = 'bold ' + fontSize + 'px ' + fontFamily`. Stacked-gradient's `'700 '` is bold by number; the real deviations are scaling-letters (`'600 '`) and homepage-demo-shader, which has no weight token at all — it renders at 400, a weight nothing preloads.
 
 ### Adding a new shader
 1. Create `snippets/shader-controls-[name].liquid` — define `controls` array and optional `customAfterBuild`; use globals from base snippet
@@ -188,7 +188,7 @@ Always use bold: `ctx.font = 'bold ' + fontSize + 'px ' + fontFamily` (existing 
 4. Tag the product `shader-[name]` in Shopify
 5. `npm run build:shader-defs`, then add the shader to the `#shader-picker` list in `test-shaders.html` — the palette lab picks it up from `shader-defs.js` automatically. Run this after **any** snippet control change, not just a new shader; `npm test` fails if you forget.
 
-**Checklist before submitting:** confirm the Finish section is built from `FINISH_CONTROLS` (or `FINISH_CONTROLS_PRE` + extras + POST rows), AND that every Finish uniform has a `setup()` location + `render()` call. Declare `u_opacity`, `u_grain_mode`, `u_distress`, `u_distress_scale`, `u_distress_falloff`, `u_pos_x`, `u_pos_y`, `u_scale` in your GLSL; the vignette/halftone uniforms come from `commonGLSL` — wire them, don't redeclare them. See "Finish section — standard controls" above.
+**Checklist before submitting:** confirm the Finish section is built from `FINISH_CONTROLS` (or `FINISH_CONTROLS_PRE` + extras + POST rows), AND that every Finish uniform has a `setup()` location + `render()` call. Declare `u_opacity`, `u_grain_mode`, `u_distress`, `u_distress_scale`, `u_distress_falloff`, `u_pos_x`, `u_pos_y`, `u_scale` in your GLSL and include `window.ShaderBase.commonGLSL` in your `fragSrc` array; wire its vignette/halftone uniforms, don't redeclare them. See "Finish section — standard controls" above.
 
 ## Probabilistic color palettes
 
@@ -310,7 +310,7 @@ handle.renderFrame(ProbabilisticPaletteShader.FIXED_TIME);
   ```
   `shader-base.js` declares `u_group_mode/_count/_bounds[7]/_colors[8]/_seed/_density`, looks them up itself and uploads them each frame, so there is no per-shader JS wiring. **Support is detected, not listed**: a shader that never calls `paletteGroupColor` has the uniforms optimized out, so `handle.supportsGroups` (a null uniform location) can't drift from the GLSL. The lab badges the size rules inert on exactly the shaders that report false.
 
-  Wired so far, with the size expression and the element id each uses: **rise-shirt** (`1.0 - t` since dot radius is `mix(effectiveMax, u_min_radius, t)`; id = halftone cell `floor(gridUv.y) * u_cols + floor(gridUv.x)`), **circle-on-line** / **line-circle** (line thickness within `u_width_top`→`u_width_bot`; id = `floor(warped * u_line_count)`, the line index `phase` is the fract of), **three-square** (`colFill`, the normalized column width resampled at the column centre — the per-fragment `fillSample` is exactly what the wiring avoids, since it made one column report two sizes; a binary signal, so only two cohorts are ever reached; id = `layer * 1024.0 + floor(scaledX)`, offset by layer so the same column of two squares is two elements).
+  Wired so far, with the size expression and the element id each uses: **rise-shirt** (`1.0 - cellMix`, the radius mix factor resampled at the halftone cell centre — dot radius itself is `mix(effectiveMax, u_min_radius, mixFactor)` per fragment; id = halftone cell `floor(gridUv.y) * u_cols + floor(gridUv.x)`), **circle-on-line** / **line-circle** (line thickness within `u_width_top`→`u_width_bot`; id = `floor(warped * u_line_count)`, the line index `phase` is the fract of), **three-square** (`colFill`, the normalized column width resampled at the column centre — the per-fragment `fillSample` is exactly what the wiring avoids, since it made one column report two sizes; a binary signal, so only two cohorts are ever reached; id = `layer * 1024.0 + floor(scaledX)`, offset by layer so the same column of two squares is two elements).
 
   **Print density rolls per element, in the GLSL.** `paletteRoll32` is a transcription of `makeRng`/`elementRoll`, not a second generator: mulberry32 is pure uint32 arithmetic and WebGL2 uint math wraps mod 2^32 exactly as `Math.imul` and `>>>` do, so the shader reaches the same decision the CPU would — on every GPU, without a readback. A float hash would drift between drivers and break same-seed-same-pixels.
   - **`highp` is load-bearing, not decoration.** A GLSL ES 3.00 fragment shader defaults `int`/`uint` to **mediump** (16 bits guaranteed) and these shaders declare only `precision mediump float`. Left implicit, the arithmetic is exact on desktop and wrong on a phone. Every uint in the roll, `u_group_seed`, `u_group_density` and each shader's `…Id` local is explicitly `highp` — the id matters too, since past 2048 a mediump float stops counting in ones and adjacent elements start sharing a roll.
@@ -471,9 +471,13 @@ Two settings only mean what they say under conditions the panel has to check:
   so the box kept showing its build-time state.
 
 ### An unset `generativeWeights` reads as on
-`createAssigner` skips variation only when the flag is exactly `false` — but `createPalette` writes `generativeWeights: false` explicitly, so this only bites hand-written or stored palette JSON that omits the flag.
+`createAssigner` skips variation only when the flag is exactly `false` — `createPalette` writes `generativeWeights: false` explicitly, so this bites hand-written or stored palette JSON that omits the flag.
 `describe()` — which the tier badges and preview strip read — must use the same
 test, or an unset flag makes the reported hierarchy differ from the rendered one.
+The editor's Generative weights checkbox currently gets this wrong: it reads
+`!!palette.generativeWeights`, so an imported JSON without the flag renders
+*varied* under an unticked box — and ticking-then-unticking the box to "fix"
+the mismatch writes an explicit `false` that genuinely changes the output.
 
 ### Adding a preset
 Data only, no engine change:
