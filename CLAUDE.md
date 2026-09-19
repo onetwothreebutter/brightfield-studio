@@ -119,7 +119,7 @@ The Finish section is always the last section in the controls array, and it is b
 - `FINISH_CONTROLS_POST` — `u_vignette_top/bottom/left/right` (0–20), `u_vignette_anchor_x/y` (0–1, default 0.5), `u_pos_x`/`u_pos_y` (−0.5–0.5), `u_scale` (0.2–3.0)
 - `FINISH_CONTROLS` — PRE concatenated with POST
 
-Everything in the section is `noRandomize: true` (line-text deliberately swaps that for `randomMin`/`randomMax` on its vignette rows). A shader with nothing to add concatenates `FINISH_CONTROLS` wholesale; a shader with Finish extras or its own position/vignette defaults uses `FINISH_CONTROLS_PRE`, then its extras, then either `FINISH_CONTROLS_POST` or hand-written POST rows carrying shader-specific `value:`s (chladni, rise-shirt, line-text, stacked-gradient and three-square do this).
+Everything in the section is `noRandomize: true` (line-text deliberately swaps that for `randomMin`/`randomMax` on its four vignette *edge* rows — its anchor rows stay `noRandomize`). A shader with nothing to add concatenates `FINISH_CONTROLS` wholesale; a shader with Finish extras or its own position/vignette defaults uses `FINISH_CONTROLS_PRE`, then its extras, then either `FINISH_CONTROLS_POST` or hand-written POST rows carrying shader-specific `value:`s (chladni, rise-shirt, line-text, stacked-gradient and three-square do this). One outlier: outline-pulse writes its own `Finish` header, inserts `u_transparent_bg` *before* `FINISH_CONTROLS_PRE.slice(1)` (slicing off the shared header), then takes `FINISH_CONTROLS_POST` wholesale.
 
 **GLSL uniforms to declare in every shader:**
 ```glsl

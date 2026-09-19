@@ -43,7 +43,7 @@ Key files:
 The two pages share differently:
 
 - **Homepage demo — Share button**: saves the current shader state to R2 via `POST /save-shader-state` and copies a short URL (`#share=<id>`) to the clipboard.
-- **Product page — Share button**: captures the canvas as a JPEG and POSTs it with the shader state to `POST /create-share`; the Worker stores both and returns an absolute share-page URL (`https://share.brightfield.studio/<id>`), which is what gets copied. That page shows the design image with Open Graph tags and links back to the product with a `?bfr=<base64-state>#shader` URL that restores the design.
+- **Product page — Share button**: captures the canvas as a JPEG and POSTs it with the shader state to `POST /create-share`; the Worker stores both and returns an absolute share-page URL (`https://share.brightfield.studio/<id>`), which is what gets copied. That page carries the design image in its Open Graph/Twitter meta tags (so link previews show it) and immediately redirects the visitor to the product with a `?bfr=<base64-state>#shader` URL that restores the design.
 
 Both pages still restore `#share=` URLs. When one is loaded:
 
@@ -58,7 +58,7 @@ Worker endpoints:
 - `POST /save-shader-state` — accepts `{ state: {...} }`, stores in R2, returns `{ id }` (UUID)
 - `GET /get-shader-state/:id` — returns the stored state JSON
 - `POST /create-share` — accepts `{ image, shader, productHandle, values }`, stores the JPEG + metadata in R2, returns `{ id, url }`
-- `GET /share/:id` (served on `share.brightfield.studio`) — the share page itself
+- `GET https://share.brightfield.studio/<id>` — the share page itself (every GET on that host treats the path as the id; the same page is also at `GET /share/:id` on the workers.dev domain)
 
 ## How to Create a New Shirt
 

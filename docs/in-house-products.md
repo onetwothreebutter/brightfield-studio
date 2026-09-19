@@ -2,7 +2,7 @@
 
 An "in-house" product is a merchant-designed listing with a fixed shader
 look — as opposed to a **custom** product, generated dynamically from a
-customer's own design via `worker POST /create-product` at purchase time, or
+customer's own design via `worker POST /create-product` at add-to-cart, or
 a **community** product, created by the worker when a moderator approves a
 submission (`POST /community/approve`). In-house products are ordinary
 Shopify products the merchant creates and configures by hand.
