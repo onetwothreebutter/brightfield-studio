@@ -67,9 +67,9 @@ handle.renderFrame(12.0);                     // one frame at a fixed t, values 
 
 ### Shared globals (from `shader-controls-base.liquid`)
 Never redefine these locally in a shader snippet — they are already in scope:
-- `SHADER_FONTS` — canonical 26-font array
-- `COSINE_PRESETS` — 21 cosine palette presets (Rainbow, Cool Blue, Neon Heat, Cyberpunk, Golden, and others)
-- `FOUR_STOP_PRESETS` — 24 four-stop presets (Neon, Retro, Sunset, Aurora, Dusk, and others)
+- `SHADER_FONTS` — the canonical font array (no test pins its length — count it rather than quoting a number, which has gone stale here before)
+- `COSINE_PRESETS` — cosine palette presets keyed by name (Rainbow, Cool Blue, Neon Heat, Cyberpunk, Golden, and others)
+- `FOUR_STOP_PRESETS` — four-stop presets keyed by name (Neon, Retro, Sunset, Aurora, Dusk, and others)
 - `toHex(v, key)` — float[3] → hex string; gamma-encodes unless `key` is a palette-coefficient key (`PALETTE_COEFF_KEYS`, from `shader-color-utils.liquid`)
 - `vividHex(hue)` — hue (0–1) → vivid hex string at fixed high saturation/value; used by the global Randomize button for every `type: 'color'` control, and by any shader's own custom randomize button (e.g. Chladni's two-hue pattern randomizer)
 - `applyColors(keyValPairs)` — writes to `_shaderState.values` (linearizing literal color keys, passing coefficient keys through) + updates color pickers + dispatches input event
@@ -140,7 +140,7 @@ var _gm = Math.round(v.u_grain_mode != null ? parseFloat(v.u_grain_mode) : 0);
 gl.uniform1f(u.distress,      v['u_distress_' + _gm]       != null ? v['u_distress_' + _gm]       : (v.u_distress       != null ? v.u_distress       : 0.0));
 gl.uniform1f(u.distressScale, v['u_distress_scale_' + _gm] != null ? v['u_distress_scale_' + _gm] : (v.u_distress_scale != null ? v.u_distress_scale : 80.0));
 ```
-(The inner fallback only ever fires where `values` is assigned wholesale — the manual/lab harness. On the product page every control key is pre-seeded with its default and both restore paths drop unknown keys, so a pre-split design's saved `u_distress` is discarded there and the per-mode default applies instead.)
+(The inner fallback only ever fires where `values` is assigned wholesale — the manual/lab harness. On the product page every control key is pre-seeded with its default and every restore path (`?bfr=`, legacy `#s=`, `#share=`) drops unknown keys, so a pre-split design's saved `u_distress` is discarded there and the per-mode default applies instead.)
 
 **UV position/scale transform — apply at the very top of `main()`, right after computing `uv`:**
 ```glsl
@@ -270,12 +270,16 @@ window._shaderState.values = m.values;           // complete, ready to render
 handle.renderFrame(ProbabilisticPaletteShader.FIXED_TIME);
 ```
 
-- **Four-stop wins wherever it's offered.** The mode is picked by matching the
-  option *label* (`4-Stop`), not by assuming a value — the shaders disagree about
-  numbering (echo-text is Flat/4-Stop/Cosine, four-circles is
-  Cosine/4-Stop/Per-Quadrant, rise-shirt is Cosine/4-Stop/OKLCH). Cosine and
-  OKLCH mode take curve coefficients rather than colors, so they are never
-  assigned. chladni has no mode control and always paints with its two colors.
+- **Four-stop wins wherever it's offered.** Where the mode is a `select`, it is
+  picked by matching the option *label* (`4-Stop`), not by assuming a value —
+  the shaders disagree about numbering (echo-text is Flat/4-Stop/Cosine,
+  four-circles is Cosine/4-Stop/Per-Quadrant, rise-shirt is
+  Cosine/4-Stop/OKLCH). Where the mode is a toggle there is no label to match,
+  so the adapter assumes 1 = 4-stop when the def has 4-stop slots — the
+  naming-conventions rule that a toggle-mode shader must keep On = 4-stop
+  exists for this. Cosine and OKLCH mode take curve coefficients rather than
+  colors, so they are never assigned. chladni has no mode control and always
+  paints with its two colors.
 - **A shader that colors something itself keeps doing so.** stacked-gradient
   draws its word in the complement of the gradient unless *Custom Text Color* is
   on; the lab leaves `u_text_color` alone until that toggle flips, then takes it
@@ -478,6 +482,9 @@ The editor's Generative weights checkbox currently gets this wrong: it reads
 `!!palette.generativeWeights`, so an imported JSON without the flag renders
 *varied* under an unticked box — and ticking-then-unticking the box to "fix"
 the mismatch writes an explicit `false` that genuinely changes the output.
+The lab's distribution-table readout (`palette-lab.html`) makes the same
+truthy read, so the same import is labelled "fixed weights" while rendering
+varied.
 
 ### Adding a preset
 Data only, no engine change:
