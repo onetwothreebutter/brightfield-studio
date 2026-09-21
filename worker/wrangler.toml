@@ -65,6 +65,16 @@ namespace_id = "1002"
   limit = 30
   period = 60
 
+# Community submissions are unauthenticated and do two R2 writes per call
+# (the submission JSON plus a full rewrite of the shared list index), so the
+# reviews rationale below applies at least as strongly here.
+[[ratelimits]]
+name = "RATE_LIMITER_COMMUNITY_SUBMIT"
+namespace_id = "1005"
+  [ratelimits.simple]
+  limit = 5
+  period = 60
+
 # Reviews are a common spam target and cost nothing to attempt repeatedly (no
 # image upload, no Shopify Admin API call on the write path itself), so this
 # gets the tightest limit of the bunch.
