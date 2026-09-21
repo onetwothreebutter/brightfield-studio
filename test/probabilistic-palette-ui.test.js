@@ -154,3 +154,31 @@ describe('import panel', () => {
     window.localStorage.removeItem(UI.STORAGE_KEY);
   });
 });
+
+describe('generative weights checkbox', () => {
+  function mountWith(palette) {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    UI.mount(host, { palette: palette });
+    return Array.from(host.querySelectorAll('input[type=checkbox]'))
+      .find((c) => /Generative weights/.test(c.parentNode.textContent));
+  }
+
+  it('reads an unset flag as on, like the engine does', () => {
+    const palette = PP.paletteFromHexList('#606c38 #283618 #fefae0', { name: 'Unset' });
+    delete palette.generativeWeights;
+    expect(mountWith(palette).checked).toBe(true);
+
+    // The box has to agree with what is actually rendered: describe() and
+    // createAssigner both test `!== false`, so this palette's shares vary.
+    const varied = PP.describe(palette, 7).map((d) => d.share);
+    const fixed = PP.describe(palette, null).map((d) => d.share);
+    expect(varied).not.toEqual(fixed);
+  });
+
+  it('reads an explicit false as off', () => {
+    const palette = PP.paletteFromHexList('#606c38 #283618', { name: 'Off' });
+    palette.generativeWeights = false;
+    expect(mountWith(palette).checked).toBe(false);
+  });
+});

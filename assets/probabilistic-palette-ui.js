@@ -1040,7 +1040,7 @@
       var genRow = el('div', 'pp-row');
       genRow.style.marginTop = '10px';
       var genChk = input('checkbox');
-      genChk.checked = !!palette.generativeWeights;
+      genChk.checked = palette.generativeWeights !== false;
       var genLabel = el('label', 'pp-toggle');
       genLabel.appendChild(genChk);
       genLabel.appendChild(el('span', null, 'Generative weights'));
