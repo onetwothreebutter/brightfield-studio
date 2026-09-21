@@ -478,13 +478,12 @@ Two settings only mean what they say under conditions the panel has to check:
 `createAssigner` skips variation only when the flag is exactly `false` — `createPalette` writes `generativeWeights: false` explicitly, so this bites hand-written or stored palette JSON that omits the flag.
 `describe()` — which the tier badges and preview strip read — must use the same
 test, or an unset flag makes the reported hierarchy differ from the rendered one.
-The editor's Generative weights checkbox currently gets this wrong: it reads
-`!!palette.generativeWeights`, so an imported JSON without the flag renders
-*varied* under an unticked box — and ticking-then-unticking the box to "fix"
-the mismatch writes an explicit `false` that genuinely changes the output.
-The lab's distribution-table readout (`palette-lab.html`) makes the same
-truthy read, so the same import is labelled "fixed weights" while rendering
-varied.
+Every read site uses `!== false` — the engine, `describe()`, the editor's
+Generative weights checkbox and the lab's distribution-table readout. A truthy
+read is the tempting shorthand and it is always wrong here: it renders an
+unset-flag palette *varied* under an unticked box, and ticking-then-unticking
+that box to "fix" the mismatch writes an explicit `false` that genuinely
+changes the output (#642).
 
 ### Adding a preset
 Data only, no engine change:
