@@ -22,7 +22,9 @@ const SNIPPETS = join(ROOT, 'snippets');
 export const OUTPUT = join(ROOT, 'assets', 'shader-defs.js');
 
 // The only Liquid in any of these files is `{% render 'x' %}` — inline it.
-function snippet(name) {
+// Exported so tests that inspect a snippet's effective source (e.g.
+// shader-finish-controls.test.js) resolve nested renders the same way.
+export function snippet(name) {
   const src = readFileSync(join(SNIPPETS, name + '.liquid'), 'utf8');
   return src.replace(/\{%-?\s*render\s+'([^']+)'\s*-?%\}/g, (_, inner) => snippet(inner));
 }
