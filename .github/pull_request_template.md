@@ -30,7 +30,7 @@
 
 ## Testing
 
-<!-- The command and its actual result, with counts: `npm test` — 569 passed,
-     19 files. Separate automated from visual. If local visual verification is
-     still outstanding, say so plainly — never imply it happened. Screenshots or
-     GIFs for anything that renders. -->
+<!-- The command and its actual result, with the counts your run printed:
+     `npm test` — N passed, M files. Separate automated from visual. If local
+     visual verification is still outstanding, say so plainly — never imply it
+     happened. Screenshots or GIFs for anything that renders. -->

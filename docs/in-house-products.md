@@ -1,10 +1,11 @@
 # In-house products
 
 An "in-house" product is a merchant-designed listing with a fixed shader
-look — as opposed to a **custom** or **community** product, which is
-generated dynamically from a customer's own design via
-`worker POST /create-product`. In-house products are ordinary Shopify
-products the merchant creates and configures by hand.
+look — as opposed to a **custom** product, generated dynamically from a
+customer's own design via `worker POST /create-product` at add-to-cart, or
+a **community** product, created by the worker when a moderator approves a
+submission (`POST /community/approve`). In-house products are ordinary
+Shopify products the merchant creates and configures by hand.
 
 ## End-to-end setup
 
@@ -19,8 +20,9 @@ products the merchant creates and configures by hand.
 
 2. **Create the Shopify product.** Set up the product and its variants
    normally in Shopify admin — this is a regular product, not something
-   created through the worker's `/create-product` endpoint (that endpoint is
-   exclusively for customer-generated custom/community products).
+   created through the worker (`/create-product` is exclusively for
+   customer-generated custom products; community products are created by
+   `/community/approve` at moderation time).
 
 3. **Set up the product in Printful.** Configure the product/print file in
    Printful's dashboard via the native Shopify catalog-sync app, as usual.
