@@ -1,9 +1,10 @@
 {%- comment -%}
   Analytics. Every provider registers itself as a *sink* behind its own theme
   setting, and window.bfTrack(eventName, params) fans each event out to all of
-  them — sections never call gtag()/posthog directly. Shopify's Customer Privacy
-  API is the consent source of record and is synced to every provider once,
-  here, rather than once per vendor.
+  them — sections never call gtag()/posthog directly. window.bfLog(level,
+  message, attrs) is the same fan-out for structured logs. Shopify's Customer
+  Privacy API is the consent source of record and is synced to every provider
+  once, here, rather than once per vendor.
 
   Three parts, in order:
     1. Liquid-rendered config — the only Liquid that reaches JavaScript.
@@ -40,6 +41,7 @@
     var cfg = window.bfAnalyticsConfig || {};
     var enabled = !cfg.designMode;
     var sinks = [];
+    var logSinks = [];
     var consentListeners = [];
 
     // Every event in the theme goes through here. A sink that throws (blocked
@@ -47,6 +49,17 @@
     window.bfTrack = function (eventName, params) {
       for (var i = 0; i < sinks.length; i++) {
         try { sinks[i](eventName, params || {}); } catch (e) { /* analytics never breaks the page */ }
+      }
+    };
+
+    // Structured logs, same fan-out and the same never-throws rule. `level` is
+    // one of OTel's severities (trace/debug/info/warn/error/fatal) so a log
+    // from the theme and a log from the worker land in one stream under one
+    // vocabulary. Nothing here writes to the browser console — a log meant for
+    // the shopper's devtools is a console call, not this.
+    window.bfLog = function (level, message, attrs) {
+      for (var i = 0; i < logSinks.length; i++) {
+        try { logSinks[i](level, message, attrs || {}); } catch (e) { /* as above */ }
       }
     };
 
@@ -140,11 +153,37 @@
           }
         },
         capture_pageview: true,
-        autocapture: true
+        autocapture: true,
+        // PostHog Logs. console.* autocapture is deliberately off: on a
+        // storefront it forwards everything Shopify's own scripts, the
+        // checkout and any installed app write to the console — output this
+        // theme does not control and cannot audit for the tokens and session
+        // ids PostHog's own docs warn about. Logs here are explicit, via
+        // bfLog().
+        logs: {
+          serviceName: 'brightfield-theme',
+          captureConsoleLogs: false
+        }
       });
 
       sinks.push(function (eventName, params) {
         window.posthog.capture(eventName, params);
+      });
+
+      // posthog.logger is NOT one of the methods the loader stub above queues
+      // (it lists init/capture/opt_in_capturing/… and no more), so it does not
+      // exist until array.js lands — read it at call time and drop the log
+      // rather than throwing a TypeError into whatever section called bfLog.
+      //
+      // Consent is checked here rather than assumed to ride
+      // opt_out_capturing_by_default: that switch is documented for events,
+      // and a log is not worth guessing about. Nothing is emitted until
+      // Shopify has said analytics is allowed.
+      logSinks.push(function (level, message, attrs) {
+        var logger = window.posthog.logger;
+        if (!logger || typeof logger[level] !== 'function') return;
+        if (!window.posthog.has_opted_in_capturing()) return;
+        logger[level](message, attrs);
       });
 
       // The cart form writes this into a cart attribute at checkout so the

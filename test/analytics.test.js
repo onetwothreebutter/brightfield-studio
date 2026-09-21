@@ -20,8 +20,8 @@ if (/\{[{%]/.test(logicSrc)) {
 }
 
 // The theme-facing surface: only the config object is Liquid-rendered.
-function makePosthogStub({ optedIn = false, distinctId = 'ph-distinct-123' } = {}) {
-  return {
+function makePosthogStub({ optedIn = false, distinctId = 'ph-distinct-123', logger = null } = {}) {
+  const stub = {
     init: vi.fn(),
     capture: vi.fn(),
     opt_in_capturing: vi.fn(),
@@ -29,6 +29,15 @@ function makePosthogStub({ optedIn = false, distinctId = 'ph-distinct-123' } = {
     has_opted_in_capturing: vi.fn(() => optedIn),
     get_distinct_id: vi.fn(() => distinctId)
   };
+  // Absent by default, because that is the shipped shape: `logger` is not one
+  // of the methods the loader stub queues, so it does not exist on
+  // window.posthog until array.js has landed.
+  if (logger) stub.logger = logger;
+  return stub;
+}
+
+function makeLoggerStub() {
+  return { trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), fatal: vi.fn() };
 }
 
 let docListeners;
@@ -83,6 +92,7 @@ beforeEach(() => {
   delete window.dataLayer;
   delete window.gtag;
   delete window.bfTrack;
+  delete window.bfLog;
   delete window.bfAnalyticsId;
   delete window.bfAnalyticsConfig;
   delete window.posthog;
@@ -386,5 +396,75 @@ describe('analytics snippet — Liquid surface', () => {
     const schema = JSON.parse(readFileSync(join(ROOT, 'config', 'settings_schema.json'), 'utf8'));
     const ids = schema.flatMap((g) => (g.settings || []).map((s) => s.id));
     expect(ids).toEqual(expect.arrayContaining(['ga4_measurement_id', 'posthog_project_key', 'posthog_api_host', 'posthog_session_replay']));
+  });
+});
+
+describe('analytics snippet — bfLog', () => {
+  it('exists and is a silent no-op when no provider is configured', () => {
+    run({ ga4: 'G-TEST', posthogKey: null, designMode: false }, { posthog: null });
+    expect(typeof window.bfLog).toBe('function');
+    expect(() => window.bfLog('error', 'nothing is listening')).not.toThrow();
+  });
+
+  it('forwards to posthog.logger at the requested level once the shopper has opted in', () => {
+    const logger = makeLoggerStub();
+    run(BOTH, { posthog: makePosthogStub({ optedIn: true, logger }) });
+    window.bfLog('error', 'shader failed to compile', { shader: 'rise-shirt' });
+    expect(logger.error).toHaveBeenCalledWith('shader failed to compile', { shader: 'rise-shirt' });
+    expect(logger.info).not.toHaveBeenCalled();
+  });
+
+  it('defaults the attributes to an object so a sink never sees undefined', () => {
+    const logger = makeLoggerStub();
+    run(BOTH, { posthog: makePosthogStub({ optedIn: true, logger }) });
+    window.bfLog('warn', 'no attributes');
+    expect(logger.warn).toHaveBeenCalledWith('no attributes', {});
+  });
+
+  // posthog.logger does not exist until array.js has loaded — the loader stub
+  // queues init/capture/… and nothing else. A section that logs early must not
+  // get a TypeError for its trouble.
+  it('drops the log rather than throwing when array.js has not landed yet', () => {
+    const ph = run(BOTH, { posthog: makePosthogStub({ optedIn: true }) });
+    expect(ph.logger).toBeUndefined();
+    expect(() => window.bfLog('error', 'too early')).not.toThrow();
+  });
+
+  it('drops the log when an unknown level is passed', () => {
+    const logger = makeLoggerStub();
+    run(BOTH, { posthog: makePosthogStub({ optedIn: true, logger }) });
+    expect(() => window.bfLog('verbose', 'not a severity')).not.toThrow();
+    for (const fn of Object.values(logger)) expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('emits nothing until the shopper has opted in', () => {
+    const logger = makeLoggerStub();
+    run(BOTH, { posthog: makePosthogStub({ optedIn: false, logger }) });
+    window.bfLog('error', 'pre-consent');
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('does not register a sink in the theme editor', () => {
+    const logger = makeLoggerStub();
+    run({ ...BOTH, designMode: true }, { posthog: makePosthogStub({ optedIn: true, logger }) });
+    window.bfLog('error', 'design mode');
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('survives a sink that throws', () => {
+    const logger = makeLoggerStub();
+    logger.error.mockImplementation(() => { throw new Error('logger blew up'); });
+    run(BOTH, { posthog: makePosthogStub({ optedIn: true, logger }) });
+    expect(() => window.bfLog('error', 'boom')).not.toThrow();
+  });
+});
+
+describe('analytics snippet — PostHog logs config', () => {
+  it('names the service and leaves console autocapture off', () => {
+    const ph = run(BOTH);
+    expect(ph.init.mock.calls[0][1].logs).toEqual({
+      serviceName: 'brightfield-theme',
+      captureConsoleLogs: false
+    });
   });
 });
