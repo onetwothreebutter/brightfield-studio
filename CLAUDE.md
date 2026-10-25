@@ -22,6 +22,7 @@ Non-negotiable:
 - Dev preview: `npm run dev` → `scripts/dev.mjs`, which runs `shopify theme dev --store brightfield-2.myshopify.com` on a free port (9292 preferred)
 - Manual push: `npm run push` → `shopify theme push --store brightfield-2.myshopify.com --theme 143500345459`
 - Palette lab: `npm run palette-lab` → probabilistic palette editor + sample grid at `palette-lab.html`
+- Code card: `npm run code-card` → the product gallery's "shader code" image at `code-card.html` (see "Code card" below)
 
 ## Architecture
 - Shopify theme (custom, no base theme)
@@ -64,7 +65,15 @@ var handle = window.ShaderBase.last;          // null if create() bailed out
 window._shaderState.values = values;
 handle.renderFrame(12.0);                     // one frame at a fixed t, values snapped
 ```
-`renderFrame` rebinds its own program and quad first, so many shaders can share one WebGL context — which is the only way to render 50 thumbnails without Chrome dropping contexts. Same `t` + same values ⇒ same pixels.
+`renderFrame` rebinds its own program and quad first, so many shaders can share one WebGL context — which is the only way to render 50 thumbnails without Chrome dropping contexts. Same `t` + same values ⇒ same pixels. `handle.fragSrc` is the fragment source exactly as compiled, `commonGLSL` included.
+
+### Code card (`code-card.html`)
+A product's gallery image of its own shader source: an excerpt set in monospace on black, each glyph lit by the design rendered under it, the rest a dim ghost. Pure logic (design parsing, source listing, fit layout, per-glyph ink sampling) is `assets/code-card.js`, tested in `test/code-card.test.js`; the page owns the canvases.
+- **The design is rendered at the card's own size**, so it sits where it would on a gallery image of the same shape. Paste the product's design (`?bfr=` link, its base64, `{ shader, values }`, or a lab export sidecar) to light the code with the real thing — every key is kept, unlike the product page's control-keys-only restore.
+- **A glyph takes the ink as printed, not the cell's mean**: brightness-weighted hue, scaled to the brightest inked pixel. A plain mean of thin anti-aliased strokes and black gaps comes out muddy.
+- **Per-pixel mode cuts the design to all the type in one `source-in`.** A `destination-in` per `fillText` keeps only the last glyph.
+- **`customAfterBuild` is off** — three-square's (and others') applies the Rainbow/Retro presets on load and would overwrite a pasted design's colours; the `_` preset pickers are hidden to match.
+- **`handle` is nulled on every shader switch** until the new one is ready. A queued frame otherwise draws the old program with the new shader's values — chladni's `u_a` is a number where three-square's is a vec3, so that one throws.
 
 ### Shared globals (from `shader-controls-base.liquid`)
 Never redefine these locally in a shader snippet — they are already in scope:
