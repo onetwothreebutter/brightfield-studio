@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code Card</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- The shaders' own text-overlay fonts, same list as test-shaders.html. -->
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Azeret+Mono:wght@900&family=Barlow+Condensed:wght@700&family=Bebas+Neue&family=Fjalla+One&family=Big+Shoulders+Display:wght@700&family=Bricolage+Grotesque:wght@800&family=Courier+Prime:wght@700&family=Cutive+Mono&family=DM+Mono:wght@500&family=DM+Sans:wght@900&family=Epilogue:wght@900&family=Fira+Code:wght@700&family=Fragment+Mono&family=Geist+Mono:wght@900&family=IBM+Plex+Mono:wght@700&family=Inconsolata:wght@900&family=JetBrains+Mono:wght@800&family=Montserrat:wght@900&family=Orbitron:wght@700&family=Oswald:wght@700&family=Playfair+Display:wght@700&family=Righteous&family=Roboto+Mono:wght@700&family=Russo+One&family=Share+Tech+Mono&family=Source+Code+Pro:wght@900&family=Space+Mono:wght@700&family=Spline+Sans+Mono:wght@700&family=Syne:wght@800&family=Teko:wght@500&family=Unbounded:wght@900" rel="stylesheet">
+<!-- The card's code faces, at the weights the Weight select offers. -->
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;700&family=Fira+Code:wght@400;500;700&family=Space+Mono:wght@400;700&family=DM+Mono:wght@400;500&display=block" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #111;
+    color: #eee;
+    font-family: 'IBM Plex Mono', 'Menlo', monospace;
+    font-size: 12px;
+  }
+
+  #layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 440px;
+    height: 100vh;
+  }
+
+  #stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px 20px 20px;
+    background: #050505;
+    min-height: 0;
+  }
+  .view-toggle { display: flex; gap: 0; }
+  .view-toggle button { border-radius: 0; color: #888; }
+  .view-toggle button:first-child { border-radius: 3px 0 0 3px; }
+  .view-toggle button:last-child { border-radius: 0 3px 3px 0; margin-left: -1px; }
+  .view-toggle button.is-on { color: #000; background: #0cf; border-color: #0cf; }
+  #frame-wrap { max-width: 100%; box-shadow: 0 0 0 1px #222; }
+  #html-frame { display: block; width: 100%; height: 100%; border: 0; background: #000; }
+  #card {
+    display: block;
+    max-width: 100%;
+    max-height: calc(100vh - 110px);
+    width: auto;
+    height: auto;
+    box-shadow: 0 0 0 1px #222;
+  }
+  [hidden] { display: none !important; }
+  #card-meta { color: #777; font-size: 11px; }
+
+  #panels {
+    overflow-y: auto;
+    background: #161616;
+    border-left: 1px solid #2a2a2a;
+    padding: 14px 16px 48px;
+  }
+  h1 { font-size: 14px; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .lede { color: #888; line-height: 1.5; margin-bottom: 14px; }
+  .panel { border-top: 1px solid #2a2a2a; padding: 12px 0 14px; }
+  .panel h2 {
+    font-size: 11px; font-weight: 600; color: #999;
+    letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px;
+  }
+
+  .field { display: grid; grid-template-columns: 110px minmax(0, 1fr) 44px; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .field > label { color: #999; }
+  .field output { color: #0cf; text-align: right; font-variant-numeric: tabular-nums; }
+  .field--wide { grid-template-columns: 110px minmax(0, 1fr); }
+  .pair { display: flex; gap: 6px; align-items: center; }
+  .pair input { width: 70px; }
+
+  select, input[type=number], textarea, button {
+    background: #1e1e1e; color: #eee; border: 1px solid #3a3a3a; border-radius: 3px;
+    font: inherit; padding: 4px 6px;
+  }
+  input[type=range] { width: 100%; accent-color: #0cf; }
+  input[type=color] { width: 44px; height: 24px; background: none; border: 1px solid #3a3a3a; border-radius: 3px; }
+  button { cursor: pointer; color: #0cf; padding: 5px 10px; }
+  button:hover { border-color: #0cf; }
+  button.primary { background: #0cf; color: #000; border-color: #0cf; font-weight: 600; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; }
+  .msg { color: #888; }
+  .msg.warn { color: #f90; }
+  .hint { color: #777; line-height: 1.5; margin-top: 4px; }
+
+  textarea { width: 100%; resize: vertical; line-height: 1.45; white-space: pre; overflow-x: auto; }
+
+  #listing {
+    height: 260px; overflow: auto; background: #0c0c0c; border: 1px solid #2a2a2a; border-radius: 3px;
+    font-size: 11px; line-height: 1.5; white-space: pre; cursor: pointer; user-select: none;
+  }
+  .src-row { padding: 0 8px 0 0; }
+  .src-row:hover { background: #1c1c1c; }
+  .src-row.is-selected { background: #0d2a33; }
+  .src-n { display: inline-block; width: 40px; padding-right: 8px; text-align: right; color: #555; }
+  .src-row--shared { color: #666; font-style: italic; padding-left: 48px; cursor: default; }
+
+  #shader-canvas { display: none; }
+</style>
+</head>
+<body>
+<div id="layout">
+  <section id="stage">
+    <div class="view-toggle" role="group" aria-label="Preview">
+      <button type="button" data-view="html">HTML</button>
+      <button type="button" data-view="png">PNG still</button>
+    </div>
+    <div id="frame-wrap"><iframe id="html-frame" title="Code card, as exported"></iframe></div>
+    <canvas id="card" width="1548" height="1748" hidden></canvas>
+    <div id="card-meta"></div>
+  </section>
+
+  <aside id="panels">
+    <h1>Code card</h1>
+    <p class="lede">A product's shader source, lit by the design it draws. Glyphs over ink take its colour; the rest stay a dim ghost so the whole excerpt reads. Exported as HTML/CSS — real text with a highlight reading down the lines on a seamless loop — or as a PNG still.</p>
+
+    <section class="panel">
+      <h2>Card</h2>
+      <div class="field field--wide"><label for="shader-picker">Shader</label><select id="shader-picker"></select></div>
+      <div class="field field--wide"><label for="size-preset">Shape</label>
+        <div class="pair">
+          <select id="size-preset">
+            <option value="tile">Gallery tile 387×437 @4×</option>
+            <option value="print">Print 3:4</option>
+            <option value="square">Square</option>
+            <option value="custom">Custom</option>
+          </select>
+          <input type="number" id="card-width" min="64" max="8192" step="2" aria-label="Width">
+          <input type="number" id="card-height" min="64" max="8192" step="2" aria-label="Height">
+        </div>
+      </div>
+      <div class="field field--wide"><label for="card-font">Font</label>
+        <div class="pair">
+          <select id="card-font" data-card="font">
+            <option>JetBrains Mono</option>
+            <option>IBM Plex Mono</option>
+            <option>Fira Code</option>
+            <option>Space Mono</option>
+            <option>DM Mono</option>
+          </select>
+          <select id="card-weight" data-card="weight" aria-label="Weight">
+            <option value="400">Regular</option>
+            <option value="500">Medium</option>
+            <option value="700">Bold</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label for="card-padding">Padding</label><input type="range" id="card-padding" data-card="padding" min="0" max="0.25" step="0.005"><output></output></div>
+      <div class="field"><label for="card-lh">Line height</label><input type="range" id="card-lh" data-card="lineHeight" min="1" max="2.4" step="0.05"><output></output></div>
+      <div class="field"><label for="card-threshold">Ink threshold</label><input type="range" id="card-threshold" data-card="threshold" min="0.01" max="0.6" step="0.01"><output></output></div>
+      <div class="field"><label for="card-ghost">Ghost</label><input type="range" id="card-ghost" data-card="ghost" min="0" max="0.6" step="0.01"><output></output></div>
+      <div class="field"><label for="card-time">Shader time (s)</label><input type="range" id="card-time" data-card="time" min="0" max="60" step="0.1"><output></output></div>
+      <div class="field field--wide"><label for="card-bg">Background</label><input type="color" id="card-bg" data-card="background"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Highlight</h2>
+      <div class="field"><label for="card-loop">Loop length (s)</label><input type="range" id="card-loop" data-card="loop" min="4" max="40" step="0.5"><output></output></div>
+      <div class="field"><label for="card-band">Band (lines)</label><input type="range" id="card-band" data-card="band" min="0.5" max="8" step="0.5"><output></output></div>
+      <div class="field"><label for="card-soft">Falloff (lines)</label><input type="range" id="card-soft" data-card="soft" min="0" max="6" step="0.25"><output></output></div>
+      <div class="field"><label for="card-rest">Resting ink</label><input type="range" id="card-rest" data-card="restInk" min="0" max="1" step="0.01"><output></output></div>
+      <div class="field"><label for="card-hi">Highlighted text</label><input type="range" id="card-hi" data-card="hiWhite" min="0.2" max="1" step="0.01"><output></output></div>
+      <div class="field"><label for="card-bar">Line bar</label><input type="range" id="card-bar" data-card="lineBar" min="0" max="0.25" step="0.01"><output></output></div>
+      <p class="hint">A band sweeps down the excerpt once per loop; falloff 0 with a one-line band steps line by line. Every line runs the same CSS keyframes, offset to when the band reaches it, so the loop has no seam. With reduced motion the card holds still at full ink.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Export</h2>
+      <div class="row">
+        <button type="button" class="primary" id="export-html">Export HTML</button>
+        <button type="button" id="copy-snippet">Copy snippet</button>
+        <button type="button" id="export">Export PNG</button>
+      </div>
+      <p class="msg" id="export-msg"></p>
+      <p class="hint">The HTML is a standalone page. The snippet is just its <code>&lt;style&gt;</code> and <code>&lt;div class="bf-cc"&gt;</code>, scoped and sized to whatever width it's given — the page that hosts it has to load the font.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Code</h2>
+      <div id="listing" aria-label="Compiled fragment source"></div>
+      <p class="hint">Click a line to start a selection, shift-click to extend it. Line numbers are the compiled source's.</p>
+      <div class="row">
+        <button type="button" id="use-lines">Use lines</button>
+        <button type="button" id="add-settings">Add settings line</button>
+      </div>
+      <textarea id="excerpt" rows="16" spellcheck="false" aria-label="Excerpt"></textarea>
+      <p class="hint">The card sets exactly this text — edit freely. Every line fits; nothing is cropped.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Design</h2>
+      <textarea id="design-paste" rows="3" spellcheck="false" placeholder="Paste a ?bfr= link, its base64, { shader, values } JSON, or a palette-lab export sidecar"></textarea>
+      <div class="row">
+        <button type="button" id="load-design">Load design</button>
+        <button type="button" id="reset-design">Reset to defaults</button>
+        <span class="msg" id="design-msg"></span>
+      </div>
+      <div id="shader-gui-body"></div>
+    </section>
+  </aside>
+</div>
+
+<canvas id="shader-canvas" width="1548" height="1748"></canvas>
+
+<script src="assets/probabilistic-palette.js"></script>
+<script src="assets/shader-base.js"></script>
+<script src="assets/shader-defs.js"></script>
+<script src="assets/shader-gui.js"></script>
+<script src="assets/probabilistic-palette-shader.js"></script>
+<script src="assets/code-card.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var CC = window.CodeCard;
+  var PPS = window.ProbabilisticPaletteShader;
+  var SHADERS = window.ShaderDefs.SHADERS;
+
+  // Every shader draws into the one hidden context, one frame at a time, on
+  // demand — the palette lab's arrangement. The design is only ever read
+  // back: glyph colours are sampled from it, then the card is built as HTML
+  // (and drawn to a 2D canvas for the PNG still).
+  window.ShaderBase.manual = true;
+
+  var GL_CANVAS = document.getElementById('shader-canvas');
+  var card = document.getElementById('card');
+  var cardCtx = card.getContext('2d');
+  // The design flattened on black, read back once per prepare.
+  var design = document.createElement('canvas');
+  var designCtx = design.getContext('2d', { willReadFrequently: true });
+
+  var SIZES = { tile: [1548, 1748], print: [1800, 2400], square: [2048, 2048] };
+  // A pixel at or under this brightness (0–255) is shirt, not ink.
+  var INK_FLOOR = 24;
+  var STORAGE_KEY = 'brightfield-code-card';
+  var DEFAULT_CARD = {
+    width: 1548, height: 1748, font: 'JetBrains Mono', weight: '500',
+    padding: 0.07, lineHeight: 1.55, threshold: 0.1, ghost: 0.18,
+    time: PPS.FIXED_TIME, background: '#000000',
+    // A one-line band with a soft edge, reading down at a pace a shopper can
+    // follow, over ink dimmed enough that the band is the news.
+    loop: 16, band: 1, soft: 1.5, restInk: 0.35, hiWhite: 0.92, lineBar: 0.06,
+    view: 'html'
+  };
+  // Lines offered when a shader is first opened: the top of main(), which is
+  // where the design is decided rather than declared. Forty is roughly what
+  // fills a gallery tile once typical GLSL sets the width.
+  var DEFAULT_LINES = 40;
+  // Weights Google Fonts serves for each face — asking for one it lacks is a
+  // 400, not a fallback, so the exported link asks for the nearest it has.
+  var FONT_WEIGHTS = {
+    'JetBrains Mono': [100, 200, 300, 400, 500, 600, 700, 800],
+    'IBM Plex Mono': [100, 200, 300, 400, 500, 600, 700],
+    'Fira Code': [300, 400, 500, 600, 700],
+    'Space Mono': [400, 700],
+    'DM Mono': [300, 400, 500]
+  };
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  // Per-shader values, excerpt and selection, so switching away and back
+  // keeps what you curated. Persisted per browser; nothing here is shared.
+
+  function loadState() {
+    var s = null;
+    try { s = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { s = null; }
+    s = s && typeof s === 'object' ? s : {};
+    return {
+      shader: s.shader,
+      card: Object.assign({}, DEFAULT_CARD, s.card),
+      values: s.values || {},
+      excerpts: s.excerpts || {},
+      selections: s.selections || {}
+    };
+  }
+
+  var state = loadState();
+  var saveTimer = null;
+  function writeState() {
+    saveTimer = null;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* private window */ }
+  }
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(writeState, 300);
+  }
+  // A reload inside the debounce — or while a render holds the main thread
+  // past it — would otherwise drop the last edit.
+  window.addEventListener('pagehide', function () {
+    if (saveTimer) { clearTimeout(saveTimer); writeState(); }
+  });
+
+  // Saved values are merged over today's defaults, so a control added since
+  // they were saved still has a value.
+  function valuesFor(name) {
+    var v = state.values[name];
+    if (!v || !v.__merged) {
+      v = Object.assign(PPS.defaultValues(SHADERS[name]), v || {});
+      Object.defineProperty(v, '__merged', { value: true });
+      state.values[name] = v;
+    }
+    return v;
+  }
+
+  var current = null;
+  var handle = null;
+
+  // ── Shader loading ────────────────────────────────────────────────────────
+  // Same contract as the lab's withShader: the script calls create() and drops
+  // the handle, which is picked up from ShaderBase.last; a 404 fires onerror,
+  // and both paths have to drain the queue.
+
+  var handles = {};
+  var pending = {};
+
+  function withShader(name, done) {
+    if (handles[name]) return done(handles[name]);
+    if (pending[name]) { pending[name].push(done); return; }
+    pending[name] = [done];
+    window._shaderState = { values: valuesFor(name), textDirty: true };
+    var s = document.createElement('script');
+    s.src = 'assets/' + name + '.js';
+    s.onerror = function () {
+      delete pending[name];
+      meta('assets/' + name + '.js failed to load');
+    };
+    s.onload = function () {
+      var waiting = pending[name];
+      delete pending[name];
+      if (!window.ShaderBase.last) { meta(name + ' did not finish ShaderBase.create — see the console'); return; }
+      handles[name] = window.ShaderBase.last;
+      waiting.forEach(function (fn) { fn(handles[name]); });
+    };
+    document.head.appendChild(s);
+  }
+
+  function setShader(name) {
+    current = name;
+    // Dropped until the new shader is ready: a frame already queued would
+    // otherwise draw the old program with the new shader's values, and
+    // rendering one shader's program with another's uniforms is not always
+    // silent — chladni's u_a is a number where three-square's is a vec3.
+    handle = null;
+    state.shader = name;
+    picker.value = name;
+    save();
+    withShader(name, function (h) {
+      if (name !== current) return;
+      handle = h;
+      if (!state.selections[name]) {
+        var first = CC.mainLine(h.fragSrc);
+        state.selections[name] = { from: first, to: first + DEFAULT_LINES - 1 };
+      }
+      if (state.excerpts[name] == null) {
+        var sel = state.selections[name];
+        state.excerpts[name] = CC.excerpt(h.fragSrc, sel.from, sel.to);
+      }
+      excerptEl.value = state.excerpts[name];
+      buildGUI();
+      buildListing();
+      window._shaderState.textDirty = true;
+      scheduleRender();
+    });
+  }
+
+  // ── Control panel ─────────────────────────────────────────────────────────
+  // customAfterBuild is off because it applies the Rainbow/Retro presets on
+  // load, which would overwrite a pasted design's colours; the `_` preset
+  // pickers are hidden because, without it, nothing listens to them.
+
+  function buildGUI() {
+    var body = document.getElementById('shader-gui-body');
+    body.innerHTML = '';
+    var def = SHADERS[current];
+    window.ShaderGUI.build(body, def, {
+      values: valuesFor(current),
+      hiddenKeys: def.controls.filter(function (c) { return c.key && c.key.charAt(0) === '_'; })
+        .map(function (c) { return c.key; }),
+      randomize: false,
+      customAfterBuild: false,
+      onChange: function () { save(); scheduleRender(); }
+    });
+  }
+
+  // ── Source listing ────────────────────────────────────────────────────────
+
+  var listing = document.getElementById('listing');
+
+  function buildListing() {
+    var frag = document.createDocumentFragment();
+    CC.sourceRows(handle.fragSrc, window.ShaderBase.commonGLSL).forEach(function (r) {
+      var div = document.createElement('div');
+      if (r.shared) {
+        div.className = 'src-row src-row--shared';
+        div.textContent = '⋯ ShaderBase.commonGLSL — ' + r.count + ' shared lines';
+      } else {
+        div.className = 'src-row';
+        div.dataset.line = r.line;
+        var n = document.createElement('span');
+        n.className = 'src-n';
+        n.textContent = r.line;
+        div.appendChild(n);
+        div.appendChild(document.createTextNode(r.text || ' '));
+      }
+      frag.appendChild(div);
+    });
+    listing.innerHTML = '';
+    listing.appendChild(frag);
+    paintSelection();
+    var start = listing.querySelector('.src-row.is-selected');
+    if (start) listing.scrollTop = start.offsetTop - listing.offsetTop - 24;
+  }
+
+  function paintSelection() {
+    var sel = state.selections[current];
+    var lo = Math.min(sel.from, sel.to);
+    var hi = Math.max(sel.from, sel.to);
+    listing.querySelectorAll('.src-row[data-line]').forEach(function (row) {
+      var n = +row.dataset.line;
+      row.classList.toggle('is-selected', n >= lo && n <= hi);
+    });
+    document.getElementById('use-lines').textContent = 'Use lines ' + lo + '–' + hi;
+  }
+
+  listing.addEventListener('click', function (e) {
+    var row = e.target.closest('.src-row[data-line]');
+    if (!row || !current) return;
+    var n = +row.dataset.line;
+    var sel = state.selections[current];
+    state.selections[current] = e.shiftKey ? { from: sel.from, to: n } : { from: n, to: n };
+    paintSelection();
+    save();
+  });
+
+  // ── Excerpt ───────────────────────────────────────────────────────────────
+
+  var excerptEl = document.getElementById('excerpt');
+
+  function setExcerpt(text) {
+    excerptEl.value = text;
+    state.excerpts[current] = text;
+    save();
+    scheduleRender();
+  }
+
+  excerptEl.addEventListener('input', function () { setExcerpt(excerptEl.value); });
+
+  document.getElementById('use-lines').addEventListener('click', function () {
+    if (!handle) return;
+    var sel = state.selections[current];
+    setExcerpt(CC.excerpt(handle.fragSrc, sel.from, sel.to));
+  });
+
+  document.getElementById('add-settings').addEventListener('click', function () {
+    if (!current) return;
+    var line = CC.settingsLine(SHADERS[current], valuesFor(current));
+    if (line) setExcerpt(line + '\n' + excerptEl.value);
+  });
+
+  // ── Design paste ──────────────────────────────────────────────────────────
+
+  var designMsg = document.getElementById('design-msg');
+  function designNote(text, warn) {
+    designMsg.textContent = text;
+    designMsg.className = 'msg' + (warn ? ' warn' : '');
+  }
+
+  document.getElementById('load-design').addEventListener('click', function () {
+    var d = CC.parseDesign(document.getElementById('design-paste').value);
+    if (!d) return designNote('Not a design — expected a ?bfr= link, its base64, or { shader, values } JSON.', true);
+    if (!SHADERS[d.shader]) return designNote('Unknown shader "' + d.shader + '".', true);
+    // Every key is kept, not only controls: a palette-lab design can carry
+    // size-group uniforms, and the card should show what the lab showed.
+    var v = Object.assign(PPS.defaultValues(SHADERS[d.shader]), d.values);
+    Object.defineProperty(v, '__merged', { value: true });
+    state.values[d.shader] = v;
+    designNote('Loaded ' + d.shader + '.');
+    setShader(d.shader);
+  });
+
+  document.getElementById('reset-design').addEventListener('click', function () {
+    if (!current) return;
+    delete state.values[current];
+    designNote('Reset ' + current + ' to its defaults.');
+    setShader(current);
+  });
+
+  // ── Card controls ─────────────────────────────────────────────────────────
+
+  var picker = document.getElementById('shader-picker');
+  Object.keys(SHADERS).sort().forEach(function (name) {
+    var o = document.createElement('option');
+    o.value = name;
+    o.textContent = name;
+    picker.appendChild(o);
+  });
+  picker.addEventListener('change', function () { setShader(picker.value); });
+
+  var sizePreset = document.getElementById('size-preset');
+  var widthEl = document.getElementById('card-width');
+  var heightEl = document.getElementById('card-height');
+
+  function syncSize() {
+    widthEl.value = state.card.width;
+    heightEl.value = state.card.height;
+    sizePreset.value = Object.keys(SIZES).filter(function (k) {
+      return SIZES[k][0] === state.card.width && SIZES[k][1] === state.card.height;
+    })[0] || 'custom';
+  }
+
+  sizePreset.addEventListener('change', function () {
+    var s = SIZES[sizePreset.value];
+    if (!s) return;
+    state.card.width = s[0];
+    state.card.height = s[1];
+    syncSize(); save(); scheduleRender();
+  });
+  [widthEl, heightEl].forEach(function (el) {
+    el.addEventListener('change', function () {
+      var w = Math.round(+widthEl.value / 2) * 2, h = Math.round(+heightEl.value / 2) * 2;
+      if (!(w >= 64 && w <= 8192 && h >= 64 && h <= 8192)) { syncSize(); return; }
+      state.card.width = w;
+      state.card.height = h;
+      syncSize(); save(); scheduleRender();
+    });
+  });
+
+  // Settings that change how the prepared card is drawn but not what was
+  // prepared — no shader frame, no re-sampling — so dragging them is cheap.
+  var PAINT_ONLY = {
+    ghost: 1, background: 1, loop: 1, band: 1, soft: 1, restInk: 1, hiWhite: 1, lineBar: 1
+  };
+
+  document.querySelectorAll('[data-card]').forEach(function (el) {
+    var key = el.dataset.card;
+    var out = el.parentNode.querySelector('output');
+    el.value = state.card[key];
+    if (out) out.textContent = el.value;
+    el.addEventListener('input', function () {
+      state.card[key] = el.type === 'range' ? parseFloat(el.value) : el.value;
+      if (out) out.textContent = el.value;
+      save();
+      if (PAINT_ONLY[key]) { paint(); scheduleHtml(); } else scheduleRender();
+    });
+  });
+  syncSize();
+
+  // ── Preview ───────────────────────────────────────────────────────────────
+  // The HTML view is an iframe of exactly the exported page, so what plays
+  // here is what ships. The PNG view is the canvas still.
+
+  var frameWrap = document.getElementById('frame-wrap');
+  var frame = document.getElementById('html-frame');
+  var viewButtons = document.querySelectorAll('[data-view]');
+
+  function showView(view) {
+    state.card.view = view;
+    viewButtons.forEach(function (b) { b.classList.toggle('is-on', b.dataset.view === view); });
+    frameWrap.hidden = view !== 'html';
+    card.hidden = view !== 'png';
+  }
+  viewButtons.forEach(function (b) {
+    b.addEventListener('click', function () { showView(b.dataset.view); save(); });
+  });
+  showView(state.card.view === 'png' ? 'png' : 'html');
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  // prepare() does everything expensive — the shader frame, the layout, each
+  // glyph's ink — and runs only when one of those inputs changes. paint()
+  // draws the still from it; buildHtml() turns the same thing into the card.
+
+  var queued = false;
+  function scheduleRender() {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(function () { queued = false; render(); });
+  }
+
+  // A canvas font that hasn't loaded measures and draws as the fallback, and
+  // fitLayout would size the grid to the wrong advance — so wait for it.
+  var fontsReady = {};
+  function fontSpec(size) {
+    return state.card.weight + ' ' + size + 'px "' + state.card.font + '"';
+  }
+
+  function sizeTo(c, w, h) {
+    if (c.width !== w) c.width = w;
+    if (c.height !== h) c.height = h;
+  }
+
+  function excerptLines() {
+    var lines = excerptEl.value.replace(/\t/g, '  ').split('\n').map(function (l) {
+      return l.replace(/\s+$/, '');
+    });
+    while (lines.length > 1 && !lines[lines.length - 1]) lines.pop();
+    return lines;
+  }
+
+  var prep = null;
+
+  function render() {
+    if (!handle) return;
+    var probe = fontSpec(100);
+    if (!fontsReady[probe]) {
+      document.fonts.load(probe).then(function () { fontsReady[probe] = true; scheduleRender(); },
+        function () { fontsReady[probe] = true; scheduleRender(); });
+      return;
+    }
+    prepare(probe);
+    paint();
+    scheduleHtml();
+  }
+
+  function prepare(probe) {
+    var C = state.card;
+    var W = C.width, H = C.height;
+
+    // The design, at the card's own size, so it sits where it would on a
+    // gallery image of the same shape.
+    var gl = handle.gl;
+    if (GL_CANVAS.width !== W || GL_CANVAS.height !== H) {
+      GL_CANVAS.width = W;
+      GL_CANVAS.height = H;
+      window._shaderState.textDirty = true;
+    }
+    gl.viewport(0, 0, W, H);
+    window._shaderState.values = valuesFor(current);
+    handle.renderFrame(C.time);
+
+    sizeTo(design, W, H);
+    designCtx.fillStyle = '#000';
+    designCtx.fillRect(0, 0, W, H);
+    designCtx.drawImage(GL_CANVAS, 0, 0, W, H);
+    var px = designCtx.getImageData(0, 0, W, H).data;
+
+    var texts = excerptLines();
+    var cols = texts.reduce(function (m, l) { return Math.max(m, l.length); }, 1);
+    cardCtx.font = probe;
+    var L = CC.fitLayout({
+      cols: cols, rows: texts.length, width: W, height: H,
+      padding: C.padding, lineHeight: C.lineHeight,
+      advance: cardCtx.measureText('M').width / 100
+    });
+
+    // Each character's ink, or null: spaces and glyphs over bare shirt.
+    var glyphs = 0, lit = 0;
+    var lines = texts.map(function (text, r) {
+      var colors = [];
+      var y = L.y + r * L.cellH;
+      for (var c = 0; c < text.length; c++) {
+        colors.push(null);
+        if (text.charAt(c) === ' ') continue;
+        glyphs++;
+        var s = CC.sampleCell(px, W, H, { x: L.x + c * L.cellW, y: y, w: L.cellW, h: L.cellH }, INK_FLOOR);
+        if (s.color && s.coverage >= C.threshold) { colors[c] = s.color; lit++; }
+      }
+      return { text: text, colors: colors };
+    });
+
+    prep = { W: W, H: H, L: L, lines: lines, font: fontSpec(L.fontSize.toFixed(2)) };
+    meta(W + '×' + H + ' · ' + lines.length + ' lines × ' + cols + ' cols · ' +
+      L.fontSize.toFixed(1) + 'px type at this size · ' + lit + ' of ' + glyphs + ' glyphs lit');
+  }
+
+  // The still: the loop at rest with its ink at full strength — the same
+  // card a reduced-motion visitor sees. One fillText per character keeps each
+  // glyph on its cell, as the HTML's monospace grid does.
+  function paint() {
+    var P = prep;
+    if (!P) return;
+    var C = state.card, L = P.L;
+    sizeTo(card, P.W, P.H);
+    cardCtx.fillStyle = C.background;
+    cardCtx.fillRect(0, 0, P.W, P.H);
+    cardCtx.font = P.font;
+    cardCtx.textBaseline = 'middle';
+    cardCtx.textAlign = 'left';
+    var ghost = 'rgba(255,255,255,' + C.ghost + ')';
+    P.lines.forEach(function (line, r) {
+      var y = L.y + (r + 0.5) * L.cellH;
+      for (var c = 0; c < line.text.length; c++) {
+        var ch = line.text.charAt(c);
+        if (ch === ' ') continue;
+        cardCtx.fillStyle = line.colors[c] ? 'rgb(' + line.colors[c].join(',') + ')' : ghost;
+        cardCtx.fillText(ch, L.x + c * L.cellW, y);
+      }
+    });
+  }
+
+  function meta(text) { document.getElementById('card-meta').textContent = text; }
+
+  // ── HTML ──────────────────────────────────────────────────────────────────
+
+  function nearestWeight(font, weight) {
+    var have = FONT_WEIGHTS[font] || [400];
+    return have.reduce(function (best, w) {
+      return Math.abs(w - weight) < Math.abs(best - weight) ? w : best;
+    }, have[0]);
+  }
+
+  function html() {
+    var C = state.card, P = prep;
+    var weight = nearestWeight(C.font, +C.weight);
+    return CC.buildHtml({
+      lines: P.lines, width: P.W, height: P.H, layout: P.L,
+      font: C.font, weight: weight, ghost: C.ghost, restInk: C.restInk, hiWhite: C.hiWhite,
+      lineBar: C.lineBar, background: C.background, loop: C.loop, band: C.band, soft: C.soft,
+      title: 'Code card — ' + current,
+      fontHref: 'https://fonts.googleapis.com/css2?family=' + C.font.replace(/ /g, '+') +
+        ':wght@' + weight + '&display=block'
+    });
+  }
+
+  // Debounced: a new srcdoc reloads the frame and restarts the loop, which
+  // would stutter on every step of a slider drag.
+  var htmlTimer = null;
+  var lastPage = null;
+  function scheduleHtml() {
+    clearTimeout(htmlTimer);
+    htmlTimer = setTimeout(function () {
+      if (!prep) return;
+      var page = html().page;
+      // Fit the frame to the stage at the card's own shape.
+      frameWrap.style.aspectRatio = prep.W + ' / ' + prep.H;
+      frameWrap.style.width = 'min(100%, calc((100vh - 110px) * ' + prep.W + ' / ' + prep.H + '))';
+      if (page !== lastPage) { frame.srcdoc = page; lastPage = page; }
+    }, 200);
+  }
+
+  // ── Export ────────────────────────────────────────────────────────────────
+
+  var exportMsg = document.getElementById('export-msg');
+  function exportNote(text, warn) {
+    exportMsg.textContent = text;
+    exportMsg.className = 'msg' + (warn ? ' warn' : '');
+  }
+
+  function download(name, blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+  }
+
+  function baseName() { return 'code-card-' + current; }
+
+  document.getElementById('export-html').addEventListener('click', function () {
+    if (!handle) return;
+    render();
+    if (!prep) return;
+    var page = html().page;
+    download(baseName() + '.html', new Blob([page], { type: 'text/html' }));
+    exportNote('Saved ' + baseName() + '.html — ' + (page.length / 1024).toFixed(0) + ' KB.');
+  });
+
+  document.getElementById('copy-snippet').addEventListener('click', function () {
+    if (!handle) return;
+    render();
+    if (!prep) return;
+    var snippet = html().snippet;
+    navigator.clipboard.writeText(snippet).then(function () {
+      exportNote('Copied the snippet — ' + (snippet.length / 1024).toFixed(0) + ' KB. Load "' + state.card.font + '" on the host page.');
+    }, function () {
+      exportNote('The clipboard refused — use Export HTML and lift the part between the code card comments.', true);
+    });
+  });
+
+  document.getElementById('export').addEventListener('click', function () {
+    if (!handle) return;
+    render();
+    var name = baseName() + '-' + state.card.width + 'x' + state.card.height + '.png';
+    card.toBlob(function (blob) {
+      download(name, blob);
+      exportNote('Saved ' + name);
+    }, 'image/png');
+  });
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+
+  var asked = new URLSearchParams(location.search).get('shader');
+  setShader(SHADERS[asked] ? asked : SHADERS[state.shader] ? state.shader : 'three-square');
+})();
+</script>
+</body>
+</html>

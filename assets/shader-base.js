@@ -415,6 +415,9 @@
       canvas: canvas,
       gl: gl,
       program: program,
+      // The fragment source exactly as compiled, commonGLSL included — what a
+      // host that shows the code (code-card.html) lists.
+      fragSrc: fragSrc,
       // True when this shader actually calls paletteGroupColor — see groupU.
       supportsGroups: supportsGroups,
       // Same detection, one step further in: true only when the shader also

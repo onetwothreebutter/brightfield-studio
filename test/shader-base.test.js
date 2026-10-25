@@ -108,6 +108,14 @@ describe('shader-base.js', () => {
     expect(h).toBe(500);
   });
 
+  it('exposes the compiled fragment source on the handle, joined from an array', () => {
+    const handle = window.ShaderBase.create({
+      fragSrc: ['#version 300 es', 'void main() {}'], setup: () => ({}), render: vi.fn()
+    });
+    expect(handle.fragSrc).toBe('#version 300 es\nvoid main() {}');
+    expect(window.ShaderBase.last.fragSrc).toBe(handle.fragSrc);
+  });
+
   // ── _shaderExport ────────────────────────────────────────────────────────────
 
   it('sets window._shaderExport to a function', () => {
