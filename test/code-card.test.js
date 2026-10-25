@@ -117,53 +117,136 @@ describe('fitLayout', () => {
   });
 });
 
-describe('highlightWeight', () => {
+// Opacity of one line's highlight at loop phase `p`, read off the generated
+// keyframes the way a browser would — the keyframes are the implementation,
+// so this evaluates them rather than restating the maths. Eased segments are
+// only checked at their ends, where every easing agrees.
+function keyframeStops(css) {
+  return [...css.matchAll(/([\d.]+)%\{opacity:([\d.]+)(?:;animation-timing-function:([\w-]+))?\}/g)]
+    .map((m) => ({ at: +m[1] / 100, v: +m[2], ease: m[3] }));
+}
+function opacityAt(stops, p) {
+  p = ((p % 1) + 1) % 1;
+  for (let i = 0; i < stops.length - 1; i++) {
+    const a = stops[i], b = stops[i + 1];
+    if (p < a.at || p > b.at) continue;
+    if (a.ease === 'step-end') return p < b.at ? a.v : b.v;
+    if (a.v === b.v) return a.v;
+    return p === a.at ? a.v : p === b.at ? b.v : null;   // mid-ease: not asserted
+  }
+  return stops[stops.length - 1].v;
+}
+
+describe('line highlight', () => {
   const o = { rows: 30, band: 1, soft: 1.5 };
-  const rows = [...Array(30).keys()];
+  const t = () => CC.highlightTiming(o);
 
-  it('loops without a seam: phase 1 is phase 0, and nothing is lit there', () => {
-    rows.forEach((r) => {
-      expect(CC.highlightWeight(r, 1, o)).toBeCloseTo(CC.highlightWeight(r, 0, o), 12);
-      expect(CC.highlightWeight(r, 0, o)).toBe(0);
-    });
+  it('loops without a seam: 0% and 100% are the same lit keyframe', () => {
+    const stops = keyframeStops(CC.highlightKeyframes('hl', t()));
+    expect(stops[0]).toMatchObject({ at: 0, v: 1 });
+    expect(stops[stops.length - 1]).toMatchObject({ at: 1, v: 1 });
+    stops.slice(1).forEach((s, i) => expect(s.at).toBeGreaterThanOrEqual(stops[i].at));
   });
 
-  it('lights every row fully once per loop, in order from the top', () => {
-    const peaks = rows.map((r) => {
-      let best = 0, at = -1;
-      for (let i = 0; i < 2000; i++) {
-        const w = CC.highlightWeight(r, i / 2000, o);
-        if (w > best) { best = w; at = i; }
-      }
-      expect(best).toBe(1);
-      return at;
-    });
+  it('peaks every line once per loop, top to bottom, with the band off-screen at the seam', () => {
+    const peaks = [...Array(30).keys()].map((r) => t().peak(r));
     peaks.slice(1).forEach((p, i) => expect(p).toBeGreaterThan(peaks[i]));
+    // At phase 0 the band is above the first line and clear of it, and at
+    // phase 1 it has cleared the last one: no line is lit at the seam.
+    const stops = keyframeStops(CC.highlightKeyframes('hl', t()));
+    peaks.forEach((p) => {
+      expect(opacityAt(stops, 0 - p)).toBe(0);
+      expect(opacityAt(stops, 1 - p)).toBe(0);
+    });
   });
 
-  it('stays between 0 and 1 and falls off with distance from the band', () => {
-    for (let i = 0; i <= 100; i++) {
-      rows.forEach((r) => {
-        const w = CC.highlightWeight(r, i / 100, o);
-        expect(w).toBeGreaterThanOrEqual(0);
-        expect(w).toBeLessThanOrEqual(1);
-      });
-    }
+  it('holds a line lit for the band and dark beyond its falloff', () => {
+    const tm = t();
+    const stops = keyframeStops(CC.highlightKeyframes('hl', tm));
     const period = 30 + 1 + 3;
-    const phaseAt = (row) => (row + 0.5 + 0.5 + 1.5) / period;   // band centred on `row`
-    const p = phaseAt(10);
-    expect(CC.highlightWeight(10, p, o)).toBe(1);
-    expect(CC.highlightWeight(11, p, o)).toBeGreaterThan(CC.highlightWeight(12, p, o));
-    expect(CC.highlightWeight(14, p, o)).toBe(0);
+    // Phase at which the band's centre is on line 10.
+    const p = tm.peak(10);
+    expect(opacityAt(stops, p - tm.peak(10))).toBe(1);
+    expect(opacityAt(stops, p - tm.peak(14))).toBe(0);           // 4 lines away: past band/2 + soft
+    expect(tm.plateau).toBeCloseTo(0.5 / period);
+    expect(tm.fall).toBeCloseTo(1.5 / period);
   });
 
   it('steps one line at a time with no falloff', () => {
-    const hard = { rows: 30, band: 1, soft: 0 };
+    const tm = CC.highlightTiming({ rows: 30, band: 1, soft: 0 });
+    const stops = keyframeStops(CC.highlightKeyframes('hl', tm));
+    expect(stops.some((s) => s.ease === 'step-end')).toBe(true);
     for (let i = 0; i < 300; i++) {
-      const lit = rows.filter((r) => CC.highlightWeight(r, (i + 0.37) / 300, hard) === 1);
+      const phase = (i + 0.37) / 300;
+      const lit = [...Array(30).keys()].filter((r) => opacityAt(stops, phase - tm.peak(r)) === 1);
       expect(lit.length).toBeLessThanOrEqual(1);
-      rows.forEach((r) => expect([0, 1]).toContain(CC.highlightWeight(r, (i + 0.37) / 300, hard)));
     }
+  });
+});
+
+describe('buildHtml', () => {
+  // Built lazily: describe bodies run before beforeAll has loaded the module.
+  let layout;
+  let base;
+  beforeAll(() => {
+    layout = CC.fitLayout({ cols: 20, rows: 3, width: 1000, height: 1200, padding: 0.1, lineHeight: 1.5, advance: 0.6 });
+    base = {
+      width: 1000, height: 1200, layout, font: 'JetBrains Mono', weight: '500',
+      ghost: 0.18, restInk: 0.35, hiWhite: 0.92, lineBar: 0.06, background: '#000000',
+      loop: 12, band: 1, soft: 1.5, title: 'Card <test>'
+    };
+  });
+  const red = [200, 40, 30];
+  const lines = [
+    { text: 'if (a < b && c) {', colors: [red, red, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
+    { text: '', colors: [] },
+    { text: 'x', colors: [null] }
+  ];
+  const html = () => CC.buildHtml(Object.assign({ lines }, base));
+
+  it('sets the text as escaped, real text with one row per line, empty lines kept', () => {
+    const { markup } = html();
+    expect(markup).toContain('(a &lt; b &amp;&amp; c) {');
+    expect(markup).not.toContain('a < b');
+    expect(markup.match(/class="bf-cc__row"/g)).toHaveLength(3);
+    expect(markup).toContain('<span class="bf-cc__rest"> </span>');
+  });
+
+  it('puts nothing between rows — inside a <pre>, a newline there is an extra blank line', () => {
+    expect(html().markup).not.toMatch(/<\/span>\s+<span class="bf-cc__row">/);
+  });
+
+  it('merges identically inked characters into one run and leaves bare text bare', () => {
+    expect(html().markup).toContain('<i style="--c:200 40 30">if</i> (a');
+  });
+
+  it('duplicates each line into a highlight layer hidden from assistive tech, delayed to its peak', () => {
+    const { markup } = html();
+    const delays = [...markup.matchAll(/aria-hidden="true" style="animation-delay:(-[\d.]+)s"/g)].map((m) => +m[1]);
+    expect(delays).toHaveLength(3);
+    const tm = CC.highlightTiming({ rows: 3, band: 1, soft: 1.5 });
+    delays.forEach((d, r) => {
+      expect(d).toBeCloseTo(-(1 - tm.peak(r)) * 12, 3);
+      expect(d).toBeLessThan(0);
+      expect(d).toBeGreaterThan(-12);
+    });
+  });
+
+  it('sizes everything as a share of the card width, so any width is the same card', () => {
+    const { css } = html();
+    expect(css).toContain('container-type:inline-size');
+    expect(css).toContain('aspect-ratio:1000/1200');
+    expect(css).toContain('font-size:' + +(layout.fontSize / 10).toFixed(4) + 'cqw');
+    expect(css).toContain('padding-left:' + +(layout.x / 10).toFixed(4) + '%');
+    expect(css).toContain('animation:bf-cc-hl 12s linear infinite');
+    expect(css).toContain('prefers-reduced-motion');
+  });
+
+  it('wraps the snippet in a standalone page with the font and an escaped title', () => {
+    const { page, snippet } = CC.buildHtml(Object.assign({ lines, fontHref: 'https://fonts.example/css?a=1&b=2' }, base));
+    expect(page).toContain(snippet);
+    expect(page).toContain('<title>Card &lt;test&gt;</title>');
+    expect(page).toContain('href="https://fonts.example/css?a=1&amp;b=2"');
   });
 });
 

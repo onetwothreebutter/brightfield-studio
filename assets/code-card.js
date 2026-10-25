@@ -6,7 +6,9 @@
  * colour, and everything else stays a dim ghost so the whole excerpt reads.
  * The page owns the canvases; this file owns every decision that can be made
  * without one — what a pasted design means, which source lines to offer, how
- * big the type is, and what colour each character cell is.
+ * big the type is, what colour each character cell is, and the HTML/CSS card
+ * (a highlight reading down the lines on a seamless CSS loop) built from all
+ * of that.
  *
  * DOM-free and renderer-free, so it runs under jsdom.
  */
@@ -194,32 +196,125 @@
   }
 
   // ── Line highlight ────────────────────────────────────────────────────────
-  // How lit row `row` is at `phase` (0–1) of a loop: a band `band` lines tall,
-  // with `soft` lines of falloff each side, sweeps down the excerpt once per
-  // loop. The sweep's period is rows + band + both falloffs, so the band clears
-  // the last line before it re-enters above the first, and at phase 0 nothing
-  // is lit. The weight is periodic in phase with period 1, so frame N of an
-  // N-frame loop would equal frame 0: frames 0..N-1 loop without a seam.
-  // `soft: 0` with `band: 1` steps line by line — one row lit at a time.
+  // A band `band` lines tall, with `soft` lines of falloff each side, sweeps
+  // down the excerpt once per loop. Every line runs the same keyframes — lit
+  // at 0%, fading over the falloff, dark, fading back to lit at 100% — shifted
+  // by a negative delay to the moment the band's centre crosses it. The sweep's
+  // period is rows + band + both falloffs, so the band clears the last line
+  // before it re-enters above the first. 0% and 100% are the same keyframe and
+  // every line shares one duration, so the loop has no seam. `soft: 0` with
+  // `band: 1` steps line by line.
 
-  function highlightWeight(row, phase, o) {
+  function highlightTiming(o) {
     var band = Math.max(0.01, o.band);
     var soft = Math.max(0, o.soft || 0);
     var period = o.rows + band + 2 * soft;
-    var center = phase * period - band / 2 - soft;
-    var d = (row + 0.5) - center;
-    d = ((d % period) + period) % period;
-    if (d > period / 2) d -= period;
-    var a = Math.abs(d);
-    var half = band / 2;
-    if (a <= half) return 1;
-    if (soft <= 0 || a >= half + soft) return 0;
-    var t = 1 - (a - half) / soft;
-    return t * t * (3 - 2 * t);
+    return {
+      // Half-width of the lit plateau and width of each falloff, as fractions
+      // of the loop. plateau + fall never exceeds a half, so they can't overlap.
+      plateau: band / 2 / period,
+      fall: soft / period,
+      // When `row` sits at the band's centre, as a fraction of the loop.
+      peak: function (row) { return (row + 0.5 + band / 2 + soft) / period; }
+    };
+  }
+
+  function pct(f) { return +(f * 100).toFixed(4) + '%'; }
+
+  // ease-in-out has smoothstep's flat ends, so a line eases in and out of the
+  // band rather than snapping at its edge.
+  function highlightKeyframes(name, t) {
+    var h = t.plateau, s = t.fall;
+    var stops = s > 0
+      ? [[0, 1, 'linear'], [h, 1, 'ease-in-out'], [h + s, 0, 'linear'],
+         [1 - h - s, 0, 'ease-in-out'], [1 - h, 1, 'linear'], [1, 1]]
+      : [[0, 1, 'step-end'], [h, 0, 'step-end'], [1 - h, 1, 'linear'], [1, 1]];
+    return '@keyframes ' + name + '{' + stops.map(function (k) {
+      return pct(k[0]) + '{opacity:' + k[1] + (k[2] ? ';animation-timing-function:' + k[2] : '') + '}';
+    }).join('') + '}';
+  }
+
+  // ── HTML ──────────────────────────────────────────────────────────────────
+  // The card as real text: a <pre> of rows, each row two stacked layers of
+  // the same runs — the resting layer (ink dimmed, bare text a ghost) and the
+  // highlighted layer (ink full, bare text bright, a faint line bar) whose
+  // opacity is the only thing animated, so the browser can run it on the
+  // compositor. Every size is a share of the card's width (cqw and percentage
+  // padding), so it is the same card at any width. Colours are per run of
+  // identically inked characters, carried as a `--c` triple.
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function runsHtml(text, colors) {
+    var out = '';
+    for (var i = 0; i < text.length;) {
+      var key = colors[i] ? colors[i].join(' ') : '';
+      var j = i + 1;
+      while (j < text.length && (colors[j] ? colors[j].join(' ') : '') === key) j++;
+      var chunk = escapeHtml(text.slice(i, j));
+      out += key ? '<i style="--c:' + key + '">' + chunk + '</i>' : chunk;
+      i = j;
+    }
+    // An empty line still needs a line box, or the rows below it move up.
+    return out || ' ';
+  }
+
+  function num(v, d) { return +v.toFixed(d == null ? 4 : d); }
+
+  // o: { lines: [{ text, colors: [rgb|null per character] }], width, height,
+  //      layout (fitLayout's), font, weight, ghost, restInk, hiWhite, lineBar,
+  //      background, loop (s), band, soft, title, fontHref }
+  function buildHtml(o) {
+    var W = o.width, L = o.layout;
+    var t = highlightTiming({ rows: o.lines.length, band: o.band, soft: o.soft });
+    var css = [
+      '.bf-cc{--bf-cc-ghost:' + o.ghost + ';--bf-cc-rest:' + o.restInk + ';--bf-cc-hi:' + o.hiWhite +
+        ';--bf-cc-bar:' + o.lineBar + ';position:relative;container-type:inline-size;aspect-ratio:' +
+        W + '/' + o.height + ';background:' + o.background + ';overflow:hidden}',
+      '.bf-cc__code{margin:0;padding:' + pct(L.y / W) + ' 0 0;font-family:"' + o.font +
+        '",ui-monospace,monospace;font-weight:' + o.weight + ';font-size:' + num(L.fontSize / W * 100) +
+        'cqw;line-height:' + num(L.cellH / L.fontSize) + ';white-space:pre;font-variant-ligatures:none;' +
+        'font-feature-settings:"calt" 0,"liga" 0;color:rgb(255 255 255/var(--bf-cc-ghost))}',
+      '.bf-cc__code code{font:inherit}',
+      '.bf-cc__row{display:grid}',
+      '.bf-cc__row>span{grid-area:1/1;padding-left:' + pct(L.x / W) + '}',
+      '.bf-cc i{font-style:normal}',
+      '.bf-cc__rest i{color:rgb(var(--c)/var(--bf-cc-rest))}',
+      '.bf-cc__hi{color:rgb(255 255 255/var(--bf-cc-hi));background:rgb(255 255 255/var(--bf-cc-bar));' +
+        'opacity:0;animation:bf-cc-hl ' + o.loop + 's linear infinite;user-select:none;pointer-events:none}',
+      '.bf-cc__hi i{color:rgb(var(--c))}',
+      highlightKeyframes('bf-cc-hl', t),
+      // Without motion, the still card: ink at full strength, nothing sweeping.
+      '@media (prefers-reduced-motion:reduce){.bf-cc{--bf-cc-rest:1}.bf-cc__hi{animation:none}}'
+    ].join('\n');
+    var rows = o.lines.map(function (line, r) {
+      var runs = runsHtml(line.text, line.colors);
+      var delay = -(1 - t.peak(r)) * o.loop;
+      return '<span class="bf-cc__row"><span class="bf-cc__rest">' + runs + '</span>' +
+        '<span class="bf-cc__hi" aria-hidden="true" style="animation-delay:' + num(delay, 3) + 's">' +
+        runs + '</span></span>';
+    // No separator: inside a <pre>, a newline between rows is a line box of
+    // its own, which double-spaces the card and the text it copies as.
+    }).join('');
+    var markup = '<div class="bf-cc"><pre class="bf-cc__code"><code>' + rows + '</code></pre></div>';
+    var snippet = '<style>\n' + css + '\n</style>\n' + markup;
+    var page = '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n' +
+      '<meta name="viewport" content="width=device-width,initial-scale=1">\n' +
+      '<title>' + escapeHtml(o.title || 'Code card') + '</title>\n' +
+      (o.fontHref ? '<link rel="stylesheet" href="' + escapeHtml(o.fontHref) + '">\n' : '') +
+      '<style>\nhtml,body{margin:0;height:100%;background:' + o.background + '}\n' +
+      'body{display:grid;place-items:center}\n' +
+      '.bf-cc{width:min(100vw,calc(100vh*' + W + '/' + o.height + '))}\n</style>\n' +
+      '</head>\n<body>\n<!-- code card: start -->\n' + snippet + '\n<!-- code card: end -->\n</body>\n</html>\n';
+    return { css: css, markup: markup, snippet: snippet, page: page };
   }
 
   window.CodeCard = {
-    highlightWeight: highlightWeight,
+    highlightTiming: highlightTiming,
+    highlightKeyframes: highlightKeyframes,
+    buildHtml: buildHtml,
     parseDesign: parseDesign,
     sourceRows: sourceRows,
     excerpt: excerpt,
