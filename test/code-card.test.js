@@ -117,6 +117,56 @@ describe('fitLayout', () => {
   });
 });
 
+describe('highlightWeight', () => {
+  const o = { rows: 30, band: 1, soft: 1.5 };
+  const rows = [...Array(30).keys()];
+
+  it('loops without a seam: phase 1 is phase 0, and nothing is lit there', () => {
+    rows.forEach((r) => {
+      expect(CC.highlightWeight(r, 1, o)).toBeCloseTo(CC.highlightWeight(r, 0, o), 12);
+      expect(CC.highlightWeight(r, 0, o)).toBe(0);
+    });
+  });
+
+  it('lights every row fully once per loop, in order from the top', () => {
+    const peaks = rows.map((r) => {
+      let best = 0, at = -1;
+      for (let i = 0; i < 2000; i++) {
+        const w = CC.highlightWeight(r, i / 2000, o);
+        if (w > best) { best = w; at = i; }
+      }
+      expect(best).toBe(1);
+      return at;
+    });
+    peaks.slice(1).forEach((p, i) => expect(p).toBeGreaterThan(peaks[i]));
+  });
+
+  it('stays between 0 and 1 and falls off with distance from the band', () => {
+    for (let i = 0; i <= 100; i++) {
+      rows.forEach((r) => {
+        const w = CC.highlightWeight(r, i / 100, o);
+        expect(w).toBeGreaterThanOrEqual(0);
+        expect(w).toBeLessThanOrEqual(1);
+      });
+    }
+    const period = 30 + 1 + 3;
+    const phaseAt = (row) => (row + 0.5 + 0.5 + 1.5) / period;   // band centred on `row`
+    const p = phaseAt(10);
+    expect(CC.highlightWeight(10, p, o)).toBe(1);
+    expect(CC.highlightWeight(11, p, o)).toBeGreaterThan(CC.highlightWeight(12, p, o));
+    expect(CC.highlightWeight(14, p, o)).toBe(0);
+  });
+
+  it('steps one line at a time with no falloff', () => {
+    const hard = { rows: 30, band: 1, soft: 0 };
+    for (let i = 0; i < 300; i++) {
+      const lit = rows.filter((r) => CC.highlightWeight(r, (i + 0.37) / 300, hard) === 1);
+      expect(lit.length).toBeLessThanOrEqual(1);
+      rows.forEach((r) => expect([0, 1]).toContain(CC.highlightWeight(r, (i + 0.37) / 300, hard)));
+    }
+  });
+});
+
 describe('sampleCell', () => {
   // 4×2 image: left half black, right half two different inks.
   const data = new Uint8ClampedArray([

@@ -78,6 +78,8 @@
   button.primary { background: #0cf; color: #000; border-color: #0cf; font-weight: 600; }
   .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; }
   .msg { color: #888; }
+  .check { display: flex; gap: 6px; align-items: center; color: #ccc; }
+  button:disabled { opacity: 0.5; cursor: default; }
   .msg.warn { color: #f90; }
   .hint { color: #777; line-height: 1.5; margin-top: 4px; }
 
@@ -105,7 +107,7 @@
 
   <aside id="panels">
     <h1>Code card</h1>
-    <p class="lede">A product's shader source, lit by the design it draws. Glyphs over ink take its colour; the rest stay a dim ghost so the whole excerpt reads.</p>
+    <p class="lede">A product's shader source, lit by the design it draws. Glyphs over ink take its colour; the rest stay a dim ghost so the whole excerpt reads. Export a still, or a seamless video loop with a highlight reading down the lines.</p>
 
     <section class="panel">
       <h2>Card</h2>
@@ -118,8 +120,8 @@
             <option value="square">Square</option>
             <option value="custom">Custom</option>
           </select>
-          <input type="number" id="card-width" min="64" max="8192" step="1" aria-label="Width">
-          <input type="number" id="card-height" min="64" max="8192" step="1" aria-label="Height">
+          <input type="number" id="card-width" min="64" max="8192" step="2" aria-label="Width">
+          <input type="number" id="card-height" min="64" max="8192" step="2" aria-label="Height">
         </div>
       </div>
       <div class="field field--wide"><label for="card-font">Font</label>
@@ -152,6 +154,35 @@
       <div class="field"><label for="card-time">Shader time (s)</label><input type="range" id="card-time" data-card="time" min="0" max="60" step="0.1"><output></output></div>
       <div class="field field--wide"><label for="card-bg">Background</label><input type="color" id="card-bg" data-card="background"></div>
       <div class="row"><button type="button" class="primary" id="export">Export PNG</button><span class="msg" id="export-msg"></span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Video</h2>
+      <div class="field field--wide"><label for="card-animate">Preview</label>
+        <label class="check"><input type="checkbox" id="card-animate" data-card="animate"> Play the loop</label>
+      </div>
+      <div class="field"><label for="card-loop">Loop length (s)</label><input type="range" id="card-loop" data-card="loop" min="4" max="40" step="0.5"><output></output></div>
+      <div class="field"><label for="card-band">Band (lines)</label><input type="range" id="card-band" data-card="band" min="0.5" max="8" step="0.5"><output></output></div>
+      <div class="field"><label for="card-soft">Falloff (lines)</label><input type="range" id="card-soft" data-card="soft" min="0" max="6" step="0.25"><output></output></div>
+      <div class="field"><label for="card-rest">Resting ink</label><input type="range" id="card-rest" data-card="restInk" min="0" max="1" step="0.01"><output></output></div>
+      <div class="field"><label for="card-hi">Highlighted text</label><input type="range" id="card-hi" data-card="hiWhite" min="0.2" max="1" step="0.01"><output></output></div>
+      <div class="field"><label for="card-bar">Line bar</label><input type="range" id="card-bar" data-card="lineBar" min="0" max="0.25" step="0.01"><output></output></div>
+      <div class="field field--wide"><label for="card-format">Format</label>
+        <div class="pair">
+          <select id="card-format" data-card="videoFormat">
+            <option value="mp4">MP4 · H.264</option>
+            <option value="webm">WebM · VP9</option>
+          </select>
+          <select id="card-fps" data-card="fps" aria-label="Frame rate">
+            <option value="24">24 fps</option>
+            <option value="30">30 fps</option>
+            <option value="60">60 fps</option>
+          </select>
+        </div>
+      </div>
+      <div class="row"><button type="button" class="primary" id="export-video">Export video</button><span class="msg" id="video-readout"></span></div>
+      <p class="msg" id="video-msg"></p>
+      <p class="hint">A band sweeps down the excerpt once per loop. Falloff 0 with a one-line band steps line by line. Frame <i>i</i> of <i>N</i> is drawn at <i>i/N</i> of the sweep, so the last frame flows into the first.</p>
     </section>
 
     <section class="panel">
@@ -203,12 +234,17 @@
   var GL_CANVAS = document.getElementById('shader-canvas');
   var card = document.getElementById('card');
   var cardCtx = card.getContext('2d');
-  // The design flattened on black and read back once per render: per-glyph
-  // lighting samples it, per-pixel lighting masks it.
+  // The design flattened on black and read back once per prepare: per-glyph
+  // lighting samples it, per-pixel lighting splits the type by it.
   var design = document.createElement('canvas');
   var designCtx = design.getContext('2d', { willReadFrequently: true });
-  var mask = document.createElement('canvas');
-  var maskCtx = mask.getContext('2d');
+  // Per-pixel lighting's layers — see splitStrokes.
+  var typeLayer = document.createElement('canvas');
+  var typeCtx = typeLayer.getContext('2d', { willReadFrequently: true });
+  var inkLayer = document.createElement('canvas');
+  var inkCtx = inkLayer.getContext('2d');
+  var plainLayer = document.createElement('canvas');
+  var plainCtx = plainLayer.getContext('2d');
 
   var SIZES = { tile: [1548, 1748], print: [1800, 2400], square: [2048, 2048] };
   // A pixel at or under this brightness (0–255) is shirt, not ink.
@@ -217,7 +253,11 @@
   var DEFAULT_CARD = {
     width: 1548, height: 1748, font: 'JetBrains Mono', weight: '500',
     padding: 0.07, lineHeight: 1.55, mode: 'glyph', threshold: 0.1,
-    ghost: 0.18, underlay: 0, time: PPS.FIXED_TIME, background: '#000000'
+    ghost: 0.18, underlay: 0, time: PPS.FIXED_TIME, background: '#000000',
+    // Video: a one-line band with a soft edge, reading down at a pace a
+    // shopper can follow, over ink dimmed enough that the band is the news.
+    animate: false, loop: 16, fps: '30', band: 1, soft: 1.5,
+    restInk: 0.35, hiWhite: 0.92, lineBar: 0.06, videoFormat: 'mp4'
   };
   // Lines offered when a shader is first opened: the top of main(), which is
   // where the design is decided rather than declared. Forty is roughly what
@@ -477,7 +517,9 @@
   });
   [widthEl, heightEl].forEach(function (el) {
     el.addEventListener('change', function () {
-      var w = Math.round(+widthEl.value), h = Math.round(+heightEl.value);
+      // Even, because H.264 cannot encode an odd dimension, and a still that
+      // doesn't match its own video is a trap.
+      var w = Math.round(+widthEl.value / 2) * 2, h = Math.round(+heightEl.value / 2) * 2;
       if (!(w >= 64 && w <= 8192 && h >= 64 && h <= 8192)) { syncSize(); return; }
       state.card.width = w;
       state.card.height = h;
@@ -485,26 +527,47 @@
     });
   });
 
+  // Settings that change how the prepared card is drawn but not what was
+  // prepared — no shader frame, no re-sampling — so dragging them is cheap
+  // and a playing preview just picks them up on its next frame.
+  var PAINT_ONLY = {
+    ghost: 1, underlay: 1, background: 1, animate: 1, loop: 1, fps: 1,
+    band: 1, soft: 1, restInk: 1, hiWhite: 1, lineBar: 1, videoFormat: 1
+  };
+
   document.querySelectorAll('[data-card]').forEach(function (el) {
     var key = el.dataset.card;
     var out = el.parentNode.querySelector('output');
-    el.value = state.card[key];
+    if (el.type === 'checkbox') el.checked = !!state.card[key];
+    else el.value = state.card[key];
     if (out) out.textContent = el.value;
     el.addEventListener('input', function () {
-      state.card[key] = el.type === 'range' ? parseFloat(el.value) : el.value;
+      state.card[key] = el.type === 'checkbox' ? el.checked
+        : el.type === 'range' ? parseFloat(el.value) : el.value;
       if (out) out.textContent = el.value;
-      save(); scheduleRender();
+      save();
+      if (PAINT_ONLY[key]) { videoReadout(); repaint(); } else scheduleRender();
     });
   });
   syncSize();
 
   // ── Render ────────────────────────────────────────────────────────────────
+  // Two stages. prepare() does everything expensive — the shader frame, the
+  // layout, each glyph's ink — and runs only when one of those inputs
+  // changes. paint(phase) draws the card from what it prepared, cheaply
+  // enough to run once per video frame: phase null is the still card, and a
+  // number 0–1 is that point in the highlight loop.
 
   var queued = false;
   function scheduleRender() {
     if (queued) return;
     queued = true;
-    requestAnimationFrame(function () { queued = false; render(); });
+    requestAnimationFrame(function () {
+      queued = false;
+      // A video export owns the card until it finishes (and re-renders then):
+      // a prepare mid-export would change the frames under it.
+      if (!exporting) render();
+    });
   }
 
   // A canvas font that hasn't loaded measures and draws as the fallback, and
@@ -541,19 +604,26 @@
     });
   }
 
+  var prep = null;
+
   function render() {
     if (!handle) return;
-    var C = state.card;
     var probe = fontSpec(100);
     if (!fontsReady[probe]) {
       document.fonts.load(probe).then(function () { fontsReady[probe] = true; scheduleRender(); },
         function () { fontsReady[probe] = true; scheduleRender(); });
       return;
     }
+    prepare(probe);
+    repaint();
+  }
+
+  function prepare(probe) {
+    var C = state.card;
     var W = C.width, H = C.height;
 
-    // 1. The design, at the card's own size, so it sits where it would on a
-    //    gallery image of the same shape.
+    // The design, at the card's own size, so it sits where it would on a
+    // gallery image of the same shape.
     var gl = handle.gl;
     if (GL_CANVAS.width !== W || GL_CANVAS.height !== H) {
       GL_CANVAS.width = W;
@@ -569,8 +639,8 @@
     designCtx.fillStyle = '#000';
     designCtx.fillRect(0, 0, W, H);
     designCtx.drawImage(GL_CANVAS, 0, 0, W, H);
+    var px = designCtx.getImageData(0, 0, W, H).data;
 
-    // 2. The grid.
     var lines = excerptLines();
     var cols = lines.reduce(function (m, l) { return Math.max(m, l.length); }, 1);
     cardCtx.font = probe;
@@ -580,9 +650,60 @@
       advance: cardCtx.measureText('M').width / 100
     });
     var font = fontSpec(L.fontSize.toFixed(2));
-    var ghost = 'rgba(255,255,255,' + C.ghost + ')';
 
-    // 3. The card.
+    var glyphs = [], lit = 0;
+    eachGlyph(lines, L, function (ch, x, y, c, r) {
+      var color = null;
+      if (C.mode !== 'pixel') {
+        var s = CC.sampleCell(px, W, H, { x: x, y: y - L.cellH / 2, w: L.cellW, h: L.cellH }, INK_FLOOR);
+        if (s.color && s.coverage >= C.threshold) { color = s.color; lit++; }
+      }
+      glyphs.push({ ch: ch, x: x, y: y, row: r, color: color });
+    });
+    if (C.mode === 'pixel') splitStrokes(px, W, H, glyphs, font);
+
+    prep = { W: W, H: H, L: L, rows: lines.length, font: font, glyphs: glyphs, mode: C.mode };
+    meta(W + '×' + H + ' · ' + lines.length + ' lines × ' + cols + ' cols · ' +
+      L.fontSize.toFixed(1) + 'px type' +
+      (C.mode === 'pixel' ? '' : ' · ' + lit + ' of ' + glyphs.length + ' glyphs lit'));
+    videoReadout();
+  }
+
+  // Per pixel: the type split once into two layers, so each row's ink and its
+  // bare strokes can be faded independently every frame. The ink layer is the
+  // design inside the strokes; the plain layer is the strokes where there is
+  // no ink. Lightening the design over white strokes can't be faded per row
+  // that way — a highlighted white stroke out-lightens every ink under it.
+  function splitStrokes(px, W, H, glyphs, font) {
+    sizeTo(typeLayer, W, H);
+    typeCtx.clearRect(0, 0, W, H);
+    typeCtx.font = font;
+    typeCtx.textBaseline = 'middle';
+    typeCtx.textAlign = 'left';
+    typeCtx.fillStyle = '#fff';
+    glyphs.forEach(function (g) { typeCtx.fillText(g.ch, g.x, g.y); });
+    var type = typeCtx.getImageData(0, 0, W, H).data;
+    var ink = inkCtx.createImageData(W, H), plain = plainCtx.createImageData(W, H);
+    for (var i = 0; i < type.length; i += 4) {
+      var a = type[i + 3];
+      if (!a) continue;
+      if (Math.max(px[i], px[i + 1], px[i + 2]) > INK_FLOOR) {
+        ink.data[i] = px[i]; ink.data[i + 1] = px[i + 1]; ink.data[i + 2] = px[i + 2]; ink.data[i + 3] = a;
+      } else {
+        plain.data[i] = plain.data[i + 1] = plain.data[i + 2] = 255; plain.data[i + 3] = a;
+      }
+    }
+    sizeTo(inkLayer, W, H);
+    sizeTo(plainLayer, W, H);
+    inkCtx.putImageData(ink, 0, 0);
+    plainCtx.putImageData(plain, 0, 0);
+  }
+
+  function paint(phase) {
+    var P = prep;
+    if (!P) return;
+    var C = state.card, W = P.W, H = P.H, L = P.L;
+    var still = phase == null;
     sizeTo(card, W, H);
     cardCtx.globalCompositeOperation = 'source-over';
     cardCtx.globalAlpha = 1;
@@ -597,71 +718,178 @@
       cardCtx.globalCompositeOperation = 'source-over';
       cardCtx.globalAlpha = 1;
     }
-    cardCtx.font = font;
-    cardCtx.textBaseline = 'middle';
-    cardCtx.textAlign = 'left';
 
-    var glyphs = 0, lit = 0;
-    if (C.mode === 'pixel') {
-      cardCtx.fillStyle = ghost;
-      eachGlyph(lines, L, function (ch, x, y) { glyphs++; cardCtx.fillText(ch, x, y); });
-      // The design cut to the strokes, then laid over the ghost with lighten,
-      // so a stroke is ink where the design is brighter and ghost where not.
-      // All the type goes down first and the design is cut to it in one
-      // source-in: a destination-in per glyph would keep only the last glyph.
-      sizeTo(mask, W, H);
-      maskCtx.globalCompositeOperation = 'source-over';
-      maskCtx.clearRect(0, 0, W, H);
-      maskCtx.font = font;
-      maskCtx.textBaseline = 'middle';
-      maskCtx.textAlign = 'left';
-      maskCtx.fillStyle = '#fff';
-      eachGlyph(lines, L, function (ch, x, y) { maskCtx.fillText(ch, x, y); });
-      maskCtx.globalCompositeOperation = 'source-in';
-      maskCtx.drawImage(design, 0, 0);
-      maskCtx.globalCompositeOperation = 'source-over';
-      cardCtx.globalCompositeOperation = 'lighten';
-      cardCtx.drawImage(mask, 0, 0);
-      cardCtx.globalCompositeOperation = 'source-over';
-      lit = null;
-    } else {
-      var px = designCtx.getImageData(0, 0, W, H).data;
-      eachGlyph(lines, L, function (ch, x, y) {
-        glyphs++;
-        var s = CC.sampleCell(px, W, H, { x: x, y: y - L.cellH / 2, w: L.cellW, h: L.cellH }, INK_FLOOR);
-        if (s.color && s.coverage >= C.threshold) {
-          lit++;
-          cardCtx.fillStyle = 'rgb(' + s.color.join(',') + ')';
-        } else {
-          cardCtx.fillStyle = ghost;
-        }
-        cardCtx.fillText(ch, x, y);
+    // How lit each row is. The still card is the loop at rest with its ink at
+    // full strength; a frame dims the resting ink and lifts the band.
+    var weights = [];
+    for (var r = 0; r < P.rows; r++) {
+      weights.push(still ? 0 : CC.highlightWeight(r, phase, { rows: P.rows, band: C.band, soft: C.soft }));
+    }
+    var rest = still ? 1 : C.restInk;
+    function inkAlpha(w) { return rest + (1 - rest) * w; }
+    function bareAlpha(w) { return C.ghost + (C.hiWhite - C.ghost) * w; }
+    // Row boundaries on whole pixels, so neighbouring bars and strips meet
+    // without a seam or an overlap.
+    function rowTop(r) { return Math.round(L.y + r * L.cellH); }
+
+    if (!still && C.lineBar > 0) {
+      weights.forEach(function (w, r) {
+        if (!w) return;
+        cardCtx.fillStyle = 'rgba(255,255,255,' + (C.lineBar * w) + ')';
+        cardCtx.fillRect(0, rowTop(r), W, rowTop(r + 1) - rowTop(r));
       });
     }
 
-    meta(W + '×' + H + ' · ' + lines.length + ' lines × ' + cols + ' cols · ' +
-      L.fontSize.toFixed(1) + 'px type' +
-      (lit == null ? '' : ' · ' + lit + ' of ' + glyphs + ' glyphs lit'));
+    if (P.mode === 'pixel') {
+      // Strips partition the whole card (the first and last reach the
+      // edges), so every stroke pixel is drawn exactly once.
+      for (var s = 0; s < P.rows; s++) {
+        var y0 = s === 0 ? 0 : rowTop(s);
+        var y1 = s === P.rows - 1 ? H : rowTop(s + 1);
+        if (y1 <= y0) continue;
+        cardCtx.globalAlpha = bareAlpha(weights[s]);
+        cardCtx.drawImage(plainLayer, 0, y0, W, y1 - y0, 0, y0, W, y1 - y0);
+        cardCtx.globalAlpha = inkAlpha(weights[s]);
+        cardCtx.drawImage(inkLayer, 0, y0, W, y1 - y0, 0, y0, W, y1 - y0);
+      }
+      cardCtx.globalAlpha = 1;
+      return;
+    }
+
+    cardCtx.font = P.font;
+    cardCtx.textBaseline = 'middle';
+    cardCtx.textAlign = 'left';
+    P.glyphs.forEach(function (g) {
+      var w = weights[g.row];
+      cardCtx.fillStyle = g.color
+        ? 'rgba(' + g.color.join(',') + ',' + inkAlpha(w) + ')'
+        : 'rgba(255,255,255,' + bareAlpha(w) + ')';
+      cardCtx.fillText(g.ch, g.x, g.y);
+    });
   }
 
   function meta(text) { document.getElementById('card-meta').textContent = text; }
 
+  // ── Preview loop ──────────────────────────────────────────────────────────
+  // Plays the same phase the export would draw at that moment, so what you
+  // tune is what gets encoded.
+
+  var animating = false;
+  var exporting = false;
+
+  function tick() {
+    if (!state.card.animate || exporting) { animating = false; return; }
+    var ms = state.card.loop * 1000;
+    paint((performance.now() % ms) / ms);
+    requestAnimationFrame(tick);
+  }
+
+  function repaint() {
+    if (exporting) return;
+    if (!state.card.animate) { paint(null); return; }
+    if (!animating && prep) { animating = true; requestAnimationFrame(tick); }
+  }
+
+  function loopFrames() {
+    return Math.max(1, Math.round(state.card.loop * parseInt(state.card.fps, 10)));
+  }
+
+  function videoReadout() {
+    var C = state.card;
+    var text = loopFrames() + ' frames';
+    if (prep) text += ' · ' + ((prep.rows + C.band + 2 * C.soft) / C.loop).toFixed(1) + ' lines/s';
+    document.getElementById('video-readout').textContent = text;
+  }
+
   // ── Export ────────────────────────────────────────────────────────────────
 
+  function download(name, blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+  }
+
   document.getElementById('export').addEventListener('click', function () {
-    if (!handle) return;
+    if (!handle || exporting) return;
     render();
+    paint(null);   // the still, even while the preview is playing
     var name = 'code-card-' + current + '-' + state.card.width + 'x' + state.card.height + '.png';
     card.toBlob(function (blob) {
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+      download(name, blob);
       document.getElementById('export-msg').textContent = 'Saved ' + name;
     }, 'image/png');
+  });
+
+  // The video is encoded frame by frame through WebCodecs rather than
+  // recorded off a playing canvas: a recorder stamps frames with wall-clock
+  // time, so a slow frame stretches and the loop point lands wherever the
+  // recording happened to stop. Here frame i is drawn at phase i/N and
+  // stamped at exactly i/fps, so frame N — never drawn — would be frame 0,
+  // and the file loops without a seam. The muxer is a devDependency loaded
+  // from node_modules, which is why the page has to be served from the repo
+  // root (`npm run code-card` does).
+  var MUXER = './node_modules/mediabunny/dist/bundles/mediabunny.min.mjs';
+  var videoBtn = document.getElementById('export-video');
+  var videoMsg = document.getElementById('video-msg');
+
+  function videoNote(text, warn) {
+    videoMsg.textContent = text;
+    videoMsg.className = 'msg' + (warn ? ' warn' : '');
+  }
+
+  videoBtn.addEventListener('click', function () {
+    if (!handle || exporting) return;
+    render();
+    if (!prep) return;
+    var C = state.card;
+    var fps = parseInt(C.fps, 10);
+    var frames = loopFrames();
+    var mp4 = C.videoFormat === 'mp4';
+    var W = prep.W, H = prep.H;
+    var name = 'code-card-' + current + '-' + W + 'x' + H + '-' + C.loop + 's.' + (mp4 ? 'mp4' : 'webm');
+    exporting = true;
+    videoBtn.disabled = true;
+    videoNote('Loading the encoder…');
+    import(MUXER).then(function (MB) {
+      return MB.getFirstEncodableVideoCodec(mp4 ? ['avc'] : ['vp9', 'vp8'], { width: W, height: H })
+        .then(function (codec) {
+          if (!codec) {
+            throw new Error((mp4 ? 'H.264' : 'VP9/VP8') + ' encoding at ' + W + '×' + H +
+              ' is not available in this browser' + (mp4 ? ' — try WebM.' : '.'));
+          }
+          var output = new MB.Output({
+            format: mp4 ? new MB.Mp4OutputFormat({ fastStart: 'in-memory' }) : new MB.WebMOutputFormat(),
+            target: new MB.BufferTarget()
+          });
+          var source = new MB.CanvasSource(card, { codec: codec, bitrate: MB.QUALITY_VERY_HIGH });
+          output.addVideoTrack(source, { frameRate: fps });
+          var i = 0;
+          function next() {
+            if (i >= frames) return output.finalize();
+            paint(i / frames);
+            var t = i / fps;
+            i++;
+            if (i % fps === 0) videoNote('Encoding frame ' + i + ' of ' + frames + '…');
+            return source.add(t, 1 / fps).then(next);
+          }
+          return output.start().then(next).then(function () {
+            var buf = output.target.buffer;
+            download(name, new Blob([buf], { type: mp4 ? 'video/mp4' : 'video/webm' }));
+            videoNote('Saved ' + name + ' — ' + frames + ' frames, ' +
+              (buf.byteLength / 1048576).toFixed(1) + ' MB, ' + codec + '.');
+          });
+        });
+    }).catch(function (e) {
+      videoNote(e && e.message ? e.message : String(e), true);
+    }).then(function () {
+      exporting = false;
+      videoBtn.disabled = false;
+      render();
+    });
   });
 
   // ── Boot ──────────────────────────────────────────────────────────────────

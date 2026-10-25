@@ -193,7 +193,33 @@
     };
   }
 
+  // ── Line highlight ────────────────────────────────────────────────────────
+  // How lit row `row` is at `phase` (0–1) of a loop: a band `band` lines tall,
+  // with `soft` lines of falloff each side, sweeps down the excerpt once per
+  // loop. The sweep's period is rows + band + both falloffs, so the band clears
+  // the last line before it re-enters above the first, and at phase 0 nothing
+  // is lit. The weight is periodic in phase with period 1, so frame N of an
+  // N-frame loop would equal frame 0: frames 0..N-1 loop without a seam.
+  // `soft: 0` with `band: 1` steps line by line — one row lit at a time.
+
+  function highlightWeight(row, phase, o) {
+    var band = Math.max(0.01, o.band);
+    var soft = Math.max(0, o.soft || 0);
+    var period = o.rows + band + 2 * soft;
+    var center = phase * period - band / 2 - soft;
+    var d = (row + 0.5) - center;
+    d = ((d % period) + period) % period;
+    if (d > period / 2) d -= period;
+    var a = Math.abs(d);
+    var half = band / 2;
+    if (a <= half) return 1;
+    if (soft <= 0 || a >= half + soft) return 0;
+    var t = 1 - (a - half) / soft;
+    return t * t * (3 - 2 * t);
+  }
+
   window.CodeCard = {
+    highlightWeight: highlightWeight,
     parseDesign: parseDesign,
     sourceRows: sourceRows,
     excerpt: excerpt,
