@@ -1,0 +1,92 @@
+var controls = [
+  // ── Grid ──────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Grid' },
+  { key: 'u_rows', label: 'Rows', type: 'range', min: 4, max: 40, step: 1, value: 16 },
+  { key: 'u_cols', label: 'Columns', type: 'range', min: 4, max: 40, step: 1, value: 12 },
+  { key: 'u_dot_density', label: 'Dot Density', type: 'range', min: 0, max: 1, step: 0.01, value: 0.5,
+    tip: 'Fraction of cells that hold a dot. At 1 the grid is solid and the lines stop reading as connections; at 0 they connect nothing. 0.5 is the intended look.' },
+  { key: 'u_seed', label: 'Seed', type: 'range', min: 0, max: 999, step: 1, value: 3,
+    tip: 'Reshuffles which dots appear, their sizes, and where the lines land.' },
+  // ── Dots ──────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Dots' },
+  { key: 'u_dot_large', label: 'Large Size', type: 'range', min: 0, max: 1, step: 0.01, value: 0.34,
+    tip: 'Radius as a fraction of half a cell. Every dot is randomly assigned one of the three sizes.' },
+  { key: 'u_dot_medium', label: 'Medium Size', type: 'range', min: 0, max: 1, step: 0.01, value: 0.20 },
+  { key: 'u_dot_small', label: 'Small Size', type: 'range', min: 0, max: 1, step: 0.01, value: 0.10 },
+  { key: 'u_dot_jitter', label: 'Center Jitter', type: 'range', min: 0, max: 0.6, step: 0.01, value: 0.18,
+    tip: 'How far each dot drifts off its cell center. Line ends follow their dots, so strokes stay attached.' },
+  { key: 'u_dot_wobble', label: 'Edge Wobble', type: 'range', min: 0, max: 1, step: 0.01, value: 0.35,
+    tip: 'Modulates each dot\'s radius by angle so the outline breathes instead of being machine-perfect.' },
+  // ── Lines ─────────────────────────────────────────────────────────────────
+  { type: 'header', label: 'Lines' },
+  { key: 'u_line_count', label: 'Line Count', type: 'range', min: 0, max: 6, step: 1, value: 4,
+    tip: 'Straight strokes connecting two dots in the same row or column. A tight grid may fit fewer than requested.' },
+  { key: 'u_line_min_span', label: 'Min Span', type: 'range', min: 2, max: 12, step: 1, value: 3,
+    tip: 'Cells between a line\'s two endpoints. The floor of 2 keeps lines from ever connecting adjacent neighbors.' },
+  { key: 'u_line_width', label: 'Line Width', type: 'range', min: 0.01, max: 0.4, step: 0.005, value: 0.09,
+    tip: 'Stroke width as a fraction of a cell height. Tapers slightly toward both ends.' },
+  { key: 'u_line_wobble', label: 'Line Wobble', type: 'range', min: 0, max: 0.3, step: 0.005, value: 0.06,
+    tip: 'Sideways drift along the stroke — the difference between a drawn line and a plotted one.' },
+  { key: 'u_line_overshoot', label: 'End Overshoot', type: 'range', min: 0, max: 1, step: 0.01, value: 0.25,
+    tip: 'How far each end runs past (or stops short of) its dot, per line.' },
+  // ── Color Palette ──────────────────────────────────────────────────────────
+  { type: 'header', label: 'Color Palette' },
+  { key: 'u_color_mode', label: '4-Color Mode', type: 'toggle', value: 0,
+    tip: 'Off = cosine palette. On = 4-stop linear gradient from top to bottom.' },
+  { key: '_dl_palette_preset', label: 'Preset', type: 'select', paletteDependent: true, value: 'Rainbow',
+    options: Object.keys(COSINE_PRESETS).map(function (k) { return { label: k, value: k }; })
+  },
+  { key: 'u_a', label: 'Palette A', type: 'color', paletteDependent: true, value: '#808080',
+    tip: 'Offset — base brightness per channel. Sets the center point colors oscillate around.' },
+  { key: 'u_b', label: 'Palette B', type: 'color', paletteDependent: true, value: '#808080',
+    tip: 'Amplitude — color swing range per channel. Higher = more vivid, saturated output.' },
+  { key: 'u_c', label: 'Palette C', type: 'color', paletteDependent: true, value: '#ffffff',
+    tip: 'Frequency — how many times the palette cycles per channel.' },
+  { key: 'u_d', label: 'Palette D', type: 'color', paletteDependent: true, value: '#0054ab',
+    tip: 'Phase — shifts the starting hue of the color cycle.' },
+  { key: '_dl_4color_preset', label: 'Preset', type: 'select', stopDependent: true, value: 'Neon',
+    options: Object.keys(FOUR_STOP_PRESETS).map(function (k) { return { label: k, value: k }; })
+  },
+  { key: 'u_color0', label: 'Color 1 (Top)',    type: 'color', stopDependent: true, value: '#ff3366' },
+  { key: 'u_color1', label: 'Color 2',          type: 'color', stopDependent: true, value: '#ffcc00' },
+  { key: 'u_color2', label: 'Color 3',          type: 'color', stopDependent: true, value: '#00ccff' },
+  { key: 'u_color3', label: 'Color 4 (Bottom)', type: 'color', stopDependent: true, value: '#aa00ff' },
+].concat(FINISH_CONTROLS);
+
+var customAfterBuild = function () {
+  var cosineKeys = ['u_a', 'u_b', 'u_c', 'u_d'];
+
+  function applyCosinePreset(p) {
+    applyColors(cosineKeys.map(function (k, i) {
+      return [k, [p.a, p.b, p.c, p.d][i]];
+    }));
+  }
+
+  function apply4ColorPreset(p) {
+    applyColors([
+      ['u_color0', p.c0],
+      ['u_color1', p.c1],
+      ['u_color2', p.c2],
+      ['u_color3', p.c3],
+    ]);
+  }
+
+  // Apply default on load so shader matches pickers.
+  applyCosinePreset(COSINE_PRESETS['Rainbow']);
+
+  var cosinePresetSel = document.querySelector('[data-param-key="_dl_palette_preset"]');
+  if (cosinePresetSel) {
+    cosinePresetSel.addEventListener('change', function () {
+      var p = COSINE_PRESETS[this.value];
+      if (p) applyCosinePreset(p);
+    });
+  }
+
+  var fourColorPresetSel = document.querySelector('[data-param-key="_dl_4color_preset"]');
+  if (fourColorPresetSel) {
+    fourColorPresetSel.addEventListener('change', function () {
+      var p = FOUR_STOP_PRESETS[this.value];
+      if (p) apply4ColorPreset(p);
+    });
+  }
+};
