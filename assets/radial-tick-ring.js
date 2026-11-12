@@ -1,0 +1,365 @@
+(function () {
+  'use strict';
+
+  // ── Fragment shader ─────────────────────────────────────────────────────────
+  // Three nested circles, no text: a sunburst of radial tick marks straddling
+  // the ring radius (compass-rose graduations), a freely positionable solid
+  // inner disc, and a center-locked knockout that punches alpha to zero
+  // through both.
+  var fragSrc = [
+    '#version 300 es',
+    'precision mediump float;',
+    '',
+    'uniform vec2  u_resolution;',
+    'uniform float u_aspect;',
+    '',
+    '// Outer ring — drawn as tick marks, never as a stroked circle',
+    'uniform float u_ring_radius;',
+    'uniform float u_tick_count;',
+    'uniform float u_tick_length;',
+    'uniform float u_tick_width;',
+    'uniform float u_width_gradient;',
+    'uniform float u_width_gradient_strength;',
+    'uniform float u_width_gradient_rotation;',
+    'uniform float u_tick_phase;',
+    'uniform float u_tick_major_every;',
+    'uniform float u_tick_major_scale;',
+    'uniform float u_gap_size;',
+    'uniform float u_gap_position;',
+    '',
+    '// Inner disc — offset in aspect-corrected space so X and Y move equally',
+    'uniform float u_inner_radius;',
+    'uniform float u_inner_x;',
+    'uniform float u_inner_y;',
+    '',
+    '// Knockout — locked to the design center',
+    'uniform float u_knockout_enabled;',
+    'uniform float u_knockout_radius;',
+    '',
+    '// Palette — cosine (mode 0) or 4-stop (mode 1), driven by radius',
+    'uniform float u_color_mode;',
+    'uniform vec3  u_a;',
+    'uniform vec3  u_b;',
+    'uniform vec3  u_c;',
+    'uniform vec3  u_d;',
+    'uniform vec3  u_color0;',
+    'uniform vec3  u_color1;',
+    'uniform vec3  u_color2;',
+    'uniform vec3  u_color3;',
+    '',
+    '// Per-element solid color overrides',
+    'uniform float u_use_ring_color;',
+    'uniform vec3  u_ring_color;',
+    'uniform float u_use_inner_color;',
+    'uniform vec3  u_inner_color;',
+    '',
+    '// Finish',
+    'uniform float u_opacity;',
+    'uniform float u_distress;',
+    'uniform float u_distress_scale;',
+    'uniform float u_grain_mode;',
+    'uniform float u_distress_falloff;',
+    'uniform float u_pos_x;',
+    'uniform float u_pos_y;',
+    'uniform float u_scale;',
+    '',
+    'out vec4 fragColor;',
+    '',
+    window.ShaderBase.commonGLSL,
+    '',
+    '// ── OKLCH color space helpers (perceptually-uniform 4-stop blending) ──────',
+    'vec3 linear_rgb_to_oklab(vec3 c) {',
+    '  float l_ = 0.4122214708*c.r + 0.5363325363*c.g + 0.0514459929*c.b;',
+    '  float m_ = 0.2119034982*c.r + 0.6806995451*c.g + 0.1073969566*c.b;',
+    '  float s_ = 0.0883024619*c.r + 0.2817188376*c.g + 0.6299787005*c.b;',
+    '  float l = pow(max(l_, 0.0), 1.0/3.0);',
+    '  float m = pow(max(m_, 0.0), 1.0/3.0);',
+    '  float s = pow(max(s_, 0.0), 1.0/3.0);',
+    '  return vec3(0.2104542553*l+0.7936177850*m-0.0040720468*s,',
+    '              1.9779984951*l-2.4285922050*m+0.4505937099*s,',
+    '              0.0259040371*l+0.4072456269*m-0.4631496600*s);',
+    '}',
+    'vec3 oklab_to_linear_rgb(vec3 lab) {',
+    '  float l_ = lab.x+0.3963377774*lab.y+0.2158037573*lab.z;',
+    '  float m_ = lab.x-0.1055613458*lab.y-0.0638541728*lab.z;',
+    '  float s_ = lab.x-0.0894841775*lab.y-1.2914855480*lab.z;',
+    '  float l = l_*l_*l_; float m = m_*m_*m_; float s = s_*s_*s_;',
+    '  return vec3( 4.0767416621*l-3.3077115913*m+0.2309699292*s,',
+    '              -1.2684380046*l+2.6097574011*m-0.3413193965*s,',
+    '              -0.0041960863*l-0.7034186147*m+1.7076147010*s);',
+    '}',
+    'vec3 oklab_to_oklch(vec3 lab) {',
+    '  return vec3(lab.x, sqrt(lab.y*lab.y + lab.z*lab.z), atan(lab.z, lab.y));',
+    '}',
+    'vec3 oklch_to_oklab(vec3 lch) {',
+    '  return vec3(lch.x, lch.y*cos(lch.z), lch.y*sin(lch.z));',
+    '}',
+    'vec3 mix_oklch(vec3 a, vec3 b, float t) {',
+    '  float dh = mod(b.z - a.z + 3.14159265, 6.28318530) - 3.14159265;',
+    '  return vec3(mix(a.x, b.x, t), mix(a.y, b.y, t), a.z + t * dh);',
+    '}',
+    '',
+    '// Evaluates the design color + alpha at any uv (post pos/scale transform).',
+    '// aaFixed: 0.0 for the per-fragment path (fwidth-based AA); a small fixed',
+    '// half-width when sampling at halftone cell positions, where uv is constant',
+    '// across fragments and fwidth is meaningless.',
+    'vec4 designEval(vec2 uv, float aaFixed) {',
+    '  vec2  p = (uv - 0.5) * vec2(u_aspect, 1.0);',
+    '  float r = length(p);',
+    '  float a = atan(p.y, p.x);',
+    '',
+    '  // Ticks: build each one as a box SDF in (tangential, radial) space. Using',
+    '  // arc length (angFrac * cellAngle * r) as the tangential coordinate keeps',
+    '  // every tick a constant screen width instead of fanning out with radius.',
+    '  // Tick centers sit at half-integer slots, so floor(slot) is constant',
+    '  // across a whole tick and can key the major/minor choice.',
+    '  float slot       = a / 6.28318530 * u_tick_count + u_tick_phase;',
+    '  float angFrac    = abs(fract(slot) - 0.5);',
+    '  float tangential = angFrac * (6.28318530 / max(u_tick_count, 1.0)) * r;',
+    '  // Wrap the slot index into [0, count) before the major test. With an odd',
+    '  // tick count a tick center lands exactly on the atan seam at +/-PI, and',
+    '  // its two halves see floor(slot) values differing by exactly count — raw',
+    '  // floor values only agree under mod(., majorEvery) when majorEvery',
+    '  // divides count, so without the wrap that one tick draws half at major',
+    '  // length and half at minor length.',
+    '  float slotIdx    = mod(floor(slot), max(u_tick_count, 1.0));',
+    '  float isMajor    = step(mod(slotIdx, max(u_tick_major_every, 1.0)), 0.5);',
+    '  float len        = mix(u_tick_length, u_tick_length * u_tick_major_scale, isMajor);',
+    '',
+    '  // Where this tick sits around the dial, as a fraction of a turn. Taken',
+    '  // from the tick\'s own center slot so it is constant across the whole mark',
+    '  // — both the width gradient and the gap key off it, which is what keeps a',
+    '  // single tick from being tapered or sliced along its own angular span.',
+    '  float tickTurn   = (floor(slot) + 0.5 - u_tick_phase) / max(u_tick_count, 1.0);',
+    '',
+    '  // Width gradient: thinnest at the gradient origin, widening symmetrically',
+    '  // in both directions to its thickest 180 degrees away. Rotation moves the',
+    '  // thin point — 0 puts it at 12 o\'clock (turn 0.25), increasing clockwise,',
+    '  // matching the gap. turnDist is 0 at the origin and 1 opposite it, so the',
+    '  // two ends are controlled independently: Width Gradient thins the near end',
+    '  // below Tick Width, Strength thickens the far end above it. At the',
+    '  // defaults (0 and 1) the mix collapses to 1.0 and every tick is uniform.',
+    '  float gradTurn   = 0.25 - u_width_gradient_rotation;',
+    '  float turnDist   = abs(fract(tickTurn - gradTurn + 0.5) - 0.5) * 2.0;',
+    '  float tickWidth  = u_tick_width * mix(1.0 - u_width_gradient, u_width_gradient_strength, turnDist);',
+    '',
+    '  // The radial term is what keeps the middle open: near r=0 the tangential',
+    '  // term collapses for every angle, so only |r - ringRadius| > len*0.5',
+    '  // excludes the center. Very short ring radius + very long ticks will',
+    '  // deliberately let the ticks merge through the middle.',
+    '  float tickSDF    = max(tangential - tickWidth * 0.5,',
+    '                         abs(r - u_ring_radius) - len * 0.5);',
+    '  float aaTick     = max(fwidth(tickSDF) * 0.5, aaFixed);',
+    '  float tickMask   = 1.0 - smoothstep(-aaTick, aaTick, tickSDF);',
+    '',
+    '  // Gap: an angular wedge with no ticks. Keyed off the tick center too, so',
+    '  // a tick is either fully drawn or fully gone — a wedge tested per-fragment',
+    '  // would slice marks in half at the gap edges. Position 0 puts the gap at',
+    '  // 12 o\'clock and increases clockwise.',
+    '  float gapTurn    = 0.25 - u_gap_position;',
+    '  float gapDist    = abs(fract(tickTurn - gapTurn + 0.5) - 0.5);',
+    '  tickMask        *= step(u_gap_size / 720.0, gapDist);',
+    '',
+    '  // Inner disc — offset in the same aspect-corrected space as p',
+    '  float innerSDF   = length(p - vec2(u_inner_x, u_inner_y)) - u_inner_radius;',
+    '  float aaInner    = max(fwidth(innerSDF) * 0.5, aaFixed);',
+    '  float innerMask  = 1.0 - smoothstep(-aaInner, aaInner, innerSDF);',
+    '',
+    '  // Knockout — center-locked hole through everything',
+    '  float koSDF      = r - u_knockout_radius;',
+    '  float aaKo       = max(fwidth(koSDF) * 0.5, aaFixed);',
+    '  float koIn       = 1.0 - smoothstep(-aaKo, aaKo, koSDF);',
+    '  float koMask     = mix(1.0, 1.0 - koIn, u_knockout_enabled);',
+    '',
+    '  // Palette driven by normalized radius so it sweeps outward through the',
+    '  // concentric shapes.',
+    '  float t = clamp(r / max(u_ring_radius, 0.001), 0.0, 1.0);',
+    '  vec3  palColor = cosinePalette(t, u_a, u_b, u_c, u_d);',
+    '',
+    '  float t01 = clamp(t * 3.0, 0.0, 1.0);',
+    '  float t12 = clamp((t - 1.0 / 3.0) * 3.0, 0.0, 1.0);',
+    '  float t23 = clamp((t - 2.0 / 3.0) * 3.0, 0.0, 1.0);',
+    '  vec3 lch0 = oklab_to_oklch(linear_rgb_to_oklab(u_color0));',
+    '  vec3 lch1 = oklab_to_oklch(linear_rgb_to_oklab(u_color1));',
+    '  vec3 lch2 = oklab_to_oklch(linear_rgb_to_oklab(u_color2));',
+    '  vec3 lch3 = oklab_to_oklch(linear_rgb_to_oklab(u_color3));',
+    '  vec3 seg01 = mix_oklch(lch0, lch1, t01);',
+    '  vec3 seg12 = mix_oklch(lch1, lch2, t12);',
+    '  vec3 seg23 = mix_oklch(lch2, lch3, t23);',
+    '  vec3 blendedLch = mix(mix(seg01, seg12, step(1.0 / 3.0, t)), seg23, step(2.0 / 3.0, t));',
+    '  vec3 gradColor = clamp(oklab_to_linear_rgb(oklch_to_oklab(blendedLch)), 0.0, 1.0);',
+    '  vec3 finalPal = mix(palColor, gradColor, u_color_mode);',
+    '',
+    '  vec3 ringCol    = mix(finalPal, u_ring_color,  u_use_ring_color);',
+    '  vec3 innerCol   = mix(finalPal, u_inner_color, u_use_inner_color);',
+    '  vec3 finalColor = mix(ringCol, innerCol, innerMask);',
+    '',
+    '  // Union with max(), not +: adding double-brightens the overlap and pushes',
+    '  // alpha past 1. Knockout multiplies in last so it cuts through both.',
+    '  float shapeMask      = max(tickMask, innerMask);',
+    '  float visibilityMask = shapeMask * koMask;',
+    '  return vec4(finalColor, visibilityMask);',
+    '}',
+    '',
+    'void main() {',
+    '  vec2 uv = gl_FragCoord.xy / u_resolution;',
+    '  uv = (uv - 0.5) / u_scale + 0.5 + vec2(u_pos_x, u_pos_y);',
+    '  vec4 px = designEval(uv, 0.0);',
+    '  vec3 finalColor = px.rgb;',
+    '  vec2 dUV = gl_FragCoord.xy / u_resolution;',
+    '  float vigMask = computeVigMask(dUV);',
+    '  float alpha;',
+    '  if (u_grain_mode >= 3.5) {',
+    '    // Half-tone: size each dot by design coverage over its cell (3x3',
+    '    // supersample) so dots shrink toward shape edges instead of slicing.',
+    '    vec2 cellFrag  = halftoneCellCenter(u_distress_scale);',
+    '    float cellSize = max(2.0, u_distress_scale / 10.0);',
+    '    float covSum = 0.0;',
+    '    vec3  inkSum = vec3(0.0);',
+    '    for (int i = -1; i <= 1; i++) {',
+    '      for (int j = -1; j <= 1; j++) {',
+    '        vec2 sFrag = cellFrag + vec2(float(i), float(j)) * (cellSize / 3.0);',
+    '        vec2 sUV   = (sFrag / u_resolution - 0.5) / u_scale + 0.5 + vec2(u_pos_x, u_pos_y);',
+    '        vec4 smp   = designEval(sUV, 0.002);',
+    '        covSum += smp.a;',
+    '        inkSum += smp.rgb * smp.a;',
+    '      }',
+    '    }',
+    '    vec3 dotColor  = covSum > 0.001 ? inkSum / covSum : finalColor;',
+    '    float coverage = covSum / 9.0;',
+    '    float cellVig  = computeVigMask(cellFrag / u_resolution);',
+    '    float dotLuma  = dot(dotColor, vec3(0.299, 0.587, 0.114));',
+    '    alpha = halftoneNoise(u_distress_scale, halftoneDrive(coverage, dotLuma, cellVig, u_distress)) * u_opacity;',
+    '    finalColor = dotColor;',
+    '  } else {',
+    '    alpha = applyDistress(px.a, dUV, u_distress, u_distress_scale, u_grain_mode, u_distress_falloff, dot(finalColor, vec3(0.299, 0.587, 0.114)), vigMask) * u_opacity;',
+    '    finalColor = finalColor * vigMask;',
+    '  }',
+    '  vec3 encoded = pow(max(finalColor, 0.0), vec3(1.0 / 2.2));',
+    '  fragColor = vec4(encoded * alpha, alpha);',
+    '}'
+  ].join('\n');
+
+  window.ShaderBase.create({
+    animateValues: true,
+    instantKeys: [
+      'u_opacity', 'u_distress_0', 'u_distress_scale_0', 'u_distress_1', 'u_distress_scale_1',
+      'u_distress_2', 'u_distress_scale_2', 'u_distress_3', 'u_distress_scale_3', 'u_grain_mode',
+      'u_halftone_shape', 'u_distress_falloff', 'u_vignette_top', 'u_vignette_bottom',
+      'u_vignette_left', 'u_vignette_right', 'u_vignette_anchor_x', 'u_vignette_anchor_y',
+      // Integer-step controls: fract(slot) only tiles seamlessly across the
+      // atan seam at ±PI when the tick count is a whole number, so lerping
+      // through fractional counts tears a visible seam along the -X axis.
+      'u_tick_count', 'u_tick_major_every',
+    ],
+    fragSrc: fragSrc,
+
+    setup: function (gl, program) {
+      return {
+        res:              gl.getUniformLocation(program, 'u_resolution'),
+        aspect:           gl.getUniformLocation(program, 'u_aspect'),
+        ringRadius:       gl.getUniformLocation(program, 'u_ring_radius'),
+        tickCount:        gl.getUniformLocation(program, 'u_tick_count'),
+        tickLength:       gl.getUniformLocation(program, 'u_tick_length'),
+        tickWidth:        gl.getUniformLocation(program, 'u_tick_width'),
+        widthGradient:    gl.getUniformLocation(program, 'u_width_gradient'),
+        widthGradStrength: gl.getUniformLocation(program, 'u_width_gradient_strength'),
+        widthGradRotation: gl.getUniformLocation(program, 'u_width_gradient_rotation'),
+        tickPhase:        gl.getUniformLocation(program, 'u_tick_phase'),
+        tickMajorEvery:   gl.getUniformLocation(program, 'u_tick_major_every'),
+        tickMajorScale:   gl.getUniformLocation(program, 'u_tick_major_scale'),
+        gapSize:          gl.getUniformLocation(program, 'u_gap_size'),
+        gapPosition:      gl.getUniformLocation(program, 'u_gap_position'),
+        innerRadius:      gl.getUniformLocation(program, 'u_inner_radius'),
+        innerX:           gl.getUniformLocation(program, 'u_inner_x'),
+        innerY:           gl.getUniformLocation(program, 'u_inner_y'),
+        knockoutEnabled:  gl.getUniformLocation(program, 'u_knockout_enabled'),
+        knockoutRadius:   gl.getUniformLocation(program, 'u_knockout_radius'),
+        colorMode:        gl.getUniformLocation(program, 'u_color_mode'),
+        palA:             gl.getUniformLocation(program, 'u_a'),
+        palB:             gl.getUniformLocation(program, 'u_b'),
+        palC:             gl.getUniformLocation(program, 'u_c'),
+        palD:             gl.getUniformLocation(program, 'u_d'),
+        color0:           gl.getUniformLocation(program, 'u_color0'),
+        color1:           gl.getUniformLocation(program, 'u_color1'),
+        color2:           gl.getUniformLocation(program, 'u_color2'),
+        color3:           gl.getUniformLocation(program, 'u_color3'),
+        useRingColor:     gl.getUniformLocation(program, 'u_use_ring_color'),
+        ringColor:        gl.getUniformLocation(program, 'u_ring_color'),
+        useInnerColor:    gl.getUniformLocation(program, 'u_use_inner_color'),
+        innerColor:       gl.getUniformLocation(program, 'u_inner_color'),
+        opacity:          gl.getUniformLocation(program, 'u_opacity'),
+        distress:         gl.getUniformLocation(program, 'u_distress'),
+        distressScale:    gl.getUniformLocation(program, 'u_distress_scale'),
+        grainMode:        gl.getUniformLocation(program, 'u_grain_mode'),
+        distressFalloff:  gl.getUniformLocation(program, 'u_distress_falloff'),
+        halftoneAngle:    gl.getUniformLocation(program, 'u_halftone_angle'),
+        halftoneLuma:     gl.getUniformLocation(program, 'u_halftone_luma'),
+        halftoneShape:    gl.getUniformLocation(program, 'u_halftone_shape'),
+        vignetteTop:      gl.getUniformLocation(program, 'u_vignette_top'),
+        vignetteBottom:   gl.getUniformLocation(program, 'u_vignette_bottom'),
+        vignetteLeft:     gl.getUniformLocation(program, 'u_vignette_left'),
+        vignetteRight:    gl.getUniformLocation(program, 'u_vignette_right'),
+        vignetteAnchorX:  gl.getUniformLocation(program, 'u_vignette_anchor_x'),
+        vignetteAnchorY:  gl.getUniformLocation(program, 'u_vignette_anchor_y'),
+        posX:             gl.getUniformLocation(program, 'u_pos_x'),
+        posY:             gl.getUniformLocation(program, 'u_pos_y'),
+        scale:            gl.getUniformLocation(program, 'u_scale'),
+      };
+    },
+
+    render: function (gl, u, v, w, h) {
+      gl.uniform2f(u.res, w, h);
+      gl.uniform1f(u.aspect, w / h);
+      gl.uniform1f(u.ringRadius,     v.u_ring_radius      != null ? v.u_ring_radius      : 0.33);
+      gl.uniform1f(u.tickCount,      v.u_tick_count       != null ? v.u_tick_count       : 48.0);
+      gl.uniform1f(u.tickLength,     v.u_tick_length      != null ? v.u_tick_length      : 0.05);
+      gl.uniform1f(u.tickWidth,      v.u_tick_width       != null ? v.u_tick_width       : 0.010);
+      gl.uniform1f(u.widthGradient,  v.u_width_gradient   != null ? v.u_width_gradient   : 0.0);
+      gl.uniform1f(u.widthGradStrength, v.u_width_gradient_strength != null ? v.u_width_gradient_strength : 1.0);
+      gl.uniform1f(u.widthGradRotation, v.u_width_gradient_rotation != null ? v.u_width_gradient_rotation : 0.0);
+      gl.uniform1f(u.tickPhase,      v.u_tick_phase       != null ? v.u_tick_phase       : 0.0);
+      gl.uniform1f(u.tickMajorEvery, v.u_tick_major_every != null ? v.u_tick_major_every : 5.0);
+      gl.uniform1f(u.tickMajorScale, v.u_tick_major_scale != null ? v.u_tick_major_scale : 1.8);
+      gl.uniform1f(u.gapSize,        v.u_gap_size         != null ? v.u_gap_size         : 0.0);
+      gl.uniform1f(u.gapPosition,    v.u_gap_position     != null ? v.u_gap_position     : 0.0);
+      gl.uniform1f(u.innerRadius,    v.u_inner_radius     != null ? v.u_inner_radius     : 0.16);
+      gl.uniform1f(u.innerX,         v.u_inner_x          != null ? v.u_inner_x          : 0.0);
+      gl.uniform1f(u.innerY,         v.u_inner_y          != null ? v.u_inner_y          : 0.0);
+      gl.uniform1f(u.knockoutEnabled, v.u_knockout_enabled != null ? v.u_knockout_enabled : 1.0);
+      gl.uniform1f(u.knockoutRadius,  v.u_knockout_radius  != null ? v.u_knockout_radius  : 0.06);
+      gl.uniform1f(u.colorMode, v.u_color_mode != null ? parseFloat(v.u_color_mode) : 0.0);
+      gl.uniform3fv(u.palA, v.u_a || [0.5, 0.5, 0.5]);
+      gl.uniform3fv(u.palB, v.u_b || [0.5, 0.5, 0.5]);
+      gl.uniform3fv(u.palC, v.u_c || [1.0, 1.0, 1.0]);
+      gl.uniform3fv(u.palD, v.u_d || [0.0, 0.33, 0.67]);
+      gl.uniform3fv(u.color0, v.u_color0 || [1.0, 0.2, 0.4]);
+      gl.uniform3fv(u.color1, v.u_color1 || [1.0, 0.8, 0.0]);
+      gl.uniform3fv(u.color2, v.u_color2 || [0.0, 0.8, 1.0]);
+      gl.uniform3fv(u.color3, v.u_color3 || [0.667, 0.0, 1.0]);
+      gl.uniform1f(u.useRingColor,  v.u_use_ring_color  != null ? v.u_use_ring_color  : 0.0);
+      gl.uniform3fv(u.ringColor,    v.u_ring_color  || [1.0, 1.0, 1.0]);
+      gl.uniform1f(u.useInnerColor, v.u_use_inner_color != null ? v.u_use_inner_color : 0.0);
+      gl.uniform3fv(u.innerColor,   v.u_inner_color || [1.0, 1.0, 1.0]);
+
+      gl.uniform1f(u.opacity, v.u_opacity != null ? v.u_opacity : 1.0);
+      var _gm = Math.round(v.u_grain_mode != null ? parseFloat(v.u_grain_mode) : 0);
+      gl.uniform1f(u.distress, v['u_distress_' + _gm] != null ? v['u_distress_' + _gm] : (v.u_distress != null ? v.u_distress : 0.0));
+      gl.uniform1f(u.distressScale, v['u_distress_scale_' + _gm] != null ? v['u_distress_scale_' + _gm] : (v.u_distress_scale != null ? v.u_distress_scale : 80.0));
+      gl.uniform1f(u.grainMode, v.u_grain_mode != null ? parseFloat(v.u_grain_mode) : 0.0);
+      gl.uniform1f(u.distressFalloff, v.u_distress_falloff != null ? v.u_distress_falloff : 0.0);
+      gl.uniform1f(u.halftoneAngle, (v.u_halftone_angle != null ? v.u_halftone_angle : 45.0) * Math.PI / 180.0);
+      gl.uniform1f(u.halftoneLuma, v.u_halftone_luma != null ? v.u_halftone_luma : 0.0);
+      gl.uniform1f(u.halftoneShape, v.u_halftone_shape != null ? parseFloat(v.u_halftone_shape) : 0.0);
+      gl.uniform1f(u.vignetteTop, v.u_vignette_top != null ? v.u_vignette_top : 0.0);
+      gl.uniform1f(u.vignetteBottom, v.u_vignette_bottom != null ? v.u_vignette_bottom : 0.0);
+      gl.uniform1f(u.vignetteLeft, v.u_vignette_left != null ? v.u_vignette_left : 0.0);
+      gl.uniform1f(u.vignetteRight, v.u_vignette_right != null ? v.u_vignette_right : 0.0);
+      gl.uniform1f(u.vignetteAnchorX, v.u_vignette_anchor_x != null ? v.u_vignette_anchor_x : 0.5);
+      gl.uniform1f(u.vignetteAnchorY, v.u_vignette_anchor_y != null ? v.u_vignette_anchor_y : 0.5);
+      gl.uniform1f(u.posX, v.u_pos_x != null ? v.u_pos_x : 0.0);
+      gl.uniform1f(u.posY, v.u_pos_y != null ? v.u_pos_y : 0.0);
+      gl.uniform1f(u.scale, v.u_scale != null ? v.u_scale : 1.0);
+    },
+  });
+}());
