@@ -85,9 +85,13 @@
 
   function closeMenu() {
     dialog.close();
+  }
+
+  // Fires for Esc as well as our own close, so state and focus reset once.
+  dialog.addEventListener('close', function () {
     toggle.setAttribute('aria-expanded', 'false');
     toggle.focus();
-  }
+  });
 
   toggle.addEventListener('click', openMenu);
   closeBtn.addEventListener('click', closeMenu);

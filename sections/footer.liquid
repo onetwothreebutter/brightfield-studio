@@ -22,10 +22,13 @@
     </div>
 
     <div class="footer-bottom">
-      {%- if shop.privacy_policy or shop.terms_of_service -%}
+      {%- if shop.privacy_policy or shop.shipping_policy or shop.terms_of_service -%}
         <ul class="footer-legal">
           {%- if shop.privacy_policy -%}
             <li><a href="{{ shop.privacy_policy.url }}">Privacy</a></li>
+          {%- endif -%}
+          {%- if shop.shipping_policy -%}
+            <li><a href="{{ shop.shipping_policy.url }}">Shipping</a></li>
           {%- endif -%}
           {%- if shop.terms_of_service -%}
             <li><a href="{{ shop.terms_of_service.url }}">Terms of Service</a></li>

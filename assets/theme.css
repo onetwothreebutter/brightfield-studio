@@ -13,7 +13,7 @@
     --color-text: #fffbfb;            /* color-text-primary */
     --color-text-muted: #cfc4c4;      /* color-text-secondary */
     --color-accent: #ff0a54;          /* color-pink-54 */
-    --color-accent-hover: #ec004c;
+    --color-accent-hover: #d6003f;  /* darker than Figma #ec004c for 4.5:1 on tint */
     --color-tint: #ffecec;            /* button hover fill / secondary border */
 
     /* The old cyan/magenta roles, kept as aliases so the pages that Phase 1
@@ -310,7 +310,7 @@ h6 {
     top: -6px;
     right: -8px;
     background: var(--color-accent);
-    color: var(--color-text);
+    color: var(--color-bg);
     font-size: 0.6rem;
     font-weight: 600;
     width: 16px;
@@ -1034,7 +1034,7 @@ h6 {
     /* Light scheme: the base roles re-pointed at the Figma neutrals. */
     --color-bg: #fbfafa;              /* color-footer-bg */
     --color-text: #372e2e;            /* color-neutral-20 */
-    --color-text-muted: #7f7575;      /* color-neutral-50 */
+    --color-text-muted: #776d6d;      /* neutral-50 #7f7575 darkened to 4.5:1 */
     --color-border: #cfc4c4;          /* color-neutral-80 */
     background: var(--color-bg);
     color: var(--color-text);
@@ -1483,7 +1483,8 @@ dialog.mobile-nav[open]::backdrop {
 
 .mobile-nav__inner {
     position: relative;
-    padding: var(--space-3xl) var(--space-3xl) var(--space-2xl);
+    min-height: 100%;
+    padding: var(--space-3xl) var(--space-3xl) var(--space-2xl) var(--space-lg);
 }
 
 .mobile-nav__close {
@@ -2226,7 +2227,7 @@ dialog.mobile-nav[open]::backdrop {
 
 .shader-demo__canvas-wrap {
     box-shadow: 0 0 51px var(--color-primary-dim);
-    outline: 1px solid rgb(0 255 255 / 8%);
+    outline: 1px solid color-mix(in srgb, var(--color-accent) 8%, transparent);
     border-radius: 30px;
 }
 
