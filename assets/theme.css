@@ -24,8 +24,7 @@
     --color-primary-dim: color-mix(in srgb, var(--color-primary) 10%, transparent);
     --color-secondary-dim: color-mix(in srgb, var(--color-secondary) 10%, transparent);
 
-    /* #e05 only clears ~4.3:1 on --color-surface, which fails AA for the small
-       type errors are usually set in. --color-error is the readable stand-in. */
+    /* Readable error red: the old #e05 is ~4.0:1 on --color-surface. */
     --color-error: #ff6b7a;
     --color-error-dim: rgba(255, 107, 122, 0.12);
     --color-error-border: rgba(255, 107, 122, 0.35);
@@ -393,7 +392,7 @@ h6 {
 
 .hero__title {
     font-size: clamp(2.5rem, 8vw, 6rem);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--color-text);
     margin-bottom: 1.5rem;
     text-shadow: 0 0 50px color-mix(in srgb, var(--color-primary) 25%, transparent);
@@ -741,12 +740,12 @@ h6 {
 }
 
 .variant-fieldset--invalid .variant-option span {
-    border-color: #e05;
+    border-color: var(--color-error);
 }
 
 .variant-error {
     font-size: 0.8125rem;
-    color: #e05;
+    color: var(--color-error);
     margin: -0.75rem 0 1rem;
 }
 
@@ -1038,6 +1037,11 @@ h6 {
     --color-text: #372e2e;            /* color-neutral-20 */
     --color-text-muted: #776d6d;      /* neutral-50 #7f7575 darkened to 4.5:1 */
     --color-border: #cfc4c4;          /* color-neutral-80 */
+    /* Aliases resolve where declared, so re-declare them or they keep the dark values. */
+    --color-primary: var(--color-text);
+    --color-secondary: var(--color-accent);
+    --color-primary-dim: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    --color-secondary-dim: color-mix(in srgb, var(--color-secondary) 10%, transparent);
     background: var(--color-bg);
     color: var(--color-text);
     padding: var(--space-3xl) 0 0;
@@ -2136,7 +2140,7 @@ dialog.mobile-nav[open]::backdrop {
     letter-spacing: 0.1em;
     text-transform: uppercase;
     background: transparent;
-    color: var(--color-secondary);
+    color: var(--color-text);   /* pink 0.65rem text is under 4.5:1 on the panels */
     border: 1px solid var(--color-secondary);
     border-radius: var(--radius);
     padding: 0.45rem 0.6rem;
@@ -3001,8 +3005,8 @@ dialog.mobile-nav[open]::backdrop {
     text-transform: capitalize;
 }
 .community-designs__like-btn--liked {
-    color: #e05;
-    border-color: #e05;
+    color: var(--color-error);
+    border-color: var(--color-error);
 }
 .recent-designs__heading {
     font-size: 1rem;
@@ -3029,8 +3033,8 @@ dialog.mobile-nav[open]::backdrop {
 }
 .community-designs__like-btn:hover,
 .community-designs__like-btn--liked {
-    color: #e05;
-    border-color: #e05;
+    color: var(--color-error);
+    border-color: var(--color-error);
 }
 .community-designs__like-icon {
     line-height: 1;
@@ -3201,7 +3205,7 @@ dialog.mobile-nav[open]::backdrop {
 }
 .mockup-modal__community-error {
     font-size: 0.75rem;
-    color: #e05;
+    color: var(--color-error);
     margin: 0;
 }
 
@@ -3413,7 +3417,7 @@ dialog.mobile-nav[open]::backdrop {
 .newsletter__error {
     margin: 0.75rem 0 0;
     font-size: 0.875rem;
-    color: #e05;
+    color: var(--color-error);
 }
 
 @media (max-width: 480px) {
@@ -3636,7 +3640,7 @@ dialog.mobile-nav[open]::backdrop {
 
 .product-reviews__form-error {
     font-size: 0.8125rem;
-    color: #e05;
+    color: var(--color-error);
 }
 
 .product-reviews__form-success {
