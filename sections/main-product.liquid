@@ -10,7 +10,7 @@
 {%- endfor -%}
 {%- if product.tags contains 'community-design' -%}
   {%- assign is_community_design = true -%}
-  {%- assign submission_id = product.metafields.custom.submission_id | default: '' -%}
+  {%- assign submission_id = product.metafields.custom.submission_id.value | default: '' -%}
 {%- endif -%}
 
 {%- if shader_file -%}
@@ -102,7 +102,7 @@
       price: {{ product.selected_or_first_available_variant.price | divided_by: 100.0 | json }}
     },
     shader: {{ shader_file | json }},
-    submissionId: {{ submission_id | json }}
+    submissionId: {{ submission_id | json | replace: '</', '<\/' }}
   };
 </script>
 
@@ -145,10 +145,10 @@ window.BFShaderDef = function (body) {
 {%- if product.variants.size > 1 -%}
 <script src="{{ 'product-variant-sync.js' | asset_url }}" defer></script>
 {%- endif -%}
-<script src="{{ 'product-design-assistant.js' | asset_url }}" defer></script>
 {%- if shader_file -%}
 <script src="{{ 'product-customize-layout.js' | asset_url }}" defer></script>
 <script src="{{ 'product-shader-gui.js' | asset_url }}" defer></script>
+<script src="{{ 'product-design-assistant.js' | asset_url }}" defer></script>
 <script src="{{ 'product-preview-shirt.js' | asset_url }}" defer></script>
 
 <script src="{{ 'shader-base.js' | asset_url }}" defer></script>
