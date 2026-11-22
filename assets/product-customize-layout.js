@@ -1,17 +1,5 @@
 // Product page, shader products only: layout around the Customize panel
-// (mobile sticky canvas, scroll shadows, height lock) and the mockup modal's
-// size select.
-
-// ── Mockup modal size select ──────────────────────────────────────────────────
-(function () {
-  var sel   = document.getElementById('mockup-size-select');
-  var price = document.getElementById('mockup-modal-price');
-  if (!sel || !price) return;
-  sel.addEventListener('change', function () {
-    var opt = sel.options[sel.selectedIndex];
-    if (opt && opt.dataset.price) price.textContent = opt.dataset.price;
-  });
-})();
+// (mobile sticky canvas, scroll shadows, height lock).
 
 // ── Mobile sticky-canvas fade for Customize controls ─────────────────────────
 (function () {

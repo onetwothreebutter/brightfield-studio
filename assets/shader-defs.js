@@ -250,6 +250,7 @@
 
     // The helpers above, as one object for code outside a snippet's scope: the
     // product page's panel (assets/product-shader-gui.js) and window.ShaderDefs.
+    // Each consumer uses a subset; this is the one list to add a helper to.
     var ShaderLib = {
       SHADER_FONTS: SHADER_FONTS,
       COSINE_PRESETS: COSINE_PRESETS,

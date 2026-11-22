@@ -1,13 +1,13 @@
 // Product page, shader products only: the Customize control panel, plus
 // randomize, share links and restoring saved or community designs. The
-// control definitions come from window.BFShaderDef (rendered inline by the
-// section); Liquid values from window.BFProduct.
+// control definitions come from window.BFShaderDef(body) (rendered inline by
+// the section); Liquid values from window.BFProduct.
 
 // ── Shader GUI ────────────────────────────────────────────────────────────────
 (function (cfg) {
-  var def = window.BFShaderDef;
-  if (!def) return;
-  var body = def.body;
+  var body = document.getElementById('shader-gui-body');
+  if (!body || !window.BFShaderDef) return;
+  var def = window.BFShaderDef(body);
   var controls = def.controls;
   var customAfterBuild = def.customAfterBuild;
   var lib = def.lib;

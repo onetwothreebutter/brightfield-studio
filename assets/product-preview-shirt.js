@@ -1,6 +1,17 @@
 // Product page, shader products only: Preview on Shirt and the custom-design
 // add to cart. Liquid values come from window.BFProduct.
 
+// ── Mockup modal size select ──────────────────────────────────────────────────
+(function () {
+  var sel   = document.getElementById('mockup-size-select');
+  var price = document.getElementById('mockup-modal-price');
+  if (!sel || !price) return;
+  sel.addEventListener('change', function () {
+    var opt = sel.options[sel.selectedIndex];
+    if (opt && opt.dataset.price) price.textContent = opt.dataset.price;
+  });
+})();
+
 // ── Preview on Shirt ──────────────────────────────────────────────────────────
 (function (cfg) {
   var btn           = document.getElementById('shader-preview-btn');

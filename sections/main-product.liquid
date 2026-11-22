@@ -69,7 +69,7 @@
     </div>
 
     {%- if shader_file -%}
-    {%- unless product.tags contains 'community-design' -%}
+    {%- unless is_community_design -%}
     <div class="product-recent-designs" id="product-recent-designs" style="display:none">
       <h3 class="product-recent-designs__heading">Your Recent Designs</h3>
       <div id="product-recent-designs-container"></div>
@@ -112,11 +112,9 @@
 // Liquid. Same contract as register() in scripts/build-shader-defs.mjs: the
 // snippets expect `body` (the panel; chladni appends to it) and the base
 // snippet's helpers in scope, and define `controls` and maybe
-// `customAfterBuild`. assets/product-shader-gui.js builds the panel from this.
-window.BFShaderDef = (function () {
-  var body = document.getElementById('shader-gui-body');
-  if (!body) return null;
-
+// `customAfterBuild`. assets/product-shader-gui.js calls it with the panel once
+// the page has parsed, so the panel's markup can sit anywhere on the page.
+window.BFShaderDef = function (body) {
   {% render 'shader-controls-base' %}
   {% case shader_file %}
   {% when 'chladni' %}          {% render 'shader-controls-chladni' %}
@@ -135,12 +133,11 @@ window.BFShaderDef = (function () {
   {% endcase %}
 
   return {
-    body: body,
     controls: controls,
     customAfterBuild: typeof customAfterBuild === 'function' ? customAfterBuild : null,
     lib: ShaderLib
   };
-}());
+};
 </script>
 {%- endif -%}
 
@@ -150,7 +147,7 @@ window.BFShaderDef = (function () {
 {%- endif -%}
 <script src="{{ 'product-design-assistant.js' | asset_url }}" defer></script>
 {%- if shader_file -%}
-<script src="{{ 'product-customize.js' | asset_url }}" defer></script>
+<script src="{{ 'product-customize-layout.js' | asset_url }}" defer></script>
 <script src="{{ 'product-shader-gui.js' | asset_url }}" defer></script>
 <script src="{{ 'product-preview-shirt.js' | asset_url }}" defer></script>
 
