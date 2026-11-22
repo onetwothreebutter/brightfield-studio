@@ -1,0 +1,144 @@
+{% doc %}
+  Product page info column: title, price, description, the order form with
+  variant options, and the size guide.
+
+  @param {product} product
+  @param {string} [shader_file] - Shader name from the product's shader-* tag
+  @param {boolean} is_community_design
+  @param {string} [submission_id] - Community submission id, blank otherwise
+{% enddoc %}
+{%- comment -%}
+  No size is preselected: the shopper must explicitly choose one (validated by
+  assets/product-variant-sync.js). With a no-returns policy, an accidental
+  default-size order is a straight loss. An explicit ?variant= deep link
+  (product.selected_variant) still wins, since that reflects an intentional
+  choice rather than a default.
+{%- endcomment -%}
+{%- assign preselected_variant = product.selected_variant -%}
+<div class="product-info">
+  {%- if product.vendor != blank -%}
+    <p class="product-vendor">{{ product.vendor }}</p>
+  {%- endif -%}
+
+  <h1
+    class="product-title glitch"
+    data-text="{{ product.title | escape }}"
+  >
+    {{ product.title | escape }}
+  </h1>
+
+  {%- assign creator_name = product.metafields.custom.creator_name -%}
+  {%- if creator_name != blank -%}
+    <p class="product-creator">Designed by {{ creator_name | escape }}</p>
+  {%- endif -%}
+
+  <p class="product-price">
+    {%- if product.compare_at_price > product.price -%}
+      <s class="product-price__compare">{{ product.compare_at_price | money }}</s>
+    {%- endif -%}
+    {{ product.price | money }}
+  </p>
+
+  <div id="product-order-form">
+    {%- form 'product', product -%}
+
+      {%- if product.variants.size > 1 -%}
+        {%- for option in product.options_with_values -%}
+          {%- assign opt_idx = option.position | minus: 1 -%}
+          <fieldset class="variant-fieldset">
+            <legend class="variant-label">{{ option.name }}</legend>
+            <div class="variant-options">
+              {%- for value in option.values -%}
+                <label class="variant-option">
+                  <input
+                    type="radio"
+                    name="options[{{ option.name | escape }}]"
+                    value="{{ value | escape }}"
+                    {% if preselected_variant and preselected_variant.options[opt_idx] == value %}checked{% endif %}
+                  >
+                  <span>{{ value | escape }}</span>
+                </label>
+              {%- endfor -%}
+            </div>
+          </fieldset>
+        {%- endfor -%}
+
+        <p class="variant-error" id="variant-error" role="alert" tabindex="-1" style="display:none">Please select a size.</p>
+
+        <select name="id" class="variant-select visually-hidden">
+          <option value="" selected>Select a size</option>
+          {%- for variant in product.variants -%}
+            <option
+              value="{{ variant.id }}"
+              data-variant-title="{{ variant.title | escape }}"
+              {% if preselected_variant and variant.id == preselected_variant.id %}selected{% endif %}
+              {% unless variant.available %}disabled{% endunless %}
+            >
+              {{ variant.title }}
+            </option>
+          {%- endfor -%}
+        </select>
+
+      {%- else -%}
+        <input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">
+      {%- endif -%}
+
+      <input type="hidden" name="quantity" value="1">
+      {%- if shader_file -%}
+      <input type="hidden" name="properties[_source]" value="inhouse">
+      {%- endif -%}
+      {%- if is_community_design -%}
+      <input type="hidden" name="properties[Design Type]" value="Community Design">
+      {%- if submission_id != blank -%}
+      <input type="hidden" name="properties[_design_id]" value="{{ submission_id | escape }}">
+      {%- endif -%}
+      {%- endif -%}
+
+      <div class="product-actions">
+        <button
+          type="submit"
+          class="btn btn--primary btn--lg btn--full"
+          {% unless product.available %}disabled{% endunless %}
+        >
+          {%- if product.available -%}Add to Cart{%- else -%}Sold Out{%- endif -%}
+        </button>
+        {%- if shader_file -%}
+        <button type="button" class="product-customize-btn btn btn--outline btn--lg" data-tab="shader">Design Yours</button>
+        {%- endif -%}
+      </div>
+
+    {%- endform -%}
+  </div>
+
+  <div class="product-trust">
+    <ul class="product-trust__list">
+      <li>Unisex fit — true to size</li>
+      <li><a href="/pages/faq#size-guide" id="size-guide-trigger" aria-haspopup="dialog">Size guide</a></li>
+      <li>Printed to order in 2–5 business days</li>
+      <li>Estimated arrival: 5–10 business days</li>
+      <li>Free replacement for damage or print defects</li>
+    </ul>
+    <a class="product-trust__link" href="/pages/faq#shipping-returns">Shipping &amp; returns</a>
+  </div>
+
+  <dialog id="size-guide-modal" class="size-guide-modal" aria-labelledby="size-guide-modal-title">
+    <div class="size-guide-modal__header">
+      <h2 id="size-guide-modal-title" class="size-guide-modal__title">Size Guide</h2>
+      <button type="button" class="size-guide-modal__close" id="size-guide-modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="size-guide-modal__body">
+      {%- render 'size-chart-table' -%}
+    </div>
+  </dialog>
+
+
+  {%- if shader_file -%}
+  {%- render 'product-customize' -%}
+  {%- endif -%}
+
+  {%- if product.description != blank -%}
+    <div class="product-description rte">
+      {{ product.description }}
+    </div>
+  {%- endif -%}
+</div>

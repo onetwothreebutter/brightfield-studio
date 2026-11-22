@@ -4,13 +4,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const liquid = readFileSync(join(__dirname, '../sections/main-product.liquid'), 'utf8');
-
-// Extract the IIFE from the inline <script> block added for variant sync.
-// Match the script tag that contains the variant-fieldset querySelector.
-const scriptMatch = liquid.match(/<script>\s*(\(function\s*\(\)\s*\{[\s\S]*?variantSel[\s\S]*?\}\)\(\);)\s*<\/script>/);
-if (!scriptMatch) throw new Error('Could not find variant sync script in main-product.liquid');
-const variantSyncSrc = scriptMatch[1];
+const variantSyncSrc = readFileSync(join(__dirname, '../assets/product-variant-sync.js'), 'utf8');
 
 function buildForm(variants, { preselectFirst = true } = {}) {
   // variants: [{ id, options: ['Small', 'Red'], available: true }, ...]

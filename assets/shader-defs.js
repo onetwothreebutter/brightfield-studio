@@ -248,6 +248,27 @@
     ];
     var FINISH_CONTROLS = FINISH_CONTROLS_PRE.concat(FINISH_CONTROLS_POST);
 
+    // The helpers above, as one object for code outside a snippet's scope: the
+    // product page's panel (assets/product-shader-gui.js) and window.ShaderDefs.
+    // Each consumer uses a subset; this is the one list to add a helper to.
+    var ShaderLib = {
+      SHADER_FONTS: SHADER_FONTS,
+      COSINE_PRESETS: COSINE_PRESETS,
+      FOUR_STOP_PRESETS: FOUR_STOP_PRESETS,
+      FINISH_CONTROLS: FINISH_CONTROLS,
+      FINISH_CONTROLS_PRE: FINISH_CONTROLS_PRE,
+      FINISH_CONTROLS_POST: FINISH_CONTROLS_POST,
+      PALETTE_COEFF_KEYS: PALETTE_COEFF_KEYS,
+      srgbToLinear: srgbToLinear,
+      linearToSrgb: linearToSrgb,
+      hexToRgb: hexToRgb,
+      toHex: toHex,
+      vividHex: vividHex,
+      applyColors: applyColors,
+      cosinePresetGradient: cosinePresetGradient,
+      fourStopPresetGradient: fourStopPresetGradient
+    };
+
 
     var SHADERS = {};
 
@@ -2015,19 +2036,6 @@
     });
 
 
-    window.ShaderDefs = {
-      SHADERS: SHADERS,
-      SHADER_FONTS: SHADER_FONTS,
-      COSINE_PRESETS: COSINE_PRESETS,
-      FOUR_STOP_PRESETS: FOUR_STOP_PRESETS,
-      FINISH_CONTROLS: FINISH_CONTROLS,
-      FINISH_CONTROLS_PRE: FINISH_CONTROLS_PRE,
-      FINISH_CONTROLS_POST: FINISH_CONTROLS_POST,
-      PALETTE_COEFF_KEYS: PALETTE_COEFF_KEYS,
-      srgbToLinear: srgbToLinear,
-      linearToSrgb: linearToSrgb,
-      hexToRgb: hexToRgb,
-      toHex: toHex,
-      vividHex: vividHex
-    };
+    // ShaderLib is defined at the end of shader-controls-base.liquid.
+    window.ShaderDefs = Object.assign({ SHADERS: SHADERS }, ShaderLib);
 }());
