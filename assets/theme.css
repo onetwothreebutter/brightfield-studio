@@ -1,35 +1,69 @@
 /* ============================================================
-   SHADER STORE — theme.css
-   Palette: #080808 bg | #00ffff cyan | #ff00ff magenta
+   BRIGHTFIELD — theme.css
+   Palette: #121111 bg | #fffbfb text | #ff0a54 accent
    ============================================================ */
 
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700;800&family=Anton&family=Bebas+Neue&family=Playfair+Display:wght@900&family=Oswald:wght@400;700&family=Orbitron:wght@900&family=Teko:wght@700&family=Righteous&family=Russo+One&family=Big+Shoulders+Display:wght@400;700;900&family=Space+Mono:wght@400;700&family=Roboto+Mono:wght@400;500;700&family=Source+Code+Pro:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&family=Fira+Code:wght@300;400;500;700&family=Inconsolata:wght@400;500;700&family=Courier+Prime:wght@400;700&family=Share+Tech+Mono:wght@400&family=Cutive+Mono:wght@400&family=DM+Mono:wght@300;400;500&family=Fragment+Mono:wght@400&family=Azeret+Mono:wght@400;500;700&family=Spline+Sans+Mono:wght@400;500;700&family=Geist+Mono:wght@400;500;700&family=Syne:wght@400;500;700&family=Unbounded:wght@400;500;700&family=Bricolage+Grotesque:wght@400;500;700&family=Epilogue:wght@400;500;700&family=DM+Sans:wght@400;500;700&family=Montserrat:wght@400;500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Merriweather:wght@400&family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700;800&family=Anton&family=Bebas+Neue&family=Playfair+Display:wght@900&family=Oswald:wght@400;700&family=Orbitron:wght@900&family=Teko:wght@700&family=Righteous&family=Russo+One&family=Big+Shoulders+Display:wght@400;700;900&family=Space+Mono:wght@400;700&family=Roboto+Mono:wght@400;500;700&family=Source+Code+Pro:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&family=Fira+Code:wght@300;400;500;700&family=Inconsolata:wght@400;500;700&family=Courier+Prime:wght@400;700&family=Share+Tech+Mono:wght@400&family=Cutive+Mono:wght@400&family=DM+Mono:wght@300;400;500&family=Fragment+Mono:wght@400&family=Azeret+Mono:wght@400;500;700&family=Spline+Sans+Mono:wght@400;500;700&family=Geist+Mono:wght@400;500;700&family=Syne:wght@400;500;700&family=Unbounded:wght@400;500;700&family=Bricolage+Grotesque:wght@400;500;700&family=Epilogue:wght@400;500;700&family=DM+Sans:wght@400;500;700&family=Montserrat:wght@400;500;700&display=swap");
 
 /* ─── Custom Properties ──────────────────────────────────── */
 :root {
-    --color-bg: #080808;
-    --color-surface: #111111;
-    --color-surface-2: #1a1a1a;
-    --color-border: rgba(0, 255, 255, 0.12);
-    --color-text: #e0e0e0;
-    --color-text-muted: #777777;
-    --color-primary: #00ffff;
-    --color-secondary: #ff00ff;
-    --color-primary-dim: rgba(0, 255, 255, 0.1);
-    --color-secondary-dim: rgba(255, 0, 255, 0.1);
+    /* Brightfield 2026 tokens, from the Figma variables (Foundation page). */
+    --color-bg: #121111;              /* color-bg-page */
+    --color-surface: #191818;         /* color-bg-surface */
+    --color-surface-2: #1e1b1b;       /* color-neutral-10 */
+    --color-border: #372e2e;          /* color-border-default */
+    --color-border-strong: #665c5c;   /* color-border-strong */
+    --color-text: #fffbfb;            /* color-text-primary */
+    --color-text-muted: #cfc4c4;      /* color-text-secondary */
+    --color-accent: #ff0a54;          /* color-pink-54 */
+    --color-accent-hover: #ec004c;
+    --color-tint: #ffecec;            /* button hover fill / secondary border */
+
+    /* The old cyan/magenta roles, re-pointed at the new palette. Channels
+       are kept separately so the glows and tints written as
+       rgb(var(--color-primary-rgb) / a) follow the palette. */
+    --color-primary-rgb: 255 251 251;
+    --color-secondary-rgb: 255 10 84;
+    --color-primary: rgb(var(--color-primary-rgb));
+    --color-secondary: var(--color-accent);
+    --color-primary-dim: rgb(var(--color-primary-rgb) / 0.1);
+    --color-secondary-dim: rgb(var(--color-secondary-rgb) / 0.1);
+
+    /* Light footer */
+    --color-footer-bg: #fbfafa;
+    --color-footer-text: #372e2e;     /* color-neutral-20 */
+    --color-footer-muted: #7f7575;    /* color-neutral-50 */
+    --color-footer-rule: #cfc4c4;     /* color-neutral-80 */
+
     /* #e05 only clears ~4.3:1 on --color-surface, which fails AA for the small
        type errors are usually set in. --color-error is the readable stand-in. */
     --color-error: #ff6b7a;
     --color-error-dim: rgba(255, 107, 122, 0.12);
     --color-error-border: rgba(255, 107, 122, 0.35);
 
-    --font-heading: "Space Grotesk", system-ui, sans-serif;
-    --font-body: "IBM Plex Mono", "Courier New", monospace;
+    --font-heading: "Poppins", system-ui, sans-serif;
+    --font-body: "Poppins", system-ui, sans-serif;
+    --font-serif: "Merriweather", Georgia, serif;
+    --font-mono: "IBM Plex Mono", "Courier New", monospace;
+    --tracking-tight: -0.04em;        /* Figma body/heading letter-spacing -4% */
 
+    /* 12/8/4-column grid: 120px margins at 1440, 48px on tablet, 20px on
+       phones; 20px gutters throughout. */
     --container-width: 1200px;
-    --container-padding: clamp(1rem, 4vw, 2rem);
+    --container-padding: 20px;
+    --grid-gutter: 20px;
 
-    --header-height: 64px;
+    --space-2xs: 4px;
+    --space-xs: 8px;
+    --space-sm: 12px;
+    --space-md: 16px;
+    --space-md-lg: 20px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --space-2xl: 48px;
+    --space-3xl: 64px;
+
+    --header-height: 88px;
 
     --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     --transition-fast: 140ms ease;
@@ -37,6 +71,12 @@
 
     --radius: 4px;
     --radius-lg: 8px;
+}
+
+@media (min-width: 768px) {
+    :root {
+        --container-padding: 48px;
+    }
 }
 
 /* ─── Reset ──────────────────────────────────────────────── */
@@ -120,7 +160,7 @@ h6 {
 
 /* ─── Layout Utilities ───────────────────────────────────── */
 .container {
-    max-width: var(--container-width);
+    max-width: calc(var(--container-width) + 2 * var(--container-padding));
     margin: 0 auto;
     padding: 0 var(--container-padding);
 }
@@ -153,38 +193,40 @@ h6 {
     padding: 0.625rem 1.5rem;
     font-family: var(--font-body);
     font-size: 0.8125rem;
-    font-weight: 600;
-    letter-spacing: 0.09em;
+    font-weight: 400;
+    letter-spacing: 0.02em;
     text-transform: uppercase;
-    border: none;
+    border: 2px solid transparent;
     border-radius: var(--radius);
     cursor: pointer;
     transition:
         background var(--transition-base),
-        color var(--transition-base),
-        box-shadow var(--transition-base);
+        border-color var(--transition-base),
+        color var(--transition-base);
     white-space: nowrap;
 }
 
+/* Figma "primary button": light fill, dark label. Hover tints the fill and
+   turns the label accent pink. */
 .btn--primary {
-    background: var(--color-primary);
-    color: #000;
-}
-.btn--primary:hover:not(:disabled) {
-    background: #fff;
-    box-shadow:
-        0 0 18px var(--color-primary),
-        0 0 40px var(--color-primary-dim);
+    background: var(--color-text);
+    border-color: var(--color-text);
+    color: var(--color-bg);
 }
 
+/* Figma "secondary button": outline only. */
 .btn--outline {
     background: transparent;
-    color: var(--color-primary);
-    border: 1px solid var(--color-primary);
+    border-color: var(--color-tint);
+    color: var(--color-text);
+    border-radius: 6px;
 }
+
+.btn--primary:hover:not(:disabled),
 .btn--outline:hover:not(:disabled) {
-    background: var(--color-primary-dim);
-    box-shadow: 0 0 18px var(--color-primary-dim);
+    background: var(--color-tint);
+    border-color: var(--color-tint);
+    color: var(--color-accent-hover);
 }
 
 .btn--lg {
@@ -222,41 +264,49 @@ h6 {
     align-items: center;
     justify-content: space-between;
     height: 100%;
-    gap: 2rem;
+    gap: var(--space-2xl);
 }
 
 .site-header__logo {
-    font-family: var(--font-heading);
-    font-size: 1.2rem;
-    font-weight: 800;
-    color: var(--color-primary);
-    letter-spacing: -0.02em;
-    text-shadow: 0 0 24px rgba(0, 255, 255, 0.45);
-    white-space: nowrap;
+    display: block;
+    width: 116px;
     flex-shrink: 0;
+    color: var(--color-text);
+}
+
+.site-header__right {
+    display: flex;
+    align-items: center;
+    gap: 98px;
 }
 
 .site-nav__list {
     display: flex;
-    gap: 2rem;
+    gap: var(--space-2xl);
 }
 
-.site-nav__link {
-    font-size: 0.8rem;
-    letter-spacing: 0.07em;
+/* Figma UI/Nav: Poppins Medium 20/20, accent on hover. */
+.site-nav__link,
+.mobile-nav__link {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 500;
+    line-height: 1;
     text-transform: uppercase;
     color: var(--color-text);
     transition: color var(--transition-fast);
 }
 .site-nav__link:hover,
-.site-nav__link.is-active {
-    color: var(--color-primary);
+.site-nav__link.is-active,
+.mobile-nav__link:hover,
+.mobile-nav__link.is-active {
+    color: var(--color-accent);
 }
 
 .site-header__icons {
     display: flex;
     align-items: center;
-    gap: 1.25rem;
+    gap: var(--space-lg);
     flex-shrink: 0;
 }
 
@@ -269,17 +319,17 @@ h6 {
     position: relative;
 }
 .header-icon:hover {
-    color: var(--color-primary);
+    color: var(--color-accent);
 }
 
 .cart-count {
     position: absolute;
     top: -6px;
-    right: -6px;
-    background: var(--color-secondary);
-    color: #fff;
+    right: -8px;
+    background: var(--color-accent);
+    color: var(--color-text);
     font-size: 0.6rem;
-    font-weight: 700;
+    font-weight: 600;
     width: 16px;
     height: 16px;
     border-radius: 50%;
@@ -363,7 +413,7 @@ h6 {
     font-weight: 800;
     color: var(--color-text);
     margin-bottom: 1.5rem;
-    text-shadow: 0 0 50px rgba(0, 255, 255, 0.25);
+    text-shadow: 0 0 50px rgb(var(--color-primary-rgb) / 0.25);
     text-wrap: balance;
 }
 
@@ -464,8 +514,8 @@ h6 {
 .product-card:hover {
     border-color: var(--color-primary);
     box-shadow:
-        0 0 28px rgba(0, 255, 255, 0.08),
-        0 0 60px rgba(0, 255, 255, 0.04);
+        0 0 28px rgb(var(--color-primary-rgb) / 0.08),
+        0 0 60px rgb(var(--color-primary-rgb) / 0.04);
 }
 
 .product-card__link {
@@ -477,8 +527,8 @@ h6 {
     inset: 0;
     background: linear-gradient(
         135deg,
-        rgba(0, 255, 255, 0.07) 0%,
-        rgba(255, 0, 255, 0.07) 100%
+        rgb(var(--color-primary-rgb) / 0.07) 0%,
+        rgb(var(--color-secondary-rgb) / 0.07) 100%
     );
     opacity: 0;
     transition: opacity var(--transition-base);
@@ -511,7 +561,7 @@ h6 {
 .product-card__badge--new {
     color: #001414;
     background: var(--color-primary);
-    box-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
+    box-shadow: 0 0 12px rgb(var(--color-primary-rgb) / 0.5);
 }
 
 .product-card__image {
@@ -852,9 +902,9 @@ h6 {
     height: fit-content;
     max-height: 90vh;
     box-shadow:
-        0 0 0 1px rgba(0, 255, 255, 0.06),
+        0 0 0 1px rgb(var(--color-primary-rgb) / 0.06),
         0 8px 32px rgba(0, 0, 0, 0.6),
-        0 0 60px rgba(0, 255, 255, 0.05);
+        0 0 60px rgb(var(--color-primary-rgb) / 0.05);
 }
 
 /* display must stay scoped to [open] — an unconditional `display: flex` on
@@ -995,94 +1045,91 @@ h6 {
 }
 
 /* ─── Footer ─────────────────────────────────────────────── */
+/* Figma "Footer" component: light band, wordmark left, links right, then a
+   rule and the legal row. Stacks below 768px (its Mobile breakpoint). */
 .site-footer {
-    background: var(--color-surface);
-    border-top: 1px solid var(--color-border);
-    padding: 4rem 0 2rem;
+    background: var(--color-footer-bg);
+    color: var(--color-footer-text);
+    padding: var(--space-3xl) 0 0;
     margin-top: 6rem;
 }
 
-.footer-grid {
-    display: grid;
-    grid-template-columns: 1fr 2fr;
-    gap: 4rem;
-    margin-bottom: 3rem;
+.footer-top {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3xl);
+    margin-bottom: var(--space-2xl);
 }
 
 .footer-logo {
-    font-family: var(--font-heading);
-    font-size: 1.2rem;
-    font-weight: 800;
-    color: var(--color-primary);
-    display: inline-block;
-    margin-bottom: 0.75rem;
-}
-
-.footer-tagline {
-    font-size: 0.875rem;
-    color: var(--color-text-muted);
-    line-height: 1.7;
-}
-
-.footer-nav {
-    display: flex;
-    gap: 3rem;
-    justify-content: flex-end;
-    flex-wrap: wrap;
-}
-
-.footer-nav__heading {
-    font-size: 0.7rem;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    text-align: right;
-    color: var(--color-text-muted);
-    margin-bottom: 1rem;
+    display: block;
+    width: 176px;
+    color: var(--color-footer-text);
 }
 
 .footer-nav__list {
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
-    align-items: flex-end;
+    gap: var(--space-md);
 }
 
 .footer-nav__list a {
-    font-size: 0.875rem;
-    color: var(--color-text-muted);
-    transition: color var(--transition-fast);
-}
-.footer-nav__list a:hover {
-    color: var(--color-primary);
+    font-size: 1.25rem;
+    line-height: 1.2;
+    letter-spacing: var(--tracking-tight);
 }
 
 .footer-bottom {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-top: 2rem;
-    border-top: 1px solid var(--color-border);
-    gap: 1rem;
+    flex-direction: column;
+    gap: var(--space-xl);
+    padding: 30px 0;
+    border-top: 1px solid var(--color-footer-rule);
+}
+
+.footer-legal {
+    display: flex;
     flex-wrap: wrap;
+    gap: var(--space-xl);
 }
 
-.footer-copy {
-    font-size: 0.775rem;
-    color: var(--color-text-muted);
-}
-
+.footer-legal a,
+.footer-copy,
 .footer-business {
-    font-size: 0.775rem;
-    color: var(--color-text-muted);
+    font-size: 1rem;
+    line-height: 1.25;
+    letter-spacing: var(--tracking-tight);
+    color: var(--color-footer-muted);
 }
 
-.footer-business a {
-    color: var(--color-text-muted);
-    transition: color var(--transition-fast);
-}
-
+.footer-nav__list a:hover,
+.footer-legal a:hover,
 .footer-business a:hover {
-    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+@media (min-width: 768px) {
+    .site-footer {
+        padding-top: 93px;
+    }
+    .footer-top {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 111px;
+    }
+    .footer-nav__list {
+        flex-direction: row;
+        gap: var(--space-3xl);
+    }
+    .footer-bottom {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: center;
+        column-gap: clamp(var(--space-3xl), 18vw, 257px);
+    }
 }
 
 /* ─── Cart Page ──────────────────────────────────────────── */
@@ -1394,6 +1441,8 @@ h6 {
 }
 
 /* ── Mobile nav drawer ──────────────────────────────────────── */
+/* Figma nav, menu=mobile: a surface-coloured drawer over the right ~70% of
+   the screen, links right-aligned. */
 
 .mobile-nav-toggle {
     display: none;
@@ -1401,24 +1450,24 @@ h6 {
     justify-content: center;
     background: none;
     border: none;
-    padding: 0.25rem;
+    padding: 0;
     cursor: pointer;
     color: var(--color-text);
     transition: color var(--transition-fast);
 }
-.mobile-nav-toggle:hover { color: var(--color-primary); }
+.mobile-nav-toggle:hover { color: var(--color-accent); }
 
 dialog.mobile-nav {
     position: fixed;
     inset: 0 0 0 auto;
     margin: 0;
     padding: 0;
-    width: min(300px, 80vw);
+    width: 71%;
     height: 100dvh;
     max-height: none;
     background: var(--color-surface);
+    color: var(--color-text);
     border: none;
-    border-left: 1px solid var(--color-border);
     translate: 100% 0;
     transition: translate 0.28s ease, display 0.28s ease allow-discrete;
     overflow-y: auto;
@@ -1428,7 +1477,6 @@ dialog.mobile-nav[open] {
 }
 dialog.mobile-nav::backdrop {
     background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
     opacity: 0;
     transition: opacity 0.28s ease, display 0.28s ease allow-discrete;
 }
@@ -1441,46 +1489,29 @@ dialog.mobile-nav[open]::backdrop {
 }
 
 .mobile-nav__inner {
-    display: flex;
-    flex-direction: column;
-    padding: 1.25rem 1.5rem 2rem;
-    min-height: 100%;
+    position: relative;
+    padding: var(--space-3xl) var(--space-3xl) var(--space-2xl);
 }
 
 .mobile-nav__close {
-    align-self: flex-end;
+    position: absolute;
+    top: 19px;
+    right: 22px;
     background: none;
     border: none;
-    padding: 0.25rem;
-    cursor: pointer;
-    color: var(--color-text-muted);
-    transition: color var(--transition-fast);
-    margin-bottom: 2rem;
-}
-.mobile-nav__close:hover { color: var(--color-primary); }
-
-.mobile-nav__list {
-    list-style: none;
     padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-}
-
-.mobile-nav__link {
-    display: block;
-    padding: 0.9rem 0;
-    border-bottom: 1px solid var(--color-border);
-    font-size: 0.85rem;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
+    cursor: pointer;
     color: var(--color-text);
     transition: color var(--transition-fast);
 }
-.mobile-nav__link:hover,
-.mobile-nav__link.is-active {
-    color: var(--color-primary);
+.mobile-nav__close:hover { color: var(--color-accent); }
+
+.mobile-nav__list {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--space-2xl);
+    padding-top: var(--space-lg);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1491,19 +1522,12 @@ dialog.mobile-nav[open]::backdrop {
 }
 
 @media (max-width: 768px) {
+    .site-header__right {
+        gap: var(--space-md);
+    }
     .mobile-nav-toggle { display: flex; }
     .site-nav {
         display: none;
-    }
-
-    .footer-grid {
-        grid-template-columns: 1fr;
-        gap: 2rem;
-    }
-
-    .footer-bottom {
-        flex-direction: column;
-        text-align: center;
     }
 }
 
@@ -1765,14 +1789,14 @@ dialog.mobile-nav[open]::backdrop {
 
 @keyframes shaderGuiGlow {
     0% {
-        box-shadow: 0 0 0 0 rgba(0, 255, 255, 0);
+        box-shadow: 0 0 0 0 rgb(var(--color-primary-rgb) / 0);
     }
     30% {
         box-shadow: 0 0 var(--glow-blur, 40px) var(--glow-spread, 10px)
-            rgba(0, 255, 255, var(--glow-peak-opacity, 0.5));
+            rgb(var(--color-primary-rgb) / var(--glow-peak-opacity, 0.5));
     }
     100% {
-        box-shadow: 0 0 0 0 rgba(0, 255, 255, 0);
+        box-shadow: 0 0 0 0 rgb(var(--color-primary-rgb) / 0);
     }
 }
 .shader-gui-glow {
@@ -1809,9 +1833,9 @@ dialog.mobile-nav[open]::backdrop {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     box-shadow:
-        0 0 0 1px rgba(0, 255, 255, 0.06),
+        0 0 0 1px rgb(var(--color-primary-rgb) / 0.06),
         0 8px 32px rgba(0, 0, 0, 0.6),
-        0 0 60px rgba(0, 255, 255, 0.05);
+        0 0 60px rgb(var(--color-primary-rgb) / 0.05);
     animation: modal-in 220ms var(--ease-out) both;
     overflow: hidden;
 }
@@ -2124,7 +2148,7 @@ dialog.mobile-nav[open]::backdrop {
         border-color var(--transition-fast);
 }
 .shader-control__share-btn:hover {
-    background: var(--color-secondary-dim, rgba(255, 0, 255, 0.1));
+    background: var(--color-secondary-dim, rgb(var(--color-secondary-rgb) / 0.1));
 }
 
 /* ── Homepage shader demo ────────────────────────────────────── */
@@ -2376,7 +2400,7 @@ dialog.mobile-nav[open]::backdrop {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     box-shadow:
-        0 0 0 1px rgba(0, 255, 255, 0.06),
+        0 0 0 1px rgb(var(--color-primary-rgb) / 0.06),
         0 8px 32px rgba(0, 0, 0, 0.6);
     animation: modal-in 200ms var(--ease-out) both;
 }
@@ -2529,7 +2553,7 @@ dialog.mobile-nav[open]::backdrop {
 .shader-demo__controls,
 .shader-gui {
     scrollbar-width: thin;
-    scrollbar-color: rgba(0, 255, 255, 0.25) transparent;
+    scrollbar-color: rgb(var(--color-primary-rgb) / 0.25) transparent;
 }
 .shader-demo__controls::-webkit-scrollbar,
 .shader-gui::-webkit-scrollbar {
@@ -2541,12 +2565,12 @@ dialog.mobile-nav[open]::backdrop {
 }
 .shader-demo__controls::-webkit-scrollbar-thumb,
 .shader-gui::-webkit-scrollbar-thumb {
-    background: rgba(0, 255, 255, 0.25);
+    background: rgb(var(--color-primary-rgb) / 0.25);
     border-radius: 9999px;
 }
 .shader-demo__controls::-webkit-scrollbar-thumb:hover,
 .shader-gui::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 255, 255, 0.5);
+    background: rgb(var(--color-primary-rgb) / 0.5);
 }
 
 /* ── Scroll shadows ─────────────────────────────────────────── */
@@ -2579,7 +2603,7 @@ dialog.mobile-nav[open]::backdrop {
     bottom: 10px;
     left: 50%;
     transform: translateX(-50%);
-    color: rgba(0, 255, 255, 0.65);
+    color: rgb(var(--color-primary-rgb) / 0.65);
     font-size: 1.4rem;
     opacity: 0;
     transition: opacity 0.3s;
@@ -2587,7 +2611,7 @@ dialog.mobile-nav[open]::backdrop {
 }
 .is-scrollable-bottom:not(.has-scrolled) > .scroll-shadow--bottom::after {
     opacity: 1;
-    color: rgba(0, 255, 255, 0.9);
+    color: rgb(var(--color-primary-rgb) / 0.9);
     font-size: 1.7rem;
 }
 .is-scrollable-bottom.has-scrolled > .scroll-shadow--bottom::after {
@@ -3620,4 +3644,11 @@ dialog.mobile-nav[open]::backdrop {
     font-size: 0.875rem;
     color: var(--color-primary);
     margin-top: 1rem;
+}
+
+/* ─── Wordmark ───────────────────────────────────────────── */
+.wordmark {
+    display: block;
+    width: 100%;
+    height: auto;
 }
