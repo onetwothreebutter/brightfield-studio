@@ -730,9 +730,10 @@ h6 {
 }
 
 .variant-option input[type="radio"]:checked + span {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background: var(--color-primary-dim);
+    /* Filled, so selected differs from hover by more than a 10% tint */
+    border-color: var(--color-text);
+    color: var(--color-bg);
+    background: var(--color-text);
 }
 .variant-option span:hover {
     border-color: var(--color-primary);
@@ -1022,9 +1023,10 @@ h6 {
     color: var(--color-primary);
 }
 .pagination .current {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background: var(--color-primary-dim);
+    /* Filled, so selected differs from hover by more than a 10% tint */
+    border-color: var(--color-text);
+    color: var(--color-bg);
+    background: var(--color-text);
 }
 
 /* ─── Footer ─────────────────────────────────────────────── */
@@ -1108,7 +1110,8 @@ h6 {
     }
     .footer-nav__list {
         flex-direction: row;
-        gap: var(--space-3xl);
+        flex-wrap: wrap;
+        gap: var(--space-md) var(--space-3xl);
     }
     .footer-bottom {
         flex-direction: row;
@@ -1121,7 +1124,7 @@ h6 {
 
 @media (min-width: 1025px) {
     .footer-bottom {
-        column-gap: calc(4 * var(--space-3xl));
+        justify-content: space-between;
     }
 }
 
@@ -1515,7 +1518,8 @@ dialog.mobile-nav[open]::backdrop {
     }
 }
 
-@media (max-width: 768px) {
+/* The full nav needs ~1000px with a 4-link menu, so tablets get the drawer too. */
+@media (max-width: 1024px) {
     .site-header__right {
         gap: var(--space-md);
     }
@@ -2067,9 +2071,10 @@ dialog.mobile-nav[open]::backdrop {
     transition: all var(--transition-fast);
 }
 .shader-control__toggle.is-on {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background: var(--color-primary-dim);
+    /* Filled, so selected differs from hover by more than a 10% tint */
+    border-color: var(--color-text);
+    color: var(--color-bg);
+    background: var(--color-text);
 }
 
 .shader-control__action {
