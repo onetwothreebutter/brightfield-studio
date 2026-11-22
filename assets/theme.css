@@ -1,42 +1,65 @@
 /* ============================================================
-   SHADER STORE — theme.css
-   Palette: #080808 bg | #00ffff cyan | #ff00ff magenta
+   BRIGHTFIELD — theme.css
+   Palette: #121111 bg | #fffbfb text | #ff0a54 accent
    ============================================================ */
-
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700;800&family=Anton&family=Bebas+Neue&family=Playfair+Display:wght@900&family=Oswald:wght@400;700&family=Orbitron:wght@900&family=Teko:wght@700&family=Righteous&family=Russo+One&family=Big+Shoulders+Display:wght@400;700;900&family=Space+Mono:wght@400;700&family=Roboto+Mono:wght@400;500;700&family=Source+Code+Pro:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&family=Fira+Code:wght@300;400;500;700&family=Inconsolata:wght@400;500;700&family=Courier+Prime:wght@400;700&family=Share+Tech+Mono:wght@400&family=Cutive+Mono:wght@400&family=DM+Mono:wght@300;400;500&family=Fragment+Mono:wght@400&family=Azeret+Mono:wght@400;500;700&family=Spline+Sans+Mono:wght@400;500;700&family=Geist+Mono:wght@400;500;700&family=Syne:wght@400;500;700&family=Unbounded:wght@400;500;700&family=Bricolage+Grotesque:wght@400;500;700&family=Epilogue:wght@400;500;700&family=DM+Sans:wght@400;500;700&family=Montserrat:wght@400;500;700&display=swap");
 
 /* ─── Custom Properties ──────────────────────────────────── */
 :root {
-    --color-bg: #080808;
-    --color-surface: #111111;
-    --color-surface-2: #1a1a1a;
-    --color-border: rgba(0, 255, 255, 0.12);
-    --color-text: #e0e0e0;
-    --color-text-muted: #777777;
-    --color-primary: #00ffff;
-    --color-secondary: #ff00ff;
-    --color-primary-dim: rgba(0, 255, 255, 0.1);
-    --color-secondary-dim: rgba(255, 0, 255, 0.1);
-    /* #e05 only clears ~4.3:1 on --color-surface, which fails AA for the small
-       type errors are usually set in. --color-error is the readable stand-in. */
+    /* Brightfield 2026 tokens, from the Figma variables (Foundation page). */
+    --color-bg: #121111;              /* color-bg-page */
+    --color-surface: #191818;         /* color-bg-surface */
+    --color-surface-2: #1e1b1b;       /* color-neutral-10 */
+    --color-border: #372e2e;          /* color-border-default */
+    --color-text: #fffbfb;            /* color-text-primary */
+    --color-text-muted: #cfc4c4;      /* color-text-secondary */
+    --color-accent: #ff0a54;          /* color-pink-54 */
+    --color-accent-hover: #d6003f;  /* darker than Figma #ec004c for 4.5:1 on tint */
+    --color-tint: #ffecec;            /* button hover fill / secondary border */
+
+    /* The old cyan/magenta roles, kept as aliases so the pages that Phase 1
+       doesn't redesign pick up the new palette. New code uses the names above;
+       later phases move each remaining use onto them. */
+    --color-primary: var(--color-text);
+    --color-secondary: var(--color-accent);
+    --color-primary-dim: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    --color-secondary-dim: color-mix(in srgb, var(--color-secondary) 10%, transparent);
+
+    /* Readable error red: the old #e05 is ~4.0:1 on --color-surface. */
     --color-error: #ff6b7a;
     --color-error-dim: rgba(255, 107, 122, 0.12);
     --color-error-border: rgba(255, 107, 122, 0.35);
 
-    --font-heading: "Space Grotesk", system-ui, sans-serif;
-    --font-body: "IBM Plex Mono", "Courier New", monospace;
+    --font-body: "Poppins", system-ui, sans-serif;
+    --font-heading: var(--font-body);
+    --tracking-tight: -0.04em;        /* Figma body/heading letter-spacing -4% */
 
+    /* 12/8/4-column grid: 120px margins at 1440, 48px on tablet, 20px on
+       phones. */
     --container-width: 1200px;
-    --container-padding: clamp(1rem, 4vw, 2rem);
+    --container-padding: 20px;
 
-    --header-height: 64px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --space-2xl: 48px;
+    --space-3xl: 64px;
+    --space-4xl: 96px;
+
+    --header-height: 88px;
 
     --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     --transition-fast: 140ms ease;
     --transition-base: 240ms ease;
 
     --radius: 4px;
+    --radius-md: 6px;
     --radius-lg: 8px;
+}
+
+@media (min-width: 769px) {
+    :root {
+        --container-padding: 48px;
+    }
 }
 
 /* ─── Reset ──────────────────────────────────────────────── */
@@ -120,7 +143,7 @@ h6 {
 
 /* ─── Layout Utilities ───────────────────────────────────── */
 .container {
-    max-width: var(--container-width);
+    max-width: calc(var(--container-width) + 2 * var(--container-padding));
     margin: 0 auto;
     padding: 0 var(--container-padding);
 }
@@ -153,38 +176,40 @@ h6 {
     padding: 0.625rem 1.5rem;
     font-family: var(--font-body);
     font-size: 0.8125rem;
-    font-weight: 600;
-    letter-spacing: 0.09em;
+    font-weight: 400;
+    letter-spacing: 0.02em;
     text-transform: uppercase;
-    border: none;
+    border: 2px solid transparent;
     border-radius: var(--radius);
     cursor: pointer;
     transition:
         background var(--transition-base),
-        color var(--transition-base),
-        box-shadow var(--transition-base);
+        border-color var(--transition-base),
+        color var(--transition-base);
     white-space: nowrap;
 }
 
+/* Figma "primary button": light fill, dark label. Hover tints the fill and
+   turns the label accent pink. */
 .btn--primary {
-    background: var(--color-primary);
-    color: #000;
-}
-.btn--primary:hover:not(:disabled) {
-    background: #fff;
-    box-shadow:
-        0 0 18px var(--color-primary),
-        0 0 40px var(--color-primary-dim);
+    background: var(--color-text);
+    border-color: var(--color-text);
+    color: var(--color-bg);
 }
 
+/* Figma "secondary button": outline only. */
 .btn--outline {
     background: transparent;
-    color: var(--color-primary);
-    border: 1px solid var(--color-primary);
+    border-color: var(--color-tint);
+    color: var(--color-text);
+    border-radius: var(--radius-md);
 }
+
+.btn--primary:hover:not(:disabled),
 .btn--outline:hover:not(:disabled) {
-    background: var(--color-primary-dim);
-    box-shadow: 0 0 18px var(--color-primary-dim);
+    background: var(--color-tint);
+    border-color: var(--color-tint);
+    color: var(--color-accent-hover);
 }
 
 .btn--lg {
@@ -222,41 +247,48 @@ h6 {
     align-items: center;
     justify-content: space-between;
     height: 100%;
-    gap: 2rem;
+    gap: var(--space-2xl);
 }
 
 .site-header__logo {
-    font-family: var(--font-heading);
-    font-size: 1.2rem;
-    font-weight: 800;
-    color: var(--color-primary);
-    letter-spacing: -0.02em;
-    text-shadow: 0 0 24px rgba(0, 255, 255, 0.45);
-    white-space: nowrap;
+    display: block;
+    width: 116px;
     flex-shrink: 0;
+}
+
+.site-header__right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4xl);
 }
 
 .site-nav__list {
     display: flex;
-    gap: 2rem;
+    gap: var(--space-2xl);
 }
 
-.site-nav__link {
-    font-size: 0.8rem;
-    letter-spacing: 0.07em;
+/* Figma UI/Nav: Poppins Medium 20/20, accent on hover. */
+.site-nav__link,
+.mobile-nav__link {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 500;
+    line-height: 1;
     text-transform: uppercase;
     color: var(--color-text);
     transition: color var(--transition-fast);
 }
 .site-nav__link:hover,
-.site-nav__link.is-active {
-    color: var(--color-primary);
+.site-nav__link.is-active,
+.mobile-nav__link:hover,
+.mobile-nav__link.is-active {
+    color: var(--color-accent);
 }
 
 .site-header__icons {
     display: flex;
     align-items: center;
-    gap: 1.25rem;
+    gap: var(--space-lg);
     flex-shrink: 0;
 }
 
@@ -269,17 +301,17 @@ h6 {
     position: relative;
 }
 .header-icon:hover {
-    color: var(--color-primary);
+    color: var(--color-accent);
 }
 
 .cart-count {
     position: absolute;
     top: -6px;
-    right: -6px;
-    background: var(--color-secondary);
-    color: #fff;
+    right: -8px;
+    background: var(--color-accent);
+    color: var(--color-bg);
     font-size: 0.6rem;
-    font-weight: 700;
+    font-weight: 600;
     width: 16px;
     height: 16px;
     border-radius: 50%;
@@ -360,10 +392,10 @@ h6 {
 
 .hero__title {
     font-size: clamp(2.5rem, 8vw, 6rem);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--color-text);
     margin-bottom: 1.5rem;
-    text-shadow: 0 0 50px rgba(0, 255, 255, 0.25);
+    text-shadow: 0 0 50px color-mix(in srgb, var(--color-primary) 25%, transparent);
     text-wrap: balance;
 }
 
@@ -464,8 +496,8 @@ h6 {
 .product-card:hover {
     border-color: var(--color-primary);
     box-shadow:
-        0 0 28px rgba(0, 255, 255, 0.08),
-        0 0 60px rgba(0, 255, 255, 0.04);
+        0 0 28px color-mix(in srgb, var(--color-primary) 8%, transparent),
+        0 0 60px color-mix(in srgb, var(--color-primary) 4%, transparent);
 }
 
 .product-card__link {
@@ -477,8 +509,8 @@ h6 {
     inset: 0;
     background: linear-gradient(
         135deg,
-        rgba(0, 255, 255, 0.07) 0%,
-        rgba(255, 0, 255, 0.07) 100%
+        color-mix(in srgb, var(--color-primary) 7%, transparent) 0%,
+        color-mix(in srgb, var(--color-secondary) 7%, transparent) 100%
     );
     opacity: 0;
     transition: opacity var(--transition-base);
@@ -511,7 +543,7 @@ h6 {
 .product-card__badge--new {
     color: #001414;
     background: var(--color-primary);
-    box-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--color-primary) 50%, transparent);
 }
 
 .product-card__image {
@@ -697,9 +729,10 @@ h6 {
 }
 
 .variant-option input[type="radio"]:checked + span {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background: var(--color-primary-dim);
+    /* Filled, so selected differs from hover by more than a 10% tint */
+    border-color: var(--color-text);
+    color: var(--color-bg);
+    background: var(--color-text);
 }
 .variant-option span:hover {
     border-color: var(--color-primary);
@@ -707,12 +740,12 @@ h6 {
 }
 
 .variant-fieldset--invalid .variant-option span {
-    border-color: #e05;
+    border-color: var(--color-error);
 }
 
 .variant-error {
     font-size: 0.8125rem;
-    color: #e05;
+    color: var(--color-error);
     margin: -0.75rem 0 1rem;
 }
 
@@ -852,9 +885,9 @@ h6 {
     height: fit-content;
     max-height: 90vh;
     box-shadow:
-        0 0 0 1px rgba(0, 255, 255, 0.06),
+        0 0 0 1px color-mix(in srgb, var(--color-primary) 6%, transparent),
         0 8px 32px rgba(0, 0, 0, 0.6),
-        0 0 60px rgba(0, 255, 255, 0.05);
+        0 0 60px color-mix(in srgb, var(--color-primary) 5%, transparent);
 }
 
 /* display must stay scoped to [open] — an unconditional `display: flex` on
@@ -989,100 +1022,114 @@ h6 {
     color: var(--color-primary);
 }
 .pagination .current {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background: var(--color-primary-dim);
+    /* Filled, so selected differs from hover by more than a 10% tint */
+    border-color: var(--color-text);
+    color: var(--color-bg);
+    background: var(--color-text);
 }
 
 /* ─── Footer ─────────────────────────────────────────────── */
+/* Figma "Footer" component: light band, wordmark left, links right, then a
+   rule and the legal row. Stacks below 768px (its Mobile breakpoint). */
 .site-footer {
-    background: var(--color-surface);
-    border-top: 1px solid var(--color-border);
-    padding: 4rem 0 2rem;
+    /* Light scheme: the base roles re-pointed at the Figma neutrals. */
+    --color-bg: #fbfafa;              /* color-footer-bg */
+    --color-text: #372e2e;            /* color-neutral-20 */
+    --color-text-muted: #776d6d;      /* neutral-50 #7f7575 darkened to 4.5:1 */
+    --color-border: #cfc4c4;          /* color-neutral-80 */
+    /* Aliases resolve where declared, so re-declare them or they keep the dark values. */
+    --color-primary: var(--color-text);
+    --color-secondary: var(--color-accent);
+    --color-primary-dim: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    --color-secondary-dim: color-mix(in srgb, var(--color-secondary) 10%, transparent);
+    background: var(--color-bg);
+    color: var(--color-text);
+    padding: var(--space-3xl) 0 0;
     margin-top: 6rem;
 }
 
-.footer-grid {
-    display: grid;
-    grid-template-columns: 1fr 2fr;
-    gap: 4rem;
-    margin-bottom: 3rem;
+.footer-top {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3xl);
+    margin-bottom: var(--space-2xl);
 }
 
 .footer-logo {
-    font-family: var(--font-heading);
-    font-size: 1.2rem;
-    font-weight: 800;
-    color: var(--color-primary);
-    display: inline-block;
-    margin-bottom: 0.75rem;
-}
-
-.footer-tagline {
-    font-size: 0.875rem;
-    color: var(--color-text-muted);
-    line-height: 1.7;
-}
-
-.footer-nav {
-    display: flex;
-    gap: 3rem;
-    justify-content: flex-end;
-    flex-wrap: wrap;
-}
-
-.footer-nav__heading {
-    font-size: 0.7rem;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    text-align: right;
-    color: var(--color-text-muted);
-    margin-bottom: 1rem;
+    display: block;
+    width: 176px;
 }
 
 .footer-nav__list {
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
-    align-items: flex-end;
+    gap: var(--space-md);
 }
 
 .footer-nav__list a {
-    font-size: 0.875rem;
-    color: var(--color-text-muted);
-    transition: color var(--transition-fast);
-}
-.footer-nav__list a:hover {
-    color: var(--color-primary);
+    font-size: 1.25rem;
+    line-height: 1.2;
+    letter-spacing: var(--tracking-tight);
 }
 
 .footer-bottom {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-top: 2rem;
+    flex-direction: column;
+    gap: var(--space-xl);
+    padding: var(--space-xl) 0;
     border-top: 1px solid var(--color-border);
-    gap: 1rem;
+}
+
+.footer-legal {
+    display: flex;
     flex-wrap: wrap;
+    gap: var(--space-xl);
 }
 
-.footer-copy {
-    font-size: 0.775rem;
-    color: var(--color-text-muted);
-}
-
+.footer-legal a,
+.footer-copy,
 .footer-business {
-    font-size: 0.775rem;
+    font-size: 1rem;
+    line-height: 1.25;
+    letter-spacing: var(--tracking-tight);
     color: var(--color-text-muted);
 }
 
-.footer-business a {
-    color: var(--color-text-muted);
-    transition: color var(--transition-fast);
-}
-
+.footer-nav__list a:hover,
+.footer-legal a:hover,
 .footer-business a:hover {
-    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+@media (min-width: 769px) {
+    .site-footer {
+        padding-top: var(--space-4xl);
+    }
+    .footer-top {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: calc(var(--space-4xl) + var(--space-md));
+    }
+    .footer-nav__list {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: var(--space-md) var(--space-3xl);
+    }
+    .footer-bottom {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: center;
+        column-gap: var(--space-3xl);
+    }
+}
+
+@media (min-width: 1025px) {
+    .footer-bottom {
+        justify-content: space-between;
+    }
 }
 
 /* ─── Cart Page ──────────────────────────────────────────── */
@@ -1394,6 +1441,8 @@ h6 {
 }
 
 /* ── Mobile nav drawer ──────────────────────────────────────── */
+/* Figma nav, menu=mobile: a surface-coloured drawer over the right ~70% of
+   the screen, links right-aligned. */
 
 .mobile-nav-toggle {
     display: none;
@@ -1401,24 +1450,24 @@ h6 {
     justify-content: center;
     background: none;
     border: none;
-    padding: 0.25rem;
+    padding: 0;
     cursor: pointer;
     color: var(--color-text);
     transition: color var(--transition-fast);
 }
-.mobile-nav-toggle:hover { color: var(--color-primary); }
+.mobile-nav-toggle:hover { color: var(--color-accent); }
 
 dialog.mobile-nav {
     position: fixed;
     inset: 0 0 0 auto;
     margin: 0;
     padding: 0;
-    width: min(300px, 80vw);
+    width: 71%;
     height: 100dvh;
     max-height: none;
     background: var(--color-surface);
+    color: var(--color-text);
     border: none;
-    border-left: 1px solid var(--color-border);
     translate: 100% 0;
     transition: translate 0.28s ease, display 0.28s ease allow-discrete;
     overflow-y: auto;
@@ -1428,7 +1477,6 @@ dialog.mobile-nav[open] {
 }
 dialog.mobile-nav::backdrop {
     background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
     opacity: 0;
     transition: opacity 0.28s ease, display 0.28s ease allow-discrete;
 }
@@ -1441,46 +1489,30 @@ dialog.mobile-nav[open]::backdrop {
 }
 
 .mobile-nav__inner {
-    display: flex;
-    flex-direction: column;
-    padding: 1.25rem 1.5rem 2rem;
+    position: relative;
     min-height: 100%;
+    padding: var(--space-3xl) var(--space-3xl) var(--space-2xl) var(--space-lg);
 }
 
 .mobile-nav__close {
-    align-self: flex-end;
+    position: absolute;
+    top: var(--container-padding);
+    right: var(--container-padding);
     background: none;
     border: none;
-    padding: 0.25rem;
-    cursor: pointer;
-    color: var(--color-text-muted);
-    transition: color var(--transition-fast);
-    margin-bottom: 2rem;
-}
-.mobile-nav__close:hover { color: var(--color-primary); }
-
-.mobile-nav__list {
-    list-style: none;
     padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-}
-
-.mobile-nav__link {
-    display: block;
-    padding: 0.9rem 0;
-    border-bottom: 1px solid var(--color-border);
-    font-size: 0.85rem;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
+    cursor: pointer;
     color: var(--color-text);
     transition: color var(--transition-fast);
 }
-.mobile-nav__link:hover,
-.mobile-nav__link.is-active {
-    color: var(--color-primary);
+.mobile-nav__close:hover { color: var(--color-accent); }
+
+.mobile-nav__list {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--space-2xl);
+    padding-top: var(--space-lg);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1490,20 +1522,14 @@ dialog.mobile-nav[open]::backdrop {
     }
 }
 
-@media (max-width: 768px) {
+/* The full nav needs ~1000px with a 4-link menu, so tablets get the drawer too. */
+@media (max-width: 1024px) {
+    .site-header__right {
+        gap: var(--space-md);
+    }
     .mobile-nav-toggle { display: flex; }
     .site-nav {
         display: none;
-    }
-
-    .footer-grid {
-        grid-template-columns: 1fr;
-        gap: 2rem;
-    }
-
-    .footer-bottom {
-        flex-direction: column;
-        text-align: center;
     }
 }
 
@@ -1765,14 +1791,14 @@ dialog.mobile-nav[open]::backdrop {
 
 @keyframes shaderGuiGlow {
     0% {
-        box-shadow: 0 0 0 0 rgba(0, 255, 255, 0);
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 0%, transparent);
     }
     30% {
         box-shadow: 0 0 var(--glow-blur, 40px) var(--glow-spread, 10px)
-            rgba(0, 255, 255, var(--glow-peak-opacity, 0.5));
+            color-mix(in srgb, var(--color-primary) calc(var(--glow-peak-opacity, 0.5) * 100%), transparent);
     }
     100% {
-        box-shadow: 0 0 0 0 rgba(0, 255, 255, 0);
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 0%, transparent);
     }
 }
 .shader-gui-glow {
@@ -1809,9 +1835,9 @@ dialog.mobile-nav[open]::backdrop {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     box-shadow:
-        0 0 0 1px rgba(0, 255, 255, 0.06),
+        0 0 0 1px color-mix(in srgb, var(--color-primary) 6%, transparent),
         0 8px 32px rgba(0, 0, 0, 0.6),
-        0 0 60px rgba(0, 255, 255, 0.05);
+        0 0 60px color-mix(in srgb, var(--color-primary) 5%, transparent);
     animation: modal-in 220ms var(--ease-out) both;
     overflow: hidden;
 }
@@ -2049,9 +2075,10 @@ dialog.mobile-nav[open]::backdrop {
     transition: all var(--transition-fast);
 }
 .shader-control__toggle.is-on {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background: var(--color-primary-dim);
+    /* Filled, so selected differs from hover by more than a 10% tint */
+    border-color: var(--color-text);
+    color: var(--color-bg);
+    background: var(--color-text);
 }
 
 .shader-control__action {
@@ -2113,7 +2140,7 @@ dialog.mobile-nav[open]::backdrop {
     letter-spacing: 0.1em;
     text-transform: uppercase;
     background: transparent;
-    color: var(--color-secondary);
+    color: var(--color-text);   /* pink 0.65rem text is under 4.5:1 on the panels */
     border: 1px solid var(--color-secondary);
     border-radius: var(--radius);
     padding: 0.45rem 0.6rem;
@@ -2124,7 +2151,7 @@ dialog.mobile-nav[open]::backdrop {
         border-color var(--transition-fast);
 }
 .shader-control__share-btn:hover {
-    background: var(--color-secondary-dim, rgba(255, 0, 255, 0.1));
+    background: var(--color-secondary-dim);
 }
 
 /* ── Homepage shader demo ────────────────────────────────────── */
@@ -2209,7 +2236,7 @@ dialog.mobile-nav[open]::backdrop {
 
 .shader-demo__canvas-wrap {
     box-shadow: 0 0 51px var(--color-primary-dim);
-    outline: 1px solid rgb(0 255 255 / 8%);
+    outline: 1px solid color-mix(in srgb, var(--color-accent) 8%, transparent);
     border-radius: 30px;
 }
 
@@ -2376,7 +2403,7 @@ dialog.mobile-nav[open]::backdrop {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     box-shadow:
-        0 0 0 1px rgba(0, 255, 255, 0.06),
+        0 0 0 1px color-mix(in srgb, var(--color-primary) 6%, transparent),
         0 8px 32px rgba(0, 0, 0, 0.6);
     animation: modal-in 200ms var(--ease-out) both;
 }
@@ -2529,7 +2556,7 @@ dialog.mobile-nav[open]::backdrop {
 .shader-demo__controls,
 .shader-gui {
     scrollbar-width: thin;
-    scrollbar-color: rgba(0, 255, 255, 0.25) transparent;
+    scrollbar-color: color-mix(in srgb, var(--color-primary) 25%, transparent) transparent;
 }
 .shader-demo__controls::-webkit-scrollbar,
 .shader-gui::-webkit-scrollbar {
@@ -2541,12 +2568,12 @@ dialog.mobile-nav[open]::backdrop {
 }
 .shader-demo__controls::-webkit-scrollbar-thumb,
 .shader-gui::-webkit-scrollbar-thumb {
-    background: rgba(0, 255, 255, 0.25);
+    background: color-mix(in srgb, var(--color-primary) 25%, transparent);
     border-radius: 9999px;
 }
 .shader-demo__controls::-webkit-scrollbar-thumb:hover,
 .shader-gui::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 255, 255, 0.5);
+    background: color-mix(in srgb, var(--color-primary) 50%, transparent);
 }
 
 /* ── Scroll shadows ─────────────────────────────────────────── */
@@ -2579,7 +2606,7 @@ dialog.mobile-nav[open]::backdrop {
     bottom: 10px;
     left: 50%;
     transform: translateX(-50%);
-    color: rgba(0, 255, 255, 0.65);
+    color: color-mix(in srgb, var(--color-primary) 65%, transparent);
     font-size: 1.4rem;
     opacity: 0;
     transition: opacity 0.3s;
@@ -2587,7 +2614,7 @@ dialog.mobile-nav[open]::backdrop {
 }
 .is-scrollable-bottom:not(.has-scrolled) > .scroll-shadow--bottom::after {
     opacity: 1;
-    color: rgba(0, 255, 255, 0.9);
+    color: color-mix(in srgb, var(--color-primary) 90%, transparent);
     font-size: 1.7rem;
 }
 .is-scrollable-bottom.has-scrolled > .scroll-shadow--bottom::after {
@@ -2978,8 +3005,8 @@ dialog.mobile-nav[open]::backdrop {
     text-transform: capitalize;
 }
 .community-designs__like-btn--liked {
-    color: #e05;
-    border-color: #e05;
+    color: var(--color-error);
+    border-color: var(--color-error);
 }
 .recent-designs__heading {
     font-size: 1rem;
@@ -3006,8 +3033,8 @@ dialog.mobile-nav[open]::backdrop {
 }
 .community-designs__like-btn:hover,
 .community-designs__like-btn--liked {
-    color: #e05;
-    border-color: #e05;
+    color: var(--color-error);
+    border-color: var(--color-error);
 }
 .community-designs__like-icon {
     line-height: 1;
@@ -3097,7 +3124,7 @@ dialog.mobile-nav[open]::backdrop {
     grid-template-columns: 1fr;
     gap: 2rem;
 }
-@media (min-width: 768px) {
+@media (min-width: 769px) {
     .designs-row {
         grid-template-columns: 1fr 1fr;
         align-items: start;
@@ -3178,7 +3205,7 @@ dialog.mobile-nav[open]::backdrop {
 }
 .mockup-modal__community-error {
     font-size: 0.75rem;
-    color: #e05;
+    color: var(--color-error);
     margin: 0;
 }
 
@@ -3390,7 +3417,7 @@ dialog.mobile-nav[open]::backdrop {
 .newsletter__error {
     margin: 0.75rem 0 0;
     font-size: 0.875rem;
-    color: #e05;
+    color: var(--color-error);
 }
 
 @media (max-width: 480px) {
@@ -3613,11 +3640,18 @@ dialog.mobile-nav[open]::backdrop {
 
 .product-reviews__form-error {
     font-size: 0.8125rem;
-    color: #e05;
+    color: var(--color-error);
 }
 
 .product-reviews__form-success {
     font-size: 0.875rem;
     color: var(--color-primary);
     margin-top: 1rem;
+}
+
+/* ─── Wordmark ───────────────────────────────────────────── */
+.wordmark {
+    display: block;
+    width: 100%;
+    height: auto;
 }

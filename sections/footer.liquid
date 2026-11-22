@@ -1,66 +1,40 @@
 <footer class="site-footer" role="contentinfo">
   <div class="container">
 
-    <div class="footer-grid">
-      <div class="footer-brand">
-        <a href="{{ routes.root_url }}" class="footer-logo">{{ shop.name }}</a>
-        {%- if section.settings.tagline != blank -%}
-          <p class="footer-tagline">{{ section.settings.tagline }}</p>
-        {%- endif -%}
-      </div>
+    <div class="footer-top">
+      <a href="{{ routes.root_url }}" class="footer-logo">
+        {%- render 'wordmark' -%}
+      </a>
 
-      <nav class="footer-nav" aria-label="Footer navigation">
-        <div class="footer-nav__column">
-          <h3 class="footer-nav__heading">Customer Care</h3>
-          <ul class="footer-nav__list">
-            <li><a href="/pages/contact">Contact</a></li>
-            <li><a href="/pages/faq">FAQ</a></li>
-            {%- if shop.shipping_policy -%}
-              <li><a href="{{ shop.shipping_policy.url }}">Shipping</a></li>
-            {%- endif -%}
-            {%- if shop.refund_policy -%}
-              <li><a href="{{ shop.refund_policy.url }}">Returns</a></li>
-            {%- endif -%}
-            <li><a href="/pages/faq#size-guide">Size Guide</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-nav__column">
-          <h3 class="footer-nav__heading">About</h3>
-          <ul class="footer-nav__list">
-            <li><a href="/pages/about">About Brightfield</a></li>
-            <li><a href="/pages/about#how-it-works">How It Works</a></li>
-            <li><a href="/pages/community-designs">Community</a></li>
-          </ul>
-        </div>
-
-        {%- if shop.privacy_policy or shop.terms_of_service -%}
-          <div class="footer-nav__column">
-            <h3 class="footer-nav__heading">Legal</h3>
-            <ul class="footer-nav__list">
-              {%- if shop.privacy_policy -%}
-                <li><a href="{{ shop.privacy_policy.url }}">{{ shop.privacy_policy.title }}</a></li>
-              {%- endif -%}
-              {%- if shop.terms_of_service -%}
-                <li><a href="{{ shop.terms_of_service.url }}">{{ shop.terms_of_service.title }}</a></li>
-              {%- endif -%}
-            </ul>
-          </div>
-        {%- endif -%}
-
-        {%- if section.settings.instagram != blank -%}
-          <div class="footer-nav__column">
-            <h3 class="footer-nav__heading">Follow</h3>
-            <ul class="footer-nav__list">
-              <li><a href="{{ section.settings.instagram }}" target="_blank" rel="noopener noreferrer">Instagram</a></li>
-            </ul>
-          </div>
-        {%- endif -%}
+      <nav aria-label="Footer navigation">
+        <ul class="footer-nav__list">
+          <li><a href="/pages/about">About</a></li>
+          <li><a href="/pages/contact">Contact</a></li>
+          <li><a href="/pages/faq">FAQ</a></li>
+          {%- if shop.refund_policy -%}
+            <li><a href="{{ shop.refund_policy.url }}">Returns</a></li>
+          {%- endif -%}
+          {%- if section.settings.instagram != blank -%}
+            <li><a href="{{ section.settings.instagram }}" target="_blank" rel="noopener noreferrer">Instagram</a></li>
+          {%- endif -%}
+        </ul>
       </nav>
     </div>
 
     <div class="footer-bottom">
-      <p class="footer-copy">&copy; {{ 'now' | date: '%Y' }} {{ shop.name }}. All rights reserved.</p>
+      {%- if shop.privacy_policy or shop.shipping_policy or shop.terms_of_service -%}
+        <ul class="footer-legal">
+          {%- if shop.privacy_policy -%}
+            <li><a href="{{ shop.privacy_policy.url }}">Privacy</a></li>
+          {%- endif -%}
+          {%- if shop.shipping_policy -%}
+            <li><a href="{{ shop.shipping_policy.url }}">Shipping</a></li>
+          {%- endif -%}
+          {%- if shop.terms_of_service -%}
+            <li><a href="{{ shop.terms_of_service.url }}">Terms of Service</a></li>
+          {%- endif -%}
+        </ul>
+      {%- endif -%}
       {%- if shop.email != blank or section.settings.location_text != blank -%}
         <p class="footer-business">
           {%- if shop.email != blank -%}
@@ -74,6 +48,7 @@
           {%- endif -%}
         </p>
       {%- endif -%}
+      <p class="footer-copy">&copy; {{ 'now' | date: '%Y' }} {{ shop.name }}</p>
     </div>
 
   </div>
@@ -83,12 +58,6 @@
 {
   "name": "Footer",
   "settings": [
-    {
-      "type": "text",
-      "id": "tagline",
-      "label": "Tagline",
-      "default": "Art rendered in silicon. Worn on skin."
-    },
     {
       "type": "url",
       "id": "instagram",

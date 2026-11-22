@@ -2,57 +2,49 @@
   <div class="site-header__inner container">
 
     <a href="{{ routes.root_url }}" class="site-header__logo">
-      {{ shop.name }}
+      {%- render 'wordmark' -%}
     </a>
 
-    <nav class="site-nav" aria-label="Main navigation">
-      <ul class="site-nav__list">
-        {%- for link in linklists.main-menu.links -%}
-          <li class="site-nav__item">
-            <a
-              href="{{ link.url }}"
-              class="site-nav__link{% if link.active %} is-active{% endif %}"
-            >
-              {{ link.title }}
-            </a>
-          </li>
-        {%- endfor -%}
-      </ul>
-    </nav>
+    <div class="site-header__right">
+      <nav class="site-nav" aria-label="Main navigation">
+        <ul class="site-nav__list">
+          {%- for link in linklists.main-menu.links -%}
+            <li class="site-nav__item">
+              <a
+                href="{{ link.url }}"
+                class="site-nav__link{% if link.active %} is-active{% endif %}"
+              >
+                {{ link.title }}
+              </a>
+            </li>
+          {%- endfor -%}
+        </ul>
+      </nav>
 
-    <div class="site-header__icons">
-      <a href="{{ routes.search_url }}" class="header-icon" aria-label="Search">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <circle cx="11" cy="11" r="8"/>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-      </a>
-      <a href="{{ routes.cart_url }}" class="header-icon cart-icon" aria-label="Cart ({{ cart.item_count }} items)">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
-          <line x1="3" y1="6" x2="21" y2="6"/>
-          <path d="M16 10a4 4 0 01-8 0"/>
-        </svg>
-        {%- if cart.item_count > 0 -%}
-          <span class="cart-count" aria-hidden="true">{{ cart.item_count }}</span>
-        {%- endif -%}
-      </a>
-      <button
-        class="mobile-nav-toggle"
-        id="mobile-nav-toggle"
-        aria-expanded="false"
-        aria-controls="mobile-nav-dialog"
-        aria-label="Open menu"
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <line x1="3" y1="6" x2="21" y2="6"/>
-          <line x1="3" y1="12" x2="21" y2="12"/>
-          <line x1="3" y1="18" x2="21" y2="18"/>
-        </svg>
-      </button>
+      <div class="site-header__icons">
+        <a href="{{ routes.search_url }}" class="header-icon" aria-label="Search">
+          {%- render 'icon-search' -%}
+        </a>
+        <a href="{{ routes.cart_url }}" class="header-icon cart-icon" aria-label="Cart ({{ cart.item_count }} items)">
+          <svg width="21" height="24" viewBox="47.4376 0 21 24" fill="currentColor" aria-hidden="true">
+            <path d="M57.9376 0C54.7176 0 52.1043 2.61333 52.1043 5.83333V7H48.6043C47.9626 7 47.4376 7.525 47.4376 8.16667V21C47.4376 22.2833 48.4876 23.3333 49.771 23.3333H66.1043C67.3876 23.3333 68.4376 22.2833 68.4376 21V8.16667C68.4376 7.525 67.9126 7 67.271 7H63.771V5.83333C63.771 2.61333 61.1576 0 57.9376 0ZM54.4376 5.83333C54.4376 3.90833 56.0126 2.33333 57.9376 2.33333C59.8626 2.33333 61.4376 3.90833 61.4376 5.83333V7H54.4376V5.83333Z"/>
+          </svg>
+          {%- if cart.item_count > 0 -%}
+            <span class="cart-count" aria-hidden="true">{{ cart.item_count }}</span>
+          {%- endif -%}
+        </a>
+        <button
+          class="mobile-nav-toggle"
+          id="mobile-nav-toggle"
+          aria-expanded="false"
+          aria-controls="mobile-nav-dialog"
+          aria-label="Open menu"
+        >
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true">
+            <path d="M5 6H27V8H5V6ZM5 15H27V17H5V15ZM5 24H27V26H5V24Z"/>
+          </svg>
+        </button>
+      </div>
     </div>
 
   </div>
@@ -61,10 +53,8 @@
 <dialog class="mobile-nav" id="mobile-nav-dialog" aria-label="Main navigation">
   <div class="mobile-nav__inner">
     <button class="mobile-nav__close" id="mobile-nav-close" aria-label="Close menu">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-           stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <line x1="18" y1="6" x2="6" y2="18"/>
-        <line x1="6" y1="6" x2="18" y2="18"/>
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M21.871 4.54765C21.8716 4.54784 21.8721 4.54815 21.8733 4.54927L23.4507 6.12673C23.4519 6.12785 23.4522 6.12837 23.4523 6.12902C23.4526 6.12963 23.4526 6.1303 23.4523 6.13091C23.4522 6.13154 23.4519 6.13206 23.4507 6.13318L15.5839 14.0001L23.4507 21.8669C23.4519 21.868 23.4522 21.8686 23.4523 21.8692C23.4525 21.8698 23.4525 21.8705 23.4523 21.8711C23.4522 21.8717 23.4519 21.8723 23.4507 21.8734L21.8733 23.4509C21.8721 23.452 21.8716 23.4523 21.871 23.4525C21.8704 23.4527 21.8697 23.4527 21.8691 23.4525C21.8685 23.4523 21.8679 23.452 21.8668 23.4509L13.9999 15.584L6.13306 23.4509C6.13196 23.452 6.13142 23.4523 6.13079 23.4525C6.13017 23.4527 6.1295 23.4527 6.12887 23.4525C6.12827 23.4523 6.12773 23.452 6.12661 23.4509L4.54914 21.8734C4.54802 21.8723 4.54772 21.8717 4.54753 21.8711C4.54731 21.8705 4.54731 21.8698 4.54753 21.8692C4.54772 21.8686 4.54802 21.8681 4.54914 21.8669L12.416 14.0001L4.54914 6.13318C4.54802 6.13209 4.54772 6.13154 4.54753 6.13091C4.54734 6.13029 4.54734 6.12962 4.54753 6.129C4.54772 6.1284 4.54802 6.12785 4.54914 6.12673L6.12661 4.54927C6.12773 4.54815 6.12825 4.54784 6.1289 4.54765C6.12951 4.54743 6.13018 4.54743 6.13079 4.54765C6.13142 4.54784 6.13194 4.54815 6.13306 4.54927L13.9999 12.4161L21.8668 4.54927C21.8679 4.54815 21.8685 4.54784 21.8691 4.54765C21.8697 4.54746 21.8704 4.54746 21.871 4.54765H21.871Z"/>
       </svg>
     </button>
     <nav aria-label="Mobile navigation">
@@ -95,9 +85,13 @@
 
   function closeMenu() {
     dialog.close();
+  }
+
+  // Fires for Esc as well as our own close, so state and focus reset once.
+  dialog.addEventListener('close', function () {
     toggle.setAttribute('aria-expanded', 'false');
     toggle.focus();
-  }
+  });
 
   toggle.addEventListener('click', openMenu);
   closeBtn.addEventListener('click', closeMenu);
