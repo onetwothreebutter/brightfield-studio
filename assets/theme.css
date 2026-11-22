@@ -3,8 +3,6 @@
    Palette: #121111 bg | #fffbfb text | #ff0a54 accent
    ============================================================ */
 
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Merriweather:wght@400&family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700;800&family=Anton&family=Bebas+Neue&family=Playfair+Display:wght@900&family=Oswald:wght@400;700&family=Orbitron:wght@900&family=Teko:wght@700&family=Righteous&family=Russo+One&family=Big+Shoulders+Display:wght@400;700;900&family=Space+Mono:wght@400;700&family=Roboto+Mono:wght@400;500;700&family=Source+Code+Pro:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&family=Fira+Code:wght@300;400;500;700&family=Inconsolata:wght@400;500;700&family=Courier+Prime:wght@400;700&family=Share+Tech+Mono:wght@400&family=Cutive+Mono:wght@400&family=DM+Mono:wght@300;400;500&family=Fragment+Mono:wght@400&family=Azeret+Mono:wght@400;500;700&family=Spline+Sans+Mono:wght@400;500;700&family=Geist+Mono:wght@400;500;700&family=Syne:wght@400;500;700&family=Unbounded:wght@400;500;700&family=Bricolage+Grotesque:wght@400;500;700&family=Epilogue:wght@400;500;700&family=DM+Sans:wght@400;500;700&family=Montserrat:wght@400;500;700&display=swap");
-
 /* ─── Custom Properties ──────────────────────────────────── */
 :root {
     /* Brightfield 2026 tokens, from the Figma variables (Foundation page). */
@@ -12,28 +10,19 @@
     --color-surface: #191818;         /* color-bg-surface */
     --color-surface-2: #1e1b1b;       /* color-neutral-10 */
     --color-border: #372e2e;          /* color-border-default */
-    --color-border-strong: #665c5c;   /* color-border-strong */
     --color-text: #fffbfb;            /* color-text-primary */
     --color-text-muted: #cfc4c4;      /* color-text-secondary */
     --color-accent: #ff0a54;          /* color-pink-54 */
     --color-accent-hover: #ec004c;
     --color-tint: #ffecec;            /* button hover fill / secondary border */
 
-    /* The old cyan/magenta roles, re-pointed at the new palette. Channels
-       are kept separately so the glows and tints written as
-       rgb(var(--color-primary-rgb) / a) follow the palette. */
-    --color-primary-rgb: 255 251 251;
-    --color-secondary-rgb: 255 10 84;
-    --color-primary: rgb(var(--color-primary-rgb));
+    /* The old cyan/magenta roles, kept as aliases so the pages that Phase 1
+       doesn't redesign pick up the new palette. New code uses the names above;
+       later phases move each remaining use onto them. */
+    --color-primary: var(--color-text);
     --color-secondary: var(--color-accent);
-    --color-primary-dim: rgb(var(--color-primary-rgb) / 0.1);
-    --color-secondary-dim: rgb(var(--color-secondary-rgb) / 0.1);
-
-    /* Light footer */
-    --color-footer-bg: #fbfafa;
-    --color-footer-text: #372e2e;     /* color-neutral-20 */
-    --color-footer-muted: #7f7575;    /* color-neutral-50 */
-    --color-footer-rule: #cfc4c4;     /* color-neutral-80 */
+    --color-primary-dim: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    --color-secondary-dim: color-mix(in srgb, var(--color-secondary) 10%, transparent);
 
     /* #e05 only clears ~4.3:1 on --color-surface, which fails AA for the small
        type errors are usually set in. --color-error is the readable stand-in. */
@@ -43,25 +32,19 @@
 
     --font-heading: "Poppins", system-ui, sans-serif;
     --font-body: "Poppins", system-ui, sans-serif;
-    --font-serif: "Merriweather", Georgia, serif;
-    --font-mono: "IBM Plex Mono", "Courier New", monospace;
     --tracking-tight: -0.04em;        /* Figma body/heading letter-spacing -4% */
 
     /* 12/8/4-column grid: 120px margins at 1440, 48px on tablet, 20px on
-       phones; 20px gutters throughout. */
+       phones. */
     --container-width: 1200px;
     --container-padding: 20px;
-    --grid-gutter: 20px;
 
-    --space-2xs: 4px;
-    --space-xs: 8px;
-    --space-sm: 12px;
     --space-md: 16px;
-    --space-md-lg: 20px;
     --space-lg: 24px;
     --space-xl: 32px;
     --space-2xl: 48px;
     --space-3xl: 64px;
+    --space-4xl: 96px;
 
     --header-height: 88px;
 
@@ -70,10 +53,11 @@
     --transition-base: 240ms ease;
 
     --radius: 4px;
+    --radius-md: 6px;
     --radius-lg: 8px;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 769px) {
     :root {
         --container-padding: 48px;
     }
@@ -219,7 +203,7 @@ h6 {
     background: transparent;
     border-color: var(--color-tint);
     color: var(--color-text);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
 }
 
 .btn--primary:hover:not(:disabled),
@@ -271,13 +255,12 @@ h6 {
     display: block;
     width: 116px;
     flex-shrink: 0;
-    color: var(--color-text);
 }
 
 .site-header__right {
     display: flex;
     align-items: center;
-    gap: 98px;
+    gap: var(--space-4xl);
 }
 
 .site-nav__list {
@@ -413,7 +396,7 @@ h6 {
     font-weight: 800;
     color: var(--color-text);
     margin-bottom: 1.5rem;
-    text-shadow: 0 0 50px rgb(var(--color-primary-rgb) / 0.25);
+    text-shadow: 0 0 50px color-mix(in srgb, var(--color-primary) 25%, transparent);
     text-wrap: balance;
 }
 
@@ -514,8 +497,8 @@ h6 {
 .product-card:hover {
     border-color: var(--color-primary);
     box-shadow:
-        0 0 28px rgb(var(--color-primary-rgb) / 0.08),
-        0 0 60px rgb(var(--color-primary-rgb) / 0.04);
+        0 0 28px color-mix(in srgb, var(--color-primary) 8%, transparent),
+        0 0 60px color-mix(in srgb, var(--color-primary) 4%, transparent);
 }
 
 .product-card__link {
@@ -527,8 +510,8 @@ h6 {
     inset: 0;
     background: linear-gradient(
         135deg,
-        rgb(var(--color-primary-rgb) / 0.07) 0%,
-        rgb(var(--color-secondary-rgb) / 0.07) 100%
+        color-mix(in srgb, var(--color-primary) 7%, transparent) 0%,
+        color-mix(in srgb, var(--color-secondary) 7%, transparent) 100%
     );
     opacity: 0;
     transition: opacity var(--transition-base);
@@ -561,7 +544,7 @@ h6 {
 .product-card__badge--new {
     color: #001414;
     background: var(--color-primary);
-    box-shadow: 0 0 12px rgb(var(--color-primary-rgb) / 0.5);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--color-primary) 50%, transparent);
 }
 
 .product-card__image {
@@ -902,9 +885,9 @@ h6 {
     height: fit-content;
     max-height: 90vh;
     box-shadow:
-        0 0 0 1px rgb(var(--color-primary-rgb) / 0.06),
+        0 0 0 1px color-mix(in srgb, var(--color-primary) 6%, transparent),
         0 8px 32px rgba(0, 0, 0, 0.6),
-        0 0 60px rgb(var(--color-primary-rgb) / 0.05);
+        0 0 60px color-mix(in srgb, var(--color-primary) 5%, transparent);
 }
 
 /* display must stay scoped to [open] — an unconditional `display: flex` on
@@ -1048,8 +1031,13 @@ h6 {
 /* Figma "Footer" component: light band, wordmark left, links right, then a
    rule and the legal row. Stacks below 768px (its Mobile breakpoint). */
 .site-footer {
-    background: var(--color-footer-bg);
-    color: var(--color-footer-text);
+    /* Light scheme: the base roles re-pointed at the Figma neutrals. */
+    --color-bg: #fbfafa;              /* color-footer-bg */
+    --color-text: #372e2e;            /* color-neutral-20 */
+    --color-text-muted: #7f7575;      /* color-neutral-50 */
+    --color-border: #cfc4c4;          /* color-neutral-80 */
+    background: var(--color-bg);
+    color: var(--color-text);
     padding: var(--space-3xl) 0 0;
     margin-top: 6rem;
 }
@@ -1065,7 +1053,6 @@ h6 {
 .footer-logo {
     display: block;
     width: 176px;
-    color: var(--color-footer-text);
 }
 
 .footer-nav__list {
@@ -1084,8 +1071,8 @@ h6 {
     display: flex;
     flex-direction: column;
     gap: var(--space-xl);
-    padding: 30px 0;
-    border-top: 1px solid var(--color-footer-rule);
+    padding: var(--space-xl) 0;
+    border-top: 1px solid var(--color-border);
 }
 
 .footer-legal {
@@ -1100,7 +1087,7 @@ h6 {
     font-size: 1rem;
     line-height: 1.25;
     letter-spacing: var(--tracking-tight);
-    color: var(--color-footer-muted);
+    color: var(--color-text-muted);
 }
 
 .footer-nav__list a:hover,
@@ -1109,15 +1096,15 @@ h6 {
     text-decoration: underline;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 769px) {
     .site-footer {
-        padding-top: 93px;
+        padding-top: var(--space-4xl);
     }
     .footer-top {
         flex-direction: row;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 111px;
+        margin-bottom: calc(var(--space-4xl) + var(--space-md));
     }
     .footer-nav__list {
         flex-direction: row;
@@ -1128,7 +1115,13 @@ h6 {
         flex-wrap: wrap;
         justify-content: flex-end;
         align-items: center;
-        column-gap: clamp(var(--space-3xl), 18vw, 257px);
+        column-gap: var(--space-3xl);
+    }
+}
+
+@media (min-width: 1025px) {
+    .footer-bottom {
+        column-gap: calc(4 * var(--space-3xl));
     }
 }
 
@@ -1495,8 +1488,8 @@ dialog.mobile-nav[open]::backdrop {
 
 .mobile-nav__close {
     position: absolute;
-    top: 19px;
-    right: 22px;
+    top: 20px;
+    right: 20px;
     background: none;
     border: none;
     padding: 0;
@@ -1789,14 +1782,14 @@ dialog.mobile-nav[open]::backdrop {
 
 @keyframes shaderGuiGlow {
     0% {
-        box-shadow: 0 0 0 0 rgb(var(--color-primary-rgb) / 0);
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 0%, transparent);
     }
     30% {
         box-shadow: 0 0 var(--glow-blur, 40px) var(--glow-spread, 10px)
-            rgb(var(--color-primary-rgb) / var(--glow-peak-opacity, 0.5));
+            color-mix(in srgb, var(--color-primary) calc(var(--glow-peak-opacity, 0.5) * 100%), transparent);
     }
     100% {
-        box-shadow: 0 0 0 0 rgb(var(--color-primary-rgb) / 0);
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 0%, transparent);
     }
 }
 .shader-gui-glow {
@@ -1833,9 +1826,9 @@ dialog.mobile-nav[open]::backdrop {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     box-shadow:
-        0 0 0 1px rgb(var(--color-primary-rgb) / 0.06),
+        0 0 0 1px color-mix(in srgb, var(--color-primary) 6%, transparent),
         0 8px 32px rgba(0, 0, 0, 0.6),
-        0 0 60px rgb(var(--color-primary-rgb) / 0.05);
+        0 0 60px color-mix(in srgb, var(--color-primary) 5%, transparent);
     animation: modal-in 220ms var(--ease-out) both;
     overflow: hidden;
 }
@@ -2148,7 +2141,7 @@ dialog.mobile-nav[open]::backdrop {
         border-color var(--transition-fast);
 }
 .shader-control__share-btn:hover {
-    background: var(--color-secondary-dim, rgb(var(--color-secondary-rgb) / 0.1));
+    background: var(--color-secondary-dim);
 }
 
 /* ── Homepage shader demo ────────────────────────────────────── */
@@ -2400,7 +2393,7 @@ dialog.mobile-nav[open]::backdrop {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     box-shadow:
-        0 0 0 1px rgb(var(--color-primary-rgb) / 0.06),
+        0 0 0 1px color-mix(in srgb, var(--color-primary) 6%, transparent),
         0 8px 32px rgba(0, 0, 0, 0.6);
     animation: modal-in 200ms var(--ease-out) both;
 }
@@ -2553,7 +2546,7 @@ dialog.mobile-nav[open]::backdrop {
 .shader-demo__controls,
 .shader-gui {
     scrollbar-width: thin;
-    scrollbar-color: rgb(var(--color-primary-rgb) / 0.25) transparent;
+    scrollbar-color: color-mix(in srgb, var(--color-primary) 25%, transparent) transparent;
 }
 .shader-demo__controls::-webkit-scrollbar,
 .shader-gui::-webkit-scrollbar {
@@ -2565,12 +2558,12 @@ dialog.mobile-nav[open]::backdrop {
 }
 .shader-demo__controls::-webkit-scrollbar-thumb,
 .shader-gui::-webkit-scrollbar-thumb {
-    background: rgb(var(--color-primary-rgb) / 0.25);
+    background: color-mix(in srgb, var(--color-primary) 25%, transparent);
     border-radius: 9999px;
 }
 .shader-demo__controls::-webkit-scrollbar-thumb:hover,
 .shader-gui::-webkit-scrollbar-thumb:hover {
-    background: rgb(var(--color-primary-rgb) / 0.5);
+    background: color-mix(in srgb, var(--color-primary) 50%, transparent);
 }
 
 /* ── Scroll shadows ─────────────────────────────────────────── */
@@ -2603,7 +2596,7 @@ dialog.mobile-nav[open]::backdrop {
     bottom: 10px;
     left: 50%;
     transform: translateX(-50%);
-    color: rgb(var(--color-primary-rgb) / 0.65);
+    color: color-mix(in srgb, var(--color-primary) 65%, transparent);
     font-size: 1.4rem;
     opacity: 0;
     transition: opacity 0.3s;
@@ -2611,7 +2604,7 @@ dialog.mobile-nav[open]::backdrop {
 }
 .is-scrollable-bottom:not(.has-scrolled) > .scroll-shadow--bottom::after {
     opacity: 1;
-    color: rgb(var(--color-primary-rgb) / 0.9);
+    color: color-mix(in srgb, var(--color-primary) 90%, transparent);
     font-size: 1.7rem;
 }
 .is-scrollable-bottom.has-scrolled > .scroll-shadow--bottom::after {
@@ -3121,7 +3114,7 @@ dialog.mobile-nav[open]::backdrop {
     grid-template-columns: 1fr;
     gap: 2rem;
 }
-@media (min-width: 768px) {
+@media (min-width: 769px) {
     .designs-row {
         grid-template-columns: 1fr 1fr;
         align-items: start;
