@@ -21,7 +21,7 @@
     layout spacing where this is used).
 
   @example
-  {% render 'star-rating', average: product.metafields.custom.review_average.value, count: product.metafields.custom.review_count.value | default: 0 %}
+  {% render 'star-rating', average: product.metafields.custom.review_average.value, count: product.metafields.custom.review_count.value %}
   {% render 'star-rating', average: entry.rating, count: 1, hide_count: true %}
 {% enddoc %}
 
