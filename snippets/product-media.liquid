@@ -1,0 +1,139 @@
+{% doc %}
+  Product page media column: image gallery, the shader canvas and Customize
+  tab, and the Preview on Shirt mockup modal.
+
+  @param {product} product
+  @param {string} [shader_file] - Shader name from the product's shader-* tag
+  @param {boolean} is_community_design
+  @param {string} [submission_id] - Community submission id, blank otherwise
+{% enddoc %}
+{%- assign mockup_url = product.metafields.custom.mockup_url | default: '' -%}
+<div class="product-media">
+
+  <!-- Photo panel -->
+  <div class="media-panel is-active" data-panel="photo">
+    <div class="product-media__main">
+      {%- if product.featured_image -%}
+        <img
+          src="{{ product.featured_image | image_url: width: 900 }}"
+          alt="{{ product.featured_image.alt | escape }}"
+          class="product-media__image"
+          width="900"
+          height="900"
+        >
+      {%- endif -%}
+    </div>
+    {%- if product.images.size > 1 or mockup_url != blank -%}
+      <div class="product-media__thumbs">
+        {%- for image in product.images -%}
+          <img
+            src="{{ image | image_url: width: 150 }}"
+            alt="{{ image.alt | escape }}"
+            class="product-thumb{% if forloop.first %} is-active{% endif %}"
+            data-full="{{ image | image_url: width: 900 }}"
+            loading="lazy"
+            width="150"
+            height="150"
+          >
+        {%- endfor -%}
+        {%- if mockup_url != blank -%}
+          <img
+            src="{{ mockup_url }}"
+            alt="Shirt preview"
+            class="product-thumb"
+            data-full="{{ mockup_url }}"
+            loading="lazy"
+            width="150"
+            height="150"
+          >
+        {%- endif -%}
+      </div>
+    {%- endif -%}
+  </div>
+
+  {%- comment -%}
+    No size is preselected — the shopper must explicitly choose one
+    (validated on submit below). With a no-returns policy, an
+    accidental default-size order is a straight loss. An explicit
+    ?variant= deep link (product.selected_variant) still wins, since
+    that reflects an intentional choice rather than a default.
+    default_variant is used only where a variant value is structurally
+    required (price display, single-variant products) — never to mark
+    a size as pre-checked.
+  {%- endcomment -%}
+  {%- assign default_variant = product.selected_or_first_available_variant -%}
+  {%- assign preselected_variant = product.selected_variant -%}
+
+  <!-- Shader panel — only shown when product has a shader-[file] tag -->
+  {%- if shader_file -%}
+  <div class="media-panel" data-panel="shader">
+    <canvas id="shader-canvas" class="product-shader__canvas{% if shader_file == 'stacked-gradient' %} product-shader__canvas--square{% endif %}"{% if is_community_design and submission_id != blank %} style="opacity:0"{% endif %}></canvas>
+    <!-- Mockup modal -->
+    <div id="mockup-modal" class="mockup-modal mockup-modal--hidden">
+      <div class="mockup-modal__backdrop"></div>
+      <div class="mockup-modal__box">
+        <div class="mockup-modal__header">
+          <span class="mockup-modal__title">Shirt Preview</span>
+          <button class="mockup-modal__close" id="mockup-modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="mockup-modal__body">
+          <img id="mockup-modal-img" class="mockup-modal__img" src="" alt="Shirt preview">
+        </div>
+        <div class="mockup-modal__footer">
+          {%- if product.variants.size > 1 -%}
+            <div class="mockup-modal__size">
+              <label class="mockup-modal__size-label" for="mockup-size-select">Size</label>
+              <select id="mockup-size-select" class="mockup-modal__size-select">
+                <option value="" selected disabled>Select a size</option>
+                {%- for variant in product.variants -%}
+                  <option
+                    value="{{ variant.id }}"
+                    data-price="{{ variant.price | money | escape }}"
+                    {% if preselected_variant and variant.id == preselected_variant.id %}selected{% endif %}
+                    {% unless variant.available %}disabled{% endunless %}
+                  >
+                    {{ variant.title }}
+                  </option>
+                {%- endfor -%}
+              </select>
+            </div>
+          {%- endif -%}
+          <div class="mockup-modal__footer-actions">
+            <span class="mockup-modal__price" id="mockup-modal-price">{{ default_variant.price | money }}</span>
+            <button id="mockup-modal-order" class="btn btn--primary btn--sm btn--full">Add to Cart</button>
+          </div>
+          <p class="mockup-modal__order-status" id="mockup-order-status" role="status" aria-live="polite"></p>
+
+          <!-- Shown only after a successful add-to-cart — gallery submission is
+               secondary to the sale, so it only appears once the purchase path
+               is already complete, never competing with Add to Cart. -->
+          <div class="mockup-modal__success" id="mockup-modal-success" style="display:none">
+            <p class="mockup-modal__success-message">Added to your cart.</p>
+            <button class="btn btn--primary btn--sm btn--full" id="mockup-modal-continue">Continue to Cart</button>
+            <div class="mockup-modal__gallery-ask">
+              <button class="btn btn--ghost btn--sm btn--full" id="community-toggle">Submit this design to the gallery (optional)</button>
+              <div class="mockup-modal__community">
+                <div class="mockup-modal__community-form" id="community-form" style="display:none">
+                  <p class="mockup-modal__community-note">Share this design to the community gallery so others can get inspired by it.</p>
+                  <input type="text" id="community-name" class="mockup-modal__community-input" placeholder="Your name (displayed publicly)">
+                  <input type="email" id="community-email" class="mockup-modal__community-input" placeholder="Email (kept private)">
+                  <button class="btn btn--primary btn--sm" id="community-submit">Submit</button>
+                  <p class="mockup-modal__community-error" id="community-error" style="display:none">Submission failed. Please try again.</p>
+                  <p class="mockup-modal__community-note">Designs are reviewed before appearing publicly.</p>
+                </div>
+                <p class="mockup-modal__community-success" id="community-success" style="display:none">
+                  Submitted! Your design will appear after review.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- In-house design assistant: built entirely by JS (see below) and only
+         when ?new-inhouse-design is present, so the internal deploy workflow
+         it describes never ships in the page's rendered HTML/DOM. -->
+  </div>
+  {%- endif -%}
+
+</div>
