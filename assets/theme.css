@@ -30,8 +30,8 @@
     --color-error-dim: rgba(255, 107, 122, 0.12);
     --color-error-border: rgba(255, 107, 122, 0.35);
 
-    --font-heading: "Poppins", system-ui, sans-serif;
     --font-body: "Poppins", system-ui, sans-serif;
+    --font-heading: var(--font-body);
     --tracking-tight: -0.04em;        /* Figma body/heading letter-spacing -4% */
 
     /* 12/8/4-column grid: 120px margins at 1440, 48px on tablet, 20px on
@@ -1488,8 +1488,8 @@ dialog.mobile-nav[open]::backdrop {
 
 .mobile-nav__close {
     position: absolute;
-    top: 20px;
-    right: 20px;
+    top: var(--container-padding);
+    right: var(--container-padding);
     background: none;
     border: none;
     padding: 0;

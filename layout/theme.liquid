@@ -2,6 +2,8 @@
 <html lang="{{ request.locale.iso_code }}">
   <head>
     <meta charset="UTF-8">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>
       {%- if page_title == blank -%}{{ shop.name }}{%- else -%}{{ page_title }} &ndash; {{ shop.name }}{%- endif -%}
@@ -57,8 +59,6 @@
 
     {%- render 'analytics' -%}
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;family=Anton&amp;family=Bebas+Neue&amp;family=Playfair+Display:wght@900&amp;family=Oswald:wght@400;700&amp;family=Orbitron:wght@900&amp;family=Teko:wght@700&amp;family=Righteous&amp;family=Russo+One&amp;family=Big+Shoulders+Display:wght@400;700;900&amp;family=Space+Mono:wght@400;700&amp;family=Roboto+Mono:wght@400;500;700&amp;family=Source+Code+Pro:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;family=Fira+Code:wght@300;400;500;700&amp;family=Inconsolata:wght@400;500;700&amp;family=Courier+Prime:wght@400;700&amp;family=Share+Tech+Mono:wght@400&amp;family=Cutive+Mono:wght@400&amp;family=DM+Mono:wght@300;400;500&amp;family=Fragment+Mono:wght@400&amp;family=Azeret+Mono:wght@400;500;700&amp;family=Spline+Sans+Mono:wght@400;500;700&amp;family=Geist+Mono:wght@400;500;700&amp;family=Syne:wght@400;500;700&amp;family=Unbounded:wght@400;500;700&amp;family=Bricolage+Grotesque:wght@400;500;700&amp;family=Epilogue:wght@400;500;700&amp;family=DM+Sans:wght@400;500;700&amp;family=Montserrat:wght@400;500;700&amp;display=swap">
     {{ 'theme.css' | asset_url | stylesheet_tag }}
   </head>
