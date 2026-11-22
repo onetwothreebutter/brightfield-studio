@@ -1,17 +1,12 @@
-// Product page: in-house design assistant (internal tool).
-// Moved verbatim out of sections/main-product.liquid; Liquid values come from
-// window.BFProduct (the #bf-product-config JSON, parsed in product-page.js,
-// which loads first).
-
-(function () {
-var cfg = window.BFProduct;
+// Product page: the in-house design assistant, an internal tool that only
+// opens after ?new-inhouse-design has been visited in this browser.
 
 // ── In-house design assistant ─────────────────────────────────────────────────
 // Internal tool for building in-house design product listings. Its markup is
 // only ever created here in JS (never server-rendered) and only past the gate
 // below, so the deploy instructions it contains don't ship in the page's HTML
 // for ordinary shoppers, crawlers, or text-extraction tools to find.
-(function () {
+(function (cfg) {
   var LS_KEY = 'inhouse-design-assistant-enabled';
   if (new URLSearchParams(location.search).has('new-inhouse-design')) {
     localStorage.setItem(LS_KEY, '1');
@@ -114,6 +109,4 @@ var cfg = window.BFProduct;
   }, 1000);
 
   open();
-}());
-
-}());
+}(window.BFProduct));

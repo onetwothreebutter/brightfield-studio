@@ -1,5 +1,6 @@
 {%- assign shader_file = nil -%}
 {%- assign is_community_design = false -%}
+{%- assign submission_id = '' -%}
 {%- for tag in product.tags -%}
   {%- assign tag_prefix = tag | slice: 0, 7 -%}
   {%- if tag_prefix == 'shader-' -%}
@@ -61,13 +62,7 @@
         {%- endif -%}
       </div>
 
-      {%- comment -%}
-        submission_id is deliberately not passed: on main it was assigned
-        further down the page than the canvas, so the canvas's community-design
-        opacity:0 hold never rendered. Passing it would change that behaviour,
-        which is out of scope for this refactor.
-      {%- endcomment -%}
-      {%- render 'product-media', product: product, shader_file: shader_file, is_community_design: is_community_design -%}
+      {%- render 'product-media', product: product, shader_file: shader_file -%}
 
       {%- render 'product-info', product: product, shader_file: shader_file, is_community_design: is_community_design, submission_id: submission_id -%}
 
@@ -91,26 +86,33 @@
   </div>
 </div>
 
-<script type="application/json" id="bf-product-config">
-{
-  "currency": {{ shop.currency | json }},
-  "productTitle": {{ product.title | json }},
-  "productHandle": {{ product.handle | json }},
-  "variant": {
-    "id": {{ product.selected_or_first_available_variant.id | json }},
-    "title": {{ product.selected_or_first_available_variant.title | json }},
-    "price": {{ product.selected_or_first_available_variant.price | divided_by: 100.0 | json }}
-  },
-  "shader": {{ shader_file | json }},
-  "submissionId": {{ submission_id | default: '' | json }},
-  "holdReveal": {% if is_community_design and submission_id != blank %}true{% else %}false{% endif %}
-}
+{%- comment -%}
+  The only Liquid the product scripts need. Set inline so it exists before any
+  deferred product-*.js runs. `</` is escaped in merchant-entered strings so a
+  title can't close this <script> (same defence as structured-data.liquid).
+{%- endcomment -%}
+<script>
+  window.BFProduct = {
+    currency: {{ shop.currency | json }},
+    productTitle: {{ product.title | json | replace: '</', '<\/' }},
+    productHandle: {{ product.handle | json }},
+    variant: {
+      id: {{ product.selected_or_first_available_variant.id | json }},
+      title: {{ product.selected_or_first_available_variant.title | json | replace: '</', '<\/' }},
+      price: {{ product.selected_or_first_available_variant.price | divided_by: 100.0 | json }}
+    },
+    shader: {{ shader_file | json }},
+    submissionId: {{ submission_id | json }}
+  };
 </script>
 
 {%- if shader_file -%}
 <script>
-// The shader's control definition. Rendered inline because the snippets are
-// Liquid; assets/product-shader-gui.js builds the panel from what this exposes.
+// The shader's control definition, rendered inline because the snippets are
+// Liquid. Same contract as register() in scripts/build-shader-defs.mjs: the
+// snippets expect `body` (the panel; chladni appends to it) and the base
+// snippet's helpers in scope, and define `controls` and maybe
+// `customAfterBuild`. assets/product-shader-gui.js builds the panel from this.
 window.BFShaderDef = (function () {
   var body = document.getElementById('shader-gui-body');
   if (!body) return null;
@@ -136,12 +138,7 @@ window.BFShaderDef = (function () {
     body: body,
     controls: controls,
     customAfterBuild: typeof customAfterBuild === 'function' ? customAfterBuild : null,
-    lib: {
-      COSINE_PRESETS: COSINE_PRESETS, FOUR_STOP_PRESETS: FOUR_STOP_PRESETS,
-      vividHex: vividHex, cosinePresetGradient: cosinePresetGradient,
-      fourStopPresetGradient: fourStopPresetGradient, applyColors: applyColors,
-      toHex: toHex, hexToRgb: hexToRgb
-    }
+    lib: ShaderLib
   };
 }());
 </script>
@@ -153,6 +150,7 @@ window.BFShaderDef = (function () {
 {%- endif -%}
 <script src="{{ 'product-design-assistant.js' | asset_url }}" defer></script>
 {%- if shader_file -%}
+<script src="{{ 'product-customize.js' | asset_url }}" defer></script>
 <script src="{{ 'product-shader-gui.js' | asset_url }}" defer></script>
 <script src="{{ 'product-preview-shirt.js' | asset_url }}" defer></script>
 

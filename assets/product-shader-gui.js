@@ -1,31 +1,26 @@
-// Product page: the shader control panel (definition comes from window.BFShaderDef, rendered inline by the section).
-// Moved verbatim out of sections/main-product.liquid; Liquid values come from
-// window.BFProduct (the #bf-product-config JSON, parsed in product-page.js,
-// which loads first).
-
-(function () {
-var cfg = window.BFProduct;
+// Product page, shader products only: the Customize control panel, plus
+// randomize, share links and restoring saved or community designs. The
+// control definitions come from window.BFShaderDef (rendered inline by the
+// section); Liquid values from window.BFProduct.
 
 // ── Shader GUI ────────────────────────────────────────────────────────────────
-(function () {
+(function (cfg) {
   var def = window.BFShaderDef;
   if (!def) return;
   var body = def.body;
   var controls = def.controls;
   var customAfterBuild = def.customAfterBuild;
-  var COSINE_PRESETS = def.lib.COSINE_PRESETS, FOUR_STOP_PRESETS = def.lib.FOUR_STOP_PRESETS,
-      vividHex = def.lib.vividHex, cosinePresetGradient = def.lib.cosinePresetGradient,
-      fourStopPresetGradient = def.lib.fourStopPresetGradient, applyColors = def.lib.applyColors,
-      toHex = def.lib.toHex, hexToRgb = def.lib.hexToRgb;
+  var lib = def.lib;
 
   // Initialise shared state — shader.js reads this each frame
   var values = {};
   controls.forEach(function (c) {
     if (!c.key) return;
-    values[c.key] = c.type === 'color' ? hexToRgb(c.value, c.key) : (c.toRadians ? c.value * Math.PI / 180 : c.value);
+    values[c.key] = c.type === 'color' ? lib.hexToRgb(c.value, c.key) : (c.toRadians ? c.value * Math.PI / 180 : c.value);
   });
   window._shaderState = { values: values, textDirty: true };
-  if (cfg.holdReveal) window._shaderState.holdReveal = true;
+  // A community design stays hidden until its saved values are restored.
+  if (cfg.submissionId) window._shaderState.holdReveal = true;
 
   // Pre-populate restore key from ?bfr= share param (set by Worker share page)
   (function () {
@@ -201,7 +196,7 @@ var cfg = window.BFProduct;
 
       picker.addEventListener('input', function () {
         if (this.value.length < 7) return;
-        window._shaderState.values[ctrl.key] = hexToRgb(this.value, ctrl.key);
+        window._shaderState.values[ctrl.key] = lib.hexToRgb(this.value, ctrl.key);
         if (ctrl.textDirty) window._shaderState.textDirty = true;
       });
 
@@ -258,8 +253,8 @@ var cfg = window.BFProduct;
         sel.tabIndex = -1;
         sel.setAttribute('aria-hidden', 'true');
 
-        var presetsMap  = ctrl.swatchPreview === 'fourstop' ? FOUR_STOP_PRESETS : COSINE_PRESETS;
-        var gradientFor = ctrl.swatchPreview === 'fourstop' ? fourStopPresetGradient : cosinePresetGradient;
+        var presetsMap  = ctrl.swatchPreview === 'fourstop' ? lib.FOUR_STOP_PRESETS : lib.COSINE_PRESETS;
+        var gradientFor = ctrl.swatchPreview === 'fourstop' ? lib.fourStopPresetGradient : lib.cosinePresetGradient;
 
         var swatchScroll = document.createElement('div');
         swatchScroll.className = 'shader-control__swatch-scroll';
@@ -446,7 +441,7 @@ var cfg = window.BFProduct;
               inp.dispatchEvent(new Event('change', { bubbles: true }));
             }
           });
-          if (colorPairs.length) applyColors(colorPairs);
+          if (colorPairs.length) lib.applyColors(colorPairs);
           window._shaderState.snapValues = true;
           window._shaderState.holdReveal = false;
           window._shaderState.textDirty = true;
@@ -722,7 +717,7 @@ var cfg = window.BFProduct;
         window._shaderState.values[ctrl.key] = isOn ? 1 : 0;
 
       } else if (ctrl.type === 'color') {
-        var hex = vividHex(Math.random());
+        var hex = lib.vividHex(Math.random());
         el.value = hex;
         el.dispatchEvent(new Event('input', { bubbles: true }));
 
@@ -757,7 +752,7 @@ var cfg = window.BFProduct;
     var out = {};
     Object.keys(values).forEach(function (k) {
       var v = values[k];
-      out[k] = Array.isArray(v) ? toHex(v, k) : v;
+      out[k] = Array.isArray(v) ? lib.toHex(v, k) : v;
     });
     return btoa(JSON.stringify(out)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
@@ -770,7 +765,7 @@ var cfg = window.BFProduct;
     controlEls.forEach(function (item) {
       var k = item.ctrl.key;
       if (!(k in obj)) return;
-      result[k] = (item.ctrl.type === 'color') ? hexToRgb(obj[k], k) : obj[k];
+      result[k] = (item.ctrl.type === 'color') ? lib.hexToRgb(obj[k], k) : obj[k];
     });
     return result;
   }
@@ -797,7 +792,7 @@ var cfg = window.BFProduct;
         window._shaderState.values[k] = v;
 
       } else if (ctrl.type === 'color') {
-        el.value = toHex(v, k);
+        el.value = lib.toHex(v, k);
         window._shaderState.values[k] = v;
 
       } else {
@@ -840,7 +835,7 @@ var cfg = window.BFProduct;
           controlEls.forEach(function (item) {
             var k = item.ctrl.key;
             if (!(k in state)) return;
-            restored[k] = (item.ctrl.type === 'color') ? hexToRgb(state[k], k) : state[k];
+            restored[k] = (item.ctrl.type === 'color') ? lib.hexToRgb(state[k], k) : state[k];
           });
           applyRestoredState(restored);
           history.replaceState(null, '', cleanUrl);
@@ -991,6 +986,4 @@ var cfg = window.BFProduct;
     });
   };
   document.head.appendChild(clrScript);
-}());
-
-}());
+}(window.BFProduct));

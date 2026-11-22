@@ -1,13 +1,8 @@
-// Product page: Preview on Shirt and the custom-design add to cart.
-// Moved verbatim out of sections/main-product.liquid; Liquid values come from
-// window.BFProduct (the #bf-product-config JSON, parsed in product-page.js,
-// which loads first).
-
-(function () {
-var cfg = window.BFProduct;
+// Product page, shader products only: Preview on Shirt and the custom-design
+// add to cart. Liquid values come from window.BFProduct.
 
 // ── Preview on Shirt ──────────────────────────────────────────────────────────
-(function () {
+(function (cfg) {
   var btn           = document.getElementById('shader-preview-btn');
   var modal         = document.getElementById('mockup-modal');
   var modalImg      = document.getElementById('mockup-modal-img');
@@ -631,6 +626,4 @@ var cfg = window.BFProduct;
         });
     });
   }
-}());
-
-}());
+}(window.BFProduct));

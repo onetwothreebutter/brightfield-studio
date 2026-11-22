@@ -103,21 +103,8 @@ ${indent(indent(snippet('shader-controls-' + name)))}
   }
 
   parts.push(`
-    window.ShaderDefs = {
-      SHADERS: SHADERS,
-      SHADER_FONTS: SHADER_FONTS,
-      COSINE_PRESETS: COSINE_PRESETS,
-      FOUR_STOP_PRESETS: FOUR_STOP_PRESETS,
-      FINISH_CONTROLS: FINISH_CONTROLS,
-      FINISH_CONTROLS_PRE: FINISH_CONTROLS_PRE,
-      FINISH_CONTROLS_POST: FINISH_CONTROLS_POST,
-      PALETTE_COEFF_KEYS: PALETTE_COEFF_KEYS,
-      srgbToLinear: srgbToLinear,
-      linearToSrgb: linearToSrgb,
-      hexToRgb: hexToRgb,
-      toHex: toHex,
-      vividHex: vividHex
-    };
+    // ShaderLib is defined at the end of shader-controls-base.liquid.
+    window.ShaderDefs = Object.assign({ SHADERS: SHADERS }, ShaderLib);
 }());
 `);
 
