@@ -41,7 +41,7 @@
       <h3 class="product-card__title">{{ product.title | escape }}</h3>
       {%- render 'star-rating',
         average: product.metafields.custom.review_average.value,
-        count: product.metafields.custom.review_count.value | default: 0,
+        count: product.metafields.custom.review_count.value,
         class: 'product-card__rating'
       -%}
       <p class="product-card__price">
